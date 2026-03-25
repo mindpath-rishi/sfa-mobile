@@ -1,0 +1,39 @@
+{
+  "common": {
+    "appTitle": "SFA",
+    "ok": "ٹھیک ہے",
+    "logout": "لاگ آؤٹ"
+  },
+
+  "auth": {
+    "login": {
+      "appSubtitle": "اپنے ورک اسپیس تک محفوظ رسائی",
+      "title": "سائن اِن",
+      "userIdLabel": "یوزر آئی ڈی",
+      "userIdPlaceholder": "اپنی یوزر آئی ڈی درج کریں",
+      "passwordLabel": "پاس ورڈ",
+      "passwordPlaceholder": "اپنا پاس ورڈ درج کریں",
+      "passwordHelper": "کم از کم 6 حروف",
+      "forgotPassword": "پاس ورڈ بھول گئے؟",
+      "signingIn": "سائن اِن ہو رہا ہے...",
+      "validationError": "ویلیڈیشن ایرر",
+      "checkForm": "براہ کرم فارم کی غلطیاں چیک کریں",
+      "welcomeBack": "واپس خوش آمدید!",
+      "loginSuccess": "لاگ اِن کامیاب!",
+      "loginFailed": "لاگ اِن ناکام",
+      "invalidCredentials": "غلط معلومات۔ دوبارہ کوشش کریں۔",
+      "forgotTitle": "پاس ورڈ بھول گئے؟",
+      "forgotMessage": "براہ کرم پاس ورڈ ری سیٹ کرنے کے لیے اپنے ایڈمن سے رابطہ کریں۔"
+    }
+  },
+
+  "settings": {
+    "title": "سیٹنگز",
+    "themeMode": "تھیم موڈ",
+    "language": "زبان",
+    "english": "انگریزی",
+    "hindi": "ہندی",
+    "urdu": "اردو",
+    "arabic": "عربی"
+  }
+}

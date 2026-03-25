@@ -1,0 +1,7 @@
+export enum AppErrorType {
+  NETWORK = 'NETWORK',
+  SERVER = 'SERVER',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  NOT_FOUND = 'NOT_FOUND',
+  UNKNOWN = 'UNKNOWN',
+}

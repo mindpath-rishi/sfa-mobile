@@ -1,0 +1,217 @@
+// components/SalesSummary/constants.ts
+import { Product } from '@/features/product';
+
+export const UNITS_PER_CASE = 12;
+export const TAX_RATE = 0.16;
+
+export const MOCK_PRODUCTS: Product[] = [
+  {
+    id: '1',
+    name: 'A601-ALOHA HOUSEHOLD 6 IN 1 BUCKET',
+    sku: '36413',
+    category: 'Household',
+    subCategory: 'Cleaning',
+    brand: 'Aloha',
+    description:
+      '6 in 1 household cleaning bucket - multipurpose cleaning solution for all household needs',
+    price: 26.67,
+    mrp: 29.99,
+    discount: 0,
+    unit: 'piece',
+    stock: 10,
+    minStock: 5,
+    maxStock: 100,
+    status: 'in_stock',
+    image: null,
+    tags: ['bestseller', 'new', 'household'],
+    variants: [],
+    scheme: null,
+    margin: 0.15,
+    gst: 0.16,
+    hsn: '39249090',
+    manufacturer: 'Aloha Industries',
+    expiryDate: '2025-12-31',
+    ratings: 4.5,
+    reviews: 128,
+    lastOrdered: '2024-01-15',
+    reorderPoint: 8,
+  },
+  {
+    id: '2',
+    name: 'DWB-DR. WASH SOAP BLUE 20 X 300G',
+    sku: '28073',
+    category: 'Soap',
+    subCategory: 'Personal Care',
+    brand: 'Dr. Wash',
+    description: 'Blue washing soap 20 x 300g - effective cleaning for tough stains',
+    price: 12.5,
+    mrp: 14.99,
+    discount: 0,
+    unit: 'piece',
+    stock: 15,
+    minStock: 10,
+    maxStock: 150,
+    status: 'in_stock',
+    image: null,
+    tags: ['popular', 'soap', 'cleaning'],
+    variants: [],
+    scheme: null,
+    margin: 0.12,
+    gst: 0.16,
+    hsn: '34011190',
+    manufacturer: 'Dr. Wash Laboratories',
+    expiryDate: '2026-06-30',
+    ratings: 4.2,
+    reviews: 89,
+    lastOrdered: '2024-02-20',
+    reorderPoint: 15,
+  },
+  {
+    id: '3',
+    name: 'PREMIUM DISPOSABLE GLOVES MEDIUM 100PCS',
+    sku: '28074',
+    category: 'Safety',
+    subCategory: 'Protective Gear',
+    brand: 'SafeGuard',
+    description: 'Premium quality disposable gloves, powder-free, medium size, 100 pieces per box',
+    price: 45.99,
+    mrp: 59.99,
+    discount: 5,
+    unit: 'box',
+    stock: 25,
+    minStock: 8,
+    maxStock: 200,
+    status: 'in_stock',
+    image: null,
+    tags: ['safety', 'medical', 'disposable'],
+    variants: [],
+    scheme: 'Buy 5 Get 1 Free',
+    margin: 0.2,
+    gst: 0.16,
+    hsn: '40151900',
+    manufacturer: 'SafeGuard Medical Supplies',
+    expiryDate: '2027-01-15',
+    ratings: 4.7,
+    reviews: 234,
+    lastOrdered: '2024-02-28',
+    reorderPoint: 12,
+  },
+  {
+    id: '4',
+    name: 'ORGANIC COCONUT OIL 500ML',
+    sku: '28075',
+    category: 'Food',
+    subCategory: 'Cooking Oils',
+    brand: 'PureNature',
+    description: 'Cold-pressed organic coconut oil, ideal for cooking and skin care',
+    price: 18.75,
+    mrp: 24.99,
+    discount: 10,
+    unit: 'bottle',
+    stock: 8,
+    minStock: 5,
+    maxStock: 80,
+    status: 'low_stock',
+    image: null,
+    tags: ['organic', 'cooking', 'natural'],
+    variants: [],
+    scheme: '10% off on 2+',
+    margin: 0.18,
+    gst: 0.05,
+    hsn: '15131100',
+    manufacturer: 'PureNature Organics',
+    expiryDate: '2025-08-30',
+    ratings: 4.8,
+    reviews: 312,
+    lastOrdered: '2024-02-10',
+    reorderPoint: 10,
+  },
+  {
+    id: '5',
+    name: 'STAINLESS STEEL WATER BOTTLE 1L',
+    sku: '28076',
+    category: 'Kitchen',
+    subCategory: 'Drinkware',
+    brand: 'EcoLife',
+    description:
+      'Double-wall insulated stainless steel water bottle, keeps drinks cold for 24 hours',
+    price: 32.5,
+    mrp: 45.0,
+    discount: 0,
+    unit: 'piece',
+    stock: 0,
+    minStock: 10,
+    maxStock: 120,
+    status: 'out_of_stock',
+    image: null,
+    tags: ['eco-friendly', 'insulated', 'bottle'],
+    variants: [],
+    scheme: null,
+    margin: 0.25,
+    gst: 0.16,
+    hsn: '73239390',
+    manufacturer: 'EcoLife Products',
+    expiryDate: '2028-12-31',
+    ratings: 4.4,
+    reviews: 167,
+    lastOrdered: '2024-01-05',
+    reorderPoint: 15,
+  },
+  {
+    id: '6',
+    name: 'MICROFIBER CLEANING CLOTH 5PK',
+    sku: '28077',
+    category: 'Household',
+    subCategory: 'Cleaning',
+    brand: 'CleanMaster',
+    description: 'Set of 5 premium microfiber cleaning cloths, lint-free, reusable',
+    price: 15.99,
+    mrp: 19.99,
+    discount: 5,
+    unit: 'pack',
+    stock: 42,
+    minStock: 15,
+    maxStock: 300,
+    status: 'in_stock',
+    image: null,
+    tags: ['cleaning', 'microfiber', 'household'],
+    variants: [],
+    scheme: 'Buy 3 Get 10% Off',
+    margin: 0.22,
+    gst: 0.16,
+    hsn: '63071010',
+    manufacturer: 'CleanMaster Textiles',
+    expiryDate: '2026-12-31',
+    ratings: 4.6,
+    reviews: 445,
+    lastOrdered: '2024-03-01',
+    reorderPoint: 20,
+  },
+];
+
+// Helper function to get products by status
+export const getProductsByStatus = (status: Product['status']) => {
+  return MOCK_PRODUCTS.filter((product) => product.status === status);
+};
+
+// Helper function to get products by category
+export const getProductsByCategory = (category: string) => {
+  return MOCK_PRODUCTS.filter((product) => product.category === category);
+};
+
+// Helper function to get low stock products
+export const getLowStockProducts = () => {
+  return MOCK_PRODUCTS.filter((product) => product.stock <= product.reorderPoint);
+};
+
+// Helper function to search products
+export const searchProducts = (query: string) => {
+  const searchTerm = query.toLowerCase();
+  return MOCK_PRODUCTS.filter(
+    (product) =>
+      product.name.toLowerCase().includes(searchTerm) ||
+      product.sku.toLowerCase().includes(searchTerm) ||
+      product.brand.toLowerCase().includes(searchTerm) ||
+      product.category.toLowerCase().includes(searchTerm),
+  );
+};
