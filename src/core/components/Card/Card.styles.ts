@@ -13,20 +13,45 @@ export const useCardStyles = (props: CardStyleProps) => {
     pressed = false,
     isHovered = false,
     scaleOnPress = true,
+    selected = false,
   } = props;
   const { colors } = useTheme();
+
+  // Helper to get color based on selected variant
+  const getSelectedColor = () => {
+    switch (variant) {
+      case 'primary':
+        return colors.primary;
+      case 'success':
+        return colors.success || '#4CAF50';
+      case 'warning':
+        return colors.warning || '#FF9800';
+      case 'danger':
+        return colors.error || '#F44336';
+      case 'info':
+        return colors.info || '#2196F3';
+      default:
+        return colors.primary;
+    }
+  };
 
   const styleGenerator = createStyles((utils: StyleUtils) => {
     // Get background color based on variant and state
     const getBackgroundColor = (): string => {
-      if (disabled) return colors.border;
+      if (disabled) return colors.border + '50';
+
+      // Selected state styles
+      if (selected) {
+        const selectedColor = getSelectedColor();
+        return selectedColor + '10';
+      }
 
       if (pressed) {
         switch (variant) {
           case 'elevated':
             return colors.surface;
           case 'outlined':
-            return colors.surface;
+            return colors.surface + '80';
           case 'filled':
             return colors.surface;
           case 'ghost':
@@ -44,7 +69,7 @@ export const useCardStyles = (props: CardStyleProps) => {
         case 'elevated':
           return colors.card;
         case 'outlined':
-          return colors.card;
+          return 'transparent';
         case 'filled':
           return colors.surface;
         case 'ghost':
@@ -56,7 +81,13 @@ export const useCardStyles = (props: CardStyleProps) => {
 
     // Get border color based on variant and state
     const getBorderColor = (): string => {
-      if (disabled) return colors.border;
+      if (disabled) return colors.border + '50';
+
+      // Selected state styles
+      if (selected) {
+        return getSelectedColor();
+      }
+
       if (pressed && variant === 'outlined') return colors.primary;
 
       switch (variant) {
@@ -67,9 +98,30 @@ export const useCardStyles = (props: CardStyleProps) => {
       }
     };
 
+    // Get border width based on variant and state
+    const getBorderWidth = (): number => {
+      if (selected) return 2;
+      if (variant === 'outlined') return 1;
+      return 0;
+    };
+
     // Get shadow/elevation based on variant and state
     const getShadow = (): ViewStyle => {
-      if (disabled || variant !== 'elevated') return {};
+      if (disabled) return {};
+
+      // Selected state shadow
+      if (selected) {
+        const selectedColor = getSelectedColor();
+        return {
+          shadowColor: selectedColor,
+          shadowOffset: { width: 0, height: pressed ? 4 : 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: pressed ? 8 : 6,
+          elevation: pressed ? 6 : 4,
+        };
+      }
+
+      if (variant !== 'elevated') return {};
 
       const baseElevation = pressed ? 4 : 2;
       const baseOpacity = pressed ? 0.15 : 0.1;
@@ -116,11 +168,21 @@ export const useCardStyles = (props: CardStyleProps) => {
       container: {
         backgroundColor: getBackgroundColor(),
         borderColor: getBorderColor(),
-        borderWidth: variant === 'outlined' ? 1 : 0,
+        borderWidth: getBorderWidth(),
         borderRadius,
         padding: paddingValue,
         overflow: 'hidden',
         ...getShadow(),
+        transition: 'all 0.2s ease-in-out',
+      } as ViewStyle,
+
+      selectedContainer: {
+        borderWidth: 2,
+        ...(variant === 'elevated' && {
+          shadowOpacity: 0.25,
+          shadowRadius: 6,
+          elevation: 5,
+        }),
       } as ViewStyle,
 
       pressedScale: {

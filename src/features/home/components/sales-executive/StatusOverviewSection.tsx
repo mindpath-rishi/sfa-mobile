@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, ScrollView } from 'react-native';
 import { useStatsOverviewSectionStyles } from '../../styles/StatusOverviewSection.styles';
-import { SectionHeader } from './SectionHeader';
 import { StatCard } from './StatCard';
 import { StatsOverviewSectionProps } from '../../types/stat.types';
+import { SectionHeader } from '@/core/components';
 
 export const StatsOverviewSection: React.FC<StatsOverviewSectionProps> = ({
   todayVisits,
@@ -16,7 +16,7 @@ export const StatsOverviewSection: React.FC<StatsOverviewSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      <SectionHeader title="TODAY'S OVERVIEW" />
+      <SectionHeader title="TODAY'S OVERVIEW" variant="small" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

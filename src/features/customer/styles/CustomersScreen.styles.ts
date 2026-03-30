@@ -1,3 +1,4 @@
+// styles/CustomersScreen.styles.ts
 import { ViewStyle, TextStyle, Platform } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -6,12 +7,14 @@ export const useCustomersScreenStyles = () => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
+    // ─── Layout ──────────────────────────────────────────────────────────────
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      padding: utils.spacing[2],
     } as ViewStyle,
 
-    // Header Styles
+    // ─── Header ──────────────────────────────────────────────────────────────
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -22,19 +25,31 @@ export const useCustomersScreenStyles = () => {
     } as ViewStyle,
 
     headerTitle: {
-      fontSize: 24,
-      fontWeight: '700',
+      fontSize: utils.fontSize['2xl'],
+      fontWeight: utils.getFontWeight('bold'),
       color: colors.textPrimary,
     } as TextStyle,
 
+    // ─── Filter Button ───────────────────────────────────────────────────────
     filterButton: {
       width: 40,
       height: 40,
-      borderRadius: 20,
+      borderRadius: utils.borderRadius.full,
       backgroundColor: colors.surface,
       justifyContent: 'center',
       alignItems: 'center',
       position: 'relative',
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 4,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
     } as ViewStyle,
 
     filterButtonActive: {
@@ -47,25 +62,26 @@ export const useCustomersScreenStyles = () => {
       right: -2,
       minWidth: 16,
       height: 16,
-      borderRadius: 8,
+      borderRadius: utils.borderRadius.full,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 4,
+      paddingHorizontal: utils.spacing[1],
+      backgroundColor: colors.primary,
     } as ViewStyle,
 
     filterBadgeText: {
-      color: 'white',
-      fontSize: 10,
+      color: colors.textInverse,
+      fontSize: utils.fontSize.xs,
       fontWeight: utils.getFontWeight('bold'),
     } as TextStyle,
 
-    // Search Bar
+    // ─── Search Bar ─────────────────────────────────────────────────────────
     searchWrapper: {
       paddingHorizontal: utils.spacing[4],
       marginBottom: utils.spacing[3],
     } as ViewStyle,
 
-    // Quick Filters
+    // ─── Quick Filters ──────────────────────────────────────────────────────
     quickFiltersContainer: {
       maxHeight: 44,
       marginBottom: utils.spacing[2],
@@ -82,10 +98,10 @@ export const useCustomersScreenStyles = () => {
       paddingHorizontal: utils.spacing[3],
       paddingVertical: utils.spacing[1.5],
       backgroundColor: colors.surface,
-      borderRadius: 20,
+      borderRadius: utils.borderRadius.full,
       gap: utils.spacing[1],
       borderWidth: 1,
-      borderColor: colors.border + '30',
+      borderColor: colors.border,
     } as ViewStyle,
 
     quickFilterChipActive: {
@@ -99,10 +115,10 @@ export const useCustomersScreenStyles = () => {
     } as TextStyle,
 
     quickFilterTextActive: {
-      color: 'white',
+      color: colors.textInverse,
     } as TextStyle,
 
-    // Results Header
+    // ─── Results Header ─────────────────────────────────────────────────────
     resultsHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -119,23 +135,23 @@ export const useCustomersScreenStyles = () => {
     viewToggle: {
       flexDirection: 'row',
       backgroundColor: colors.surface,
-      borderRadius: 8,
-      padding: 2,
+      borderRadius: utils.borderRadius.md,
+      padding: utils.spacing[0.5],
       borderWidth: 1,
-      borderColor: colors.border + '30',
+      borderColor: colors.border,
     } as ViewStyle,
 
     viewToggleButton: {
       paddingHorizontal: utils.spacing[2],
       paddingVertical: utils.spacing[1],
-      borderRadius: 6,
+      borderRadius: utils.borderRadius.sm,
     } as ViewStyle,
 
     viewToggleButtonActive: {
       backgroundColor: colors.primary,
     } as ViewStyle,
 
-    // Section Header
+    // ─── Section Header ─────────────────────────────────────────────────────
     sectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -144,12 +160,12 @@ export const useCustomersScreenStyles = () => {
       paddingVertical: utils.spacing[2],
       backgroundColor: colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border + '20',
+      borderBottomColor: colors.divider,
     } as ViewStyle,
 
     sectionTitle: {
       fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('600'),
+      fontWeight: utils.getFontWeight('semibold'),
       color: colors.textPrimary,
     } as TextStyle,
 
@@ -158,28 +174,28 @@ export const useCustomersScreenStyles = () => {
       color: colors.textTertiary,
       backgroundColor: colors.border + '15',
       paddingHorizontal: utils.spacing[2],
-      paddingVertical: 2,
-      borderRadius: 12,
+      paddingVertical: utils.spacing[0.5],
+      borderRadius: utils.borderRadius.md,
       overflow: 'hidden',
     } as TextStyle,
 
-    // List Content
+    // ─── List Content ───────────────────────────────────────────────────────
     listContent: {
       paddingBottom: utils.spacing[4],
     } as ViewStyle,
 
-    // Loading Footer
+    // ─── Loading Footer ─────────────────────────────────────────────────────
     footerLoader: {
       paddingVertical: utils.spacing[4],
       alignItems: 'center',
       justifyContent: 'center',
     } as ViewStyle,
 
-    // Floating Action Button
+    // ─── Floating Action Button ─────────────────────────────────────────────
     fab: {
       position: 'absolute',
-      bottom: 20,
-      right: 20,
+      bottom: utils.spacing[5],
+      right: utils.spacing[5],
       width: 56,
       height: 56,
       borderRadius: 28,
@@ -199,7 +215,7 @@ export const useCustomersScreenStyles = () => {
       }),
     } as ViewStyle,
 
-    // Empty State
+    // ─── Empty State ────────────────────────────────────────────────────────
     emptyState: {
       flex: 1,
       justifyContent: 'center',
@@ -220,7 +236,7 @@ export const useCustomersScreenStyles = () => {
 
     emptyStateTitle: {
       fontSize: utils.fontSize.lg,
-      fontWeight: utils.getFontWeight('600'),
+      fontWeight: utils.getFontWeight('semibold'),
       color: colors.textPrimary,
       marginBottom: utils.spacing[2],
       textAlign: 'center',
@@ -238,27 +254,28 @@ export const useCustomersScreenStyles = () => {
       paddingHorizontal: utils.spacing[5],
       paddingVertical: utils.spacing[2.5],
       backgroundColor: colors.primary + '10',
-      borderRadius: 20,
+      borderRadius: utils.borderRadius.full,
       minWidth: 140,
       alignItems: 'center',
     } as ViewStyle,
 
     emptyStateButtonText: {
       fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('600'),
+      fontWeight: utils.getFontWeight('semibold'),
       color: colors.primary,
     } as TextStyle,
 
-    // Modal Styles (for any modal overrides)
+    // ─── Modal ──────────────────────────────────────────────────────────────
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: colors.overlay,
       justifyContent: 'flex-end',
     } as ViewStyle,
 
     modalContent: {
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: utils.borderRadius.xl,
+      borderTopRightRadius: utils.borderRadius.xl,
       maxHeight: '80%',
     } as ViewStyle,
 
@@ -269,25 +286,34 @@ export const useCustomersScreenStyles = () => {
       paddingHorizontal: utils.spacing[4],
       paddingVertical: utils.spacing[3],
       borderBottomWidth: 1,
-      borderBottomColor: colors.border + '30',
+      borderBottomColor: colors.divider,
     } as ViewStyle,
 
     modalTitle: {
       fontSize: utils.fontSize.lg,
-      fontWeight: utils.getFontWeight('600'),
+      fontWeight: utils.getFontWeight('semibold'),
       color: colors.textPrimary,
     } as TextStyle,
+
+    modalCloseButton: {
+      width: 32,
+      height: 32,
+      borderRadius: utils.borderRadius.full,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.border + '20',
+    } as ViewStyle,
 
     modalSection: {
       paddingHorizontal: utils.spacing[4],
       paddingVertical: utils.spacing[3],
       borderBottomWidth: 1,
-      borderBottomColor: colors.border + '20',
+      borderBottomColor: colors.divider,
     } as ViewStyle,
 
     modalSectionTitle: {
       fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('600'),
+      fontWeight: utils.getFontWeight('semibold'),
       color: colors.textPrimary,
       marginBottom: utils.spacing[2],
     } as TextStyle,
@@ -298,35 +324,37 @@ export const useCustomersScreenStyles = () => {
       paddingVertical: utils.spacing[3],
       gap: utils.spacing[2],
       borderTopWidth: 1,
-      borderTopColor: colors.border + '30',
+      borderTopColor: colors.divider,
     } as ViewStyle,
 
     resetButton: {
       flex: 1,
       paddingVertical: utils.spacing[3],
-      borderRadius: 25,
+      borderRadius: utils.borderRadius.full,
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: colors.border + '30',
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
     } as ViewStyle,
 
     resetButtonText: {
       fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('500'),
+      fontWeight: utils.getFontWeight('medium'),
       color: colors.textSecondary,
     } as TextStyle,
 
     doneButton: {
       flex: 2,
       paddingVertical: utils.spacing[3],
-      borderRadius: 25,
+      borderRadius: utils.borderRadius.full,
       alignItems: 'center',
+      backgroundColor: colors.primary,
     } as ViewStyle,
 
     doneButtonText: {
-      color: 'white',
+      color: colors.textInverse,
       fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('600'),
+      fontWeight: utils.getFontWeight('semibold'),
     } as TextStyle,
   }));
 

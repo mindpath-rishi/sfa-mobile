@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, ScrollView } from 'react-native';
 import { QuickAction as QuickActionComponent } from './QuickAction';
-import { SectionHeader } from './SectionHeader';
 import { useQuickActionsSectionStyles } from '../../styles/QuickActionSection.styles';
 import { QuickActionsSectionProps } from '../../types/quickaction.types';
+import { SectionHeader } from '@/core/components';
 
 export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
   actions,
@@ -13,7 +13,7 @@ export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      <SectionHeader title="QUICK ACTIONS" />
+      <SectionHeader title="QUICK ACTIONS" variant="small" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

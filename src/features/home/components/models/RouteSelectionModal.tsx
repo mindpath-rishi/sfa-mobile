@@ -33,13 +33,13 @@ export const RouteSelectionModal: React.FC<RouteSelectionModalProps> = ({
               {vanChangeReason || 'No change selected'}
             </Text>
             <Text style={[styles.textXSmall, { marginTop: 2 }]}>
-              {assignedVan.name} • {assignedVan.type}
+              {assignedVan.name} • {assignedVan.vanNumber}
             </Text>
           </View>
 
           <FlatList
             data={routes}
-            keyExtractor={(item: any) => item.id}
+            keyExtractor={(item: any) => item.vanId}
             renderItem={({ item }: { item: any }) => (
               <TouchableOpacity onPress={() => onSelectRoute(item)} style={styles.routeItem}>
                 <LinearGradient colors={['#4158D0', '#C850C0']} style={styles.routeIcon}>

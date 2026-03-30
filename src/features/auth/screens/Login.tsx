@@ -20,9 +20,14 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { AppFormField, AppButton, AppText } from '@/core/components';
 import { t } from '@/shared/locales/engine/t';
 import { authService } from '../services/auth.service';
-import { LoginFormData, LoginScreenProps } from '../types/login.types';
+import { LoginFormData, LoginRequest, LoginScreenProps } from '../types/login.types';
 import { useLoginStyles } from '../styles/Login.style';
 import { useLoginAnimation } from '../hooks/useLoginAnimation';
+// import messaging from '@react-native-firebase/messaging';
+import Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
+import { setTokens } from '@/shared/services/storage/tokenStorage';
+import { useAuthStore } from '@/core/store/auth.store';
 
 const { height } = Dimensions.get('window');
 const SMALL_SCREEN_HEIGHT = 700;
@@ -182,18 +187,97 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
     [trigger],
   );
 
-  /**
-   * Handle form submission
-   */
+  // const getFcmToken = async (): Promise<string | null> => {
+  //   try {
+  //     // Request permission (important for iOS + Android 13+)
+  //     const authStatus = await messaging().requestPermission();
+
+  //     const enabled =
+  //       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+  //       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+  //     if (!enabled) return null;
+
+  //     return await messaging().getToken();
+  //   } catch (error) {
+  //     console.log('FCM Token Error:', error);
+  //     return null;
+  //   }
+  // };
+
+  const getDeviceInfo = async () => {
+    // const fcmToken = await getPushToken();
+
+    return {
+      deviceId: 'dsfjklfkjdskfjl',
+      // deviceId: Device.osInternalBuildId || Device.modelId || 'unknown-device',
+      deviceType: Platform.OS,
+      os: Platform.OS,
+      osVersion: String(Platform.Version),
+      browser: Platform.OS === 'web' ? 'Chrome' : 'N/A',
+      appVersion: '1.3.0',
+      fcmToken: 'dklfjfj',
+      // agent: 'BACK_OFFICE',
+    };
+  };
+
+  const getPushToken = async (): Promise<string | null> => {
+    try {
+      if (!Device.isDevice) return null;
+
+      // Request permission
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== 'granted') return null;
+
+      // Get Expo push token
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+
+      return tokenData.data;
+    } catch (error) {
+      console.log('Push Token Error:', error);
+      return null;
+    }
+  };
+
   const onSubmit = useCallback(
     async (data: LoginFormData) => {
       Keyboard.dismiss();
 
       try {
         setLoading(true);
-        await authService.login(data);
+
+        const payload = {
+          loginId: data.userId.trim(),
+          password: data.password,
+          deviceInfo: await getDeviceInfo(),
+        };
+
+        const response = await authService.login(payload);
+
+        console.log('Login Response:', response);
+
+        const resData: any = response.data;
+
+        /**
+         * ✅ Extract user from API response
+         */
+        const user = {
+          userId: resData.user.profileId,
+          name: resData.user.profile?.name,
+          role: resData.user.profile?.role,
+          vanId: resData.user.profile?.associatedVans?.[0] ?? null,
+        };
+
+        console.log('Authenticated User:', user);
+
+        /**
+         * ✅ Store auth (token + user)
+         * ❌ No need to call setTokens again
+         */
+        await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
 
         toast.success(t('auth.login.welcomeBack'), t('auth.login.loginSuccess'));
+
         router.replace('/(tabs)/home');
       } catch (error: any) {
         toast.error(
@@ -201,7 +285,6 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
           error?.message || t('auth.login.invalidCredentials'),
         );
 
-        // Clear password and refocus for security
         setValue('password', '', { shouldValidate: true });
         setFocus('password');
       } finally {

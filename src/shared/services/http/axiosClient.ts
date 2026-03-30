@@ -1,6 +1,11 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
-import { ENV } from "@/shared/constants/env";
-import { getAccessToken, getRefreshToken, setTokens, clearTokens } from "@/shared/services/storage/tokenStorage";
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { ENV } from '@/shared/constants/env';
+import {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearTokens,
+} from '@/shared/services/storage/tokenStorage';
 
 type RefreshResponse = { accessToken: string; refreshToken?: string };
 
@@ -11,6 +16,7 @@ export const api = axios.create({
 
 api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const token = await getAccessToken();
+  console.log('Attaching token to request:', token);
   if (token) {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
@@ -74,5 +80,5 @@ api.interceptors.response.use(
     } finally {
       isRefreshing = false;
     }
-  }
+  },
 );

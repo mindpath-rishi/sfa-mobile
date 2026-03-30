@@ -10,8 +10,8 @@ export interface RouteSelectionModalProps {
 }
 
 export interface Route {
-  id: string;
+  routeId: string;
   name: string;
-  stops: number;
+  totalShops: number;
   distance: string;
 }

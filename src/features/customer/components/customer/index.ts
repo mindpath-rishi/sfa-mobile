@@ -7,5 +7,4 @@ export { CustomerVisitInfo } from './CustomerVisitInfo';
 export { CustomerQuickActions } from './CustomerQuickActions';
 export { FilterChip } from './FilterChip';
 export { SearchBar } from './SearchBar';
-export { SectionHeader } from './SectionHeader';
 export { EmptyState } from './EmptyState';

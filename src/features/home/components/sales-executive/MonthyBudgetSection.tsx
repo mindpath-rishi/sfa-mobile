@@ -4,9 +4,8 @@ import { AppCard } from '@/core/components/Card';
 import { Ionicons } from '@expo/vector-icons';
 import { MonthlyBudgetSectionProps } from '../../types/monthlyBudgetSection.types';
 import { useMonthlyBudgetSectionStyles } from '../../styles/MonthlyBudgetSection.styles';
-import { SectionHeader } from './SectionHeader';
 import { ProgressBar } from './ProgressBar';
-import { AppText } from '@/core/components';
+import { AppText, SectionHeader } from '@/core/components';
 
 export const MonthlyBudgetSection: React.FC<MonthlyBudgetSectionProps> = ({
   targetAchieved,
@@ -17,7 +16,7 @@ export const MonthlyBudgetSection: React.FC<MonthlyBudgetSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      <SectionHeader title="MONTHLY TARGET" />
+      <SectionHeader title="MONTHLY TARGET" variant="small" />
 
       <AppCard variant="elevated" padding="lg" style={styles.targetCard}>
         <View style={styles.targetHeader}>

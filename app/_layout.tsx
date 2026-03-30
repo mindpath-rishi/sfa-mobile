@@ -1,79 +1,122 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useRootNavigationState } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as NavigationBar from 'expo-navigation-bar';
 import { StatusBar } from 'expo-status-bar';
+import Toast from 'react-native-toast-message';
 
 import ThemeProvider from '@/shared/providers/ThemeProvider';
 import { AppProviders } from '@/shared/providers/AppProviders';
-import { FilterProvider } from '@/shared/contexts/FilterContext'; // Import FilterProvider
+import { FilterProvider } from '@/shared/contexts/FilterContext';
 
 import { useThemeStore } from '@/core/store/theme.store';
 import { useLanguageStore } from '@/core/store/language.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useGlobalErrorStore } from '@/core/store/error.store';
+
 import AppErrorScreen from '@/core/screens/error/Error';
-import { useTheme } from '@/shared/hooks/useTheme';
 import LoaderOverlay from '@/core/screens/LoaderOverlay';
-import { useLoaderStore } from '@/core/loader/loader.store';
-import { Platform } from 'react-native';
-import Toast from 'react-native-toast-message';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export default function RootLayout() {
   const router = useRouter();
   const navigationState = useRootNavigationState();
 
+  /* ======================================================
+   * STORES
+   * ====================================================== */
+
   const { hydrate: hydrateTheme, hydrated: themeHydrated } = useThemeStore();
-  const { colors, isDark } = useTheme();
   const { hydrate: hydrateLanguage, hydrated: languageHydrated } = useLanguageStore();
 
-  const token = useAuthStore((s) => s.accessToken);
+  const { hydrate: hydrateAuth, isHydrated: authHydrated, accessToken: token } = useAuthStore();
+
   const errorType = useGlobalErrorStore((s) => s.type);
   const clearError = useGlobalErrorStore((s) => s.clear);
+
+  const { colors, isDark } = useTheme();
+
+  /* ======================================================
+   * HYDRATION
+   * ====================================================== */
 
   useEffect(() => {
     hydrateTheme();
     hydrateLanguage();
-  }, [hydrateTheme, hydrateLanguage]);
+    hydrateAuth();
+  }, [hydrateTheme, hydrateLanguage, hydrateAuth]);
 
-  // Handle navigation bar for edge-to-edge mode
+  /* ======================================================
+   * NAVIGATION BAR (ANDROID)
+   * ====================================================== */
+
   useEffect(() => {
     if (Platform.OS === 'android' && themeHydrated) {
-      const setupNavigationBar = async () => {
-        try {
-          await NavigationBar.setBackgroundColorAsync(colors.background + '00');
-          console.log('Navigation bar button style set to:', isDark ? 'light' : 'dark');
-        } catch (error) {
-          console.error('Failed to configure navigation bar:', error);
-        }
-      };
-
-      setupNavigationBar();
+      NavigationBar.setBackgroundColorAsync(colors.background + '00').catch((error) =>
+        console.error('NavBar BG error:', error),
+      );
     }
-  }, [themeHydrated, isDark]);
+  }, [themeHydrated, colors]);
 
-  // Update button style when theme changes
   useEffect(() => {
     if (Platform.OS === 'android' && themeHydrated) {
-      NavigationBar.setButtonStyleAsync(isDark ? 'dark' : 'dark').catch((error) =>
-        console.error('Failed to update button style:', error),
+      NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch((error) =>
+        console.error('NavBar Style error:', error),
       );
     }
   }, [isDark, themeHydrated]);
 
-  // Auth redirect effect
+  /* ======================================================
+   * AUTH REDIRECT
+   * ====================================================== */
+
   useEffect(() => {
     if (!navigationState?.key) return;
-    if (!themeHydrated || !languageHydrated) return;
 
-    if (token) {
+    if (!themeHydrated || !languageHydrated || !authHydrated) return;
+
+    const currentToken = useAuthStore.getState().accessToken;
+
+    console.log('Auth State:', {
+      currentToken,
+      themeHydrated,
+      languageHydrated,
+      authHydrated,
+    });
+
+    if (!currentToken) {
       router.replace('/(auth)');
     } else {
       router.replace('/(tabs)/home');
     }
-  }, [navigationState, token, themeHydrated, languageHydrated, router]);
+  }, [navigationState, themeHydrated, languageHydrated, authHydrated, router]);
+
+  /* ======================================================
+   * LOADING STATE
+   * ====================================================== */
+
+  if (!themeHydrated || !languageHydrated || !authHydrated) {
+    return (
+      <SafeAreaProvider>
+        <View
+          style={{
+            flex: 1,
+            justifyContent: 'center',
+            alignItems: 'center',
+            backgroundColor: colors.background,
+          }}
+        >
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
+  /* ======================================================
+   * ERROR STATE
+   * ====================================================== */
 
   if (errorType) {
     return (
@@ -85,6 +128,10 @@ export default function RootLayout() {
     );
   }
 
+  /* ======================================================
+   * MAIN APP
+   * ====================================================== */
+
   return (
     <SafeAreaProvider>
       <StatusBar
@@ -93,9 +140,8 @@ export default function RootLayout() {
         backgroundColor={colors.background}
       />
 
-      {/* Main container with background color */}
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        {/* Gradient Overlay */}
+        {/* Gradient Background */}
         <LinearGradient
           colors={[colors.primary + '30', colors.primary + '10', 'transparent']}
           start={{ x: 0.5, y: 0 }}
@@ -110,11 +156,10 @@ export default function RootLayout() {
           pointerEvents="none"
         />
 
-        {/* Main Content */}
-        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        {/* App Content */}
+        <View style={{ flex: 1 }}>
           <ThemeProvider>
             <AppProviders>
-              {/* Add FilterProvider here to wrap all screens */}
               <FilterProvider>
                 <Stack
                   screenOptions={{
@@ -126,8 +171,9 @@ export default function RootLayout() {
                 >
                   <Stack.Screen name="(auth)" />
                   <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="(drawer)" /> {/* Add this if you have a drawer layout */}
+                  <Stack.Screen name="(drawer)" />
                 </Stack>
+
                 <LoaderOverlay />
                 <Toast position="bottom" />
               </FilterProvider>

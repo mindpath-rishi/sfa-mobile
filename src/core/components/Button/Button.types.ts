@@ -1,5 +1,5 @@
 // src/core/components/Button/Button.types.ts
-import { ViewStyle } from 'react-native';
+import { ViewStyle, TextStyle } from 'react-native';
 
 export type ButtonVariant =
   | 'primary'
@@ -8,34 +8,44 @@ export type ButtonVariant =
   | 'warning'
   | 'error'
   | 'info'
-  | 'outline';
+  | 'outline'
+  | 'ghost';
+
 export type ButtonSize = 'small' | 'medium' | 'large';
 
 export interface ButtonProps {
   /** Button text */
-  title: string;
-  /** Callback when button is pressed */
-  onPress: () => void;
-  /** Button variant for color */
-  variant?: ButtonVariant;
-  /** Button size */
-  size?: ButtonSize;
-  /** Whether button is disabled */
-  disabled?: boolean;
-  /** Whether to show loading state */
+  title?: string;
+  /** Whether the button is in loading state */
   loading?: boolean;
-  /** Whether button should take full width */
+  /** Whether the button is disabled */
+  disabled?: boolean;
+  /** Callback when button is pressed */
+  onPress?: () => void;
+  /** Visual variant of the button */
+  variant?: ButtonVariant;
+  /** Size of the button */
+  size?: ButtonSize;
+  /** Whether the button should take full width */
   fullWidth?: boolean;
-  /** Icon to show on left side */
+  /** Icon to display on the left */
   leftIcon?: React.ReactNode;
-  /** Icon to show on right side */
+  /** Icon to display on the right */
   rightIcon?: React.ReactNode;
-  /** Custom styles for container */
+  /** Whether the button is icon-only (no text) */
+  iconOnly?: boolean;
+  /** Additional styles for the button container */
   style?: ViewStyle;
+  /** Additional styles for the button text */
+  textStyle?: TextStyle;
+  /** Test ID for testing */
+  testID?: string;
   /** Accessibility label */
   accessibilityLabel?: string;
   /** Accessibility hint */
   accessibilityHint?: string;
-  /** Test ID for testing */
-  testID?: string;
+  /** Enable haptic feedback on press (mobile only) */
+  hapticFeedback?: boolean;
+  /** Enable press animation */
+  animation?: boolean;
 }

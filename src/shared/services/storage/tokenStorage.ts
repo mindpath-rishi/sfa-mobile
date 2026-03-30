@@ -1,8 +1,8 @@
-import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from "@/shared/constants/storage.constant";
-import { storage } from "@/shared/utils/storage";
-
+import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY } from '@/shared/constants/storage.constant';
+import { storage } from '@/shared/utils/storage';
 
 export async function setTokens(accessToken: string, refreshToken?: string) {
+  console.log('Storing tokens:', { accessToken: accessToken, refreshToken });
   await storage.setItem(ACCESS_TOKEN_KEY, accessToken);
 
   if (refreshToken) {

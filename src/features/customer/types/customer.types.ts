@@ -15,7 +15,7 @@ export interface Customer {
   creditLimit: string;
   creditDays: number;
   location: string;
-  distance: string;
+  distance: string | number;
   avatar: string | null;
   tags: string[];
   recentActivity: Activity[];

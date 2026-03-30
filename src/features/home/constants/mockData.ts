@@ -35,19 +35,19 @@ export const OTHER_WORK_OPTIONS: OtherWorkOption[] = [
 ];
 
 export const RETAILING_ROUTES: Route[] = [
-  { id: 'route1', name: 'Andheri East Route', stops: 12, distance: '8.5 km' },
-  { id: 'route2', name: 'Bandra West Route', stops: 15, distance: '10.2 km' },
-  { id: 'route3', name: 'Juhu Circle Route', stops: 8, distance: '6.3 km' },
-  { id: 'route4', name: 'Dadar Route', stops: 10, distance: '7.8 km' },
-  { id: 'route5', name: 'Malad Route', stops: 14, distance: '9.1 km' },
+  { routeId: 'route1', name: 'Andheri East Route', stops: 12, distance: '8.5 km' },
+  { routeId: 'route2', name: 'Bandra West Route', stops: 15, distance: '10.2 km' },
+  { routeId: 'route3', name: 'Juhu Circle Route', stops: 8, distance: '6.3 km' },
+  { routeId: 'route4', name: 'Dadar Route', stops: 10, distance: '7.8 km' },
+  { routeId: 'route5', name: 'Malad Route', stops: 14, distance: '9.1 km' },
 ];
 
 export const ASSIGNED_VAN: Van = {
-  id: 'van2',
+  vanId: 'van2',
   name: 'Van #MH-02-CD-5678',
-  type: 'Mahindra Pickup',
+  // vanNumber: 'Mahindra Pickup',
   capacity: '750 kg',
-  registration: 'MH-02-CD-5678',
+  vanNumber: 'MH-02-CD-5678',
 };
 
 export const LOAD_SUMMARY_DATA: LoadSummaryData = {

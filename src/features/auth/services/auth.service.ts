@@ -1,6 +1,6 @@
-import { api } from "@/core/network";
-import type { ApiResponse } from "@/core/network/api.types";
-import type { LoginFormData, LoginResponse } from "../types/login.types";
+import { api } from '@/core/network';
+import type { ApiResponse } from '@/core/network/api.types';
+import type { LoginFormData, LoginRequest, LoginResponse } from '../types/login.types';
 
 /**
  * Auth API contract used by the app.
@@ -8,7 +8,7 @@ import type { LoginFormData, LoginResponse } from "../types/login.types";
  */
 export interface AuthService {
   /** Authenticates user and returns token/user payload from backend */
-  login(payload: LoginFormData): Promise<ApiResponse<LoginResponse>>;
+  login(payload: LoginRequest): Promise<ApiResponse<LoginResponse>>;
 
   /** Clears server session/token (if backend supports it) */
   logout(): Promise<ApiResponse<{ loggedOut: boolean }>>;
@@ -20,6 +20,11 @@ export interface AuthService {
  */
 export const authService: AuthService = {
   login: (payload) =>
-    api.post<LoginResponse, LoginFormData>("/auth/login", payload),
-  logout: () => api.post<{ loggedOut: boolean }>("/auth/logout"),
+    api.post<LoginResponse, LoginRequest>('/user/login', payload) as Promise<
+      ApiResponse<LoginResponse>
+    >,
+  logout: () =>
+    api.post<{ loggedOut: boolean }>('/user/logout') as Promise<
+      ApiResponse<{ loggedOut: boolean }>
+    >,
 };

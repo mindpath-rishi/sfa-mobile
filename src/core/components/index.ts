@@ -5,3 +5,4 @@ export { default as AppFormField } from './FormField/FormField';
 export { default as AppModal } from './Modal/Modal';
 export { default as AppCard } from './Card/Card';
 export { default as AppCamera } from './Camera/Camera';
+export { SectionHeader } from './SectionHeader/SectionHeader';

@@ -1,23 +1,32 @@
-import axios, { AxiosError, AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import axios, {
+  AxiosError,
+  AxiosInstance,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+  AxiosHeaders,
+} from 'axios';
 import Constants from 'expo-constants';
 
 import { errorHandler } from '@/core/errors/error.handler';
 import { logger } from '@/core/logger/logger';
+import { useAuthStore } from '@/core/store/auth.store';
+import { getAccessToken } from '@/shared/services/storage/tokenStorage';
+import { useLoaderStore } from '../loader/loader.store';
+
 import type { ApiRequestConfig, ApiResponse, HttpMethod } from './api.types';
 
-/**
- * Token getter is injected to avoid importing auth store here (prevents circular deps).
- */
-let getToken: (() => string | null) | null = null;
+/* ======================================================
+ * CUSTOM AXIOS CONFIG
+ * ====================================================== */
 
-export const injectTokenGetter = (fn: () => string | null) => {
-  getToken = fn;
-};
+interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
+  showLoader?: boolean;
+}
 
-/**
- * Reads network config from app.config.ts -> extra.api.
- * Keeps baseURL/timeout centralized and environment-safe.
- */
+/* ======================================================
+ * APP CONFIG
+ * ====================================================== */
+
 type AppExtraConfig = {
   api?: {
     baseURL: string;
@@ -34,37 +43,83 @@ const TIMEOUT_MS = extra?.api?.timeoutMs ?? 15000;
 const AUTH_HEADER_KEY = extra?.api?.authHeaderKey ?? 'Authorization';
 const TOKEN_PREFIX = extra?.api?.tokenPrefix ?? 'Bearer';
 
-/**
- * Shared Axios instance used across the app.
- */
+/* ======================================================
+ * AXIOS INSTANCE
+ * ====================================================== */
+
 export const httpClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: TIMEOUT_MS,
 });
 
-/**
- * Attaches auth token automatically when available.
- */
+/* ======================================================
+ * TOKEN HELPER
+ * ====================================================== */
+
+const getToken = async (): Promise<string | null> => {
+  try {
+    const storeToken = useAuthStore.getState().accessToken;
+
+    if (storeToken) return storeToken;
+
+    return await getAccessToken();
+  } catch (error) {
+    logger.error('Token fetch error', { error });
+    return null;
+  }
+};
+
+/* ======================================================
+ * REQUEST INTERCEPTOR
+ * ====================================================== */
+
 httpClient.interceptors.request.use(
-  async (config: InternalAxiosRequestConfig): Promise<InternalAxiosRequestConfig> => {
-    const token = getToken?.();
+  async (config: CustomAxiosRequestConfig): Promise<CustomAxiosRequestConfig> => {
+    try {
+      // ✅ DEFAULT: loader ON
+      if (config.showLoader !== false) {
+        useLoaderStore.getState().show({ message: 'Loading...' });
+      }
 
-    if (token) {
-      config.headers = config.headers ?? {};
-      config.headers[AUTH_HEADER_KEY] = `${TOKEN_PREFIX} ${token}`;
+      const token = await getToken();
+
+      if (token) {
+        const headers = AxiosHeaders.from(config.headers ?? {});
+        headers.set(AUTH_HEADER_KEY, `${TOKEN_PREFIX} ${token}`);
+        config.headers = headers;
+      }
+
+      return config;
+    } catch (error) {
+      logger.error('Request interceptor error', { error });
+      return config;
     }
-
-    return config;
   },
   (error: AxiosError) => Promise.reject(error),
 );
 
-/**
- * Normalizes API errors into AppError and logs them in dev.
- */
+/* ======================================================
+ * RESPONSE INTERCEPTOR
+ * ====================================================== */
+
 httpClient.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse<unknown>>) => response,
+  (response: AxiosResponse<ApiResponse<unknown>>) => {
+    const config = response.config as CustomAxiosRequestConfig;
+
+    // ✅ DEFAULT: hide loader
+    if (config.showLoader !== false) {
+      useLoaderStore.getState().hide();
+    }
+
+    return response;
+  },
   (error: AxiosError) => {
+    const config = error.config as CustomAxiosRequestConfig;
+
+    if (config?.showLoader !== false) {
+      useLoaderStore.getState().hide();
+    }
+
     const appError = errorHandler(error);
 
     logger.error('HTTP Error', {
@@ -77,11 +132,11 @@ httpClient.interceptors.response.use(
   },
 );
 
-/**
- * Typed request wrapper used by services.
- * Always returns the backend ApiResponse<T>.
- */
-export const apiRequest = async <TResponse, TBody = any>(
+/* ======================================================
+ * GENERIC REQUEST
+ * ====================================================== */
+
+export const apiRequest = async <TResponse, TBody = unknown>(
   method: HttpMethod,
   url: string,
   body?: TBody,
@@ -93,24 +148,28 @@ export const apiRequest = async <TResponse, TBody = any>(
     data: body,
     params: config?.params,
     headers: config?.headers,
-  });
+
+    // ✅ DEFAULT TRUE (only false disables loader)
+    showLoader: config?.showLoader !== false,
+  } as CustomAxiosRequestConfig);
 
   return res.data;
 };
 
-/**
- * Small helpers to keep service calls clean.
- */
+/* ======================================================
+ * API METHODS
+ * ====================================================== */
+
 export const api = {
   get: <T>(url: string, config?: ApiRequestConfig) => apiRequest<T>('GET', url, undefined, config),
 
-  post: <T, B = any>(url: string, body?: B, config?: ApiRequestConfig) =>
+  post: <T, B = unknown>(url: string, body?: B, config?: ApiRequestConfig) =>
     apiRequest<T, B>('POST', url, body, config),
 
-  put: <T, B = any>(url: string, body?: B, config?: ApiRequestConfig) =>
+  put: <T, B = unknown>(url: string, body?: B, config?: ApiRequestConfig) =>
     apiRequest<T, B>('PUT', url, body, config),
 
-  patch: <T, B = any>(url: string, body?: B, config?: ApiRequestConfig) =>
+  patch: <T, B = unknown>(url: string, body?: B, config?: ApiRequestConfig) =>
     apiRequest<T, B>('PATCH', url, body, config),
 
   delete: <T>(url: string, config?: ApiRequestConfig) =>

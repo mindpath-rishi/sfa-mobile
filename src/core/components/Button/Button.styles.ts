@@ -1,67 +1,109 @@
 // src/core/components/Button/Button.styles.ts
-import { StyleSheet } from 'react-native';
-import { AppColors } from '@/shared/theme/colors';
+import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
-export const createButtonStyles = (colors: AppColors) => {
+export const createButtonStyles = (colors: any) => {
+  const baseButton: ViewStyle = {
+    borderRadius: 12,
+    overflow: 'hidden',
+  };
+
+  const baseText: TextStyle = {
+    fontWeight: '600',
+    textAlign: 'center',
+  };
+
   return StyleSheet.create({
     container: {
-      marginVertical: 4,
+      ...baseButton,
     },
+    buttonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pressable: {
+      // transition: 'all 0.2s ease-in-out', // Only works on web
+    },
+    pressed: {
+      opacity: 0.8,
+      transform: [{ scale: 0.98 }],
+    },
+    disabled: {
+      opacity: 0.6,
+    },
+
+    // Size variants
+    smallButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      minHeight: 32,
+    },
+    mediumButton: {
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      minHeight: 44,
+    },
+    largeButton: {
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      minHeight: 56,
+    },
+
+    // Text sizes
+    smallText: {
+      fontSize: 12,
+      ...baseText,
+    },
+    mediumText: {
+      fontSize: 14,
+      ...baseText,
+    },
+    largeText: {
+      fontSize: 16,
+      ...baseText,
+    },
+
+    // Text with icon
+    textWithIcon: {
+      marginHorizontal: 4,
+    },
+
+    // Layout
     fullWidth: {
       width: '100%',
     },
     autoWidth: {
       alignSelf: 'flex-start',
     },
-    buttonWrapper: {
-      flexDirection: 'row',
-      alignItems: 'center',
+
+    // Icons
+    icon: {
       justifyContent: 'center',
-      borderRadius: 8,
+      alignItems: 'center',
+    },
+    leftIcon: {
+      marginRight: 8,
+    },
+    rightIcon: {
+      marginLeft: 8,
+    },
+
+    // Icon only button
+    iconOnlyContainer: {
+      justifyContent: 'center',
+      alignItems: 'center',
       overflow: 'hidden',
     },
-    iconWrapper: {
-      position: 'absolute',
-      zIndex: 1,
-    },
-    leftIconWrapper: {
-      left: 12,
-    },
-    rightIconWrapper: {
-      right: 12,
-    },
+
+    // Loading state
     loaderContainer: {
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-      backgroundColor: colors.border + '20',
-      flexDirection: 'row',
-      gap: 8,
     },
-    disabled: {
-      opacity: 0.5,
-    },
-    // Size styles
-    smallButton: {
-      height: 36,
-    },
-    mediumButton: {
-      height: 44,
-    },
-    largeButton: {
-      height: 52,
-    },
-    // Text styles for button (RN Button doesn't accept textStyle, so these are for loader/fallback)
-    textSmall: {
-      fontSize: 12,
-    },
-    textMedium: {
-      fontSize: 14,
-    },
-    textLarge: {
-      fontSize: 16,
+
+    // Text pressed state
+    textPressed: {
+      opacity: 0.8,
     },
   });
 };

@@ -1,11 +1,39 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { View, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { CurrentActivityCardProps } from '../../types/activity.types';
 import { useCurrentActivityCardStyles } from '../../styles/CurrentActivityCard.styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText } from '@/core/components';
+
+// Helper function to format elapsed time
+const formatElapsedTime = (
+  startTime: Date,
+): { formatted: string; hours: number; minutes: number } => {
+  const now = new Date();
+  const elapsedMs = now.getTime() - startTime.getTime();
+  if (elapsedMs < 0) return { formatted: '00:00', hours: 0, minutes: 0 };
+
+  const hours = Math.floor(elapsedMs / (1000 * 60 * 60));
+  const minutes = Math.floor((elapsedMs % 3600000) / (1000 * 60));
+  const seconds = Math.floor((elapsedMs % 60000) / 1000);
+
+  let formatted = '';
+  if (hours > 0) {
+    formatted = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  } else {
+    formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  return { formatted, hours, minutes };
+};
+
+const parseStartTime = (startTime: string | Date): Date => {
+  if (startTime instanceof Date) return startTime;
+  const parsed = new Date(startTime);
+  return isNaN(parsed.getTime()) ? new Date() : parsed;
+};
 
 export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
   selectedActivity,
@@ -20,75 +48,217 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
 }) => {
   const styles = useCurrentActivityCardStyles({ selectedActivity });
   const { colors } = useTheme();
+  const [elapsedFormatted, setElapsedFormatted] = useState<string>('00:00');
+  const [elapsedHours, setElapsedHours] = useState<number>(0);
+
+  const parsedStartTime = useMemo(() => parseStartTime(startTime), [startTime]);
+  const otherWorkParsed = useMemo(
+    () => (otherWorkStartTime ? parseStartTime(otherWorkStartTime) : null),
+    [otherWorkStartTime],
+  );
+
+  const updateTimer = useCallback(() => {
+    const { formatted, hours } = formatElapsedTime(parsedStartTime);
+    setElapsedFormatted(formatted);
+    setElapsedHours(hours);
+  }, [parsedStartTime]);
+
+  useEffect(() => {
+    updateTimer();
+    const intervalId = setInterval(updateTimer, 1000);
+    return () => clearInterval(intervalId);
+  }, [updateTimer]);
+
+  const startTimeStr = parsedStartTime.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+
+  const otherWorkDuration = useMemo(() => {
+    if (!otherWorkParsed) return null;
+    const minutes = Math.floor((new Date().getTime() - otherWorkParsed.getTime()) / 60000);
+    if (minutes < 60) return `${minutes}m`;
+    return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  }, [otherWorkParsed]);
+
+  // Determine if activity is overdue (more than 4 hours)
+  const isOverdue = elapsedHours >= 4;
+  const warningColor = isOverdue ? '#FF6B6B' : selectedActivityColor;
 
   return (
     <View style={styles.activeCard}>
-      {/* Current Activity */}
-      <View style={styles.activityHighlightCard}>
+      {/* Main Activity Row - Compact */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
         <LinearGradient
           colors={[selectedActivityColor, selectedActivityColor + 'DD']}
-          style={styles.activityIconLarge}
+          style={[styles.activityIconLarge, { width: 48, height: 48, borderRadius: 12 }]}
         >
-          <Ionicons name={selectedActivityIcon as any} size={28} color="white" />
+          <Ionicons name={selectedActivityIcon as any} size={24} color="white" />
         </LinearGradient>
-        <View style={styles.activityContent}>
-          <AppText style={styles.textXSmall}>CURRENT ACTIVITY</AppText>
-          <AppText style={styles.titleMedium}>{selectedActivity}</AppText>
-          <View style={styles.timeContainer}>
-            <Ionicons name="time-outline" size={12} color={styles.textSmall.color} />
-            <AppText style={styles.textSmall}>
-              {startTime}
-              {otherWorkStartTime && selectedActivity !== 'Retailing' && (
-                <AppText style={styles.textAccent}> • Running</AppText>
-              )}
+
+        <View style={{ flex: 1, marginLeft: 12 }}>
+          <View
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <AppText style={[styles.textXSmall, { color: colors.textSecondary }]}>
+              {selectedActivity}
+            </AppText>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: '#4CAF50',
+                  marginRight: 4,
+                }}
+              />
+              <AppText style={[styles.textXSmall, { fontSize: 9, color: '#4CAF50' }]}>
+                ACTIVE
+              </AppText>
+            </View>
+          </View>
+
+          {/* Timer - Large and Clear */}
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
+            <AppText
+              style={[styles.titleMedium, { fontSize: 24, fontWeight: '700', color: warningColor }]}
+            >
+              {elapsedFormatted}
+            </AppText>
+            <AppText style={[styles.textXSmall, { marginLeft: 6, color: colors.textSecondary }]}>
+              since {startTimeStr}
             </AppText>
           </View>
         </View>
-        <View style={styles.activeBadge}>
-          <AppText style={styles.activeBadgeText}>ACTIVE</AppText>
-        </View>
       </View>
 
-      {/* Route & Van Info */}
-      {selectedActivity === 'Retailing' && selectedRoute && (
-        <View style={styles.infoHighlightCard}>
-          <View style={styles.infoRow}>
-            <View style={styles.infoIconContainer}>
-              <Ionicons name="map-outline" size={16} color={colors.primary} />
-            </View>
-            <View style={styles.infoContent}>
-              <AppText style={styles.textXSmall}>ROUTE</AppText>
-              <AppText style={styles.titleSmall}>{selectedRoute.name}</AppText>
-              <AppText style={styles.textXSmall}>
-                {selectedRoute.stops} stops • {selectedRoute.distance}
+      {/* Compact Info Grid */}
+      <View style={{ flexDirection: 'row', marginBottom: 12, gap: 12 }}>
+        {/* Route Info */}
+        {selectedActivity === 'Retailing' && selectedRoute && (
+          <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 8, padding: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Ionicons name="map-outline" size={12} color={colors.primary} />
+              <AppText style={[styles.textXSmall, { marginLeft: 4, color: colors.primary }]}>
+                ROUTE
               </AppText>
             </View>
-          </View>
-          <View style={styles.infoRow}>
-            <View style={styles.infoIconContainer}>
-              <Ionicons name="car-outline" size={16} color={colors.primary} />
+            <AppText
+              style={[styles.titleSmall, { fontSize: 13, fontWeight: '600' }]}
+              numberOfLines={1}
+            >
+              {selectedRoute['routeName']}
+            </AppText>
+            <View style={{ flexDirection: 'row', marginTop: 2 }}>
+              {selectedRoute['totalShops'] && (
+                <AppText style={[styles.textXSmall, { fontSize: 10, color: colors.textSecondary }]}>
+                  {selectedRoute['totalShops']} stops
+                </AppText>
+              )}
             </View>
-            <View style={styles.infoContent}>
-              <AppText style={styles.textXSmall}>VAN</AppText>
-              <AppText style={styles.titleSmall}>{assignedVan.name}</AppText>
-              <AppText style={styles.textXSmall}>
-                {assignedVan.type} • {assignedVan.capacity}
-              </AppText>
-            </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtonsContainer}>
-        <TouchableOpacity onPress={onPressChange} style={styles.smallActionButton}>
-          <Ionicons name="refresh" size={14} color={styles.changeActionText.color} />
-          <AppText style={styles.changeActionText}>CHANGE</AppText>
+        {/* Van Info */}
+        {assignedVan && (
+          <View
+            style={{
+              flex: selectedActivity === 'Retailing' ? 1 : 1,
+              backgroundColor: colors.surface,
+              borderRadius: 8,
+              padding: 8,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+              <Ionicons name="car-outline" size={12} color={colors.primary} />
+              <AppText style={[styles.textXSmall, { marginLeft: 4, color: colors.primary }]}>
+                VAN
+              </AppText>
+            </View>
+            <AppText
+              style={[styles.titleSmall, { fontSize: 13, fontWeight: '600' }]}
+              numberOfLines={1}
+            >
+              {assignedVan.name}
+            </AppText>
+            <AppText style={[styles.textXSmall, { fontSize: 10, color: colors.textSecondary }]}>
+              {assignedVan.vanNumber || assignedVan.name} • {assignedVan.capacity || 'Std'} Tonnages
+            </AppText>
+          </View>
+        )}
+
+        {/* Other Work Badge - Compact */}
+        {otherWorkStartTime && selectedActivity !== 'Retailing' && (
+          <View
+            style={{
+              backgroundColor: colors.warning + '20',
+              borderRadius: 8,
+              padding: 8,
+              justifyContent: 'center',
+            }}
+          >
+            <Ionicons name="briefcase-outline" size={16} color={colors.warning} />
+            <AppText
+              style={[styles.textXSmall, { fontSize: 10, color: colors.warning, marginTop: 2 }]}
+            >
+              {otherWorkDuration}
+            </AppText>
+          </View>
+        )}
+      </View>
+
+      {/* Action Buttons - Compact Horizontal */}
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <TouchableOpacity
+          onPress={onPressChange}
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 8,
+            borderRadius: 8,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="refresh" size={14} color={colors.primary} />
+          <AppText
+            style={[
+              styles.changeActionText,
+              { marginLeft: 6, fontSize: 12, color: colors.primary },
+            ]}
+          >
+            CHANGE
+          </AppText>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={onPressEnd} style={styles.smallActionButton}>
-          <Ionicons name="stop-circle" size={14} color={styles.endActionText.color} />
-          <AppText style={styles.endActionText}>END</AppText>
+        <TouchableOpacity
+          onPress={onPressEnd}
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingVertical: 8,
+            borderRadius: 8,
+            backgroundColor: isOverdue ? '#FF6B6B' : colors.error,
+          }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="stop-circle" size={14} color="white" />
+          <AppText
+            style={[
+              styles.endActionText,
+              { marginLeft: 6, fontSize: 12, color: 'white', fontWeight: '600' },
+            ]}
+          >
+            {isOverdue ? 'END NOW' : 'END'}
+          </AppText>
         </TouchableOpacity>
       </View>
     </View>

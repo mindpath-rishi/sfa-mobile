@@ -4,6 +4,7 @@ import { ViewStyle, TouchableOpacityProps, PressableProps, StyleProp } from 'rea
 export type CardVariant = 'elevated' | 'outlined' | 'filled' | 'ghost';
 export type CardPadding = 'none' | 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 export type CardRadius = 'none' | 'sm' | 'md' | 'lg' | 'xl' | 'full';
+export type CardSelectedVariant = 'primary' | 'success' | 'warning' | 'danger' | 'info';
 
 export interface CardProps extends TouchableOpacityProps {
   /** Card content */
@@ -14,10 +15,18 @@ export interface CardProps extends TouchableOpacityProps {
   padding?: CardPadding;
   /** Border radius of the card */
   radius?: CardRadius;
+  /** Whether the card is in selected state */
+  selected?: boolean;
+  /** Visual variant when card is selected */
+  selectedVariant?: CardSelectedVariant;
   /** Callback when card is pressed */
   onPress?: () => void;
   /** Callback when card is long pressed */
   onLongPress?: () => void;
+  /** Callback when press starts */
+  onPressIn?: () => void;
+  /** Callback when press ends */
+  onPressOut?: () => void;
   /** Additional styles for the container */
   style?: StyleProp<ViewStyle>;
   /** Test ID for testing */
@@ -37,13 +46,14 @@ export interface CardProps extends TouchableOpacityProps {
 }
 
 export interface CardStyleProps {
-  variant: CardVariant;
+  variant: CardVariant | CardSelectedVariant;
   padding: CardPadding;
   radius: CardRadius;
   disabled?: boolean;
   pressed?: boolean;
   isHovered?: boolean;
   scaleOnPress?: boolean;
+  selected?: boolean;
 }
 
 export interface CardSectionProps {

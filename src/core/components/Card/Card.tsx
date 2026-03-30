@@ -1,7 +1,7 @@
 // Card.tsx
 import React, { useState, useCallback, useMemo, memo } from 'react';
 import { View, TouchableOpacity, ViewStyle, Pressable, Platform, StyleProp } from 'react-native';
-import { CardProps, CardSectionProps } from './Card.types';
+import { CardProps, CardSectionProps, CardComponentType } from './Card.types';
 import { useCardStyles } from './Card.styles';
 
 // Memoized section components for better performance
@@ -84,6 +84,16 @@ Actions.displayName = 'Card.Actions';
  *   <Text>Pressable Card</Text>
  * </AppCard>
  *
+ * // Selected card
+ * <AppCard
+ *   variant="outlined"
+ *   selected={true}
+ *   selectedVariant="primary"
+ *   onPress={() => console.log('selected')}
+ * >
+ *   <Text>Selected Card</Text>
+ * </AppCard>
+ *
  * // Card with all sections
  * <AppCard variant="filled" padding="md">
  *   <AppCard.Header>
@@ -104,6 +114,8 @@ const AppCardComponent = memo<CardProps>(
     variant = 'elevated',
     padding = 'md',
     radius = 'lg',
+    selected = false,
+    selectedVariant = 'primary',
     onPress,
     onLongPress,
     onPressIn,
@@ -123,14 +135,18 @@ const AppCardComponent = memo<CardProps>(
 
     const isPressable = !!onPress || !!onLongPress;
 
+    // Determine the actual variant for styling
+    const effectiveVariant = selected ? selectedVariant : variant;
+
     const styles = useCardStyles({
-      variant,
+      variant: effectiveVariant,
       padding,
       radius,
       disabled,
       pressed,
       isHovered,
       scaleOnPress,
+      selected,
     });
 
     // Memoized handlers
@@ -145,7 +161,7 @@ const AppCardComponent = memo<CardProps>(
           // Example: Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
 
-        onPressIn?.(event);
+        onPressIn?.();
       },
       [disabled, hapticFeedback, onPressIn],
     );
@@ -155,7 +171,7 @@ const AppCardComponent = memo<CardProps>(
         if (disabled) return;
 
         setPressed(false);
-        onPressOut?.(event);
+        onPressOut?.();
       },
       [disabled, onPressOut],
     );
@@ -173,8 +189,21 @@ const AppCardComponent = memo<CardProps>(
     }, [disabled]);
 
     const containerStyle = useMemo<StyleProp<ViewStyle>>(
-      () => [styles.container, scaleOnPress && pressed && styles.pressedScale, style],
-      [styles.container, styles.pressedScale, pressed, scaleOnPress, style],
+      () => [
+        styles.container,
+        scaleOnPress && pressed && styles.pressedScale,
+        selected && styles.selectedContainer,
+        style,
+      ],
+      [
+        styles.container,
+        styles.pressedScale,
+        styles.selectedContainer,
+        pressed,
+        scaleOnPress,
+        selected,
+        style,
+      ],
     );
 
     // Choose appropriate container component based on pressability and platform
@@ -196,7 +225,7 @@ const AppCardComponent = memo<CardProps>(
         accessibilityRole: 'button' as const,
         accessibilityLabel: accessibilityLabel || 'Card',
         accessibilityHint,
-        accessibilityState: { disabled, pressed },
+        accessibilityState: { disabled, pressed, selected },
       };
 
       if (Platform.OS === 'web') {
@@ -207,6 +236,7 @@ const AppCardComponent = memo<CardProps>(
           style: ({ pressed: webPressed, hovered }: any): StyleProp<ViewStyle> => [
             styles.container,
             scaleOnPress && pressed && styles.pressedScale,
+            selected && styles.selectedContainer,
             style,
             webPressed && styles.webPressed,
             hovered && styles.webHovered,
@@ -229,9 +259,11 @@ const AppCardComponent = memo<CardProps>(
       accessibilityLabel,
       accessibilityHint,
       pressed,
+      selected,
       containerStyle,
       styles.container,
       styles.pressedScale,
+      styles.selectedContainer,
       styles.webPressed,
       styles.webHovered,
       style,
@@ -265,13 +297,7 @@ const AppCardComponent = memo<CardProps>(
 );
 
 // Attach subcomponents with proper typing
-export const AppCard = AppCardComponent as typeof AppCardComponent & {
-  Header: typeof Header;
-  Content: typeof Content;
-  Footer: typeof Footer;
-  Media: typeof Media;
-  Actions: typeof Actions;
-};
+export const AppCard = AppCardComponent as CardComponentType;
 
 AppCard.Header = Header;
 AppCard.Content = Content;
@@ -279,4 +305,5 @@ AppCard.Footer = Footer;
 AppCard.Media = Media;
 AppCard.Actions = Actions;
 AppCard.displayName = 'AppCard';
+
 export default AppCard;

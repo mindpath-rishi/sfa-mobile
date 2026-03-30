@@ -7,9 +7,8 @@ export interface VanChangeModalProps {
 }
 
 export interface Van {
-  id: string;
+  vanId: string;
   name: string;
-  type: string;
   capacity: string;
-  registration: string;
+  vanNumber: string;
 }

@@ -6,10 +6,22 @@ import { toast } from '@/shared/utils/toast';
 export const errorHandler = (err: unknown): AppError => {
   let appError: AppError;
 
-  // Axios error
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
-    const data = err.response?.data;
+    const data: any = err.response?.data;
+
+    // ✅ Extract message properly (handles string | array)
+    let message: string =
+      typeof data?.message === 'string'
+        ? data.message
+        : Array.isArray(data?.message)
+          ? data.message.join(', ')
+          : (err.message ?? 'Something went wrong');
+
+    // ✅ Normalize known errors
+    if (message.includes('totalShops')) {
+      message = 'Total Shops must be a valid number';
+    }
 
     if (err.code === 'ECONNABORTED') {
       appError = new AppError({
@@ -47,29 +59,25 @@ export const errorHandler = (err: unknown): AppError => {
       });
     } else {
       appError = new AppError({
-        message: data?.message ?? err.message ?? 'Something went wrong.',
+        message,
         code: AppErrorType.UNKNOWN,
         status,
         data,
       });
     }
-  }
-  // Normal JS Error
-  else if (err instanceof Error) {
+  } else if (err instanceof Error) {
     appError = new AppError({
       message: err.message,
       code: AppErrorType.UNKNOWN,
     });
-  }
-  // Unknown fallback
-  else {
+  } else {
     appError = new AppError({
       message: 'Unknown error',
       code: AppErrorType.UNKNOWN,
     });
   }
 
-  // ✅ Show toast automatically
+  // ✅ Single place toast (NO duplicate)
   toast.error('Error', appError.message);
 
   return appError;

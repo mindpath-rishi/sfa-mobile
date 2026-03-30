@@ -19,7 +19,7 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      height: props.size === 'sm' ? 56 : props.size === 'lg' ? 80 : 64,
+      height: props.size === 'sm' ? 56 : props.size === 'lg' ? 80 : 50,
       backgroundColor: props.transparent ? 'transparent' : colors.background,
       // borderBottomWidth: props.showBorder ? 1 : 0,
       // borderBottomColor: colors.border + '30',

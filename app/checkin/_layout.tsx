@@ -1,11 +1,10 @@
 // SaleLayout.tsx
-import { Stack, useNavigation } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Header, HeaderProps } from '@/core/components/Header';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
-import { useCallback } from 'react';
+import { useMemo } from 'react';
 
-// Define extended options type
 type ScreenOptions = {
   title?: string;
   subtitle?: string;
@@ -25,13 +24,19 @@ type ScreenOptions = {
   filterCount?: number;
   onFilterPress?: () => void;
   badgeCount?: number;
+  useCustomerTitle?: boolean;
 };
 
 export default function SaleLayout() {
   const { colors } = useTheme();
   const { productsFilterCount } = useFilterContext();
+  const params = useLocalSearchParams();
 
-  // Helper function to create screen options with type safety
+  // Get customer name from params - single source of truth
+  const customerName = useMemo(() => {
+    return (params.customerName as string) || (params.name as string) || null;
+  }, [params.customerName, params.name]);
+
   const createScreenOptions = (options: ScreenOptions) => options;
 
   return (
@@ -40,14 +45,19 @@ export default function SaleLayout() {
         header: ({ options, navigation }) => {
           const customOptions = options as ScreenOptions;
 
-          // Determine if filter should be shown on this screen
+          // Determine title - use customer name if requested and available
+          let title = customOptions.title;
+          if (customOptions.useCustomerTitle && customerName) {
+            title = customerName;
+          }
+
           const shouldShowFilter = customOptions.showFilter ?? false;
           const filterCount = customOptions.filterCount ?? productsFilterCount;
           const filterActive = customOptions.filterActive ?? filterCount > 0;
 
           return (
             <Header
-              title={customOptions.title || 'Sale'}
+              title={title}
               subtitle={customOptions.subtitle}
               showBack={
                 customOptions.showBack !== undefined
@@ -55,15 +65,12 @@ export default function SaleLayout() {
                   : navigation.canGoBack()
               }
               showMenu={customOptions.showMenu || false}
-              // rightIcon={customOptions.rightIcon}
-              // secondRightIcon={customOptions.secondRightIcon}
               onRightPress={customOptions.onRightPress}
               onSecondRightPress={customOptions.onSecondRightPress}
               elevated={customOptions.elevated !== undefined ? customOptions.elevated : true}
               centeredTitle={
                 customOptions.centeredTitle !== undefined ? customOptions.centeredTitle : true
               }
-              // size={customOptions.headerSize || 'md'}
               showBorder={customOptions.showBorder !== undefined ? customOptions.showBorder : true}
               showSearch={customOptions.showSearch || false}
               showFilter={shouldShowFilter}
@@ -80,50 +87,29 @@ export default function SaleLayout() {
       <Stack.Screen
         name="index"
         options={createScreenOptions({
-          title: 'Sale',
+          title: 'Sale Summary',
           showMenu: true,
-          headerSize: 'lg',
-          rightIcon: 'search',
-          showFilter: true, // Enable filter on index screen
+          showFilter: true,
           centeredTitle: false,
-          onFilterPress: () => {
-            // This will be overridden by the screen's own handler
-            console.log('Filter pressed from layout');
-          },
+          onFilterPress: () => console.log('Filter pressed'),
         })}
       />
 
+      {/* Non-sale screens - all use customer name as title */}
       <Stack.Screen
-        name="new"
+        name="nonsale/second-step"
         options={createScreenOptions({
-          title: 'New Sale',
+          useCustomerTitle: true,
           showBack: true,
-          rightIcon: 'save',
-          secondRightIcon: 'close',
           centeredTitle: false,
         })}
       />
 
       <Stack.Screen
-        name="salesSummary"
+        name="nonsale/final-step"
         options={createScreenOptions({
-          title: 'Sales Summary',
+          useCustomerTitle: true,
           showBack: true,
-          headerSize: 'sm',
-          rightIcon: 'print',
-          centeredTitle: false,
-          elevated: false,
-        })}
-      />
-
-      <Stack.Screen
-        name="[id]"
-        options={createScreenOptions({
-          title: 'Sale Details',
-          showBack: true,
-          rightIcon: 'share',
-          secondRightIcon: 'ellipsis-vertical',
-          badgeCount: 1,
           centeredTitle: false,
         })}
       />
