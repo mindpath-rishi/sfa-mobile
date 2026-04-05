@@ -10,7 +10,7 @@ import Constants from 'expo-constants';
 import { errorHandler } from '@/core/errors/error.handler';
 import { logger } from '@/core/logger/logger';
 import { useAuthStore } from '@/core/store/auth.store';
-import { getAccessToken } from '@/shared/services/storage/tokenStorage';
+import { getAccessToken } from '@/shared/services/tokenStorage';
 import { useLoaderStore } from '../loader/loader.store';
 
 import type { ApiRequestConfig, ApiResponse, HttpMethod } from './api.types';
@@ -76,7 +76,6 @@ const getToken = async (): Promise<string | null> => {
 httpClient.interceptors.request.use(
   async (config: CustomAxiosRequestConfig): Promise<CustomAxiosRequestConfig> => {
     try {
-      // ✅ DEFAULT: loader ON
       if (config.showLoader !== false) {
         useLoaderStore.getState().show({ message: 'Loading...' });
       }
@@ -106,7 +105,6 @@ httpClient.interceptors.response.use(
   (response: AxiosResponse<ApiResponse<unknown>>) => {
     const config = response.config as CustomAxiosRequestConfig;
 
-    // ✅ DEFAULT: hide loader
     if (config.showLoader !== false) {
       useLoaderStore.getState().hide();
     }
@@ -128,7 +126,10 @@ httpClient.interceptors.response.use(
       message: appError.message,
     });
 
-    return Promise.reject(appError);
+    // ✅ Prevent unhandled rejection
+    return Promise.resolve({
+      data: null,
+    } as AxiosResponse);
   },
 );
 
@@ -141,19 +142,17 @@ export const apiRequest = async <TResponse, TBody = unknown>(
   url: string,
   body?: TBody,
   config?: ApiRequestConfig,
-): Promise<ApiResponse<TResponse>> => {
+): Promise<ApiResponse<TResponse> | null> => {
   const res = await httpClient.request<ApiResponse<TResponse>>({
     method,
     url,
     data: body,
     params: config?.params,
     headers: config?.headers,
-
-    // ✅ DEFAULT TRUE (only false disables loader)
     showLoader: config?.showLoader !== false,
   } as CustomAxiosRequestConfig);
 
-  return res.data;
+  return res?.data ?? null;
 };
 
 /* ======================================================

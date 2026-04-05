@@ -17,9 +17,9 @@ export const MOCK_DATA = {
 
 export const QUICK_ACTIONS: QuickAction[] = [
   { icon: 'location', label: 'Check In', color: '#4158D0', route: '/checkin' },
-  { icon: 'cart', label: 'New Order', color: '#C850C0', route: '/orders/new', badge: 3 },
+  // { icon: 'cart', label: 'New Order', color: '#C850C0', route: '/orders/new', badge: 3 },
   { icon: 'cash', label: 'Collection', color: '#FF512F', route: '/collections' },
-  { icon: 'people', label: 'Customers', color: '#11998e', route: '/customers' },
+  { icon: 'people', label: 'Outlets', color: '#11998e', route: '/outlets' },
   { icon: 'map', label: 'Route', color: '#F37335', route: '/beats' },
 ];
 
@@ -35,11 +35,11 @@ export const OTHER_WORK_OPTIONS: OtherWorkOption[] = [
 ];
 
 export const RETAILING_ROUTES: Route[] = [
-  { routeId: 'route1', name: 'Andheri East Route', stops: 12, distance: '8.5 km' },
-  { routeId: 'route2', name: 'Bandra West Route', stops: 15, distance: '10.2 km' },
-  { routeId: 'route3', name: 'Juhu Circle Route', stops: 8, distance: '6.3 km' },
-  { routeId: 'route4', name: 'Dadar Route', stops: 10, distance: '7.8 km' },
-  { routeId: 'route5', name: 'Malad Route', stops: 14, distance: '9.1 km' },
+  { routeId: 'route1', name: 'Andheri East Route', totalShops: 12, distance: '8.5 km' },
+  { routeId: 'route2', name: 'Bandra West Route', totalShops: 15, distance: '10.2 km' },
+  { routeId: 'route3', name: 'Juhu Circle Route', totalShops: 8, distance: '6.3 km' },
+  { routeId: 'route4', name: 'Dadar Route', totalShops: 10, distance: '7.8 km' },
+  { routeId: 'route5', name: 'Malad Route', totalShops: 14, distance: '9.1 km' },
 ];
 
 export const ASSIGNED_VAN: Van = {

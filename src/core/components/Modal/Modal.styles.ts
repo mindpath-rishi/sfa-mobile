@@ -67,7 +67,9 @@ export const useModalStyles = (
           return {
             ...basePosition,
             justifyContent: 'flex-end',
-            paddingBottom: utils.spacing[8],
+            alignItems: 'stretch', // 🔥 IMPORTANT
+
+            // paddingBottom: utils.spacing[8],
           };
         case 'left':
           return {
@@ -113,8 +115,8 @@ export const useModalStyles = (
       modalWrapper: {
         flex: 1,
         width: '100%',
+        justifyContent: position === 'bottom' ? 'flex-end' : 'center', // 🔥 FIX
         alignItems: 'center',
-        justifyContent: 'center',
       } as ViewStyle,
 
       // Modal container styles

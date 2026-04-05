@@ -1,26 +1,21 @@
-// components/SalesSummary/components/ProductsSection.tsx
 import React from 'react';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { Product } from '@/features/product';
+import { CartItemWithDetails, Product } from '@/features/product';
 import { ProductItem } from './ProductItem';
-import { CartItem } from '../../types/sales-summary.types';
 import { EmptyState } from '@/core/components/EmptyState/EmptyState';
+import { useCartStore } from '@/core/store/cart.store';
 
 interface ProductsSectionProps {
-  products: Product[];
-  cartItemsCount: number;
+  products: CartItemWithDetails[];
   hasItems: boolean;
-  onCartUpdate: (items: CartItem[]) => void;
 }
 
-export const ProductsSection: React.FC<ProductsSectionProps> = ({
-  products,
-  cartItemsCount,
-  hasItems,
-  onCartUpdate,
-}) => {
+export const ProductsSection: React.FC<ProductsSectionProps> = ({ products, hasItems }) => {
   const { colors } = useTheme();
+
+  // ✅ get cart from store
+  const { items } = useCartStore();
 
   return (
     <>
@@ -45,13 +40,18 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
         >
           Products ({products.length})
         </Text>
+
         <Text style={{ fontSize: 11, color: colors.textTertiary }}>
-          {hasItems ? `${cartItemsCount} items selected` : 'select products'}
+          {hasItems ? `${items.length} items selected` : 'select products'}
         </Text>
       </View>
 
       {products.map((product, idx) => (
-        <ProductItem key={product.id} product={product} index={idx} onCartUpdate={onCartUpdate} />
+        <ProductItem
+          key={product.productId} // ✅ FIXED
+          product={product}
+          index={idx}
+        />
       ))}
 
       {!hasItems && <EmptyState title="Item" />}

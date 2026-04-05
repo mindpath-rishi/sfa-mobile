@@ -2,7 +2,6 @@ import React from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { SalesConfirmationScreen } from '@/features/checkin';
 import CustomerOutstandingScreen from '@/features/checkin/screens/OutstandingScreen';
 
 export default function SaleConfirmationPage() {

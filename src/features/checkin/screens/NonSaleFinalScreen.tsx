@@ -1,4 +1,3 @@
-// components/non-sale/NonSaleFinalScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Alert, BackHandler } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,6 +7,8 @@ import { BottomBar } from '../components/nonsale/BottomBar';
 import { SelectedCategoryBadge } from '../components/nonsale/SelectedItemBadge';
 import { ReasonCard } from '../components/nonsale/ReasonCard';
 import { EmptyState } from '@/core/components/EmptyState';
+import { nonSaleService } from '@/features/outlet/services/non-sale.service';
+import { useOutletStore } from '@/core/store/outlet.store';
 
 export const FURTHER_REASONS: Record<string, Array<{ id: string; label: string }>> = {
   product: [
@@ -59,6 +60,8 @@ export const NonSaleFinalScreen: React.FC = () => {
 
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const activeVisit = useOutletStore((s) => s.activeVisit);
+  const clearVisit = useOutletStore((s) => s.clearVisit);
 
   // Extract data from params
   const customer = {
@@ -101,38 +104,20 @@ export const NonSaleFinalScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!selectedReason) {
-      Alert.alert('Selection Required', 'Please select a reason before submitting');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const payload = {
-        customer,
-        category: categoryId,
-        categoryTitle,
-        reason: reasonId,
-        reasonLabel,
-        furtherReason: selectedReason,
-        furtherReasonLabel: specificReasons.find((r) => r.id === selectedReason)?.label,
-        timestamp: new Date().toISOString(),
-      };
-
-      console.log('Non-sale submitted:', payload);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      Alert.alert(
-        'Success',
-        'Non-sale reason submitted successfully',
-        [{ text: 'OK', onPress: () => router.push('/checkin') }],
-        { cancelable: false },
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to submit reason. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+    console.log('==============active visit===========', activeVisit);
+    const payload: any = {
+      visitId: activeVisit?.visitId,
+      vanId: activeVisit?.visitId,
+      outletId: activeVisit?.outlet?.customerId,
+      reasonId: reasonId,
+      reasonCategoryId: categoryId,
+      // routeSessionId: activeVisit?.routeSessionId,
+      remark: '',
+    };
+    const response = await nonSaleService.markNonSale(payload);
+    if (response.success) {
+      clearVisit();
+      router.push('/outlets');
     }
   };
 

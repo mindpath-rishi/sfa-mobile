@@ -26,7 +26,7 @@ import { useLoginAnimation } from '../hooks/useLoginAnimation';
 // import messaging from '@react-native-firebase/messaging';
 import Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { setTokens } from '@/shared/services/storage/tokenStorage';
+import { setTokens } from '@/shared/services/tokenStorage';
 import { useAuthStore } from '@/core/store/auth.store';
 
 const { height } = Dimensions.get('window');

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import jwtDecode from 'jwt-decode';
 
-import { clearTokens, getAccessToken, setTokens } from '@/shared/services/storage/tokenStorage';
+import { clearTokens, getAccessToken, setTokens } from '@/shared/services/tokenStorage';
 
 /* ======================================================
  * TYPES
@@ -14,11 +14,39 @@ type AuthUser = {
   vanId?: string | null;
 };
 
+type Route = {
+  routeId: string;
+  name?: string;
+  routeSessionId: string;
+  workSessionId: string;
+  vanId: string;
+};
+
 type JwtPayload = {
   sub?: string;
   name?: string;
   role?: string;
   vanId?: string;
+};
+
+/* ======================================================
+ * HELPERS
+ * ====================================================== */
+
+const decodeToken = (token: string): AuthUser | null => {
+  try {
+    const decoded = jwtDecode<JwtPayload>(token);
+
+    return {
+      userId: decoded.sub || '',
+      name: decoded.name,
+      role: decoded.role,
+      vanId: decoded.vanId ?? null,
+    };
+  } catch (error) {
+    console.warn('JWT decode failed:', error);
+    return null;
+  }
 };
 
 /* ======================================================
@@ -29,52 +57,44 @@ export const useAuthStore = create<{
   isHydrated: boolean;
   accessToken: string | null;
   user: AuthUser | null;
+  selectedRoute: Route | null;
 
   hydrate: () => Promise<void>;
-  setAuth: (accessToken: string, refreshToken?: string, userFromApi?: AuthUser) => Promise<void>;
+  setAuth: (
+    accessToken: string,
+    refreshToken?: string,
+    userFromApi?: AuthUser,
+    routeFromApi?: Route,
+  ) => Promise<void>;
+
+  setSelectedRoute: (route: Route | null) => void;
+
   logout: () => Promise<void>;
 }>((set) => ({
   isHydrated: false,
   accessToken: null,
   user: null,
+  selectedRoute: null,
 
   /**
-   * 🔄 Hydrate from storage (SAFE VERSION)
+   * 🔄 Hydrate from storage
    */
   hydrate: async () => {
     try {
       const token = await getAccessToken();
 
-      console.log('Hydrated token:', token);
-
       if (!token) {
         set({
           accessToken: null,
           user: null,
+          selectedRoute: null,
           isHydrated: true,
         });
         return;
       }
 
-      let user: AuthUser | null = null;
+      const user = decodeToken(token);
 
-      try {
-        const decoded = jwtDecode<JwtPayload>(token);
-
-        user = {
-          userId: decoded.sub || '',
-          name: decoded.name,
-          role: decoded.role,
-          vanId: decoded.vanId ?? null,
-        };
-      } catch (decodeError) {
-        console.warn('JWT decode failed, but token exists:', decodeError);
-
-        // ✅ IMPORTANT: DO NOT REMOVE TOKEN
-        user = null;
-      }
-
-      // ✅ ALWAYS KEEP TOKEN
       set({
         accessToken: token,
         user,
@@ -86,6 +106,7 @@ export const useAuthStore = create<{
       set({
         accessToken: null,
         user: null,
+        selectedRoute: null,
         isHydrated: true,
       });
     }
@@ -94,32 +115,23 @@ export const useAuthStore = create<{
   /**
    * 🔐 Set Auth after login
    */
-  setAuth: async (accessToken, refreshToken, userFromApi) => {
+  setAuth: async (accessToken, refreshToken, userFromApi, routeFromApi) => {
     await setTokens(accessToken, refreshToken);
 
-    let user: AuthUser | null = null;
-
-    try {
-      if (userFromApi) {
-        user = userFromApi;
-      } else {
-        const decoded = jwtDecode<JwtPayload>(accessToken);
-
-        user = {
-          userId: decoded.sub || '',
-          name: decoded.name,
-          role: decoded.role,
-          vanId: decoded.vanId ?? null,
-        };
-      }
-    } catch (error) {
-      console.warn('Token decode failed:', error);
-    }
+    const user = userFromApi || decodeToken(accessToken);
 
     set({
       accessToken,
       user,
+      selectedRoute: routeFromApi || null,
     });
+  },
+
+  /**
+   * 📍 Set Selected Route (User Context)
+   */
+  setSelectedRoute: (route) => {
+    set({ selectedRoute: route });
   },
 
   /**
@@ -131,6 +143,7 @@ export const useAuthStore = create<{
     set({
       accessToken: null,
       user: null,
+      selectedRoute: null,
     });
   },
 }));

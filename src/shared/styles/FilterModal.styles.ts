@@ -6,16 +6,11 @@ export const useFilterModalStyles = () => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'flex-end',
-    } as ViewStyle,
-
     modalContent: {
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      width: '100%',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      overflow: 'hidden',
+      backgroundColor: colors.background,
     } as ViewStyle,
 
     // Header
@@ -26,7 +21,7 @@ export const useFilterModalStyles = () => {
       paddingHorizontal: utils.spacing[4],
       paddingVertical: utils.spacing[3],
       borderBottomWidth: 1,
-      borderBottomColor: colors.border + '30',
+      borderBottomColor: colors.border + '20',
     } as ViewStyle,
 
     modalHeaderLeft: {
@@ -36,7 +31,7 @@ export const useFilterModalStyles = () => {
     } as ViewStyle,
 
     modalTitle: {
-      fontSize: utils.fontSize.lg,
+      fontSize: utils.fontSize.xl,
       fontWeight: utils.getFontWeight('600'),
       color: colors.textPrimary,
     } as TextStyle,
@@ -44,9 +39,10 @@ export const useFilterModalStyles = () => {
     headerBadge: {
       paddingHorizontal: utils.spacing[1.5],
       paddingVertical: 2,
-      borderRadius: 12,
+      borderRadius: 16,
       minWidth: 24,
       alignItems: 'center',
+      justifyContent: 'center',
     } as ViewStyle,
 
     headerBadgeText: {
@@ -60,7 +56,7 @@ export const useFilterModalStyles = () => {
       paddingHorizontal: utils.spacing[4],
       paddingVertical: utils.spacing[2],
       borderBottomWidth: 1,
-      borderBottomColor: colors.border + '30',
+      borderBottomColor: colors.border + '20',
     } as ViewStyle,
 
     globalSearchInput: {
@@ -69,8 +65,9 @@ export const useFilterModalStyles = () => {
       paddingHorizontal: utils.spacing[3],
       paddingVertical: utils.spacing[2],
       borderWidth: 1,
-      borderRadius: utils.borderRadius.md,
+      borderRadius: utils.borderRadius.lg,
       gap: utils.spacing[2],
+      backgroundColor: colors.surface,
     } as ViewStyle,
 
     globalSearchText: {
@@ -80,14 +77,15 @@ export const useFilterModalStyles = () => {
       padding: 0,
     } as TextStyle,
 
-    // Sections
+    // Scroll Content
     scrollContent: {
       paddingBottom: utils.spacing[2],
     } as ViewStyle,
 
+    // Sections
     section: {
       borderBottomWidth: 1,
-      borderBottomColor: colors.border + '20',
+      borderBottomColor: colors.border + '15',
     } as ViewStyle,
 
     sectionHeader: {
@@ -102,12 +100,14 @@ export const useFilterModalStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: utils.spacing[2],
+      flex: 1,
     } as ViewStyle,
 
     sectionTitle: {
       fontSize: utils.fontSize.md,
       fontWeight: utils.getFontWeight('500'),
       color: colors.textPrimary,
+      flex: 1,
     } as TextStyle,
 
     sectionHeaderRight: {
@@ -117,9 +117,9 @@ export const useFilterModalStyles = () => {
     } as ViewStyle,
 
     activeBadge: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       justifyContent: 'center',
       alignItems: 'center',
     } as ViewStyle,
@@ -130,10 +130,11 @@ export const useFilterModalStyles = () => {
       fontWeight: utils.getFontWeight('600'),
     } as TextStyle,
 
-    // Options
+    // Options Container
     optionsContainer: {
       paddingHorizontal: utils.spacing[4],
       paddingBottom: utils.spacing[3],
+      gap: utils.spacing[1],
     } as ViewStyle,
 
     optionRow: {
@@ -141,6 +142,7 @@ export const useFilterModalStyles = () => {
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingVertical: utils.spacing[2],
+      paddingHorizontal: utils.spacing[1],
     } as ViewStyle,
 
     optionLeft: {
@@ -161,7 +163,7 @@ export const useFilterModalStyles = () => {
       color: colors.textTertiary,
     } as TextStyle,
 
-    // Radio
+    // Radio Button
     radio: {
       width: 20,
       height: 20,
@@ -186,7 +188,7 @@ export const useFilterModalStyles = () => {
     checkbox: {
       width: 20,
       height: 20,
-      borderRadius: 4,
+      borderRadius: 6,
       borderWidth: 2,
       borderColor: colors.border,
       justifyContent: 'center',
@@ -201,6 +203,7 @@ export const useFilterModalStyles = () => {
     // Toggle
     toggleRow: {
       paddingVertical: utils.spacing[2],
+      paddingHorizontal: utils.spacing[1],
     } as ViewStyle,
 
     toggle: {
@@ -227,10 +230,9 @@ export const useFilterModalStyles = () => {
       transform: [{ translateX: 20 }],
     } as ViewStyle,
 
-    // Range
+    // Range Inputs
     rangeContainer: {
-      paddingHorizontal: utils.spacing[4],
-      paddingBottom: utils.spacing[3],
+      paddingHorizontal: utils.spacing[1],
     } as ViewStyle,
 
     rangeInputs: {
@@ -267,19 +269,19 @@ export const useFilterModalStyles = () => {
       color: colors.textSecondary,
     } as TextStyle,
 
-    // Search
+    // Search Input
     searchContainer: {
-      paddingHorizontal: utils.spacing[4],
-      paddingBottom: utils.spacing[3],
+      paddingHorizontal: utils.spacing[1],
     } as ViewStyle,
 
     searchInputWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 1,
-      borderRadius: utils.borderRadius.md,
+      borderRadius: utils.borderRadius.lg,
       paddingHorizontal: utils.spacing[2.5],
       gap: utils.spacing[2],
+      backgroundColor: colors.surface,
     } as ViewStyle,
 
     searchInput: {
@@ -296,36 +298,20 @@ export const useFilterModalStyles = () => {
       paddingVertical: utils.spacing[3],
       gap: utils.spacing[2],
       borderTopWidth: 1,
-      borderTopColor: colors.border + '30',
+      borderTopColor: colors.border + '20',
     } as ViewStyle,
 
-    footerButton: {
+    footerResetButton: {
       flex: 1,
-      paddingVertical: utils.spacing[3],
-      borderRadius: 25,
-      alignItems: 'center',
+      height: 44,
+      borderRadius: 22,
     } as ViewStyle,
 
-    resetButton: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border + '30',
+    footerApplyButton: {
+      flex: 1,
+      height: 44,
+      borderRadius: 22,
     } as ViewStyle,
-
-    resetButtonText: {
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('500'),
-    } as TextStyle,
-
-    applyButton: {
-      flex: 2,
-    } as ViewStyle,
-
-    applyButtonText: {
-      color: 'white',
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('600'),
-    } as TextStyle,
   }));
 
   return styleGenerator(colors);

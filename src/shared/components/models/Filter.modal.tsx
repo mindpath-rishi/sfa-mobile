@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, Platform } from 'react-native';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { View, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
 import { useTheme } from '@/shared/hooks/useTheme';
-import { FilterModalProps, FilterSection } from '@/shared/types/filter.types';
 import { useFilterModalStyles } from '@/shared/styles/FilterModal.styles';
+import { FilterModalProps, FilterSection } from '@/shared/types/filter.types';
+import { AppButton, AppText, AppModal } from '@/core/components';
 
 export const FilterModal: React.FC<FilterModalProps> = ({
   visible,
@@ -12,10 +14,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   onApply,
   onReset,
   title = 'Filters',
-  showCount = true,
   applyButtonText = 'Apply',
   resetButtonText = 'Reset',
   cancelButtonText = 'Cancel',
+  showCount = true,
   maxHeight = 600,
 }) => {
   const { colors } = useTheme();
@@ -25,98 +27,77 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [searchText, setSearchText] = useState('');
 
-  // Initialize expanded sections
+  // Initialize sections and expanded state
   useEffect(() => {
-    const initialExpanded: Record<string, boolean> = {};
-    sections.forEach((section) => {
-      initialExpanded[section.id] = section.expanded || false;
+    const expanded: Record<string, boolean> = {};
+    initialSections.forEach((s) => {
+      expanded[s.id] = s.expanded || false;
     });
-    setExpandedSections(initialExpanded);
-  }, [sections]);
-
-  // Update sections when initialSections change
-  useEffect(() => {
+    setExpandedSections(expanded);
     setSections(initialSections);
   }, [initialSections]);
 
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [sectionId]: !prev[sectionId],
-    }));
-  };
+  // Handlers
+  const toggleSection = useCallback((id: string) => {
+    setExpandedSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
 
-  const handleSingleSelect = (sectionId: string, optionId: string) => {
+  const handleSingleSelect = useCallback((sectionId: string, optionId: string) => {
     setSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId ? { ...section, selectedId: optionId } : section,
-      ),
+      prev.map((s) => (s.id === sectionId ? { ...s, selectedId: optionId } : s)),
     );
-  };
+  }, []);
 
-  const handleMultipleSelect = (sectionId: string, optionId: string) => {
+  const handleMultipleSelect = useCallback((sectionId: string, optionId: string) => {
     setSections((prev) =>
-      prev.map((section) => {
-        if (section.id === sectionId) {
-          const selectedIds = section.selectedIds || [];
-          return {
-            ...section,
-            selectedIds: selectedIds.includes(optionId)
-              ? selectedIds.filter((id) => id !== optionId)
-              : [...selectedIds, optionId],
-          };
-        }
-        return section;
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const selected = s.selectedIds || [];
+        return {
+          ...s,
+          selectedIds: selected.includes(optionId)
+            ? selected.filter((id) => id !== optionId)
+            : [...selected, optionId],
+        };
       }),
     );
-  };
+  }, []);
 
-  const handleToggle = (sectionId: string) => {
+  const handleToggle = useCallback((sectionId: string) => {
     setSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId ? { ...section, toggleValue: !section.toggleValue } : section,
-      ),
+      prev.map((s) => (s.id === sectionId ? { ...s, toggleValue: !s.toggleValue } : s)),
     );
-  };
+  }, []);
 
-  const handleRangeChange = (sectionId: string, type: 'min' | 'max', value: string) => {
+  const handleRangeChange = useCallback((sectionId: string, type: 'min' | 'max', value: string) => {
     setSections((prev) =>
-      prev.map((section) => {
-        if (section.id === sectionId) {
-          const currentRange = section.rangeValue || { min: '', max: '' };
-          return {
-            ...section,
-            rangeValue: {
-              ...currentRange,
-              [type]: value,
-            },
-          };
-        }
-        return section;
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const currentRange = s.rangeValue || { min: '', max: '' };
+        return {
+          ...s,
+          rangeValue: { ...currentRange, [type]: value },
+        };
       }),
     );
-  };
+  }, []);
 
-  const handleSearchChange = (sectionId: string, value: string) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.id === sectionId ? { ...section, searchValue: value } : section,
-      ),
-    );
-  };
+  const handleSearchChange = useCallback((sectionId: string, value: string) => {
+    setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, searchValue: value } : s)));
+  }, []);
 
-  const handleApply = () => {
+  const handleApply = useCallback(() => {
     onApply(sections);
     onClose();
-  };
+  }, [sections, onApply, onClose]);
 
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     if (onReset) {
       onReset();
     } else {
       setSections(
-        initialSections.map((section) => ({
-          ...section,
+        initialSections.map((s) => ({
+          ...s,
           selectedIds: [],
           selectedId: undefined,
           toggleValue: false,
@@ -125,384 +106,313 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         })),
       );
     }
-  };
+  }, [onReset, initialSections]);
 
-  const getActiveFilterCount = (): number => {
+  // Calculate active filter count
+  const activeCount = useMemo(() => {
     let count = 0;
-    sections.forEach((section) => {
-      if (section.type === 'multiple' && section.selectedIds?.length) {
-        count += section.selectedIds.length;
-      } else if (section.type === 'single' && section.selectedId) {
-        count += 1;
-      } else if (section.type === 'toggle' && section.toggleValue) {
-        count += 1;
-      } else if (section.type === 'range' && (section.rangeValue?.min || section.rangeValue?.max)) {
-        count += 1;
-      } else if (section.type === 'search' && section.searchValue) {
-        count += 1;
+    sections.forEach((s) => {
+      if (s.type === 'multiple' && s.selectedIds?.length) {
+        count += s.selectedIds.length;
+      } else if (s.type === 'single' && s.selectedId) {
+        count++;
+      } else if (s.type === 'toggle' && s.toggleValue) {
+        count++;
+      } else if (s.type === 'range' && (s.rangeValue?.min || s.rangeValue?.max)) {
+        count++;
+      } else if (s.type === 'search' && s.searchValue) {
+        count++;
       }
     });
     return count;
-  };
+  }, [sections]);
 
-  const renderSection = (section: FilterSection) => {
-    switch (section.type) {
-      case 'single':
-        return (
-          <View style={styles.section}>
+  // Filter sections based on search
+  const filteredSections = useMemo(() => {
+    if (!searchText) return sections;
+    return sections.filter((s) => s.title.toLowerCase().includes(searchText.toLowerCase()));
+  }, [sections, searchText]);
+
+  // Render section content based on type
+  const renderSectionContent = useCallback(
+    (section: FilterSection) => {
+      switch (section.type) {
+        case 'single':
+          return section.options?.map((opt) => (
             <TouchableOpacity
-              style={styles.sectionHeader}
-              onPress={() => toggleSection(section.id)}
+              key={opt.id}
+              style={styles.optionRow}
+              onPress={() => handleSingleSelect(section.id, opt.id)}
+              activeOpacity={0.7}
             >
-              <View style={styles.sectionHeaderLeft}>
-                {section.icon && <Ionicons name={section.icon} size={20} color={colors.primary} />}
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-              <View style={styles.sectionHeaderRight}>
-                {section.selectedId && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.activeBadgeText}>1</Text>
-                  </View>
-                )}
-                <Ionicons
-                  name={expandedSections[section.id] ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {expandedSections[section.id] && (
-              <View style={styles.optionsContainer}>
-                {section.options?.map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    style={styles.optionRow}
-                    onPress={() => handleSingleSelect(section.id, option.id)}
-                  >
-                    <View style={styles.optionLeft}>
-                      <View
-                        style={[
-                          styles.radio,
-                          section.selectedId === option.id && styles.radioSelected,
-                        ]}
-                      >
-                        {section.selectedId === option.id && (
-                          <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />
-                        )}
-                      </View>
-                      {option.icon && (
-                        <Ionicons
-                          name={option.icon}
-                          size={18}
-                          color={option.color || colors.textSecondary}
-                        />
-                      )}
-                      <Text style={styles.optionLabel}>{option.label}</Text>
-                    </View>
-                    {showCount && option.count !== undefined && (
-                      <Text style={styles.optionCount}>{option.count}</Text>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        );
-
-      case 'multiple':
-        return (
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.sectionHeader}
-              onPress={() => toggleSection(section.id)}
-            >
-              <View style={styles.sectionHeaderLeft}>
-                {section.icon && <Ionicons name={section.icon} size={20} color={colors.primary} />}
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-              <View style={styles.sectionHeaderRight}>
-                {section.selectedIds && section.selectedIds.length > 0 && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.activeBadgeText}>{section.selectedIds.length}</Text>
-                  </View>
-                )}
-                <Ionicons
-                  name={expandedSections[section.id] ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {expandedSections[section.id] && (
-              <View style={styles.optionsContainer}>
-                {section.options?.map((option) => {
-                  const isSelected = section.selectedIds?.includes(option.id);
-                  return (
-                    <TouchableOpacity
-                      key={option.id}
-                      style={styles.optionRow}
-                      onPress={() => handleMultipleSelect(section.id, option.id)}
-                    >
-                      <View style={styles.optionLeft}>
-                        <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                          {isSelected && <Ionicons name="checkmark" size={14} color="white" />}
-                        </View>
-                        {option.icon && (
-                          <Ionicons
-                            name={option.icon}
-                            size={18}
-                            color={option.color || colors.textSecondary}
-                          />
-                        )}
-                        <Text style={styles.optionLabel}>{option.label}</Text>
-                      </View>
-                      {showCount && option.count !== undefined && (
-                        <Text style={styles.optionCount}>{option.count}</Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-        );
-
-      case 'toggle':
-        return (
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.sectionHeader}
-              onPress={() => toggleSection(section.id)}
-            >
-              <View style={styles.sectionHeaderLeft}>
-                {section.icon && <Ionicons name={section.icon} size={20} color={colors.primary} />}
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-              <View style={styles.sectionHeaderRight}>
-                {section.toggleValue && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="checkmark" size={12} color="white" />
-                  </View>
-                )}
-                <Ionicons
-                  name={expandedSections[section.id] ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {expandedSections[section.id] && (
-              <View style={styles.optionsContainer}>
-                <TouchableOpacity style={styles.toggleRow} onPress={() => handleToggle(section.id)}>
-                  <View style={styles.optionLeft}>
-                    <View style={[styles.toggle, section.toggleValue && styles.toggleActive]}>
-                      <View
-                        style={[
-                          styles.toggleCircle,
-                          section.toggleValue && styles.toggleCircleActive,
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.optionLabel}>
-                      {section.toggleValue ? 'Enabled' : 'Disabled'}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        );
-
-      case 'range':
-        return (
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.sectionHeader}
-              onPress={() => toggleSection(section.id)}
-            >
-              <View style={styles.sectionHeaderLeft}>
-                {section.icon && <Ionicons name={section.icon} size={20} color={colors.primary} />}
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-              <View style={styles.sectionHeaderRight}>
-                {(section.rangeValue?.min || section.rangeValue?.max) && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="funnel" size={12} color="white" />
-                  </View>
-                )}
-                <Ionicons
-                  name={expandedSections[section.id] ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {expandedSections[section.id] && (
-              <View style={styles.rangeContainer}>
-                <View style={styles.rangeInputs}>
-                  <View style={styles.rangeInputWrapper}>
-                    <Text style={styles.rangeLabel}>Min</Text>
-                    <TextInput
-                      style={[styles.rangeInput, { borderColor: colors.border }]}
-                      value={section.rangeValue?.min?.toString() || ''}
-                      onChangeText={(value) => handleRangeChange(section.id, 'min', value)}
-                      placeholder="0"
-                      keyboardType="numeric"
-                      placeholderTextColor={colors.textTertiary}
-                    />
-                  </View>
-                  <View style={styles.rangeSeparator}>
-                    <Text style={styles.rangeSeparatorText}>to</Text>
-                  </View>
-                  <View style={styles.rangeInputWrapper}>
-                    <Text style={styles.rangeLabel}>Max</Text>
-                    <TextInput
-                      style={[styles.rangeInput, { borderColor: colors.border }]}
-                      value={section.rangeValue?.max?.toString() || ''}
-                      onChangeText={(value) => handleRangeChange(section.id, 'max', value)}
-                      placeholder="Any"
-                      keyboardType="numeric"
-                      placeholderTextColor={colors.textTertiary}
-                    />
-                  </View>
+              <View style={styles.optionLeft}>
+                <View style={[styles.radio, section.selectedId === opt.id && styles.radioSelected]}>
+                  {section.selectedId === opt.id && (
+                    <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />
+                  )}
                 </View>
-              </View>
-            )}
-          </View>
-        );
-
-      case 'search':
-        return (
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.sectionHeader}
-              onPress={() => toggleSection(section.id)}
-            >
-              <View style={styles.sectionHeaderLeft}>
-                {section.icon && <Ionicons name={section.icon} size={20} color={colors.primary} />}
-                <Text style={styles.sectionTitle}>{section.title}</Text>
-              </View>
-              <View style={styles.sectionHeaderRight}>
-                {section.searchValue && (
-                  <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
-                    <Ionicons name="search" size={12} color="white" />
-                  </View>
+                {opt.icon && (
+                  <Ionicons name={opt.icon} size={18} color={opt.color || colors.textSecondary} />
                 )}
-                <Ionicons
-                  name={expandedSections[section.id] ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={colors.textSecondary}
-                />
+                <AppText style={styles.optionLabel}>{opt.label}</AppText>
+              </View>
+              {showCount && opt.count !== undefined && (
+                <AppText variant="caption" style={styles.optionCount}>
+                  {opt.count}
+                </AppText>
+              )}
+            </TouchableOpacity>
+          ));
+
+        case 'multiple':
+          return section.options?.map((opt) => {
+            const isSelected = section.selectedIds?.includes(opt.id) || false;
+            return (
+              <TouchableOpacity
+                key={opt.id}
+                style={styles.optionRow}
+                onPress={() => handleMultipleSelect(section.id, opt.id)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.optionLeft}>
+                  <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
+                    {isSelected && <Ionicons name="checkmark" size={12} color="white" />}
+                  </View>
+                  {opt.icon && (
+                    <Ionicons name={opt.icon} size={18} color={opt.color || colors.textSecondary} />
+                  )}
+                  <AppText style={styles.optionLabel}>{opt.label}</AppText>
+                </View>
+                {showCount && opt.count !== undefined && (
+                  <AppText variant="caption" style={styles.optionCount}>
+                    {opt.count}
+                  </AppText>
+                )}
+              </TouchableOpacity>
+            );
+          });
+
+        case 'toggle':
+          return (
+            <TouchableOpacity
+              style={styles.toggleRow}
+              onPress={() => handleToggle(section.id)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.optionLeft}>
+                <View style={[styles.toggle, section.toggleValue && styles.toggleActive]}>
+                  <View
+                    style={[styles.toggleCircle, section.toggleValue && styles.toggleCircleActive]}
+                  />
+                </View>
+                <AppText style={styles.optionLabel}>
+                  {section.toggleValue ? 'Enabled' : 'Disabled'}
+                </AppText>
               </View>
             </TouchableOpacity>
+          );
 
-            {expandedSections[section.id] && (
-              <View style={styles.searchContainer}>
-                <View style={[styles.searchInputWrapper, { borderColor: colors.border }]}>
-                  <Ionicons name="search" size={18} color={colors.textTertiary} />
+        case 'range':
+          return (
+            <View style={styles.rangeContainer}>
+              <View style={styles.rangeInputs}>
+                <View style={styles.rangeInputWrapper}>
+                  <AppText variant="caption" style={styles.rangeLabel}>
+                    Min
+                  </AppText>
                   <TextInput
-                    style={styles.searchInput}
-                    value={section.searchValue}
-                    onChangeText={(value) => handleSearchChange(section.id, value)}
-                    placeholder={section.searchPlaceholder || 'Search...'}
+                    style={[styles.rangeInput, { borderColor: colors.border }]}
+                    value={section.rangeValue?.min?.toString() || ''}
+                    onChangeText={(value) => handleRangeChange(section.id, 'min', value)}
+                    placeholder="0"
+                    keyboardType="numeric"
                     placeholderTextColor={colors.textTertiary}
                   />
-                  {section.searchValue ? (
-                    <TouchableOpacity onPress={() => handleSearchChange(section.id, '')}>
-                      <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-                    </TouchableOpacity>
-                  ) : null}
                 </View>
+                <View style={styles.rangeSeparator}>
+                  <AppText style={styles.rangeSeparatorText}>to</AppText>
+                </View>
+                <View style={styles.rangeInputWrapper}>
+                  <AppText variant="caption" style={styles.rangeLabel}>
+                    Max
+                  </AppText>
+                  <TextInput
+                    style={[styles.rangeInput, { borderColor: colors.border }]}
+                    value={section.rangeValue?.max?.toString() || ''}
+                    onChangeText={(value) => handleRangeChange(section.id, 'max', value)}
+                    placeholder="Any"
+                    keyboardType="numeric"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+              </View>
+            </View>
+          );
+
+        case 'search':
+          return (
+            <View style={styles.searchContainer}>
+              <View style={[styles.searchInputWrapper, { borderColor: colors.border }]}>
+                <Ionicons name="search" size={18} color={colors.textTertiary} />
+                <TextInput
+                  style={styles.searchInput}
+                  value={section.searchValue}
+                  onChangeText={(value) => handleSearchChange(section.id, value)}
+                  placeholder={section.searchPlaceholder || 'Search...'}
+                  placeholderTextColor={colors.textTertiary}
+                  autoFocus={false}
+                />
+                {section.searchValue && (
+                  <TouchableOpacity onPress={() => handleSearchChange(section.id, '')}>
+                    <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          );
+
+        default:
+          return null;
+      }
+    },
+    [
+      colors,
+      showCount,
+      styles,
+      handleSingleSelect,
+      handleMultipleSelect,
+      handleToggle,
+      handleRangeChange,
+      handleSearchChange,
+    ],
+  );
+
+  // Render section header
+  const renderSection = useCallback(
+    (section: FilterSection) => {
+      const expanded = expandedSections[section.id];
+      const hasActiveValue =
+        (section.type === 'multiple' && (section.selectedIds?.length ?? 0) > 0) ||
+        (section.type === 'single' && section.selectedId) ||
+        (section.type === 'toggle' && section.toggleValue) ||
+        (section.type === 'range' && (section.rangeValue?.min || section.rangeValue?.max)) ||
+        (section.type === 'search' && section.searchValue);
+
+      return (
+        <View key={section.id} style={styles.section}>
+          <TouchableOpacity
+            style={styles.sectionHeader}
+            onPress={() => toggleSection(section.id)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.sectionHeaderLeft}>
+              {section.icon && <Ionicons name={section.icon} size={20} color={colors.primary} />}
+              <AppText style={styles.sectionTitle}>{section.title}</AppText>
+            </View>
+
+            <View style={styles.sectionHeaderRight}>
+              {hasActiveValue && (
+                <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
+                  {section.type === 'multiple' && (section.selectedIds?.length ?? 0) > 0 ? (
+                    <AppText variant="caption" style={styles.activeBadgeText}>
+                      {section.selectedIds?.length ?? 0}
+                    </AppText>
+                  ) : (
+                    <Ionicons name="checkmark" size={12} color="white" />
+                  )}
+                </View>
+              )}
+              <Ionicons
+                name={expanded ? 'chevron-up' : 'chevron-down'}
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {expanded && <View style={styles.optionsContainer}>{renderSectionContent(section)}</View>}
+        </View>
+      );
+    },
+    [expandedSections, colors, styles, toggleSection, renderSectionContent],
+  );
+
+  return (
+    <AppModal
+      visible={visible}
+      onClose={onClose}
+      position="bottom"
+      animation="slide"
+      closeOnBackdropPress={true}
+      dismissible={true}
+      showHeader={false}
+      hideCloseButton={true}
+    >
+      <View style={[styles.modalContent, { maxHeight, backgroundColor: colors.background }]}>
+        {/* Header */}
+        <View style={styles.modalHeader}>
+          <View style={styles.modalHeaderLeft}>
+            <AppText style={styles.modalTitle}>{title}</AppText>
+            {activeCount > 0 && (
+              <View style={[styles.headerBadge, { backgroundColor: colors.primary }]}>
+                <AppText variant="caption" style={styles.headerBadgeText}>
+                  {activeCount}
+                </AppText>
               </View>
             )}
           </View>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  const activeCount = getActiveFilterCount();
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: colors.background, maxHeight }]}>
-          {/* Header */}
-          <View style={styles.modalHeader}>
-            <View style={styles.modalHeaderLeft}>
-              <Text style={styles.modalTitle}>{title}</Text>
-              {activeCount > 0 && (
-                <View style={[styles.headerBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.headerBadgeText}>{activeCount}</Text>
-                </View>
-              )}
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={24} color={colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Search All Filters (optional) */}
-          {sections.length > 5 && (
-            <View style={styles.globalSearchContainer}>
-              <View style={[styles.globalSearchInput, { borderColor: colors.border }]}>
-                <Ionicons name="search" size={18} color={colors.textTertiary} />
-                <TextInput
-                  style={styles.globalSearchText}
-                  value={searchText}
-                  onChangeText={setSearchText}
-                  placeholder="Search filters..."
-                  placeholderTextColor={colors.textTertiary}
-                />
-              </View>
-            </View>
-          )}
-
-          {/* Filter Sections */}
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+          <TouchableOpacity
+            onPress={onClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            {sections
-              .filter(
-                (section) =>
-                  !searchText || section.title.toLowerCase().includes(searchText.toLowerCase()),
-              )
-              .map((section) => (
-                <View key={section.id}>{renderSection(section)}</View>
-              ))}
-          </ScrollView>
+            <Ionicons name="close" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
 
-          {/* Footer */}
-          <View style={styles.modalFooter}>
-            <TouchableOpacity
-              style={[styles.footerButton, styles.resetButton]}
-              onPress={handleReset}
-            >
-              <Text style={[styles.resetButtonText, { color: colors.textSecondary }]}>
-                {resetButtonText}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.footerButton, styles.applyButton, { backgroundColor: colors.primary }]}
-              onPress={handleApply}
-            >
-              <Text style={styles.applyButtonText}>
-                {applyButtonText} {activeCount > 0 ? `(${activeCount})` : ''}
-              </Text>
-            </TouchableOpacity>
+        {/* Global Search */}
+        {sections.length > 5 && (
+          <View style={styles.globalSearchContainer}>
+            <View style={[styles.globalSearchInput, { borderColor: colors.border }]}>
+              <Ionicons name="search" size={18} color={colors.textTertiary} />
+              <TextInput
+                style={styles.globalSearchText}
+                value={searchText}
+                onChangeText={setSearchText}
+                placeholder="Search filters..."
+                placeholderTextColor={colors.textTertiary}
+              />
+              {searchText ? (
+                <TouchableOpacity onPress={() => setSearchText('')}>
+                  <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
+        )}
+
+        {/* Sections */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {filteredSections.map(renderSection)}
+        </ScrollView>
+
+        {/* Footer */}
+        <View style={styles.modalFooter}>
+          <AppButton
+            title={resetButtonText}
+            variant="outline"
+            onPress={handleReset}
+            style={styles.footerResetButton}
+          />
+          <AppButton
+            title={`${applyButtonText}${activeCount > 0 ? ` (${activeCount})` : ''}`}
+            onPress={handleApply}
+            style={styles.footerApplyButton}
+          />
         </View>
       </View>
-    </Modal>
+    </AppModal>
   );
 };

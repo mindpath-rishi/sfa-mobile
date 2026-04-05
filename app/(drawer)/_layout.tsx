@@ -2,12 +2,11 @@
 import { Drawer } from 'expo-router/drawer';
 import { Header } from '@/core/components/Header';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { View, Text, Platform, BackHandler } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
-import { router, useSegments, useNavigation } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
-import { useEffect } from 'react';
 import { useAuthStore } from '@/core/store/auth.store';
 
 // Custom Drawer Content
@@ -17,14 +16,7 @@ const CustomDrawerContent = (props: any) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Drawer Header */}
-      <View
-        style={{
-          padding: 20,
-          paddingTop: 40,
-          backgroundColor: colors.primary,
-        }}
-      >
+      <View style={{ padding: 20, paddingTop: 40, backgroundColor: colors.primary }}>
         <View
           style={{
             width: 60,
@@ -48,20 +40,13 @@ const CustomDrawerContent = (props: any) => {
         <DrawerItemList {...props} />
       </DrawerContentScrollView>
 
-      {/* Drawer Footer */}
-      <View
-        style={{
-          padding: 20,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-        }}
-      >
+      <View style={{ padding: 20, borderTopWidth: 1, borderTopColor: colors.border }}>
         <DrawerItem
           label="Logout"
           icon={({ color, size }) => <Ionicons name="log-out-outline" size={size} color={color} />}
           onPress={async () => {
-            await logout(); // ✅ clear token from storage + state
-            router.replace('/(auth)'); // ✅ replace (not push)
+            await logout();
+            router.replace('/(auth)');
           }}
         />
         <Text
@@ -79,16 +64,12 @@ const CustomDrawerContent = (props: any) => {
   );
 };
 
-// Helper to check if current screen is a detail screen
+// Detect detail screen
 const isDetailScreen = (segments: string[]) => {
-  console.log('Current segments:', segments);
-  if (segments[2] && segments[2] === '[id]') {
-    return true;
-  }
-  return false;
+  return segments[2] === '[id]';
 };
 
-// Get header props based on route
+// Header config
 const getHeaderProps = (
   routeName: string,
   segments: string[],
@@ -96,21 +77,6 @@ const getHeaderProps = (
   activeFilterCount?: number,
   onFilterPress?: () => void,
 ) => {
-  // const isDetail = isDetailScreen(segments);
-
-  // // For detail screens, show back button
-  // if (isDetail) {
-  //   return {
-  //     title,
-  //     showBack: true,
-  //     showMenu: false,
-  //     elevated: true,
-  //     size: 'md' as const,
-  //     centeredTitle: Platform.OS === 'ios',
-  //     showFilter: false,
-  //   };
-  // }
-
   const showBack = routeName !== '(tabs)';
 
   const commonProps = {
@@ -123,17 +89,16 @@ const getHeaderProps = (
   };
 
   switch (routeName) {
-    case 'customers':
+    case 'outlets':
       return {
         ...commonProps,
         rightIcon: 'add' as const,
-        secondRightIcon: 'scan' as const,
-        onRightPress: () => router.push('/customers/add'),
-        onSecondRightPress: () => router.push('/customers/scan'),
+        // secondRightIcon: 'scan' as const,
+        onRightPress: () => router.push('/outlets/add'), // ✅ FIXED
         showFilter: true,
         filterActive: (activeFilterCount || 0) > 0,
         filterCount: activeFilterCount || 0,
-        onFilterPress: onFilterPress,
+        onFilterPress,
       };
 
     case 'products':
@@ -144,7 +109,7 @@ const getHeaderProps = (
         showFilter: true,
         filterActive: (activeFilterCount || 0) > 0,
         filterCount: activeFilterCount || 0,
-        onFilterPress: onFilterPress,
+        onFilterPress,
       };
 
     case 'beats':
@@ -168,7 +133,7 @@ const getHeaderProps = (
         showFilter: true,
         filterActive: (activeFilterCount || 0) > 0,
         filterCount: activeFilterCount || 0,
-        onFilterPress: onFilterPress,
+        onFilterPress,
       };
 
     default:
@@ -179,55 +144,48 @@ const getHeaderProps = (
 export default function DrawerLayout() {
   const { colors } = useTheme();
   const segments = useSegments();
-  const navigation = useNavigation();
-  const { productsFilterCount, customersFilterCount, reportsFilterCount } = useFilterContext();
 
-  const handleProductsFilterPress = () => router.push('/products?openFilters=true');
-  const handleCustomersFilterPress = () => router.push('/customers?openFilters=true');
-  const handleReportsFilterPress = () => router.push('/reports?openFilters=true');
+  const {
+    productsFilterCount,
+    outletsFilterCount,
+    reportsFilterCount,
+    openOutletFilter,
+    openProductFilter,
+  } = useFilterContext();
+
+  const handleProductsFilterPress = () => {
+    openProductFilter();
+    // optional (same pattern if needed later)
+  };
+
+  const handleOutletsFilterPress = () => {
+    openOutletFilter(); // ✅ NO navigation → NO API trigger
+  };
+
+  const handleReportsFilterPress = () => {
+    // optional
+  };
 
   const isDetail = isDetailScreen(segments);
-
-  // // Handle device back button
-  // useEffect(() => {
-  //   const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-  //     if (isDetail) {
-  //       navigation.goBack();
-  //       return true;
-  //     }
-  //     return false;
-  //   });
-
-  //   return () => backHandler.remove();
-  // }, [isDetail, navigation]);
 
   return (
     <Drawer
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={({ route }) => ({
         header: ({ options }) => {
+          if (isDetail) return null;
+
           let onFilterPress;
           let activeFilterCount = 0;
-          const routeName = route.name;
 
-          // ✅ FIX: Only show header for customers index
-
-          const isDetail = isDetailScreen(segments);
-
-          console.log('Is Detail Screen:', isDetail, 'Segments:', segments);
-
-          if (isDetail) {
-            return null; // ❌ hide header for all other screens
-          }
-
-          switch (routeName) {
+          switch (route.name) {
             case 'products':
               onFilterPress = handleProductsFilterPress;
               activeFilterCount = productsFilterCount;
               break;
-            case 'customers':
-              onFilterPress = handleCustomersFilterPress;
-              activeFilterCount = customersFilterCount;
+            case 'outlets':
+              onFilterPress = handleOutletsFilterPress;
+              activeFilterCount = outletsFilterCount;
               break;
             case 'reports':
               onFilterPress = handleReportsFilterPress;
@@ -236,7 +194,7 @@ export default function DrawerLayout() {
           }
 
           const headerProps = getHeaderProps(
-            routeName,
+            route.name,
             segments,
             options.title as string,
             activeFilterCount,
@@ -245,31 +203,42 @@ export default function DrawerLayout() {
 
           return <Header {...headerProps} />;
         },
+
         drawerStyle: {
           backgroundColor: colors.surface,
           width: 280,
         },
+
         drawerLabelStyle: {
           color: colors.textPrimary,
           fontSize: 15,
           fontWeight: '500',
         },
+
         drawerActiveTintColor: colors.primary,
         drawerInactiveTintColor: colors.textSecondary,
         drawerActiveBackgroundColor: colors.primary + '20',
+
         swipeEnabled: !isDetail,
         drawerType: isDetail ? 'front' : 'slide',
+
         drawerIcon: ({ color, size, focused }) => {
           const icons: Record<string, string> = {
             '(tabs)': focused ? 'home' : 'home-outline',
-            customers: focused ? 'people' : 'people-outline',
+            outlets: focused ? 'people' : 'people-outline', // ✅ FIXED
             products: focused ? 'cube' : 'cube-outline',
             beats: focused ? 'map' : 'map-outline',
             reports: focused ? 'bar-chart' : 'bar-chart-outline',
             settings: focused ? 'settings' : 'settings-outline',
           };
-          const iconName = icons[route.name] || 'help-outline';
-          return <Ionicons name={iconName as any} size={size} color={color} />;
+
+          return (
+            <Ionicons
+              name={(icons[route.name] || 'help-outline') as any}
+              size={size}
+              color={color}
+            />
+          );
         },
       })}
     >
@@ -280,13 +249,7 @@ export default function DrawerLayout() {
           drawerItemStyle: { display: 'none' },
         }}
       />
-      <Drawer.Screen
-        name="customers"
-        options={{
-          title: 'Customers',
-          headerShown: true,
-        }}
-      />
+      <Drawer.Screen name="outlets" options={{ title: 'Outlets' }} />
       <Drawer.Screen name="products" options={{ title: 'Products' }} />
       <Drawer.Screen name="beats" options={{ title: 'My Routes' }} />
       <Drawer.Screen name="reports" options={{ title: 'Reports' }} />

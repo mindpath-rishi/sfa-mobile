@@ -1,82 +1,103 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, TextInput } from 'react-native';
+import { View, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { Product } from '../../types/product.types';
+import { CartItemWithDetails } from '../../types/product.types';
 import { useProductUnitSelectorStyles } from '../../styles/ProductUnitSelector.styles';
 import { AppText } from '@/core/components';
 
-interface CartItem {
-  type: 'cases' | 'units';
-  quantity: number;
-}
-
 interface Props {
-  product: Product;
-  onAddToCart?: (items: CartItem[]) => void;
+  product: CartItemWithDetails;
+  onAddToCart?: (items: CartItemWithDetails[]) => void;
 }
 
 export const ProductUnitSelector: React.FC<Props> = ({ product, onAddToCart }) => {
   const { colors } = useTheme();
   const styles = useProductUnitSelectorStyles();
 
-  const UNITS_PER_CASE = 12;
-  const casePrice = product.price * UNITS_PER_CASE * 0.95; // 5% discount
-  const availableCases = Math.floor(product.stock / UNITS_PER_CASE);
+  const UNITS_PER_CASE = product.unitQtyInCase || 1;
+  const casePrice = product.casePrice || 0;
+  const piecePrice = product.piecePrice || casePrice / UNITS_PER_CASE;
 
-  const [caseQuantity, setCaseQuantity] = useState(0);
-  const [unitQuantity, setUnitQuantity] = useState(0);
-  const [prevCaseQuantity, setPrevCaseQuantity] = useState(0);
-  const [prevUnitQuantity, setPrevUnitQuantity] = useState(0);
+  const availableStock = product.stock || 0;
 
-  // Auto-add to cart when quantities change
+  const availableCases = Math.floor(availableStock / UNITS_PER_CASE);
+  const remainingPieces = availableStock % UNITS_PER_CASE;
+
+  const [caseQuantity, setCaseQuantity] = useState(product.caseQty || 0);
+  const [unitQuantity, setUnitQuantity] = useState(product.pieceQty || 0);
+
+  /**
+   * ================= SYNC =================
+   */
   useEffect(() => {
-    // Only trigger if quantities have actually changed
-    const caseChanged = caseQuantity !== prevCaseQuantity;
-    const unitChanged = unitQuantity !== prevUnitQuantity;
+    setCaseQuantity(product.caseQty || 0);
+    setUnitQuantity(product.pieceQty || 0);
+  }, [product.caseQty, product.pieceQty]);
 
-    if ((caseChanged || unitChanged) && onAddToCart) {
-      const items: CartItem[] = [];
+  /**
+   * ================= STRONG VALIDATION =================
+   */
+  useEffect(() => {
+    const total = caseQuantity * UNITS_PER_CASE + unitQuantity;
 
-      // Add the changed items only (incrementally)
-      if (caseChanged) {
-        const diff = caseQuantity - prevCaseQuantity;
-        if (diff > 0) {
-          items.push({ type: 'cases', quantity: diff });
-        }
-      }
+    if (total > availableStock) {
+      const maxUnits = availableStock - caseQuantity * UNITS_PER_CASE;
 
-      if (unitChanged) {
-        const diff = unitQuantity - prevUnitQuantity;
-        if (diff > 0) {
-          items.push({ type: 'units', quantity: diff });
-        }
-      }
-
-      if (items.length > 0) {
-        onAddToCart(items);
-      }
-
-      // Update previous quantities
-      setPrevCaseQuantity(caseQuantity);
-      setPrevUnitQuantity(unitQuantity);
+      setUnitQuantity(Math.max(0, maxUnits));
     }
-  }, [caseQuantity, unitQuantity, onAddToCart]);
+  }, [caseQuantity, unitQuantity, availableStock]);
 
+  /**
+   * ================= UPDATE CART =================
+   */
+  useEffect(() => {
+    if (!onAddToCart) return;
+
+    onAddToCart([
+      {
+        productId: product.productId,
+        productName: product.productName,
+        casePrice,
+        piecePrice,
+        unitQtyInCase: UNITS_PER_CASE,
+        caseQty: caseQuantity,
+        pieceQty: unitQuantity,
+        stock: availableStock,
+      },
+    ]);
+  }, [caseQuantity, unitQuantity]);
+
+  /**
+   * ================= HANDLERS =================
+   */
+
+  // ✅ Manual Case Input
   const updateCaseQuantity = (value: string) => {
     const num = parseInt(value) || 0;
-    setCaseQuantity(Math.min(Math.max(0, num), availableCases));
+
+    const maxCase = Math.floor((availableStock - unitQuantity) / UNITS_PER_CASE);
+
+    setCaseQuantity(Math.min(Math.max(0, num), maxCase));
   };
 
+  // ✅ Manual Piece Input
   const updateUnitQuantity = (value: string) => {
     const num = parseInt(value) || 0;
-    const maxUnits = product.stock - caseQuantity * UNITS_PER_CASE;
+
+    const maxUnits = availableStock - caseQuantity * UNITS_PER_CASE;
+
     setUnitQuantity(Math.min(Math.max(0, num), maxUnits));
   };
 
+  // ✅ Strong Case Increment
   const incrementCase = () => {
-    if (caseQuantity < availableCases) {
-      setCaseQuantity(caseQuantity + 1);
+    const next = caseQuantity + 1;
+
+    const total = next * UNITS_PER_CASE + unitQuantity;
+
+    if (total <= availableStock) {
+      setCaseQuantity(next);
     }
   };
 
@@ -86,9 +107,11 @@ export const ProductUnitSelector: React.FC<Props> = ({ product, onAddToCart }) =
     }
   };
 
+  // ✅ Strong Piece Increment
   const incrementUnit = () => {
-    const maxUnits = product.stock - caseQuantity * UNITS_PER_CASE;
-    if (unitQuantity < maxUnits) {
+    const total = caseQuantity * UNITS_PER_CASE + unitQuantity + 1;
+
+    if (total <= availableStock) {
       setUnitQuantity(unitQuantity + 1);
     }
   };
@@ -99,27 +122,22 @@ export const ProductUnitSelector: React.FC<Props> = ({ product, onAddToCart }) =
     }
   };
 
+  /**
+   * ================= UI =================
+   */
   return (
     <View style={[styles.container, { borderColor: colors.border + '30' }]}>
-      {/* Cases Row */}
+      {/* CASE */}
       <View style={styles.row}>
         <View style={styles.labelContainer}>
           <AppText style={[styles.label, { color: colors.textPrimary }]}>Case</AppText>
-          <AppText style={[styles.price, { color: colors.textPrimary }]}>
-            ₹{casePrice.toFixed(2)}
-          </AppText>
-          {availableCases > 0 && (
-            <View style={[styles.discountBadge, { backgroundColor: colors.success }]}>
-              <AppText style={styles.discountText}>-5%</AppText>
-            </View>
-          )}
+          <AppText style={[styles.price, { color: colors.textPrimary }]}>K{casePrice}</AppText>
         </View>
 
         <View style={styles.quantityControl}>
           <TouchableOpacity
             style={[styles.quantityButton, { borderColor: colors.border }]}
             onPress={decrementCase}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             disabled={caseQuantity === 0}
           >
             <Ionicons
@@ -133,45 +151,47 @@ export const ProductUnitSelector: React.FC<Props> = ({ product, onAddToCart }) =
             style={[
               styles.quantityInput,
               {
+                width: 80, // ✅ increased width
                 borderColor: colors.border,
                 color: colors.textPrimary,
                 backgroundColor: colors.surface,
+                textAlign: 'center',
               },
             ]}
             value={caseQuantity.toString()}
             onChangeText={updateCaseQuantity}
             keyboardType="numeric"
-            maxLength={2}
-            editable={availableCases > 0}
           />
 
           <TouchableOpacity
             style={[styles.quantityButton, { borderColor: colors.border }]}
             onPress={incrementCase}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            disabled={caseQuantity >= availableCases}
+            disabled={caseQuantity * UNITS_PER_CASE + unitQuantity >= availableStock}
           >
             <Ionicons
               name="add"
               size={14}
-              color={caseQuantity >= availableCases ? colors.border : colors.textPrimary}
+              color={
+                caseQuantity * UNITS_PER_CASE + unitQuantity >= availableStock
+                  ? colors.border
+                  : colors.textPrimary
+              }
             />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Units Row */}
+      {/* PIECE */}
       <View style={styles.row}>
         <View style={styles.labelContainer}>
-          <AppText style={[styles.label, { color: colors.textPrimary }]}>Unit</AppText>
-          <AppText style={[styles.price, { color: colors.textPrimary }]}>₹{product.price}</AppText>
+          <AppText style={[styles.label, { color: colors.textPrimary }]}>Piece</AppText>
+          <AppText style={[styles.price, { color: colors.textPrimary }]}>K{piecePrice}</AppText>
         </View>
 
         <View style={styles.quantityControl}>
           <TouchableOpacity
             style={[styles.quantityButton, { borderColor: colors.border }]}
             onPress={decrementUnit}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             disabled={unitQuantity === 0}
           >
             <Ionicons
@@ -185,30 +205,42 @@ export const ProductUnitSelector: React.FC<Props> = ({ product, onAddToCart }) =
             style={[
               styles.quantityInput,
               {
+                width: 80, // ✅ bigger for manual input
                 borderColor: colors.border,
                 color: colors.textPrimary,
                 backgroundColor: colors.surface,
+                textAlign: 'center',
               },
             ]}
             value={unitQuantity.toString()}
             onChangeText={updateUnitQuantity}
             keyboardType="numeric"
-            maxLength={3}
           />
 
           <TouchableOpacity
             style={[styles.quantityButton, { borderColor: colors.border }]}
             onPress={incrementUnit}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            disabled={caseQuantity * UNITS_PER_CASE + unitQuantity >= availableStock}
           >
-            <Ionicons name="add" size={14} color={colors.textPrimary} />
+            <Ionicons
+              name="add"
+              size={14}
+              color={
+                caseQuantity * UNITS_PER_CASE + unitQuantity >= availableStock
+                  ? colors.border
+                  : colors.textPrimary
+              }
+            />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Stock Info */}
+      {/* STOCK */}
       <AppText style={[styles.stockInfo, { color: colors.textTertiary }]}>
-        Stock: {product.stock} units • {availableCases} cases available
+        Available Stock: {availableStock} pcs
+        {availableCases > 0 && ` • ${availableCases} cases`}
+        {remainingPieces > 0 && ` + ${remainingPieces} pcs`}
+        {UNITS_PER_CASE && ` (${UNITS_PER_CASE} pcs/case)`}
       </AppText>
     </View>
   );

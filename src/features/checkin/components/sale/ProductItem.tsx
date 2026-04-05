@@ -1,34 +1,65 @@
-// components/SalesSummary/components/ProductItem.tsx
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { Product, ProductUnitSelector } from '@/features/product';
-import { CartItem } from '../../types/sales-summary.types';
+import { CartItemWithDetails, Product, ProductUnitSelector } from '@/features/product';
+import { useCartStore } from '@/core/store/cart.store';
 
 interface ProductItemProps {
-  product: Product;
+  product: CartItemWithDetails;
   index: number;
-  onCartUpdate: (items: CartItem[]) => void;
 }
 
-export const ProductItem: React.FC<ProductItemProps> = ({ product, index, onCartUpdate }) => {
+export const ProductItem: React.FC<ProductItemProps> = ({ product, index }) => {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
 
+  // ✅ Zustand
+  const { addItems } = useCartStore();
+
+  /* ================= ADD TO CART ================= */
+
   const handleAddToCart = useCallback(
     (items: any[]) => {
-      const cartItems: CartItem[] = items.map((item) => ({
-        productId: product.id,
-        product: product,
-        type: item.type,
-        quantity: item.quantity,
-      }));
-      onCartUpdate(cartItems);
+      if (!items?.length) return;
+
+      let caseQty = 0;
+      let pieceQty = 0;
+
+      items.forEach((item) => {
+        caseQty += item.caseQty || 0;
+        pieceQty += item.pieceQty || 0;
+      });
+
+      if (caseQty === 0 && pieceQty === 0) return;
+
+      // ✅ send to store
+      addItems([
+        {
+          productId: product.productId,
+          productName: product.productName,
+          casePrice: product.casePrice,
+          piecePrice: product.piecePrice,
+          unitQtyInCase: product.unitQtyInCase,
+          caseQty,
+          pieceQty,
+        },
+      ]);
+
+      const totalItems = caseQty + pieceQty;
+      const totalValue = caseQty * product.casePrice + pieceQty * product.piecePrice;
+
+      Alert.alert(
+        '✅ Added to Cart',
+        `${totalItems} item(s) added\nTotal: ₹${totalValue.toFixed(2)}`,
+        [{ text: 'OK' }],
+      );
     },
-    [product, onCartUpdate],
+    [product, addItems],
   );
+
+  /* ================= UI ================= */
 
   return (
     <Animated.View
@@ -52,6 +83,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({ product, index, onCart
           gap: 12,
         }}
       >
+        {/* Index */}
         <View
           style={{
             width: 32,
@@ -75,18 +107,26 @@ export const ProductItem: React.FC<ProductItemProps> = ({ product, index, onCart
           </Text>
         </View>
 
+        {/* Product Info */}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Text
-            style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary, marginBottom: 3 }}
-            numberOfLines={1}
+            style={{
+              fontSize: 14,
+              fontWeight: '600',
+              color: colors.textPrimary,
+              marginBottom: 3,
+            }}
+            numberOfLines={2}
           >
-            {product.name}
+            {product.productName}
           </Text>
+
           <Text style={{ fontSize: 11, color: colors.textTertiary }}>
-            SKU {product.sku} · ZMW {product.price.toFixed(2)}/unit
+            SKU {product.productId} · Case: K{product.casePrice} | Piece: K{product.piecePrice}
           </Text>
         </View>
 
+        {/* Expand Icon */}
         <Ionicons
           name={expanded ? 'chevron-up' : 'chevron-down'}
           size={18}
@@ -94,6 +134,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({ product, index, onCart
         />
       </TouchableOpacity>
 
+      {/* Expanded Section */}
       {expanded && (
         <Animated.View entering={FadeInDown.duration(200)}>
           <View
@@ -103,7 +144,10 @@ export const ProductItem: React.FC<ProductItemProps> = ({ product, index, onCart
               padding: 12,
             }}
           >
-            <ProductUnitSelector product={product} onAddToCart={handleAddToCart} />
+            <ProductUnitSelector
+              product={product}
+              onAddToCart={handleAddToCart} // ✅ new structure
+            />
           </View>
         </Animated.View>
       )}

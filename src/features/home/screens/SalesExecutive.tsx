@@ -41,6 +41,12 @@ import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
 import { homeService } from '../services/home.service';
 import { set } from 'react-hook-form';
 import { useAuthStore } from '@/core/store/auth.store';
+import { storage, StorageKeys } from '@/core/storage';
+import { ApiResponse } from '@/core/network';
+import { outletService } from '@/features/outlet/services/outlet.service';
+import { useOutletStore } from '@/core/store/outlet.store';
+import { QuickAction } from '../types/quickaction.types';
+import { useVisitGuard } from '@/shared/hooks/useVisitGuard';
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
@@ -60,7 +66,7 @@ export default function SalesExecutiveScreen() {
   const [mappedVan, setMappedVan] = useState<Van>(ASSIGNED_VAN);
   const [showOtherOptions, setShowOtherOptions] = useState(false);
   const [showChangeOtherOptions, setShowChangeOtherOptions] = useState(false);
-  const [startTime, setStartTime] = useState('');
+  const [startTime, setStartTime] = useState<string | null>('');
   const [activityHistory] = useState<any[]>([]);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [pendingActivity, setPendingActivity] = useState<ActivityType | OtherWorkOption | null>(
@@ -70,9 +76,8 @@ export default function SalesExecutiveScreen() {
   const [otherWorkStartTime, setOtherWorkStartTime] = useState<string | null>(null);
   const [todayActivities, setTodayActivities] = useState<TodayActivity[]>([]);
   const [vanChangeReason, setVanChangeReason] = useState('');
-  const [currentActivity, setCurrentActivity] = useState<string>('');
+  const [currentActivity, setCurrentActivity] = useState<string | null>('');
   const [filteredActivityTypes, setFilteredActivityTypes] = useState(ACTIVITY_TYPES);
-  const [activeRoute, setActiveRoute] = useState<Route | null>(null);
 
   const cameraRef = useRef<any>(null);
   const [permission, requestPermission] = useCameraPermissions();
@@ -83,11 +88,22 @@ export default function SalesExecutiveScreen() {
   const greeting = new Date().getHours() < 12 ? 'Good Morning' : 'Good Afternoon';
   const user: any = useAuthStore((state) => state.user);
   const [routes, setRoutes] = useState<any>();
+  const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
+  const clearVisit = useOutletStore((s) => s.clearVisit);
+
+  const activeRoute = useAuthStore((s) => s.selectedRoute);
+  const { guard } = useVisitGuard();
 
   useEffect(() => {
     getDayStatus();
     getVan();
   }, []);
+
+  useEffect(() => {
+    if (!activeRoute?.routeSessionId) return;
+
+    visitStatus();
+  }, [activeRoute?.routeSessionId]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -224,7 +240,7 @@ export default function SalesExecutiveScreen() {
     completeDayStart();
   };
 
-  const completeDayStart = () => {
+  const completeDayStart = async () => {
     const playlod: DayStartPayload = {
       activityName: selectedActivity,
       routeId: selectedRoute?.routeId,
@@ -237,57 +253,12 @@ export default function SalesExecutiveScreen() {
     console.log('Day Start Payload:', selectedRoute);
     // return;
     try {
-      const response: any = homeService.dayStart(playlod);
-      console.log('Day Start Response:', response);
+      const response: ApiResponse<any> = await homeService.dayStart(playlod);
+      if (response?.statusCode === 201) {
+        getDayStatus();
+      }
     } catch (error) {}
     return;
-    // const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    // if (pendingActivity) {
-    //   setSelectedActivity(pendingActivity.name);
-    //   setSelectedActivityColor(pendingActivity.color);
-    //   setSelectedActivityIcon(pendingActivity.icon);
-    //   setDayStarted(true);
-    //   setStartTime(currentTime);
-    //   setOtherWorkStartTime(currentTime);
-
-    //   const newActivity: TodayActivity = {
-    //     id: Date.now().toString(),
-    //     type: pendingActivity.name.toLowerCase().replace(' ', '_'),
-    //     customer: 'Self',
-    //     time: currentTime,
-    //     status: 'in_progress',
-    //     notes: `Started ${pendingActivity.name}`,
-    //   };
-
-    //   setTodayActivities([newActivity, ...todayActivities]);
-
-    //   Alert.alert('Day Started', `You're now working on ${pendingActivity.name}`);
-    //   setPendingActivity(null);
-    // } else if (selectedRoute) {
-    //   setSelectedActivity('Retailing');
-    //   setSelectedActivityColor('#4158D0');
-    //   setSelectedActivityIcon('storefront');
-    //   setDayStarted(true);
-    //   setStartTime(currentTime);
-    //   setOtherWorkStartTime(null);
-
-    //   const newActivity: TodayActivity = {
-    //     id: Date.now().toString(),
-    //     type: 'retailing',
-    //     customer: selectedRoute.name,
-    //     time: currentTime,
-    //     status: 'in_progress',
-    //     notes: `Route: ${selectedRoute.name}, Van: ${ASSIGNED_VAN.name}`,
-    //   };
-
-    //   setTodayActivities([newActivity, ...todayActivities]);
-
-    //   Alert.alert(
-    //     'Day Started',
-    //     `You're now working on Retailing\nRoute: ${selectedRoute?.name}\nVan: ${ASSIGNED_VAN.name}`,
-    //   );
-    // }
   };
 
   const completeActivityChange = async () => {
@@ -397,45 +368,39 @@ export default function SalesExecutiveScreen() {
     // }
   };
 
-  const handleEndDay = () => {
-    Alert.alert('End Day', 'Are you sure you want to end your day?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'End Day',
-        onPress: () => {
-          if (dayStarted) {
-            const currentTime = new Date().toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            });
+  const handleQuickAction = (route: string) => {
+    if (route === '/outlets') {
+      return guard(() => {
+        router.push('/outlets');
+      });
+    }
 
-            // const finalActivity: TodayActivity = {
-            //   id: Date.now().toString(),
-            //   type: selectedActivity.toLowerCase().replace(' ', '_'),
-            //   customer: selectedActivity === 'Retailing' ? selectedRoute?.name || 'Self' : 'Self',
-            //   time: currentTime,
-            //   status: 'ended',
-            //   notes:
-            //     selectedActivity === 'Retailing' && selectedRoute
-            //       ? `Route: ${selectedRoute?.name}, Van: ${ASSIGNED_VAN.name}`
-            //       : `Ended ${selectedActivity}`,
-            // };
+    router.push(route);
+    // guard(() => {
+    // });
+  };
 
-            // setTodayActivities([finalActivity, ...todayActivities]);
-          }
+  const handleEndDay = async () => {
+    try {
+      const response = await homeService.dayComplete();
 
-          setDayStarted(false);
-          setSelectedActivity('');
-          setSelectedRoute(null);
-          setUserPhoto(null);
-          setOtherWorkStartTime(null);
-          setTodayActivities([]);
+      if (response.success) {
+        /* ===== RESET ALL STATE ===== */
+        setDayStarted(false);
+        setWorkSessionId('');
+        setCurrentActivity(null);
+        setTodayActivities([]);
+        setStartTime(null);
 
-          Alert.alert('Day Ended', 'Your day has been ended successfully');
-        },
-        style: 'destructive',
-      },
-    ]);
+        setSelectedActivityColor('#4158D0');
+        setSelectedActivityIcon('storefront');
+
+        // Reset route
+        useAuthStore.getState().setSelectedRoute(null);
+      }
+    } catch (error) {
+      console.error('Error completing day:', error);
+    }
   };
 
   const getDayStatus = async () => {
@@ -447,11 +412,17 @@ export default function SalesExecutiveScreen() {
         setWorkSessionId(response.data.workSessionId || '');
         console.log('Day Status:', response.data.activeActivity);
         setCurrentActivity(response?.data?.activeActivity?.name);
-        setTodayActivities(response?.data?.activities || []);
+        setTodayActivities(response?.data?.todayActivities || []);
         setStartTime(response?.data?.activeActivity?.startTime);
         setSelectedActivityColor('#4158D0');
         setSelectedActivityIcon('storefront');
-        setActiveRoute(response?.data?.selectedRoute);
+        const selectedRoute = response?.data?.selectedRoute;
+
+        if (selectedRoute) {
+          useAuthStore.getState().setSelectedRoute(selectedRoute);
+        } else {
+          useAuthStore.getState().setSelectedRoute(null);
+        }
       }
     } catch (error) {
       console.error('Error fetching day status:', error);
@@ -499,6 +470,55 @@ export default function SalesExecutiveScreen() {
     }
   };
 
+  const visitStatus = async () => {
+    try {
+      const query: any = {
+        workSessionId: activeRoute?.workSessionId,
+        vanId: activeRoute?.vanId,
+        routeSessionId: activeRoute?.routeSessionId,
+      };
+
+      const response = await outletService.visitStatus(query);
+
+      const visit: any = response?.data;
+
+      if (!visit?.visitId) {
+        clearVisit(); // ✅ no active visit
+        return;
+      }
+
+      console.log('============visit=============', visit);
+
+      // ✅ map backend → store
+      setActiveVisit({
+        visitId: visit.visitId,
+        outlet: {
+          id: visit.outletId,
+          customerId: visit.outletId,
+          name: visit.outletName,
+          ownerName: visit.ownerName || '',
+          phoneNumber: visit.phoneNumber || '',
+          customerTypeId: visit.customerTypeId || '',
+          address: visit.address || '',
+          customerCategoryId: visit.customerCategoryId || '',
+          channelId: visit.channelId || '',
+          marketId: visit.marketId || '',
+          provinceId: visit.provinceId || '',
+          segmentation: visit.segmentation || '',
+          geoTag: visit.geoTag || '',
+          status: visit.outletStatus || 'active',
+          isDeleted: visit.isDeleted || false,
+        },
+        checkInTime: new Date(visit.checkInTime),
+        checkOutTime: visit.checkOutTime ? new Date(visit.checkOutTime) : undefined,
+        status: visit.status,
+        routeSessionId: visit?.routeSessionId,
+      });
+    } catch (error) {
+      console.error('visitStatus error:', error);
+    }
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
@@ -529,7 +549,7 @@ export default function SalesExecutiveScreen() {
         {/* Quick Actions Section */}
         <QuickActionsSection
           actions={QUICK_ACTIONS}
-          onPressAction={(route: any) => router.push(route as any)}
+          onPressAction={(route: any) => handleQuickAction(route)}
         />
 
         {/* Stats Overview */}

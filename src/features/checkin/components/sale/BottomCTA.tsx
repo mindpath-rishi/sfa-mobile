@@ -1,4 +1,3 @@
-// components/SalesSummary/components/BottomCTA.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,68 +28,69 @@ export const BottomCTA: React.FC<BottomCTAProps> = ({
       entering={SlideInDown.springify().damping(18)}
       style={{
         position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        paddingHorizontal: 16,
-        paddingTop: 12,
-        paddingBottom: insets.bottom || 16,
-        backgroundColor: colors.background,
-        borderTopWidth: 0.5,
-        borderTopColor: colors.border + '25',
+        bottom: 16,
+        left: 16,
+        right: 16,
+        paddingBottom: insets.bottom || 0,
       }}
     >
       <TouchableOpacity
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingVertical: 16,
-          paddingHorizontal: 20,
-          borderRadius: 14,
+          borderRadius: 30,
+          paddingVertical: 14,
+          paddingHorizontal: 18,
           backgroundColor: hasItems && !isProcessing ? colors.primary : colors.surface,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+          elevation: 4,
           borderWidth: 0.5,
           borderColor: hasItems && !isProcessing ? colors.primary : colors.border + '40',
         }}
         onPress={onPress}
         disabled={!hasItems || isProcessing}
-        activeOpacity={0.82}
+        activeOpacity={0.9}
       >
         {isProcessing ? (
           <ActivityIndicator color="white" size="small" />
         ) : (
-          <>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: '600',
-                color: hasItems ? 'white' : colors.textTertiary,
-              }}
-            >
-              {hasItems ? 'Proceed to payment' : 'Add items to continue'}
-            </Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}
+          >
+            {/* LEFT CONTENT */}
+            <View>
+              <Text
+                style={{
+                  color: hasItems ? 'white' : colors.textTertiary,
+                  fontSize: 13,
+                  opacity: 0.9,
+                  marginBottom: 2,
+                }}
+              >
+                {hasItems ? 'Ready to payment' : 'Add items to continue'}
+              </Text>
 
-            {hasItems && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: 'white' }}>
-                  ZMW {total.toFixed(2)}
-                </Text>
-                <View
+              {hasItems && (
+                <Text
                   style={{
-                    backgroundColor: 'rgba(255,255,255,0.22)',
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                    borderRadius: 18,
+                    color: 'white',
+                    fontSize: 16,
+                    fontWeight: '700',
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: 'white' }}>
-                    {units} {units === 1 ? 'item' : 'items'}
-                  </Text>
-                </View>
-                <Ionicons name="arrow-forward" size={18} color="white" />
-              </View>
-            )}
-          </>
+                  {units} {units === 1 ? 'unit' : 'units'} • ZMW {total.toFixed(2)}
+                </Text>
+              )}
+            </View>
+
+            {/* RIGHT ICON */}
+            {hasItems && <Ionicons name="arrow-forward-circle" size={28} color="white" />}
+          </View>
         )}
       </TouchableOpacity>
     </Animated.View>

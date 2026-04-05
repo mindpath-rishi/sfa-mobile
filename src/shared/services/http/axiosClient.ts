@@ -5,7 +5,7 @@ import {
   getRefreshToken,
   setTokens,
   clearTokens,
-} from '@/shared/services/storage/tokenStorage';
+} from '@/shared/services/tokenStorage';
 
 type RefreshResponse = { accessToken: string; refreshToken?: string };
 

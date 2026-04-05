@@ -16,15 +16,15 @@ import { ProductStatusBadge } from './ProductStatusBadge';
 import { ProductTags } from './ProductTags';
 import { ProductPrice } from './ProductPrice';
 import { ProductUnitSelector } from './ProductUnitSelector';
-import { Product, CartItem } from '../../types/product.types';
+import { Product, CartItem, CartItemWithDetails } from '../../types/product.types';
 import { useProductCardStyles } from '../../styles/ProductCard.styles';
 import Card from '@/core/components/Card/Card';
 import { AppText } from '@/core/components';
 
 interface Props {
-  product: Product;
+  product: any;
   index: number;
-  onAddToCart?: (items: CartItem[]) => void;
+  onAddToCart?: (items: CartItemWithDetails[]) => void;
 }
 
 export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) => {
@@ -33,7 +33,7 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) =>
   const scale = useSharedValue(1);
 
   const handlePress = () => {
-    // scale.value = withSequence(withSpring(0.98, { damping: 3 }), withSpring(1, { damping: 3 }));
+    // Navigate to product details
     // router.push(`/products/${product.id}`);
   };
 
@@ -41,7 +41,7 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) =>
     transform: [{ scale: scale.value }],
   }));
 
-  const handleAddToCart = (items: CartItem[]) => {
+  const handleAddToCart = (items: CartItemWithDetails[]) => {
     if (onAddToCart) {
       onAddToCart(items);
     }
@@ -55,7 +55,7 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) =>
       <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
         <AppCard variant="elevated" padding="md" style={styles.card}>
           <View style={styles.contentRow}>
-            {/* Product Image */}
+            {/* Product Image - Uncomment if needed */}
             {/* <ProductImage image={product.image} size="medium" discount={product.discount} /> */}
 
             {/* Product Details */}
@@ -63,36 +63,32 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) =>
               {/* Header Row with Name and Status */}
               <View style={styles.headerRow}>
                 <View style={styles.titleContainer}>
-                  <AppText style={styles.productName} numberOfLines={1}>
+                  <AppText style={styles.productName} numberOfLines={2}>
                     {product.name}
                   </AppText>
-                  {/* <Text style={styles.productMeta} numberOfLines={1}>
-                    {product.brand} • {product.category}
-                  </Text> */}
+                  {product.brand && (
+                    <AppText style={styles.productMeta} numberOfLines={1}>
+                      {product.brand} • {product.category || 'Category'}
+                    </AppText>
+                  )}
                 </View>
-                <ProductStatusBadge status={product.status} />
+                <ProductStatusBadge status={product.status || 'active'} />
               </View>
 
-              {/* SKU and Unit Info */}
+              {/* SKU and Unit Info - Uncomment if needed */}
               {/* <View style={styles.infoRow}>
                 <Text style={styles.skuText}>SKU: {product.sku}</Text>
-                <Text style={styles.unitText}>Unit: {product.unit}</Text>
+                <Text style={styles.unitText}>Unit: {product.unitType}</Text>
               </View> */}
 
-              {/* Tags */}
+              {/* Tags - Uncomment if needed */}
               {/* <ProductTags tags={product.tags} limit={2} /> */}
 
-              {/* Price and Stock */}
-              {/* <View style={styles.priceRow}>
-                <ProductPrice price={product.price} mrp={product.mrp} size="medium" />
-                <Text style={styles.stockText}>{product.stock} units</Text>
-              </View> */}
-
               {/* Scheme/Badge */}
-              {product.scheme && (
+              {product.discount && product.discount > 0 && (
                 <View style={styles.schemeContainer}>
                   <AppText style={[styles.schemeText, { color: colors.success }]}>
-                    🏷️ {product.scheme}
+                    🏷️ {product.discount}% OFF
                   </AppText>
                 </View>
               )}

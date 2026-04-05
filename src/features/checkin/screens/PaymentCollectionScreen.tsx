@@ -16,7 +16,9 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { AppCard } from '@/core/components/Card';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePaymentCollectionStyles } from '../styles/PaymentCollection.styles';
-import Animated, { FadeInDown, SlideInDown, ZoomIn } from 'react-native-reanimated';
+import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
+import { useOutletStore } from '@/core/store/outlet.store';
+import { useCartStore } from '@/core/store/cart.store';
 
 // Types
 type PaymentMode = 'cash' | 'wallet' | 'card' | 'cheque' | 'credit';
@@ -32,30 +34,43 @@ export default function PaymentCollectionScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = usePaymentCollectionStyles();
-  const params = useLocalSearchParams();
 
-  // Get data from navigation params
-  const orderTotal = params.total ? parseFloat(params.total as string) : 0;
-  const subtotal = params.subtotal ? parseFloat(params.subtotal as string) : 0;
-  const tax = params.tax ? parseFloat(params.tax as string) : 0;
-  const customerName = (params.customerName as string) || 'John Shop';
-  const reference = (params.reference as string) || 'TKON_7699';
-  const items = params.items ? JSON.parse(params.items as string) : [];
+  // Get data from stores
+  const outlet = useOutletStore((s) => s.selectedOutlet);
+  const { items, summary, clearCart, getCartSummary } = useCartStore();
 
-  // Credit info from params or mock
+  // Get cart calculations using the helper method
+  const {
+    subtotal,
+    tax,
+    total: orderTotal,
+    netWeight,
+    caseDetails,
+    pieceDetails,
+  } = getCartSummary();
+
+  // Get params from navigation
+  const params = useLocalSearchParams<{
+    customerName?: string;
+    reference?: string;
+    currency?: string;
+  }>();
+
+  const customerName = params.customerName || outlet?.name || 'Customer';
+  const reference = params.reference || `ORD-${Date.now()}`;
+  const currency = params.currency || outlet?.currency || 'K';
+
+  // Credit info from outlet store
   const creditInfo: CreditInfo = {
-    creditLimit: params.creditLimit ? parseFloat(params.creditLimit as string) : 5000,
-    outstandingBalance: params.outstandingBalance
-      ? parseFloat(params.outstandingBalance as string)
-      : 1250.5,
-    availableCredit: params.availableCredit ? parseFloat(params.availableCredit as string) : 3749.5,
-    paymentTerms: (params.paymentTerms as string) || 'Net 30 days',
+    creditLimit: outlet?.creditLimit || 0,
+    outstandingBalance: outlet?.outstanding ?? 0,
+    availableCredit: (outlet?.creditLimit ?? 0) - (outlet?.outstanding ?? 0),
+    paymentTerms: outlet?.creditDays ? `${outlet.creditDays} days` : undefined,
   };
 
   const [selectedMode, setSelectedMode] = useState<PaymentMode>('cash');
   const [amount, setAmount] = useState(orderTotal.toString());
   const [paymentDetails, setPaymentDetails] = useState('');
-  const [showHistory, setShowHistory] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCreditInfo, setShowCreditInfo] = useState(true);
 
@@ -82,7 +97,7 @@ export default function PaymentCollectionScreen() {
     if (isCreditSelected && willExceedCredit) {
       Alert.alert(
         'Credit Limit Exceeded',
-        `This payment would exceed your available credit by ${params.currency}${(parsedAmount - creditInfo.availableCredit).toFixed(2)}.\n\nAvailable credit: ${params.currency}${creditInfo.availableCredit.toFixed(2)}`,
+        `This payment would exceed your available credit by ${currency}${(parsedAmount - creditInfo.availableCredit).toFixed(2)}.\n\nAvailable credit: ${currency}${creditInfo.availableCredit.toFixed(2)}`,
         [{ text: 'OK' }],
       );
       return;
@@ -91,7 +106,7 @@ export default function PaymentCollectionScreen() {
     if (parsedAmount < amountDue && !isCreditSelected) {
       Alert.alert(
         'Partial Payment',
-        `You're paying ${(amountDue - parsedAmount).toFixed(2)} less than the total amount due. Do you want to proceed with partial payment?`,
+        `You're paying ${currency}${(amountDue - parsedAmount).toFixed(2)} less than the total amount due. Do you want to proceed with partial payment?`,
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Proceed', onPress: () => processPayment() },
@@ -106,18 +121,46 @@ export default function PaymentCollectionScreen() {
   const processPayment = async () => {
     setIsProcessing(true);
     try {
+      // Simulate payment processing
       await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      // Update outlet store with new outstanding balance for credit payments
+      if (isCreditSelected) {
+        const newOutstanding = creditInfo.outstandingBalance + parsedAmount;
+        // You would typically call an API here to update the backend
+        // await updateOutletOutstanding(outlet?.id, newOutstanding);
+      }
+
+      // Prepare invoice items with details
+      const invoiceItems = items.map((item) => ({
+        productId: item.productId,
+        productName: item.productName,
+        caseQty: item.caseQty || 0,
+        pieceQty: item.pieceQty || 0,
+        casePrice: item.casePrice,
+        piecePrice: item.piecePrice,
+        caseNetWeight: item.caseNetWeight,
+        pieceNetWeight: item.pieceNetWeight,
+        totalPrice: (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice,
+      }));
+
+      // Clear cart after successful payment
+      clearCart();
 
       router.push({
         pathname: '/checkin/shareinvoice',
         params: {
           invoiceNo: `INV-${Date.now()}`,
           amount: parsedAmount.toFixed(2),
-          currency: params.currency,
+          currency: currency,
           paymentMode: selectedMode,
-          customerName,
-          reference,
-          items: JSON.stringify(items),
+          customerName: customerName,
+          reference: reference,
+          items: JSON.stringify(invoiceItems),
+          subtotal: subtotal.toFixed(2),
+          tax: tax.toFixed(2),
+          total: orderTotal.toFixed(2),
+          netWeight: netWeight.toFixed(3),
           ...(isCreditSelected && {
             newBalance: (creditInfo.outstandingBalance + parsedAmount).toFixed(2),
             remainingCredit: remainingAfterPayment.toFixed(2),
@@ -136,38 +179,59 @@ export default function PaymentCollectionScreen() {
       setAmount(creditInfo.availableCredit.toString());
       Alert.alert(
         'Credit Limit',
-        `Setting amount to available credit: ${params.currency}${creditInfo.availableCredit.toFixed(2)}`,
+        `Setting amount to available credit: ${currency}${creditInfo.availableCredit.toFixed(2)}`,
       );
     } else {
       setAmount(amountDue.toString());
     }
   };
 
-  const getPaymentModeColor = (mode: PaymentMode) => {
-    switch (mode) {
-      case 'cash':
-        return colors.success;
-      case 'wallet':
-        return colors.primary;
-      case 'card':
-        return colors.warning;
-      case 'cheque':
-        return colors.info;
-      case 'credit':
-        return colors.primary || '#9C27B0';
-      default:
-        return colors.primary;
-    }
-  };
-
   const getCreditStatusColor = () => {
+    if (creditInfo.creditLimit === 0) return colors.textTertiary;
     const usagePercent = (creditInfo.outstandingBalance / creditInfo.creditLimit) * 100;
     if (usagePercent > 80) return colors.error;
     if (usagePercent > 50) return colors.warning;
     return colors.success;
   };
 
-  const usagePercent = (creditInfo.outstandingBalance / creditInfo.creditLimit) * 100;
+  const usagePercent =
+    creditInfo.creditLimit > 0 ? (creditInfo.outstandingBalance / creditInfo.creditLimit) * 100 : 0;
+
+  // Don't render if no outlet selected
+  if (!outlet) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+        ]}
+      >
+        <Text style={{ color: colors.error }}>
+          No outlet selected. Please select an outlet first.
+        </Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+          <Text style={{ color: colors.primary }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Don't render if cart is empty
+  if (items.length === 0) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+        ]}
+      >
+        <Text style={{ color: colors.error }}>Cart is empty. Please add items first.</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20 }}>
+          <Text style={{ color: colors.primary }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -189,8 +253,8 @@ export default function PaymentCollectionScreen() {
           </View>
         </Animated.View>
 
-        {/* Credit Information Card */}
-        {showCreditInfo && (
+        {/* Credit Information Card - Only show if outlet has credit limit */}
+        {creditInfo.creditLimit > 0 && showCreditInfo && (
           <Animated.View entering={FadeInDown.delay(30).springify()}>
             <AppCard variant="elevated" padding="md" style={styles.creditCard}>
               <View style={styles.creditHeader}>
@@ -199,54 +263,62 @@ export default function PaymentCollectionScreen() {
                   <Text style={styles.creditTitle}>Credit Information</Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowCreditInfo(!showCreditInfo)}>
-                  <Ionicons name="chevron-up" size={20} color={colors.primary} />
+                  <Ionicons
+                    name={showCreditInfo ? 'chevron-up' : 'chevron-down'}
+                    size={20}
+                    color={colors.primary}
+                  />
                 </TouchableOpacity>
               </View>
 
-              <View style={styles.creditStatsGrid}>
-                <View style={styles.creditStatItem}>
-                  <Text style={styles.creditStatLabel}>Credit Limit</Text>
-                  <Text style={styles.creditStatValue}>
-                    {params.currency} {creditInfo.creditLimit.toFixed(2)}
-                  </Text>
-                </View>
-                <View style={styles.creditStatItem}>
-                  <Text style={styles.creditStatLabel}>Outstanding</Text>
-                  <Text style={[styles.creditStatValue, { color: colors.warning }]}>
-                    {params.currency} {creditInfo.outstandingBalance.toFixed(2)}
-                  </Text>
-                </View>
-                <View style={styles.creditStatItem}>
-                  <Text style={styles.creditStatLabel}>Available</Text>
-                  <Text style={[styles.creditStatValue, { color: colors.success }]}>
-                    {params.currency} {creditInfo.availableCredit.toFixed(2)}
-                  </Text>
-                </View>
-              </View>
+              {showCreditInfo && (
+                <>
+                  <View style={styles.creditStatsGrid}>
+                    <View style={styles.creditStatItem}>
+                      <Text style={styles.creditStatLabel}>Credit Limit</Text>
+                      <Text style={styles.creditStatValue}>
+                        {currency} {creditInfo.creditLimit.toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={styles.creditStatItem}>
+                      <Text style={styles.creditStatLabel}>Outstanding</Text>
+                      <Text style={[styles.creditStatValue, { color: colors.warning }]}>
+                        {currency} {creditInfo.outstandingBalance.toFixed(2)}
+                      </Text>
+                    </View>
+                    <View style={styles.creditStatItem}>
+                      <Text style={styles.creditStatLabel}>Available</Text>
+                      <Text style={[styles.creditStatValue, { color: colors.success }]}>
+                        {currency} {creditInfo.availableCredit.toFixed(2)}
+                      </Text>
+                    </View>
+                  </View>
 
-              <View style={styles.creditProgressContainer}>
-                <View style={styles.creditProgressHeader}>
-                  <Text style={styles.creditProgressLabel}>Credit Usage</Text>
-                  <Text style={styles.creditProgressPercent}>{usagePercent.toFixed(1)}%</Text>
-                </View>
-                <View style={styles.creditProgressBar}>
-                  <View
-                    style={[
-                      styles.creditProgressFill,
-                      {
-                        width: `${Math.min(100, usagePercent)}%`,
-                        backgroundColor: getCreditStatusColor(),
-                      },
-                    ]}
-                  />
-                </View>
-              </View>
+                  <View style={styles.creditProgressContainer}>
+                    <View style={styles.creditProgressHeader}>
+                      <Text style={styles.creditProgressLabel}>Credit Usage</Text>
+                      <Text style={styles.creditProgressPercent}>{usagePercent.toFixed(1)}%</Text>
+                    </View>
+                    <View style={styles.creditProgressBar}>
+                      <View
+                        style={[
+                          styles.creditProgressFill,
+                          {
+                            width: `${Math.min(100, usagePercent)}%`,
+                            backgroundColor: getCreditStatusColor(),
+                          },
+                        ]}
+                      />
+                    </View>
+                  </View>
 
-              {creditInfo.paymentTerms && (
-                <View style={styles.paymentTermsContainer}>
-                  <Ionicons name="time-outline" size={14} color={colors.primary} />
-                  <Text style={styles.paymentTermsText}>{creditInfo.paymentTerms}</Text>
-                </View>
+                  {creditInfo.paymentTerms && (
+                    <View style={styles.paymentTermsContainer}>
+                      <Ionicons name="time-outline" size={14} color={colors.primary} />
+                      <Text style={styles.paymentTermsText}>{creditInfo.paymentTerms}</Text>
+                    </View>
+                  )}
+                </>
               )}
             </AppCard>
           </Animated.View>
@@ -260,23 +332,56 @@ export default function PaymentCollectionScreen() {
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
               <Text style={styles.summaryValue}>
-                {params.currency} {subtotal.toFixed(2)}
+                {currency} {subtotal.toFixed(2)}
               </Text>
             </View>
 
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tax (16%)</Text>
               <Text style={styles.summaryValue}>
-                {params.currency} {tax.toFixed(2)}
+                {currency} {tax.toFixed(2)}
               </Text>
             </View>
+
+            {/* Weight Breakdown */}
+            {netWeight > 0 && (
+              <>
+                <View style={styles.summaryDivider} />
+                <Text style={styles.summarySubtitle}>Weight Details</Text>
+
+                {caseDetails.totalCases > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Cases ({caseDetails.totalCases})</Text>
+                    <Text style={styles.summaryValue}>
+                      {caseDetails.totalCaseWeight.toFixed(3)} kg
+                    </Text>
+                  </View>
+                )}
+
+                {pieceDetails.totalPieces > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Pieces ({pieceDetails.totalPieces})</Text>
+                    <Text style={styles.summaryValue}>
+                      {pieceDetails.totalPieceWeight.toFixed(3)} kg
+                    </Text>
+                  </View>
+                )}
+
+                <View style={[styles.summaryRow, styles.weightTotalRow]}>
+                  <Text style={styles.summaryLabel}>Total Net Weight</Text>
+                  <Text style={[styles.summaryValue, { fontWeight: 'bold' }]}>
+                    {netWeight.toFixed(3)} kg
+                  </Text>
+                </View>
+              </>
+            )}
 
             <View style={styles.summaryDivider} />
 
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total Amount Due</Text>
               <Text style={[styles.totalValue, { color: colors.primary }]}>
-                {params.currency} {orderTotal.toFixed(2)}
+                {currency} {orderTotal.toFixed(2)}
               </Text>
             </View>
           </AppCard>
@@ -371,40 +476,50 @@ export default function PaymentCollectionScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Credit Payment Option */}
-            <TouchableOpacity
-              style={[
-                styles.paymentModeCard,
-                selectedMode === 'credit' && styles.paymentModeSelected,
-                {
-                  borderColor:
-                    selectedMode === 'credit' ? colors.primary || '#9C27B0' : colors.border,
-                },
-              ]}
-              onPress={() => setSelectedMode('credit')}
-            >
-              <View style={styles.paymentModeLeft}>
-                <View
-                  style={[
-                    styles.paymentModeIcon,
-                    { backgroundColor: (colors.primary || '#9C27B0') + '15' },
-                  ]}
-                >
-                  <Ionicons name="business-outline" size={24} color={colors.primary || '#9C27B0'} />
+            {/* Credit Payment Option - Only show if outlet has credit limit */}
+            {creditInfo.creditLimit > 0 && (
+              <TouchableOpacity
+                style={[
+                  styles.paymentModeCard,
+                  selectedMode === 'credit' && styles.paymentModeSelected,
+                  {
+                    borderColor:
+                      selectedMode === 'credit' ? colors.primary || '#9C27B0' : colors.border,
+                  },
+                ]}
+                onPress={() => setSelectedMode('credit')}
+              >
+                <View style={styles.paymentModeLeft}>
+                  <View
+                    style={[
+                      styles.paymentModeIcon,
+                      { backgroundColor: (colors.primary || '#9C27B0') + '15' },
+                    ]}
+                  >
+                    <Ionicons
+                      name="business-outline"
+                      size={24}
+                      color={colors.primary || '#9C27B0'}
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.paymentModeLabel}>Credit / Account</Text>
+                    <Text style={styles.paymentModeSubLabel}>
+                      Available: {currency} {creditInfo.availableCredit.toFixed(2)}
+                    </Text>
+                  </View>
                 </View>
-                <View>
-                  <Text style={styles.paymentModeLabel}>Credit / Account</Text>
-                  <Text style={styles.paymentModeSubLabel}>
-                    Available: {params.currency} {creditInfo.availableCredit.toFixed(2)}
-                  </Text>
+                <View style={styles.paymentModeRight}>
+                  {selectedMode === 'credit' && (
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={20}
+                      color={colors.primary || '#9C27B0'}
+                    />
+                  )}
                 </View>
-              </View>
-              <View style={styles.paymentModeRight}>
-                {selectedMode === 'credit' && (
-                  <Ionicons name="checkmark-circle" size={20} color={colors.primary || '#9C27B0'} />
-                )}
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+            )}
           </View>
         </Animated.View>
 
@@ -413,7 +528,7 @@ export default function PaymentCollectionScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Payment Amount</Text>
             <View style={styles.amountInputContainer}>
-              <Text style={styles.currencySymbol}>{params.currency}</Text>
+              <Text style={styles.currencySymbol}>{currency}</Text>
               <TextInput
                 style={styles.amountInput}
                 value={amount}
@@ -436,7 +551,7 @@ export default function PaymentCollectionScreen() {
               <View style={[styles.warningBox, { backgroundColor: colors.error + '10' }]}>
                 <Ionicons name="warning-outline" size={16} color={colors.error} />
                 <Text style={[styles.warningText, { color: colors.error }]}>
-                  Amount exceeds available credit by {params.currency}
+                  Amount exceeds available credit by {currency}
                   {(parsedAmount - creditInfo.availableCredit).toFixed(2)}
                 </Text>
               </View>
@@ -446,7 +561,7 @@ export default function PaymentCollectionScreen() {
               <View style={[styles.infoBox, { backgroundColor: colors.success + '10' }]}>
                 <Ionicons name="information-circle-outline" size={16} color={colors.success} />
                 <Text style={[styles.infoText, { color: colors.success }]}>
-                  After payment, available credit: {params.currency}
+                  After payment, available credit: {currency}
                   {(creditInfo.availableCredit - parsedAmount).toFixed(2)}
                 </Text>
               </View>
@@ -505,10 +620,10 @@ export default function PaymentCollectionScreen() {
               {!isValidAmount
                 ? 'Enter amount'
                 : isCreditSelected
-                  ? `Charge to Credit Account · ${params.currency} ${parsedAmount.toFixed(2)}`
+                  ? `Charge to Credit Account · ${currency} ${parsedAmount.toFixed(2)}`
                   : parsedAmount === amountDue
-                    ? `Pay Full Amount ${params.currency} ${amountDue.toFixed(2)}`
-                    : `Pay ${params.currency} ${parsedAmount.toFixed(2)}`}
+                    ? `Pay Full Amount ${currency} ${amountDue.toFixed(2)}`
+                    : `Pay ${currency} ${parsedAmount.toFixed(2)}`}
             </Text>
           )}
         </TouchableOpacity>

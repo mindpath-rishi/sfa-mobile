@@ -96,12 +96,12 @@ export interface TodayActivitiesSectionProps {
 }
 
 export interface CurrentActivityCardProps {
-  selectedActivity: string;
+  selectedActivity: string | null;
   selectedActivityColor: string;
   selectedActivityIcon: string;
-  startTime: string;
+  startTime: string | null;
   otherWorkStartTime: string | null;
-  selectedRoute: Route | null;
+  selectedRoute: any | null;
   assignedVan: Van;
   onPressChange: () => void;
   onPressEnd: () => void;
@@ -114,7 +114,7 @@ export interface CurrentActivityCardProps {
 export interface ChangeActivityModalProps {
   visible: boolean;
   showChangeOtherOptions: boolean;
-  selectedActivity: string;
+  selectedActivity: string | null;
   activityTypes: ActivityType[];
   otherWorkOptions: OtherWorkOption[];
   onClose: () => void;

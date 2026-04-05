@@ -1,4 +1,3 @@
-// shared/contexts/FilterContext.tsx
 import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 
 interface FilterContextType {
@@ -7,22 +6,32 @@ interface FilterContextType {
   updateProductsFilterCount: (count: number) => void;
   resetProductsFilterCount: () => void;
 
-  // Customers
-  customersFilterCount: number;
-  updateCustomersFilterCount: (count: number) => void;
-  resetCustomersFilterCount: () => void;
+  // Outlets
+  outletsFilterCount: number;
+  updateOutletsFilterCount: (count: number) => void;
+  resetOutletsFilterCount: () => void;
 
   // Reports
   reportsFilterCount: number;
   updateReportsFilterCount: (count: number) => void;
   resetReportsFilterCount: () => void;
+
+  // ✅ Product Filter Handler
+  openProductFilter: () => void;
+  setOpenProductFilterHandler: (fn: () => void) => void;
+
+  // ✅ Outlet Filter Handler
+  openOutletFilter: () => void;
+  setOpenOutletFilterHandler: (fn: () => void) => void;
 }
 
 const FilterContext = createContext<FilterContextType | undefined>(undefined);
 
 export const FilterProvider = ({ children }: { children: ReactNode }) => {
+  /* ================= FILTER COUNTS ================= */
+
   const [productsFilterCount, setProductsFilterCount] = useState(0);
-  const [customersFilterCount, setCustomersFilterCount] = useState(0);
+  const [outletsFilterCount, setOutletsFilterCount] = useState(0);
   const [reportsFilterCount, setReportsFilterCount] = useState(0);
 
   const updateProductsFilterCount = useCallback((count: number) => {
@@ -33,12 +42,12 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
     setProductsFilterCount(0);
   }, []);
 
-  const updateCustomersFilterCount = useCallback((count: number) => {
-    setCustomersFilterCount(count);
+  const updateOutletsFilterCount = useCallback((count: number) => {
+    setOutletsFilterCount(count);
   }, []);
 
-  const resetCustomersFilterCount = useCallback(() => {
-    setCustomersFilterCount(0);
+  const resetOutletsFilterCount = useCallback(() => {
+    setOutletsFilterCount(0);
   }, []);
 
   const updateReportsFilterCount = useCallback((count: number) => {
@@ -49,24 +58,69 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
     setReportsFilterCount(0);
   }, []);
 
+  /* ================= PRODUCT FILTER HANDLER ================= */
+
+  const [openProductFilterHandler, setOpenProductFilterHandlerState] = useState<() => void>(
+    () => () => {},
+  );
+
+  const setOpenProductFilterHandler = useCallback((fn: () => void) => {
+    setOpenProductFilterHandlerState(() => fn);
+  }, []);
+
+  const openProductFilter = useCallback(() => {
+    openProductFilterHandler();
+  }, [openProductFilterHandler]);
+
+  /* ================= OUTLET FILTER HANDLER ================= */
+
+  const [openOutletFilterHandler, setOpenOutletFilterHandlerState] = useState<() => void>(
+    () => () => {},
+  );
+
+  const setOpenOutletFilterHandler = useCallback((fn: () => void) => {
+    setOpenOutletFilterHandlerState(() => fn);
+  }, []);
+
+  const openOutletFilter = useCallback(() => {
+    openOutletFilterHandler();
+  }, [openOutletFilterHandler]);
+
+  /* ================= PROVIDER ================= */
+
   return (
     <FilterContext.Provider
       value={{
+        // Products
         productsFilterCount,
         updateProductsFilterCount,
         resetProductsFilterCount,
-        customersFilterCount,
-        updateCustomersFilterCount,
-        resetCustomersFilterCount,
+
+        // Outlets
+        outletsFilterCount,
+        updateOutletsFilterCount,
+        resetOutletsFilterCount,
+
+        // Reports
         reportsFilterCount,
         updateReportsFilterCount,
         resetReportsFilterCount,
+
+        // Product Filter
+        openProductFilter,
+        setOpenProductFilterHandler,
+
+        // Outlet Filter
+        openOutletFilter,
+        setOpenOutletFilterHandler,
       }}
     >
       {children}
     </FilterContext.Provider>
   );
 };
+
+/* ================= HOOK ================= */
 
 export const useFilterContext = () => {
   const context = useContext(FilterContext);

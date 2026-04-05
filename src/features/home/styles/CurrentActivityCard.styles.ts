@@ -3,7 +3,7 @@ import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 interface CurrentActivityCardStyleProps {
-  selectedActivity?: string;
+  selectedActivity?: string | null;
 }
 
 export const useCurrentActivityCardStyles = (props: CurrentActivityCardStyleProps = {}) => {
@@ -42,7 +42,7 @@ export const useCurrentActivityCardStyles = (props: CurrentActivityCardStyleProp
     } as ViewStyle,
 
     textXSmall: {
-      fontSize: utils.fontSize.xs,
+      fontSize: utils.fontSize.sm,
       color: colors.textSecondary,
     } as TextStyle,
 

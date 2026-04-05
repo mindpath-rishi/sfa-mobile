@@ -1,4 +1,3 @@
-// components/SalesSummary/components/HeaderCard.tsx
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,22 +5,23 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { StatPill } from './StatPill';
 
 interface HeaderCardProps {
-  customerName: string;
-  customerId: string;
-  reference: string;
+  outletName: string | undefined;
+  customerId: string | undefined;
+  reference: string | undefined;
+
   totals: {
-    cases: number;
-    pieces: number;
-    orderedCount: number;
-    skuCount: number;
-    units: number;
+    totalCases: number;
+    totalPieces: number;
+    totalSkus: number;
+    totalItems: number;
   };
+
   onReset: () => void;
   isProcessing?: boolean;
 }
 
 export const HeaderCard: React.FC<HeaderCardProps> = ({
-  customerName,
+  outletName,
   customerId,
   reference,
   totals,
@@ -40,6 +40,7 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
         borderColor: colors.border + '30',
       }}
     >
+      {/* ================= HEADER ================= */}
       <View
         style={{
           flexDirection: 'row',
@@ -50,7 +51,7 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
       >
         <View>
           <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary }}>
-            {customerName}
+            {outletName}
           </Text>
           <Text style={{ fontSize: 12, color: colors.textTertiary, marginTop: 2 }}>
             {reference} · #{customerId}
@@ -77,15 +78,14 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
         </TouchableOpacity>
       </View>
 
+      {/* ================= STATS ================= */}
       <View style={{ flexDirection: 'row', gap: 8 }}>
-        <StatPill value={totals.cases} label="CASES" highlight={totals.cases > 0} />
-        <StatPill value={totals.pieces} label="PIECES" highlight={totals.pieces > 0} />
-        <StatPill
-          value={`${totals.orderedCount}/${totals.skuCount}`}
-          label="SKUs"
-          highlight={totals.orderedCount > 0}
-        />
-        <StatPill value={totals.units} label="UNITS" highlight={totals.units > 0} />
+        <StatPill value={totals.totalSkus} label="SKU" highlight={totals.totalSkus > 0} />
+        <StatPill value={totals.totalCases} label="CASES" highlight={totals.totalCases > 0} />
+
+        <StatPill value={totals.totalPieces} label="PIECES" highlight={totals.totalPieces > 0} />
+
+        <StatPill value={totals.totalItems} label="ITEMS" highlight={totals.totalItems > 0} />
       </View>
     </View>
   );

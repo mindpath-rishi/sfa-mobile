@@ -12,6 +12,8 @@ import { useCheckInScreenStyles } from '../styles/CheckInScreen.styles';
 import { CheckInScreenParams, Customer, NonSaleStep, TabType } from '../types/checkin.types';
 import { TabBar } from '../components/checkin/TabBar';
 import { NonSaleCategoryScreen } from './NonSaleCategoryScreen';
+import { useAuthStore } from '@/core/store/auth.store';
+import { useOutletStore } from '@/core/store/outlet.store';
 
 const MOCK_CUSTOMER: Customer = {
   id: '16295',
@@ -28,6 +30,7 @@ export default function CheckInScreen() {
 
   const [activeTab, setActiveTab] = useState<TabType>('sale');
   const [nonSaleStep, setNonSaleStep] = useState<NonSaleStep>('main');
+  const outlet = useOutletStore((s) => s.selectedOutlet);
   const [customer, setCustomer] = useState<Customer>(MOCK_CUSTOMER);
 
   const productsScreenRef = useRef<ProductsScreenRef>(null);
@@ -61,7 +64,7 @@ export default function CheckInScreen() {
   // Update header title based on active tab
   useFocusEffect(
     useCallback(() => {
-      const headerTitle = customer.name || customerName || 'Check In';
+      const headerTitle = outlet?.name || customerName || 'Check In';
 
       if (activeTab === 'sale') {
         navigation.setOptions({

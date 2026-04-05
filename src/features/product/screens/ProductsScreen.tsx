@@ -14,45 +14,33 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { ProductCard, SearchBar } from '../components/product';
-import { PRODUCTS_DATA } from '../constants/mockData';
 import { useProductsScreenStyles } from '../styles/ProductsScreen.styles';
-import { CartItem, Product } from '../types/product.types';
+import { CartItemWithDetails, Product } from '../types/product.types';
 import { FilterSection } from '@/shared/types/filter.types';
 import { FilterModal } from '@/shared/components/models/Filter.modal';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
+import { categoryService } from '@/shared/services/category.service';
+import { productService } from '@/shared/services/product.service';
+import { useCartStore } from '@/core/store/cart.store';
 
 // Constants
-const UNITS_PER_CASE = 12;
 const LOAD_MORE_THRESHOLD = 0.5;
+const PAGE_SIZE = 20;
 
 // Types
-interface CartItemWithDetails extends CartItem {
-  productId: string;
-  productName: string;
-  price: number;
-}
-
-interface QuickFilter {
-  id: string;
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  active: boolean;
-}
 
 interface FilterState {
-  categories: string[];
+  categories: {
+    name: string;
+    categoryId: string;
+  }[];
   brands: string[];
-  status: string[];
-  rating: string | undefined;
-  priceRange: { min: string; max: string };
-  discounted: boolean;
 }
 
 export interface ProductsScreenRef {
@@ -69,69 +57,193 @@ interface ProductsScreenProps {
 const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props, ref) => {
   const { colors } = useTheme();
   const styles = useProductsScreenStyles();
-  const params = useLocalSearchParams();
-  const navigation = useNavigation();
   const { onProductsCountChange } = props;
-  const { productsFilterCount, updateProductsFilterCount, resetProductsFilterCount } =
-    useFilterContext();
+  const { setOpenProductFilterHandler, resetProductsFilterCount } = useFilterContext();
 
   // State
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<FilterState>({
     categories: [],
     brands: [],
-    status: [],
-    rating: undefined,
-    priceRange: { min: '', max: '' },
-    discounted: false,
   });
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItemWithDetails[]>([]);
 
-  // Auto-open filters if URL param is present
-  useEffect(() => {
-    if (params.openFilters === 'true') {
-      setShowFilters(true);
-      router.setParams({ openFilters: undefined });
-    }
-  }, [params.openFilters]);
+  // API Data States
+  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
+  const { addItems, items, summary, hydrate } = useCartStore();
+  // const { activeVisit } = useOutletStore();
 
-  // Update header options when screen is focused
-  useFocusEffect(
-    useCallback(() => {
-      // Set the header filter press handler
-      navigation.setOptions({
-        onFilterPress: () => {
-          setShowFilters(true);
-        },
-      });
-    }, [navigation]),
+  // Fetch products from API
+  const fetchProducts = useCallback(
+    async (
+      page: number = 1,
+      shouldAppend: boolean = false,
+      search: string = searchQuery,
+      categoryIds?: string[],
+      brandNames?: string[],
+    ) => {
+      try {
+        if (page === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+
+        const params: any = {
+          page,
+          limit: PAGE_SIZE,
+          searchText: search || undefined,
+        };
+
+        // Add category filter if selected
+        if (categoryIds?.length) {
+          params.categoryIds = categoryIds.join(',');
+        }
+
+        // Add brand filter if selected
+        if (brandNames?.length) {
+          params.brands = brandNames.join(',');
+        }
+
+        const response: any = await productService.fetchProducts(params);
+
+        if (response?.success) {
+          const newProducts = response.data || [];
+          // if (items.length) {
+          //   newProducts.forEach((item: any) => {
+          //     const findItem = items.find((_item) => item.productId === _item.productId);
+          //     if (findItem) {
+          //       if (findItem.caseQty) {
+          //         item.caseQty = findItem.caseQty;
+          //       }
+          //       if (findItem?.pieceQty) {
+          //         item.pieceQty = findItem.pieceQty;
+          //       }
+          //     }
+          //   });
+          // }
+          const total = response.total || 0;
+
+          // Use backend data as single source of truth
+          // No transformation needed - trust backend values
+          if (shouldAppend) {
+            setProducts((prev) => [...prev, ...newProducts]);
+          } else {
+            setProducts(newProducts);
+          }
+
+          setTotalCount(total);
+          setHasMore(page * PAGE_SIZE < total);
+          setCurrentPage(page);
+        } else {
+          console.error('Failed to fetch products:', response?.message);
+          if (page === 1) {
+            setProducts([]);
+            setHasMore(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        Alert.alert('Error', 'Failed to load products. Please try again.');
+        if (page === 1) {
+          setProducts([]);
+        }
+      } finally {
+        if (page === 1) {
+          setLoading(false);
+        } else {
+          setLoadingMore(false);
+        }
+      }
+    },
+    [searchQuery],
   );
 
-  // Memoized data
-  const categories = useMemo(() => [...new Set(PRODUCTS_DATA.map((p) => p.category))].sort(), []);
-  const brands = useMemo(() => [...new Set(PRODUCTS_DATA.map((p) => p.brand))].sort(), []);
+  const productsWithCart = useMemo(() => {
+    return products.map((product) => {
+      const cartItem = items.find((i) => i.productId === product.productId);
+
+      return {
+        ...product,
+        caseQty: cartItem?.caseQty || 0,
+        pieceQty: cartItem?.pieceQty || 0,
+      };
+    });
+  }, [products, items]);
+
+  useEffect(() => {
+    useCartStore.getState().hydrate();
+    console.log(items, '============items===============');
+  }, []);
+
+  // Fetch brands from API
+  const fetchBrands = useCallback(async () => {
+    try {
+      // const response: any = await productService.fetchBrands();
+      // if (response?.success) {
+      //   setBrands(response.data || []);
+      // }
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+    }
+  }, []);
+
+  // Fetch categories
+  const fetchCategories = useCallback(async () => {
+    try {
+      const params: any = {
+        page: 1,
+        limit: 100,
+      };
+      const response: any = await categoryService.fetchCategory(params);
+      if (response?.success) {
+        setFilters((prev) => ({ ...prev, categories: response.data }));
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchProducts(1, false);
+    fetchBrands();
+    fetchCategories();
+  }, []);
+
+  // Handle filter changes
+  useEffect(() => {
+    const categoryIds = filters.categories.map((cat) => cat.categoryId);
+    const brandNames = filters.brands;
+    fetchProducts(1, false, searchQuery, categoryIds, brandNames);
+  }, [filters, searchQuery]);
+
+  // Set up filter handler from context
+  useEffect(() => {
+    setOpenProductFilterHandler(() => {
+      setShowFilters(true);
+    });
+
+    return () => {
+      setOpenProductFilterHandler(() => {});
+    };
+  }, [setOpenProductFilterHandler]);
 
   // Calculate active filter count
   const calculateActiveFilterCount = useCallback(() => {
     let count = 0;
     count += filters.categories.length;
     count += filters.brands.length;
-    count += filters.status.length;
-    if (filters.rating) count++;
-    if (filters.priceRange.min || filters.priceRange.max) count++;
-    if (filters.discounted) count++;
     if (searchQuery.trim()) count++;
     return count;
   }, [filters, searchQuery]);
-
-  // Update filter count in context whenever filters change
-  useEffect(() => {
-    const count = calculateActiveFilterCount();
-    updateProductsFilterCount(count);
-  }, [filters, searchQuery, calculateActiveFilterCount, updateProductsFilterCount]);
 
   // Reset filter count on unmount
   useEffect(() => {
@@ -139,64 +251,6 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
       resetProductsFilterCount();
     };
   }, [resetProductsFilterCount]);
-
-  // Filter products
-  const filteredProducts = useMemo(() => {
-    const result = PRODUCTS_DATA.filter((product) => {
-      // Category filter
-      if (filters.categories.length && !filters.categories.includes(product.category)) {
-        return false;
-      }
-
-      // Brand filter
-      if (filters.brands.length && !filters.brands.includes(product.brand)) {
-        return false;
-      }
-
-      // Status filter
-      if (filters.status.length && !filters.status.includes(product.status)) {
-        return false;
-      }
-
-      // Price range filter
-      if (filters.priceRange.min && product.price < Number(filters.priceRange.min)) {
-        return false;
-      }
-      if (filters.priceRange.max && product.price > Number(filters.priceRange.max)) {
-        return false;
-      }
-
-      // Rating filter
-      if (filters.rating && product.ratings < Number(filters.rating)) {
-        return false;
-      }
-
-      // Discount filter
-      if (filters.discounted && product.discount <= 0) {
-        return false;
-      }
-
-      // Search query
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase().trim();
-        return (
-          product.name.toLowerCase().includes(query) ||
-          product.brand.toLowerCase().includes(query) ||
-          product.category.toLowerCase().includes(query) ||
-          product.sku.toLowerCase().includes(query)
-        );
-      }
-
-      return true;
-    });
-
-    // Notify parent of count change
-    if (onProductsCountChange) {
-      onProductsCountChange(result.length);
-    }
-
-    return result;
-  }, [filters, searchQuery, onProductsCountChange]);
 
   // Filter sections for modal
   const filterSections = useMemo(
@@ -206,12 +260,12 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
         title: 'Categories',
         type: 'multiple',
         icon: 'apps-outline',
-        options: categories.map((cat) => ({
-          id: cat,
-          label: cat,
-          count: PRODUCTS_DATA.filter((p) => p.category === cat).length,
+        options: filters.categories?.map((item) => ({
+          label: item.name,
+          id: item.categoryId,
+          count: 0,
         })),
-        selectedIds: filters.categories,
+        selectedIds: filters.categories.map((cat) => cat.categoryId),
       },
       {
         id: 'brands',
@@ -221,107 +275,29 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
         options: brands.map((brand) => ({
           id: brand,
           label: brand,
-          count: PRODUCTS_DATA.filter((p) => p.brand === brand).length,
         })),
         selectedIds: filters.brands,
       },
-      {
-        id: 'status',
-        title: 'Stock Status',
-        type: 'multiple',
-        icon: 'cube-outline',
-        options: [
-          {
-            id: 'in_stock',
-            label: 'In Stock',
-            count: PRODUCTS_DATA.filter((p) => p.status === 'in_stock').length,
-          },
-          {
-            id: 'low_stock',
-            label: 'Low Stock',
-            count: PRODUCTS_DATA.filter((p) => p.status === 'low_stock').length,
-          },
-          {
-            id: 'out_of_stock',
-            label: 'Out of Stock',
-            count: PRODUCTS_DATA.filter((p) => p.status === 'out_of_stock').length,
-          },
-        ],
-        selectedIds: filters.status,
-      },
-      {
-        id: 'price',
-        title: 'Price Range (₹)',
-        type: 'range',
-        icon: 'cash-outline',
-        rangeValue: filters.priceRange,
-        min: 0,
-        max: 10000,
-      },
-      {
-        id: 'rating',
-        title: 'Rating',
-        type: 'single',
-        icon: 'star-outline',
-        options: [
-          { id: '4', label: '4★ & above' },
-          { id: '3', label: '3★ & above' },
-          { id: '2', label: '2★ & above' },
-        ],
-        selectedId: filters.rating,
-      },
-      {
-        id: 'offers',
-        title: 'Offers',
-        type: 'toggle',
-        icon: 'pricetag-outline',
-        toggleValue: filters.discounted,
-      },
     ],
-    [categories, brands, filters],
+    [brands, filters],
   );
 
-  // Quick filters
-  const quickFilters: QuickFilter[] = useMemo(
-    () => [
-      {
-        id: 'in_stock',
-        label: 'In Stock',
-        icon: 'checkmark-circle',
-        active: filters.status.includes('in_stock'),
-      },
-      {
-        id: 'discounted',
-        label: 'Offers',
-        icon: 'pricetag',
-        active: filters.discounted,
-      },
-      {
-        id: 'low_stock',
-        label: 'Low Stock',
-        icon: 'alert-circle',
-        active: filters.status.includes('low_stock'),
-      },
-    ],
-    [filters.status, filters.discounted],
-  );
-
-  // Cart summary
   const cartSummary = useMemo(() => {
-    return cartItems.reduce(
+    return items.reduce(
       (acc, item) => {
-        if (item.type === 'cases') {
-          acc.totalUnits += item.quantity * UNITS_PER_CASE;
-          acc.totalValue += item.quantity * item.price;
-        } else {
-          acc.totalUnits += item.quantity;
-          acc.totalValue += item.quantity * item.price;
-        }
+        const caseUnits = (item.caseQty || 0) * item.unitQtyInCase;
+        const pieceUnits = item.pieceQty || 0;
+
+        acc.totalUnits += caseUnits + pieceUnits;
+
+        acc.totalValue +=
+          (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice;
+
         return acc;
       },
       { totalUnits: 0, totalValue: 0 },
     );
-  }, [cartItems]);
+  }, [items]);
 
   // Expose methods to parent
   useImperativeHandle(ref, () => ({
@@ -329,10 +305,6 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
       setFilters({
         categories: [],
         brands: [],
-        status: [],
-        rating: undefined,
-        priceRange: { min: '', max: '' },
-        discounted: false,
       });
       setSearchQuery('');
       resetProductsFilterCount();
@@ -340,7 +312,7 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
     applyFilters: (newFilters: any) => {
       console.log('Apply filters called from parent', newFilters);
     },
-    getFilteredCount: () => filteredProducts.length,
+    getFilteredCount: () => products.length,
     openFilters: () => {
       setShowFilters(true);
     },
@@ -349,45 +321,58 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
   // Handlers
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await fetchProducts(1, false);
     setRefreshing(false);
-  }, []);
+  }, [fetchProducts]);
 
   const handleLoadMore = useCallback(() => {
-    if (!loading && filteredProducts.length >= 10) {
-      setLoading(true);
-      setTimeout(() => setLoading(false), 1000);
+    if (!loadingMore && hasMore && !loading) {
+      fetchProducts(currentPage + 1, true);
     }
-  }, [loading, filteredProducts.length]);
+  }, [loadingMore, hasMore, loading, currentPage, fetchProducts]);
 
-  const handleAddToCart = useCallback((items: CartItem[], product: Product) => {
-    if (!items?.length) return;
+  const handleAddToCart = useCallback(
+    (items: CartItemWithDetails[], product: Product) => {
+      if (!items?.length || !product) return;
 
-    const newItems: CartItemWithDetails[] = items.map((item) => ({
-      ...item,
-      productId: product.id,
-      productName: product.name,
-      price: item.type === 'cases' ? product.price * UNITS_PER_CASE * 0.95 : product.price,
-    }));
+      console.log(items, '==============items===============');
+      // Convert incoming items → single merged item
+      let caseQty = 0;
+      let pieceQty = 0;
 
-    setCartItems((prev) => [...prev, ...newItems]);
+      items.forEach((item) => {
+        caseQty += item.caseQty || 0;
+        pieceQty += item.pieceQty || 0;
+      });
 
-    const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
-    Alert.alert('✅ Added to Cart', `${itemCount} item(s) added`, [{ text: 'OK' }]);
-  }, []);
+      // if (caseQty === 0 && pieceQty === 0) return;
 
-  const toggleQuickFilter = useCallback((filter: QuickFilter) => {
-    if (filter.id === 'discounted') {
-      setFilters((prev) => ({ ...prev, discounted: !prev.discounted }));
-    } else {
-      setFilters((prev) => ({
-        ...prev,
-        status: prev.status.includes(filter.id)
-          ? prev.status.filter((id) => id !== filter.id)
-          : [...prev.status, filter.id],
-      }));
-    }
-  }, []);
+      // ✅ Send to store
+      addItems([
+        {
+          productId: product.productId,
+          productName: product.name,
+          casePrice: product.casePrice,
+          piecePrice: product.piecePrice,
+          unitQtyInCase: product.unitQtyInCase,
+          caseQty,
+          pieceQty,
+          stock: product.stock,
+        },
+      ]);
+
+      const totalItems = caseQty + pieceQty;
+
+      const totalValue = caseQty * product.casePrice + pieceQty * product.piecePrice;
+
+      Alert.alert(
+        '✅ Added to Cart',
+        `${totalItems} item(s) added\nTotal: ₹${totalValue.toFixed(2)}`,
+        [{ text: 'OK' }],
+      );
+    },
+    [addItems],
+  );
 
   const handleApplyFilters = useCallback(
     (sections: FilterSection[]) => {
@@ -396,19 +381,13 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
       sections.forEach((section) => {
         switch (section.id) {
           case 'categories':
-            newFilters.categories = section.selectedIds || [];
+            const selectedCategories = filters.categories.filter((cat) =>
+              section.selectedIds?.includes(cat.categoryId),
+            );
+            newFilters.categories = selectedCategories;
             break;
           case 'brands':
             newFilters.brands = section.selectedIds || [];
-            break;
-          case 'status':
-            newFilters.status = section.selectedIds || [];
-            break;
-          case 'rating':
-            newFilters.rating = section.selectedId;
-            break;
-          case 'offers':
-            newFilters.discounted = section.toggleValue || false;
             break;
         }
       });
@@ -421,75 +400,31 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
 
   const handleCloseFilters = useCallback(() => {
     setShowFilters(false);
-    router.setParams({ openFilters: undefined });
   }, []);
 
   const clearAllFilters = useCallback(() => {
     setFilters({
       categories: [],
       brands: [],
-      status: [],
-      rating: undefined,
-      priceRange: { min: '', max: '' },
-      discounted: false,
     });
     setSearchQuery('');
     setShowFilters(false);
-    router.setParams({ openFilters: undefined });
     resetProductsFilterCount();
   }, [resetProductsFilterCount]);
 
   const handleProcessSale = useCallback(() => {
-    if (cartItems.length === 0) {
+    if (items.length === 0) {
       Alert.alert('Cart Empty', 'Add items to cart before processing sale');
       return;
     }
 
-    router.push('/checkin/sale');
-
-    Alert.alert(
-      'Process Sale',
-      `Total: ${cartSummary.totalUnits} units\nAmount: ₹${cartSummary.totalValue.toFixed(2)}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: () => {
-            setCartItems([]);
-            Alert.alert('Success', 'Sale completed successfully');
-          },
-        },
-      ],
-    );
-  }, [cartItems, cartSummary]);
+    // Store cart items in context or params for checkout screen
+    router.push({
+      pathname: '/checkin/sale',
+    });
+  }, [items, cartSummary]);
 
   // Render functions
-  const renderQuickFilters = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      style={styles.quickFiltersContainer}
-      contentContainerStyle={styles.quickFiltersContent}
-    >
-      {quickFilters.map((filter) => (
-        <TouchableOpacity
-          key={filter.id}
-          style={[styles.quickFilterChip, filter.active && styles.quickFilterChipActive]}
-          onPress={() => toggleQuickFilter(filter)}
-        >
-          <Ionicons
-            name={filter.icon}
-            size={16}
-            color={filter.active ? 'white' : colors.textSecondary}
-          />
-          <Text style={[styles.quickFilterText, filter.active && styles.quickFilterTextActive]}>
-            {filter.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="cube-outline" size={48} color={colors.textTertiary} />
@@ -505,15 +440,17 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
     </View>
   );
 
-  const renderFooter = () =>
-    loading ? (
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
       <View style={styles.footerLoader}>
         <ActivityIndicator color={colors.primary} size="small" />
       </View>
-    ) : null;
+    );
+  };
 
   const renderCartButton = () =>
-    cartItems.length > 0 ? (
+    items.length > 0 ? (
       <TouchableOpacity
         style={[styles.cartButton, { backgroundColor: colors.primary }]}
         onPress={handleProcessSale}
@@ -531,6 +468,14 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
       </TouchableOpacity>
     ) : null;
 
+  // if (loading && products.length === 0) {
+  //   return (
+  //     <View style={styles.loadingContainer}>
+  //       <ActivityIndicator size="large" color={colors.primary} />
+  //     </View>
+  //   );
+  // }
+
   return (
     <View style={styles.container}>
       {/* Search Bar */}
@@ -538,16 +483,13 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
         <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
       </View>
 
-      {/* Quick Filters */}
-      {renderQuickFilters()}
-
       {/* Product List */}
-      {filteredProducts.length === 0 ? (
+      {products.length === 0 ? (
         renderEmptyState()
       ) : (
         <FlatList
-          data={filteredProducts}
-          keyExtractor={(item) => item.id}
+          data={productsWithCart}
+          keyExtractor={(item) => item.productId}
           renderItem={({ item, index }) => (
             <ProductCard
               product={item}
@@ -582,7 +524,7 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
         onApply={handleApplyFilters}
         onReset={clearAllFilters}
         title="Filter Products"
-        applyButtonText={`Show ${filteredProducts.length} products`}
+        applyButtonText={`Show ${totalCount} products`}
         resetButtonText="Reset"
         showCount={true}
         maxHeight={600}
