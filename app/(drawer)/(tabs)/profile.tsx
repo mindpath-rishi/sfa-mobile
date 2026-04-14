@@ -42,10 +42,10 @@ const SALESMAN_DATA = {
   stats: {
     totalVisits: 1245,
     totalOrders: 892,
-    totalCollections: '₹45,67,890',
-    avgOrderValue: '₹5,123',
+    totalCollections: 'K45,67,890',
+    avgOrderValue: 'K5,123',
     customerSatisfaction: 4.8,
-    incentivesEarned: '₹1,25,000',
+    incentivesEarned: 'K1,25,000',
     attendance: 98,
     targetAchievement: 87,
   },

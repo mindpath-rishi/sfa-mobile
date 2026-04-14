@@ -1,6 +1,6 @@
 // CheckInScreen.tsx
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { View, Alert, Text } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -12,13 +12,8 @@ import { useCheckInScreenStyles } from '../styles/CheckInScreen.styles';
 import { CheckInScreenParams, Customer, NonSaleStep, TabType } from '../types/checkin.types';
 import { TabBar } from '../components/checkin/TabBar';
 import { NonSaleCategoryScreen } from './NonSaleCategoryScreen';
-import { useAuthStore } from '@/core/store/auth.store';
 import { useOutletStore } from '@/core/store/outlet.store';
-
-const MOCK_CUSTOMER: Customer = {
-  id: '16295',
-  name: 'Zombela',
-};
+import PaymentsScreen from 'app/(drawer)/collection';
 
 export default function CheckInScreen() {
   const { colors } = useTheme();
@@ -31,41 +26,13 @@ export default function CheckInScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('sale');
   const [nonSaleStep, setNonSaleStep] = useState<NonSaleStep>('main');
   const outlet = useOutletStore((s) => s.selectedOutlet);
-  const [customer, setCustomer] = useState<Customer>(MOCK_CUSTOMER);
 
   const productsScreenRef = useRef<ProductsScreenRef>(null);
   const [productsCount, setProductsCount] = useState(0);
 
-  // Memoized customer data from params
-  const customerName = useMemo(() => {
-    return params.name || params.customerName || MOCK_CUSTOMER.name;
-  }, [params.name, params.customerName]);
-
-  const customerId = useMemo(() => {
-    return params.id || params.customerId || MOCK_CUSTOMER.id;
-  }, [params.id, params.customerId]);
-
-  // Initialize customer from params
-  useEffect(() => {
-    setCustomer({
-      id: customerId,
-      name: customerName,
-      address: params.address,
-      phone: params.phone,
-      route: params.route,
-    });
-
-    // Set initial tab if provided
-    if (params.tab && ['sale', 'non-sale', 'collection'].includes(params.tab)) {
-      setActiveTab(params.tab);
-    }
-  }, [customerId, customerName, params.address, params.phone, params.route, params.tab]);
-
-  // Update header title based on active tab
   useFocusEffect(
     useCallback(() => {
-      const headerTitle = outlet?.name || customerName || 'Check In';
-
+      const headerTitle = outlet?.name;
       if (activeTab === 'sale') {
         navigation.setOptions({
           title: headerTitle,
@@ -90,7 +57,7 @@ export default function CheckInScreen() {
           showFilter: false,
         });
       }
-    }, [navigation, activeTab, customer.name, customerName, productsFilterCount]),
+    }, [navigation, activeTab, productsFilterCount]),
   );
 
   const handleBack = () => {
@@ -102,15 +69,11 @@ export default function CheckInScreen() {
   };
 
   const handleCategorySelect = (category: any) => {
-    // Navigate to reason screen with params
     router.push({
       pathname: '/checkin/nonsale/second-step',
       params: {
-        customerId: customer.id,
-        customerName: customer.name,
-        customerAddress: customer.address,
-        customerPhone: customer.phone,
-        customerRoute: customer.route,
+        customerId: outlet?.customerId,
+        customerName: outlet?.name,
         categoryId: category.id,
         categoryTitle: category.title.replace('\n', ' '),
         categoryColor: category.color,
@@ -129,9 +92,7 @@ export default function CheckInScreen() {
   const renderNonSaleContent = () => {
     switch (nonSaleStep) {
       case 'main':
-        return (
-          <NonSaleCategoryScreen customer={customer} onCategorySelect={handleCategorySelect} />
-        );
+        return <NonSaleCategoryScreen onCategorySelect={handleCategorySelect} />;
       default:
         return null;
     }
@@ -144,12 +105,23 @@ export default function CheckInScreen() {
       case 'non-sale':
         return renderNonSaleContent();
       case 'collection':
+        // return (
+        //   <View style={styles.placeholderContainer}>
+        //     <Ionicons name="folder-outline" size={64} color={colors.textTertiary} />
+        //     <Text style={styles.placeholderTitle}>Collection</Text>
+        //     <Text style={styles.placeholderText}>Your saved collections and favorites</Text>
+        //   </View>
+        // );
         return (
-          <View style={styles.placeholderContainer}>
-            <Ionicons name="folder-outline" size={64} color={colors.textTertiary} />
-            <Text style={styles.placeholderTitle}>Collection</Text>
-            <Text style={styles.placeholderText}>Your saved collections and favorites</Text>
-          </View>
+          <PaymentsScreen
+            // onPaymentSelect={(payment) => {
+            //   // Handle payment selection if needed
+            //   console.log('Selected payment:', payment);
+            // }}
+            customerId={outlet?.customerId}
+            outstanding={outlet?.outstanding}
+            hideSearch={true}
+          />
         );
       default:
         return null;

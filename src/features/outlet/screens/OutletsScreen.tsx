@@ -14,6 +14,7 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { outletService } from '../services/outlet.service';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { toast } from '@/shared/utils/toast';
+import { useRouteStore } from '@/core/store/route.store';
 
 const LIMIT = 10;
 
@@ -29,7 +30,7 @@ export default function OutletsScreen() {
   const [hasMore, setHasMore] = useState(true);
 
   const [showFilters, setShowFilters] = useState(false);
-  const route = useAuthStore((s) => s.selectedRoute);
+  const route = useRouteStore((s) => s.selectedRoute);
   const activeVisit = useOutletStore((s) => s.activeVisit);
 
   const { setOpenOutletFilterHandler, updateOutletsFilterCount, resetOutletsFilterCount } =
@@ -112,6 +113,7 @@ export default function OutletsScreen() {
         limit: LIMIT,
         searchText: searchQuery,
         filters,
+        routeSessionId: route?.routeSessionId,
       };
 
       const response: ApiResponse<any> = await outletService.getRouteOutlets(payload);

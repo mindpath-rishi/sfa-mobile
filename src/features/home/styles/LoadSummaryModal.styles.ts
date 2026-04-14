@@ -1,3 +1,4 @@
+// LoadSummaryModal.styles.ts
 import { ViewStyle, TextStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -6,176 +7,442 @@ export const useLoadSummaryModalStyles = () => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    } as ViewStyle,
-
-    header: {
-      paddingTop: utils.spacing[8],
-      paddingBottom: utils.spacing[3],
+    // Header Info
+    headerInfo: {
       paddingHorizontal: utils.spacing[4],
-      backgroundColor: colors.surface,
+      paddingTop: utils.spacing[2],
+      paddingBottom: utils.spacing[3],
       borderBottomWidth: 1,
-      borderBottomColor: colors.divider,
-    } as ViewStyle,
-
-    headerContent: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: utils.spacing[2],
-    } as ViewStyle,
-
-    headerTitle: {
-      fontSize: utils.fontSize.lg,
-      fontWeight: utils.getFontWeight('bold'),
-      color: colors.textPrimary,
-    } as TextStyle,
-
-    closeButton: {
-      padding: utils.spacing[1],
+      borderBottomColor: colors.border,
     } as ViewStyle,
 
     loadNumberBadge: {
-      backgroundColor: colors.primary + '10',
-      paddingHorizontal: utils.spacing[2],
-      paddingVertical: utils.spacing[1],
-      borderRadius: utils.borderRadius.sm,
+      flexDirection: 'row',
+      alignItems: 'center',
       alignSelf: 'flex-start',
+      paddingHorizontal: utils.spacing[3],
+      paddingVertical: utils.spacing[1.5],
+      borderRadius: 20,
+      gap: utils.spacing[1.5],
     } as ViewStyle,
 
     loadNumberText: {
       fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('medium'),
-      color: colors.primary,
+      fontWeight: '600',
     } as TextStyle,
 
-    content: {
+    // Modal Inner Container
+    modalInnerContainer: {
       flex: 1,
-      padding: utils.spacing[3],
     } as ViewStyle,
 
-    summaryCard: {
-      backgroundColor: colors.surface,
-      borderRadius: utils.borderRadius.md,
-      padding: utils.spacing[3],
-      marginBottom: utils.spacing[3],
-      borderWidth: 1,
-      borderColor: colors.divider,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    } as ViewStyle,
-
-    summaryItem: {
-      flex: 1,
-      alignItems: 'flex-start',
-    } as ViewStyle,
-
-    summaryItemRight: {
-      flex: 1,
-      alignItems: 'flex-end',
-    } as ViewStyle,
-
-    summaryLabel: {
-      fontSize: utils.fontSize.xs,
-      color: colors.textSecondary,
-      marginBottom: utils.spacing[1],
-    } as TextStyle,
-
-    summaryValue: {
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('bold'),
-      color: colors.textPrimary,
-    } as TextStyle,
-
-    summaryDivider: {
-      width: 1,
-      height: '80%',
-      backgroundColor: colors.divider,
-      marginHorizontal: utils.spacing[2],
-    } as ViewStyle,
-
-    sectionTitle: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('semibold'),
-      color: colors.textPrimary,
-      marginBottom: utils.spacing[2],
-      paddingHorizontal: utils.spacing[1],
-    } as TextStyle,
-
-    skuList: {
-      paddingHorizontal: utils.spacing[1],
+    // Summary Section
+    summarySection: {
+      // paddingHorizontal: utils.spacing[1],
+      paddingTop: utils.spacing[4],
       paddingBottom: utils.spacing[2],
     } as ViewStyle,
 
-    skuCard: {
-      backgroundColor: colors.surface,
-      borderRadius: utils.borderRadius.md,
-      padding: utils.spacing[3],
-      marginBottom: utils.spacing[2],
-      borderWidth: 1,
-      borderColor: colors.divider,
+    sectionTitle: {
+      fontSize: utils.fontSize.lg,
+      fontWeight: '600',
+      marginBottom: utils.spacing[3],
+    } as TextStyle,
+
+    statsContainer: {
+      paddingBottom: utils.spacing[2],
     } as ViewStyle,
 
-    skuHeader: {
-      flexDirection: 'row',
+    statsGrid: {
       justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: utils.spacing[2],
+      gap: utils.spacing[3],
     } as ViewStyle,
 
-    skuName: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('medium'),
-      color: colors.textPrimary,
+    statCard: {
       flex: 1,
-    } as TextStyle,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: utils.spacing[3],
+      borderRadius: 12,
+      borderWidth: 1,
+      marginBottom: utils.spacing[3],
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    } as ViewStyle,
 
-    skuCode: {
+    statIconContainer: {
+      marginRight: utils.spacing[3],
+    } as ViewStyle,
+
+    statIconWrapper: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    statContent: {
+      flex: 1,
+    } as ViewStyle,
+
+    statLabel: {
       fontSize: utils.fontSize.xs,
-      color: colors.textTertiary,
-      marginLeft: utils.spacing[2],
+      marginBottom: utils.spacing[0.5],
     } as TextStyle,
 
-    stockRow: {
+    statValue: {
+      fontSize: utils.fontSize.lg,
+      fontWeight: '700',
+    } as TextStyle,
+
+    // SKU Section
+    skuSection: {
+      flex: 1,
+      // paddingHorizontal: utils.spacing[4],
+      paddingTop: utils.spacing[2],
+      paddingBottom: utils.spacing[4],
+    } as ViewStyle,
+
+    skuCountBadge: {
+      fontWeight: '600',
+    } as TextStyle,
+
+    skuListContainer: {
+      paddingBottom: utils.spacing[4],
+      gap: utils.spacing[3],
+    } as ViewStyle,
+
+    skuCard: {
+      borderRadius: 12,
+      padding: utils.spacing[3],
+      borderWidth: 1,
+      elevation: 1,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+    } as ViewStyle,
+
+    skuHeaderCompact: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: utils.spacing[2],
+    } as ViewStyle,
+
+    skuLeftSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    skuIndexBadgeCompact: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    } as ViewStyle,
+
+    skuIndexTextCompact: {
+      fontSize: utils.fontSize.sm,
+      fontWeight: '700',
+    } as TextStyle,
+
+    skuProductInfo: {
+      flex: 1,
+    } as ViewStyle,
+
+    skuNameCompact: {
+      fontSize: utils.fontSize.sm,
+      fontWeight: '600',
+      marginBottom: utils.spacing[0.5],
+    } as TextStyle,
+
+    skuCodeCompact: {
+      fontSize: utils.fontSize.xs,
+    } as TextStyle,
+
+    skuStatusBadge: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    skuDetailsGrid: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: utils.spacing[1],
-    } as ViewStyle,
-
-    stockLabel: {
-      fontSize: utils.fontSize.xs,
-      color: colors.textTertiary,
-    } as TextStyle,
-
-    stockValue: {
-      fontSize: utils.fontSize.xs,
-      fontWeight: utils.getFontWeight('medium'),
-      color: colors.textPrimary,
-    } as TextStyle,
-
-    footer: {
-      padding: utils.spacing[3],
-      backgroundColor: colors.surface,
+      paddingTop: utils.spacing[2],
       borderTopWidth: 1,
-      borderTopColor: colors.divider,
+      borderTopColor: colors.border,
     } as ViewStyle,
+
+    skuDetailItem: {
+      flex: 1,
+    } as ViewStyle,
+
+    skuDetailLabel: {
+      fontSize: utils.fontSize.xs,
+      marginBottom: utils.spacing[0.5],
+    } as TextStyle,
+
+    skuDetailValue: {
+      fontSize: utils.fontSize.sm,
+      fontWeight: '500',
+    } as TextStyle,
+
+    // Loading State
+    loadingContainer: {
+      paddingVertical: utils.spacing[8],
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    loadingText: {
+      marginTop: utils.spacing[3],
+      fontSize: utils.fontSize.sm,
+    } as TextStyle,
+
+    // Empty State
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: utils.spacing[8],
+    } as ViewStyle,
+
+    emptyIconContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: utils.spacing[3],
+    } as ViewStyle,
+
+    emptyStateText: {
+      fontSize: utils.fontSize.md,
+      fontWeight: '500',
+      marginBottom: utils.spacing[1],
+    } as TextStyle,
+
+    emptyStateSubtext: {
+      fontSize: utils.fontSize.sm,
+    } as TextStyle,
+
+    // Footer
+    footer: {
+      flexDirection: 'row',
+      gap: utils.spacing[3],
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[4],
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    } as ViewStyle,
+
+    cancelButton: {
+      flex: 1,
+      paddingVertical: utils.spacing[3],
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    } as ViewStyle,
+
+    cancelButtonText: {
+      fontSize: utils.fontSize.sm,
+      fontWeight: '600',
+    } as TextStyle,
 
     proceedButton: {
-      backgroundColor: colors.primary,
-      borderRadius: utils.borderRadius.md,
-      padding: utils.spacing[3],
+      flex: 2,
+      flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: utils.spacing[3],
+      borderRadius: 10,
+      gap: utils.spacing[2],
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
     } as ViewStyle,
 
     proceedButtonText: {
+      color: '#FFFFFF',
       fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('semibold'),
-      color: colors.textInverse,
+      fontWeight: '700',
+      letterSpacing: 0.5,
     } as TextStyle,
+    // Add to LoadSummaryModal.styles.ts
+
+    outOfStockBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: utils.spacing[1],
+    } as ViewStyle,
+
+    outOfStockText: {
+      fontSize: utils.fontSize.sm,
+      fontWeight: '500',
+    } as TextStyle,
+
+    outOfStockOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: 12,
+      pointerEvents: 'none',
+    } as ViewStyle,
+    // Add to LoadSummaryModal.styles.ts
+
+    // Page Mode Styles
+    pageContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    } as ViewStyle,
+
+    pageHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: utils.spacing[4],
+      paddingTop: utils.spacing[12],
+      paddingBottom: utils.spacing[4],
+      borderBottomWidth: 1,
+    } as ViewStyle,
+
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    pageTitle: {
+      fontSize: utils.fontSize.xl,
+      fontWeight: '700',
+    } as TextStyle,
+
+    placeholder: {
+      width: 40,
+    } as ViewStyle,
+
+    pageContent: {
+      flex: 1,
+    } as ViewStyle,
+
+    pageContentContainer: {
+      paddingBottom: utils.spacing[8],
+    } as ViewStyle,
+
+    loadNumberContainer: {
+      paddingHorizontal: utils.spacing[4],
+      paddingTop: utils.spacing[4],
+      paddingBottom: utils.spacing[2],
+    } as ViewStyle,
+    // Add to LoadSummaryModal.styles.ts
+
+    // Additional styles for Page mode
+    refreshButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    stockOverviewCard: {
+      margin: utils.spacing[4],
+      padding: utils.spacing[4],
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      elevation: 2,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    } as ViewStyle,
+
+    overviewTitle: {
+      fontSize: utils.fontSize.md,
+      fontWeight: '600',
+      marginBottom: utils.spacing[3],
+    } as TextStyle,
+
+    stockStatsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+    } as ViewStyle,
+
+    stockStatItem: {
+      alignItems: 'center',
+    } as ViewStyle,
+
+    stockStatValue: {
+      fontSize: utils.fontSize.xl,
+      fontWeight: '700',
+      marginBottom: utils.spacing[1],
+    } as TextStyle,
+
+    stockStatLabel: {
+      fontSize: utils.fontSize.xs,
+    } as TextStyle,
+
+    trendContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: utils.spacing[1],
+      gap: utils.spacing[0.5],
+    } as ViewStyle,
+
+    trendText: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: '500',
+    } as TextStyle,
+
+    skuSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: utils.spacing[4],
+      paddingTop: utils.spacing[2],
+      paddingBottom: utils.spacing[3],
+    } as ViewStyle,
+
+    skuTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    skuCountText: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: '600',
+    } as TextStyle,
+
+    pageFooter: {
+      flexDirection: 'row',
+      gap: utils.spacing[3],
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[4],
+      marginTop: utils.spacing[2],
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    } as ViewStyle,
   }));
 
   return styleGenerator(colors);

@@ -1,3 +1,4 @@
+// TodayActivitiesSection.styles.ts
 import { ViewStyle, TextStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -11,106 +12,114 @@ export const useTodayActivitiesSectionStyles = () => {
       marginBottom: utils.spacing[5],
     } as ViewStyle,
 
-    activitiesCard: {
-      backgroundColor: colors.surface,
-    } as ViewStyle,
-
-    emptyState: {
-      alignItems: 'center',
-      padding: utils.spacing[6],
-    } as ViewStyle,
-
-    emptyStateIcon: {
-      color: colors.textTertiary,
-    } as TextStyle,
-
-    emptyStateText: {
-      fontSize: utils.fontSize.sm,
-      color: colors.textTertiary,
-      marginTop: utils.spacing[2],
-    } as TextStyle,
     headerContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 12,
-      paddingHorizontal: 4,
-    },
+      paddingVertical: utils.spacing[3],
+      backgroundColor: colors.background,
+    } as ViewStyle,
+
     headerLeft: {
       flexDirection: 'row',
       alignItems: 'center',
       flex: 1,
-    },
-    badge: {
-      marginLeft: 8,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 12,
-    },
-    badgeText: {
-      fontSize: 10,
+    } as ViewStyle,
+
+    headerTitle: {
+      fontSize: utils.fontSize.xs,
       fontWeight: '600',
-    },
+      letterSpacing: 0.5,
+    } as TextStyle,
+
+    badge: {
+      marginLeft: utils.spacing[2],
+      paddingHorizontal: utils.spacing[2],
+      paddingVertical: utils.spacing[0.5],
+      borderRadius: 12,
+    } as ViewStyle,
+
+    badgeText: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: '700',
+    } as TextStyle,
+
     statsContainer: {
       flexDirection: 'row',
-      gap: 8,
-      marginBottom: 16,
-      paddingHorizontal: 4,
-    },
+      gap: utils.spacing[2],
+      marginBottom: utils.spacing[4],
+    } as ViewStyle,
+
     statCard: {
       flex: 1,
       borderRadius: 10,
-      padding: 10,
+      padding: utils.spacing[2.5],
       borderWidth: 1,
-    },
+    } as ViewStyle,
+
     statValue: {
-      fontSize: 16,
+      fontSize: utils.fontSize.md,
       fontWeight: '700',
-      marginTop: 4,
-    },
+      marginTop: utils.spacing[1],
+    } as TextStyle,
+
     statLabel: {
-      fontSize: 9,
-      marginTop: 2,
-    },
+      fontSize: utils.fontSize.xs,
+      marginTop: utils.spacing[0.5],
+    } as TextStyle,
+
     activitiesScrollView: {
       maxHeight: 400,
-    },
+    } as ViewStyle,
+
     activitiesContent: {
-      paddingVertical: 4,
-    },
+      paddingVertical: utils.spacing[1],
+    } as ViewStyle,
+
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: utils.spacing[12],
+    } as ViewStyle,
+
     emptyStateIconContainer: {
       width: 56,
       height: 56,
       borderRadius: 28,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 12,
-    },
+      marginBottom: utils.spacing[3],
+    } as ViewStyle,
+
     emptyStateTitle: {
-      fontSize: 14,
+      fontSize: utils.fontSize.sm,
       fontWeight: '500',
-      marginBottom: 4,
-    },
+      marginBottom: utils.spacing[1],
+    } as TextStyle,
+
     emptyStateSubtitle: {
-      fontSize: 11,
+      fontSize: utils.fontSize.xs,
       textAlign: 'center',
-    },
+    } as TextStyle,
+
     showMoreButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 10,
-      marginTop: 8,
+      paddingVertical: utils.spacing[2.5],
+      marginTop: utils.spacing[2],
       borderRadius: 8,
       borderWidth: 1,
-    },
+    } as ViewStyle,
+
     showMoreText: {
-      fontSize: 12,
-      fontWeight: '500',
-    },
+      fontSize: utils.fontSize.xs,
+      fontWeight: '600',
+    } as TextStyle,
+
     showMoreIcon: {
-      marginLeft: 4,
-    },
+      marginLeft: utils.spacing[1],
+    } as TextStyle,
   }));
 
   return styleGenerator(colors);

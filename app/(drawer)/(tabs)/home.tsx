@@ -28,8 +28,8 @@ export { SalesExecutiveHomeScreen as default } from '@/features/home';
 //   targetAchieved: 65,
 //   pendingOrders: 5,
 //   completedOrders: 12,
-//   collections: '₹45,000',
-//   incentives: '₹2,500',
+//   collections: 'K45,000',
+//   incentives: 'K2,500',
 //   recentActivities: [
 //     {
 //       id: 1,
@@ -50,9 +50,9 @@ export { SalesExecutiveHomeScreen as default } from '@/features/home';
 //     { id: 5, customer: 'Shinde & Sons', type: 'order', time: '4:45 PM', status: 'delivered' },
 //   ],
 //   topProducts: [
-//     { name: 'Product A', sales: 45, revenue: '₹22,500' },
-//     { name: 'Product B', sales: 32, revenue: '₹16,000' },
-//     { name: 'Product C', sales: 28, revenue: '₹14,000' },
+//     { name: 'Product A', sales: 45, revenue: 'K22,500' },
+//     { name: 'Product B', sales: 32, revenue: 'K16,000' },
+//     { name: 'Product C', sales: 28, revenue: 'K14,000' },
 //   ],
 //   nearbyCustomers: [
 //     { id: 1, name: 'Patil General Store', distance: '0.5 km', type: 'Retail' },
@@ -379,7 +379,7 @@ export { SalesExecutiveHomeScreen as default } from '@/features/home';
 //             <View style={{ alignItems: 'flex-end' }}>
 //               <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Total Revenue</Text>
 //               <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>
-//                 ₹67,500
+//                 K67,500
 //               </Text>
 //             </View>
 //           </View>

@@ -10,6 +10,7 @@ type ActiveVisit = {
   checkOutTime?: Date;
   status: VisitStatus;
   routeSessionId: string;
+  customerId: string;
 };
 
 type OutletStore = {

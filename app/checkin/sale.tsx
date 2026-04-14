@@ -8,24 +8,9 @@ export default function SaleConfirmationPage() {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
 
-  // Parse products from params
-  const products = params.products ? JSON.parse(params.products as string) : [];
-  const orderId = params.orderId as string;
-  const customerId = params.customerId as string;
-  const customerName = params.customerName as string;
-  const totalAmount = params.totalAmount ? parseFloat(params.totalAmount as string) : 0;
-  const totalUnits = params.totalUnits ? parseInt(params.totalUnits as string) : 0;
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <SalesSummary
-      // initialProducts={products}
-      // orderId={orderId}
-      // customerId={customerId}
-      // customerName={customerName}
-      // totalAmount={totalAmount}
-      // totalUnits={totalUnits}
-      />
+      <SalesSummary />
     </View>
   );
 }

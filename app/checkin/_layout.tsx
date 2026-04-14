@@ -6,6 +6,8 @@ import { useFilterContext } from '@/shared/contexts/FilterContext';
 import { useMemo } from 'react';
 
 type ScreenOptions = {
+  headerShown?: boolean;
+
   title?: string;
   subtitle?: string;
   showBack?: boolean;
@@ -32,7 +34,6 @@ export default function SaleLayout() {
   const { productsFilterCount } = useFilterContext();
   const params = useLocalSearchParams();
 
-  // Get customer name from params - single source of truth
   const customerName = useMemo(() => {
     return (params.customerName as string) || (params.name as string) || null;
   }, [params.customerName, params.name]);
@@ -45,16 +46,31 @@ export default function SaleLayout() {
         header: ({ options, navigation }) => {
           const customOptions = options as ScreenOptions;
 
-          // Determine title - use customer name if requested and available
+          /* ======================================================
+           * ✅ RELIABLE HEADER HIDE
+           * ====================================================== */
+          if (customOptions.headerShown === false) {
+            return null;
+          }
+
+          /* ======================================================
+           * TITLE LOGIC
+           * ====================================================== */
           let title = customOptions.title;
           if (customOptions.useCustomerTitle && customerName) {
             title = customerName;
           }
 
+          /* ======================================================
+           * FILTER LOGIC
+           * ====================================================== */
           const shouldShowFilter = customOptions.showFilter ?? false;
           const filterCount = customOptions.filterCount ?? productsFilterCount;
           const filterActive = customOptions.filterActive ?? filterCount > 0;
 
+          /* ======================================================
+           * HEADER UI
+           * ====================================================== */
           return (
             <Header
               title={title}
@@ -67,11 +83,9 @@ export default function SaleLayout() {
               showMenu={customOptions.showMenu || false}
               onRightPress={customOptions.onRightPress}
               onSecondRightPress={customOptions.onSecondRightPress}
-              elevated={customOptions.elevated !== undefined ? customOptions.elevated : true}
-              centeredTitle={
-                customOptions.centeredTitle !== undefined ? customOptions.centeredTitle : true
-              }
-              showBorder={customOptions.showBorder !== undefined ? customOptions.showBorder : true}
+              elevated={customOptions.elevated ?? true}
+              centeredTitle={customOptions.centeredTitle ?? true}
+              showBorder={customOptions.showBorder ?? true}
               showSearch={customOptions.showSearch || false}
               showFilter={shouldShowFilter}
               filterActive={filterActive}
@@ -84,6 +98,7 @@ export default function SaleLayout() {
         contentStyle: { backgroundColor: colors.background },
       }}
     >
+      {/* ================= INDEX ================= */}
       <Stack.Screen
         name="index"
         options={createScreenOptions({
@@ -95,7 +110,7 @@ export default function SaleLayout() {
         })}
       />
 
-      {/* Non-sale screens - all use customer name as title */}
+      {/* ================= NON SALE ================= */}
       <Stack.Screen
         name="nonsale/second-step"
         options={createScreenOptions({
@@ -111,6 +126,14 @@ export default function SaleLayout() {
           useCustomerTitle: true,
           showBack: true,
           centeredTitle: false,
+        })}
+      />
+
+      {/* ================= SHARE INVOICE ================= */}
+      <Stack.Screen
+        name="shareinvoice"
+        options={createScreenOptions({
+          headerShown: false, // ✅ works perfectly now
         })}
       />
     </Stack>

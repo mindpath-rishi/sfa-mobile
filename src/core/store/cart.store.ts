@@ -7,7 +7,7 @@ import { storage } from '../storage';
 export interface CartSummary {
   totalSkus: number;
   totalValue: number;
-  totalItems: number;
+  totalItems: number; // now = totalQty
   totalCases: number;
   totalPieces: number;
   totalNetWeight: number;
@@ -24,12 +24,12 @@ interface CartStore {
 
   hydrate: () => Promise<void>;
 
-  // New helper methods
   getCartSummary: () => {
     subtotal: number;
     tax: number;
     total: number;
-    netWeight: number;
+    totalQty: number; // ✅ added
+    totalNetWeight: number;
     caseDetails: {
       totalCases: number;
       totalCaseWeight: number;
@@ -48,9 +48,7 @@ const STORAGE_KEY = 'cart-storage';
 const saveToStorage = async (state: { items: CartItemWithDetails[]; summary: CartSummary }) => {
   try {
     await storage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // silent fail
-  }
+  } catch {}
 };
 
 const loadFromStorage = async () => {
@@ -62,29 +60,45 @@ const loadFromStorage = async () => {
   }
 };
 
+/* ================= HELPERS ================= */
+
+const toFixed4 = (value: number) => Number((value || 0).toFixed(4));
+
+const getItemNetWeight = (item: CartItemWithDetails) => {
+  const caseQty = item.caseQty ?? 0;
+  const pieceQty = item.pieceQty ?? 0;
+
+  const caseWeight = Number(item.caseNetWeight ?? 0) * caseQty;
+  const pieceWeight = Number(item.pieceNetWeight ?? 0) * pieceQty;
+
+  return {
+    caseWeight,
+    pieceWeight,
+    total: caseWeight + pieceWeight,
+  };
+};
+
 /* ================= SUMMARY ================= */
 
 const calculateSummary = (items: CartItemWithDetails[]): CartSummary => {
   const summary = items.reduce(
     (acc, item) => {
-      const caseQty = item.caseQty || 0;
-      const pieceQty = item.pieceQty || 0;
+      const caseQty = item.caseQty ?? 0;
+      const pieceQty = item.pieceQty ?? 0;
+      const unitQtyInCase = item.unitQtyInCase ?? 1;
 
-      const caseNetWeight = (item.caseNetWeight || 0) * caseQty;
-      const pieceNetWeight = (item.pieceNetWeight || 0) * pieceQty;
-      const itemNetWeight = caseNetWeight + pieceNetWeight;
+      const casePrice = item.casePrice;
+      const piecePrice = item.piecePrice ?? 0;
+
+      const quantity = caseQty * unitQtyInCase + pieceQty;
+      const { total } = getItemNetWeight(item);
 
       acc.totalCases += caseQty;
       acc.totalPieces += pieceQty;
 
-      // ❌ REMOVE OLD LOGIC
-      // acc.totalSkus += caseQty * item.unitQtyInCase + pieceQty;
-
-      acc.totalValue += caseQty * item.casePrice + pieceQty * item.piecePrice;
-
-      acc.totalItems += caseQty + pieceQty;
-
-      acc.totalNetWeight += itemNetWeight;
+      acc.totalItems += quantity; // ✅ FIXED
+      acc.totalValue += caseQty * casePrice + pieceQty * piecePrice;
+      acc.totalNetWeight += total;
 
       return acc;
     },
@@ -98,10 +112,13 @@ const calculateSummary = (items: CartItemWithDetails[]): CartSummary => {
     },
   );
 
-  // ✅ SKU COUNT (IMPORTANT)
   summary.totalSkus = items.length;
 
-  return summary;
+  return {
+    ...summary,
+    totalValue: toFixed4(summary.totalValue),
+    totalNetWeight: toFixed4(summary.totalNetWeight),
+  };
 };
 
 /* ================= STORE ================= */
@@ -117,12 +134,8 @@ export const useCartStore = create<CartStore>((set, get) => ({
     totalNetWeight: 0,
   },
 
-  /* ================= HYDRATE ================= */
-
   hydrate: async () => {
     const currentItems = get().items;
-
-    // ✅ Prevent re-hydration if already loaded
     if (currentItems.length > 0) return;
 
     const data = await loadFromStorage();
@@ -134,23 +147,18 @@ export const useCartStore = create<CartStore>((set, get) => ({
     });
   },
 
-  /* ================= ADD ================= */
-
   addItems: (newItems) => {
     set((state) => {
       const updated = [...state.items];
 
       newItems.forEach((newItem) => {
-        const caseQty = newItem.caseQty || 0;
-        const pieceQty = newItem.pieceQty || 0;
+        const caseQty = newItem.caseQty ?? 0;
+        const pieceQty = newItem.pieceQty ?? 0;
 
         const index = updated.findIndex((item) => item.productId === newItem.productId);
 
-        // ✅ REMOVE if both zero
         if (caseQty === 0 && pieceQty === 0) {
-          if (index !== -1) {
-            updated.splice(index, 1);
-          }
+          if (index !== -1) updated.splice(index, 1);
           return;
         }
 
@@ -159,15 +167,20 @@ export const useCartStore = create<CartStore>((set, get) => ({
             ...updated[index],
             caseQty,
             pieceQty,
-            // Preserve weight fields from existing item or new item
-            caseNetWeight: newItem.caseNetWeight || updated[index].caseNetWeight,
-            pieceNetWeight: newItem.pieceNetWeight || updated[index].pieceNetWeight,
+            unitQtyInCase: newItem.unitQtyInCase ?? updated[index].unitQtyInCase ?? 1,
+            caseNetWeight: newItem.caseNetWeight ?? updated[index].caseNetWeight,
+            pieceNetWeight: newItem.pieceNetWeight ?? updated[index].pieceNetWeight,
+            casePrice: newItem.casePrice ?? updated[index].casePrice ?? 0,
+            piecePrice: newItem.piecePrice ?? updated[index].piecePrice ?? 0,
           };
         } else {
           updated.push({
             ...newItem,
             caseQty,
             pieceQty,
+            unitQtyInCase: newItem.unitQtyInCase ?? 1,
+            casePrice: newItem.casePrice ?? 0,
+            piecePrice: newItem.piecePrice ?? 0,
           });
         }
       });
@@ -177,13 +190,10 @@ export const useCartStore = create<CartStore>((set, get) => ({
         summary: calculateSummary(updated),
       };
 
-      saveToStorage(newState); // async non-blocking
-
+      saveToStorage(newState);
       return newState;
     });
   },
-
-  /* ================= REMOVE ================= */
 
   removeItem: (productId) => {
     set((state) => {
@@ -195,12 +205,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
       };
 
       saveToStorage(newState);
-
       return newState;
     });
   },
-
-  /* ================= UPDATE ================= */
 
   updateQuantity: (productId, type, quantity) => {
     set((state) => {
@@ -212,7 +219,7 @@ export const useCartStore = create<CartStore>((set, get) => ({
           : { ...item, pieceQty: Math.max(0, quantity) };
       });
 
-      updated = updated.filter((item) => (item.caseQty || 0) > 0 || (item.pieceQty || 0) > 0);
+      updated = updated.filter((item) => (item.caseQty ?? 0) > 0 || (item.pieceQty ?? 0) > 0);
 
       const newState = {
         items: updated,
@@ -220,12 +227,9 @@ export const useCartStore = create<CartStore>((set, get) => ({
       };
 
       saveToStorage(newState);
-
       return newState;
     });
   },
-
-  /* ================= CLEAR ================= */
 
   clearCart: () => {
     const newState = {
@@ -244,51 +248,54 @@ export const useCartStore = create<CartStore>((set, get) => ({
     set(newState);
   },
 
-  /* ================= GET CART SUMMARY ================= */
-
   getCartSummary: () => {
-    const { items, summary } = get();
+    const { items } = get();
 
-    // Calculate financial totals
-    const subtotal = items.reduce((sum, item) => {
-      const itemTotal =
-        (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice;
-      return sum + itemTotal;
+    const subtotalRaw = items.reduce((sum, item) => {
+      return (
+        sum +
+        (item.caseQty ?? 0) * Number(item.casePrice ?? 0) +
+        (item.pieceQty ?? 0) * Number(item.piecePrice ?? 0)
+      );
     }, 0);
 
-    const tax = 0;
-    const total = subtotal + tax;
-
-    // Calculate weight details
     let totalCaseWeight = 0;
     let totalPieceWeight = 0;
     let totalCases = 0;
     let totalPieces = 0;
+    let totalQty = 0;
 
     items.forEach((item) => {
-      const caseQty = item.caseQty || 0;
-      const pieceQty = item.pieceQty || 0;
+      const caseQty = item.caseQty ?? 0;
+      const pieceQty = item.pieceQty ?? 0;
+      const unitQtyInCase = item.unitQtyInCase ?? 1;
+
+      const quantity = caseQty * unitQtyInCase + pieceQty;
+
+      const { caseWeight, pieceWeight } = getItemNetWeight(item);
 
       totalCases += caseQty;
       totalPieces += pieceQty;
-      totalCaseWeight += (item.caseNetWeight || 0) * caseQty;
-      totalPieceWeight += (item.pieceNetWeight || 0) * pieceQty;
+      totalQty += quantity;
+
+      totalCaseWeight += caseWeight;
+      totalPieceWeight += pieceWeight;
     });
 
-    const netWeight = totalCaseWeight + totalPieceWeight;
-
     return {
-      subtotal,
-      tax,
-      total,
-      netWeight,
+      subtotal: toFixed4(subtotalRaw),
+      tax: toFixed4(0),
+      total: toFixed4(subtotalRaw),
+      totalQty, // ✅ FIXED
+      totalNetWeight: toFixed4(totalCaseWeight + totalPieceWeight),
+
       caseDetails: {
         totalCases,
-        totalCaseWeight: Number(totalCaseWeight.toFixed(3)),
+        totalCaseWeight: toFixed4(totalCaseWeight),
       },
       pieceDetails: {
         totalPieces,
-        totalPieceWeight: Number(totalPieceWeight.toFixed(3)),
+        totalPieceWeight: toFixed4(totalPieceWeight),
       },
     };
   },

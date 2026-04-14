@@ -2,7 +2,7 @@
 import { Product } from '@/features/product';
 
 export const UNITS_PER_CASE = 12;
-export const TAX_RATE = 0.16;
+export const TAX_RATE = 0;
 
 export const MOCK_PRODUCTS: Product[] = [
   {

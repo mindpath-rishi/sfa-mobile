@@ -9,6 +9,7 @@ export interface GetRouteOutletsParams {
   page?: number;
   limit?: number;
   searchText?: string;
+  routeSessionId?: string;
   filters?: {
     status?: string[];
     types?: string[];
@@ -45,6 +46,8 @@ export interface OutletService {
   getOutletDetail(customerId: string): Promise<ApiResponse<any>>;
   startVisit(payload: StartVisitPayload): Promise<ApiResponse<any>>;
   visitStatus(payload: StartVisitPayload): Promise<ApiResponse<any>>;
+  completeVisit(visitId: string | undefined): Promise<ApiResponse<any>>;
+  createCustomer(payload: any): Promise<ApiResponse<any>>;
 }
 
 /**
@@ -72,7 +75,7 @@ const cleanParams = (params: Record<string, any>) => {
  */
 export const outletService: OutletService = {
   getRouteOutlets: async (params) => {
-    const { routeId, page = 1, limit = 10, searchText, filters = {} } = params;
+    const { routeId, page = 1, limit = 10, searchText, filters = {}, routeSessionId } = params;
 
     // 🔥 Flatten filters for query params
     const queryParams = cleanParams({
@@ -91,6 +94,7 @@ export const outletService: OutletService = {
       overdue: filters.overdue,
       nearby: filters.nearby,
       visited: filters.visited,
+      routeSessionId,
     });
 
     return api.get<any>(`/route/${routeId}/customers`, {
@@ -107,5 +111,15 @@ export const outletService: OutletService = {
 
   visitStatus: async (params: VisitStatusParams) => {
     return api.get<any>(`shop-visit/status`, { params }) as Promise<ApiResponse<any>>;
+  },
+
+  completeVisit: async (visitId: string) => {
+    return api.patch<any>(`shop-visit/${visitId}`, {
+      status: 'COMPLETED',
+    }) as Promise<ApiResponse<any>>;
+  },
+
+  createCustomer: async (payload: any) => {
+    return api.post<any>(`customer`, payload) as Promise<ApiResponse<any>>;
   },
 };

@@ -23,7 +23,7 @@ export const useMonthlyBudgetSectionStyles = () => {
     } as ViewStyle,
 
     progressLabel: {
-      fontSize: utils.fontSize.sm,
+      fontSize: utils.fontSize.xs,
       color: colors.textSecondary,
     } as TextStyle,
 
@@ -70,7 +70,7 @@ export const useMonthlyBudgetSectionStyles = () => {
     } as TextStyle,
 
     statValue: {
-      fontSize: utils.fontSize.md,
+      fontSize: utils.fontSize.sm,
       fontWeight: utils.getFontWeight('bold'),
       color: colors.textPrimary,
       letterSpacing: 0.4,

@@ -45,10 +45,10 @@ export const ProductPrice: React.FC<Props> = ({
 
   return (
     <View style={styles.container}>
-      <AppText style={[styles.price, getPriceSize()]}>₹{price}</AppText>
+      <AppText style={[styles.price, getPriceSize()]}>K{price}</AppText>
       {mrp > price && (
         <>
-          <AppText style={[styles.mrp, getMrpSize()]}>₹{mrp}</AppText>
+          <AppText style={[styles.mrp, getMrpSize()]}>K{mrp}</AppText>
           {showDiscount && discount > 0 && (
             <AppText style={[styles.discount, { color: colors.success }]}>{discount}% off</AppText>
           )}

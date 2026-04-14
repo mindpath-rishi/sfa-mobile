@@ -9,13 +9,17 @@ import { router, useSegments } from 'expo-router';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
 import { useAuthStore } from '@/core/store/auth.store';
 
-// Custom Drawer Content
+/* ============================
+ * CUSTOM DRAWER CONTENT
+ * ============================ */
+
 const CustomDrawerContent = (props: any) => {
   const { colors } = useTheme();
   const logout = useAuthStore((s) => s.logout);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* USER INFO */}
       <View style={{ padding: 20, paddingTop: 40, backgroundColor: colors.primary }}>
         <View
           style={{
@@ -36,10 +40,12 @@ const CustomDrawerContent = (props: any) => {
         </Text>
       </View>
 
+      {/* MENU */}
       <DrawerContentScrollView {...props} style={{ flex: 1 }}>
         <DrawerItemList {...props} />
       </DrawerContentScrollView>
 
+      {/* FOOTER */}
       <View style={{ padding: 20, borderTopWidth: 1, borderTopColor: colors.border }}>
         <DrawerItem
           label="Logout"
@@ -64,18 +70,27 @@ const CustomDrawerContent = (props: any) => {
   );
 };
 
-// Detect detail screen
+/* ============================
+ * DETAIL SCREEN DETECTION (FIXED)
+ * ============================ */
+
 const isDetailScreen = (segments: string[]) => {
-  return segments[2] === '[id]';
+  const detailScreens = ['[id]', 'detail', 'edit', 'approve', 'create'];
+
+  return segments.some((seg) => detailScreens.includes(seg));
 };
 
-// Header config
+/* ============================
+ * HEADER CONFIG
+ * ============================ */
+
 const getHeaderProps = (
   routeName: string,
   segments: string[],
   title: string,
   activeFilterCount?: number,
   onFilterPress?: () => void,
+  onRightPress?: () => void,
 ) => {
   const showBack = routeName !== '(tabs)';
 
@@ -92,10 +107,9 @@ const getHeaderProps = (
     case 'outlets':
       return {
         ...commonProps,
-        rightIcon: 'add' as const,
-        // secondRightIcon: 'scan' as const,
-        onRightPress: () => router.push('/outlets/add'), // ✅ FIXED
-        showFilter: true,
+        // rightIcon: 'add' as const,
+        onRightPress,
+        showFilter: false,
         filterActive: (activeFilterCount || 0) > 0,
         filterCount: activeFilterCount || 0,
         onFilterPress,
@@ -115,8 +129,6 @@ const getHeaderProps = (
     case 'beats':
       return {
         ...commonProps,
-        rightIcon: 'calendar' as const,
-        secondRightIcon: 'map' as const,
         onRightPress: () => router.push('/beats/calendar'),
         onSecondRightPress: () => router.push('/beats/optimize'),
         badgeCount: 2,
@@ -141,6 +153,10 @@ const getHeaderProps = (
   }
 };
 
+/* ============================
+ * MAIN DRAWER
+ * ============================ */
+
 export default function DrawerLayout() {
   const { colors } = useTheme();
   const segments = useSegments();
@@ -153,25 +169,13 @@ export default function DrawerLayout() {
     openProductFilter,
   } = useFilterContext();
 
-  const handleProductsFilterPress = () => {
-    openProductFilter();
-    // optional (same pattern if needed later)
-  };
-
-  const handleOutletsFilterPress = () => {
-    openOutletFilter(); // ✅ NO navigation → NO API trigger
-  };
-
-  const handleReportsFilterPress = () => {
-    // optional
-  };
-
   const isDetail = isDetailScreen(segments);
 
   return (
     <Drawer
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={({ route }) => ({
+        /* 🔥 FIX: Hide header on detail screens */
         header: ({ options }) => {
           if (isDetail) return null;
 
@@ -180,15 +184,14 @@ export default function DrawerLayout() {
 
           switch (route.name) {
             case 'products':
-              onFilterPress = handleProductsFilterPress;
+              onFilterPress = openProductFilter;
               activeFilterCount = productsFilterCount;
               break;
             case 'outlets':
-              onFilterPress = handleOutletsFilterPress;
+              onFilterPress = openOutletFilter;
               activeFilterCount = outletsFilterCount;
               break;
             case 'reports':
-              onFilterPress = handleReportsFilterPress;
               activeFilterCount = reportsFilterCount;
               break;
           }
@@ -204,6 +207,7 @@ export default function DrawerLayout() {
           return <Header {...headerProps} />;
         },
 
+        /* ================= UI ================= */
         drawerStyle: {
           backgroundColor: colors.surface,
           width: 280,
@@ -219,17 +223,22 @@ export default function DrawerLayout() {
         drawerInactiveTintColor: colors.textSecondary,
         drawerActiveBackgroundColor: colors.primary + '20',
 
+        /* 🔥 FIX: Disable drawer swipe on detail */
         swipeEnabled: !isDetail,
         drawerType: isDetail ? 'front' : 'slide',
 
+        /* ================= ICONS ================= */
         drawerIcon: ({ color, size, focused }) => {
           const icons: Record<string, string> = {
             '(tabs)': focused ? 'home' : 'home-outline',
-            outlets: focused ? 'people' : 'people-outline', // ✅ FIXED
+            outlets: focused ? 'people' : 'people-outline',
             products: focused ? 'cube' : 'cube-outline',
             beats: focused ? 'map' : 'map-outline',
             reports: focused ? 'bar-chart' : 'bar-chart-outline',
             settings: focused ? 'settings' : 'settings-outline',
+            stock: focused ? 'archive' : 'archive-outline',
+            topup: focused ? 'add-circle' : 'add-circle-outline',
+            collection: focused ? 'wallet' : 'wallet-outline',
           };
 
           return (
@@ -249,11 +258,26 @@ export default function DrawerLayout() {
           drawerItemStyle: { display: 'none' },
         }}
       />
-      <Drawer.Screen name="outlets" options={{ title: 'Outlets' }} />
-      <Drawer.Screen name="products" options={{ title: 'Products' }} />
+      <Drawer.Screen
+        name="outlets"
+        options={{ title: 'Outlets', drawerItemStyle: { display: 'none' } }}
+      />
+      <Drawer.Screen
+        name="products"
+        options={{ title: 'Products', drawerItemStyle: { display: 'none' } }}
+      />
       <Drawer.Screen name="beats" options={{ title: 'My Routes' }} />
-      <Drawer.Screen name="reports" options={{ title: 'Reports' }} />
-      <Drawer.Screen name="settings" options={{ title: 'Settings' }} />
+      <Drawer.Screen
+        name="reports"
+        options={{ title: 'Reports', drawerItemStyle: { display: 'none' } }}
+      />
+      <Drawer.Screen name="stock" options={{ title: 'Stock' }} />
+      <Drawer.Screen name="topup" options={{ title: 'Topup' }} />
+      <Drawer.Screen name="collection" options={{ title: 'Collection' }} />
+      <Drawer.Screen
+        name="settings"
+        options={{ title: 'Settings', drawerItemStyle: { display: 'none' } }}
+      />
     </Drawer>
   );
 }

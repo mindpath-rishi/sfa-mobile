@@ -9,6 +9,7 @@ export const useProductsScreenStyles = () => {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      paddingHorizontal: utils.spacing[2],
     } as ViewStyle,
 
     // Header Styles

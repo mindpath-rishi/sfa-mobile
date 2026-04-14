@@ -20,7 +20,7 @@ export const useQuickActionStyles = (props: QuickActionStyleProps) => {
           container: 44,
           icon: 20,
           borderRadius: 22,
-          fontSize: 10,
+          fontSize: 11,
         };
       case 'large':
         return {
@@ -34,7 +34,7 @@ export const useQuickActionStyles = (props: QuickActionStyleProps) => {
           container: 56,
           icon: 24,
           borderRadius: 28,
-          fontSize: 11,
+          fontSize: 12,
         };
     }
   };
@@ -79,7 +79,7 @@ export const useQuickActionStyles = (props: QuickActionStyleProps) => {
 
     badgeText: {
       color: 'white',
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: 'bold',
     } as TextStyle,
 

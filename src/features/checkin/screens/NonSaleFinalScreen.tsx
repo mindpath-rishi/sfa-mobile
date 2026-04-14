@@ -132,7 +132,7 @@ export const NonSaleFinalScreen: React.FC = () => {
           onPressChange={handleBack}
         />
 
-        <SectionHeader title="Select specific reason:" variant="compact" />
+        <SectionHeader title="Selected reason:" variant="compact" />
 
         {specificReasons.length > 0 ? (
           specificReasons.map((reason) => (

@@ -44,7 +44,7 @@ export const MonthlyBudgetSection: React.FC<MonthlyBudgetSectionProps> = ({
           </View>
           <View style={styles.statItemRight}>
             <Text style={styles.statLabel}>REVENUE</Text>
-            <Text style={styles.statValue}>₹67,500</Text>
+            <Text style={styles.statValue}>K67,500</Text>
           </View>
         </View>
       </AppCard>

@@ -101,7 +101,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
           <View
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
           >
-            <AppText style={[styles.textXSmall, { color: colors.textSecondary }]}>
+            <AppText style={[styles.textXSmallBold, { color: colors.textSecondary }]}>
               {selectedActivity}
             </AppText>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -114,7 +114,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
                   marginRight: 4,
                 }}
               />
-              <AppText style={[styles.textXSmall, { fontSize: 14, color: '#4CAF50' }]}>
+              <AppText style={[styles.textXSmallBold, { color: '#4CAF50' }]}>
                 ACTIVE
               </AppText>
             </View>
@@ -123,7 +123,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
           {/* Timer - Large and Clear */}
           <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
             <AppText
-              style={[styles.titleMedium, { fontSize: 24, fontWeight: '700', color: warningColor }]}
+              style={[styles.titleMedium, { fontSize: 22, fontWeight: '700', color: warningColor }]}
             >
               {elapsedFormatted}
             </AppText>
@@ -141,19 +141,16 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
           <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 8, padding: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <Ionicons name="map-outline" size={12} color={colors.primary} />
-              <AppText style={[styles.textXSmall, { marginLeft: 4, color: colors.primary }]}>
+              <AppText style={[styles.textXSmallBold, { marginLeft: 4, color: colors.primary }]}>
                 ROUTE
               </AppText>
             </View>
-            <AppText
-              style={[styles.titleSmall, { fontSize: 13, fontWeight: '600' }]}
-              numberOfLines={1}
-            >
+            <AppText style={styles.titleSmall} numberOfLines={1}>
               {selectedRoute['routeName']}
             </AppText>
             <View style={{ flexDirection: 'row', marginTop: 2 }}>
               {selectedRoute['totalShops'] && (
-                <AppText style={[styles.textXSmall, { fontSize: 10, color: colors.textSecondary }]}>
+                <AppText style={[styles.textXSmall, { color: colors.textSecondary }]}>
                   {selectedRoute['totalShops']} stops
                 </AppText>
               )}
@@ -173,17 +170,14 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <Ionicons name="car-outline" size={12} color={colors.primary} />
-              <AppText style={[styles.textXSmall, { marginLeft: 4, color: colors.primary }]}>
+              <AppText style={[styles.textXSmallBold, { marginLeft: 4, color: colors.primary }]}>
                 VAN
               </AppText>
             </View>
-            <AppText
-              style={[styles.titleSmall, { fontSize: 13, fontWeight: '600' }]}
-              numberOfLines={1}
-            >
+            <AppText style={styles.titleSmall} numberOfLines={1}>
               {assignedVan.name}
             </AppText>
-            <AppText style={[styles.textXSmall, { fontSize: 10, color: colors.textSecondary }]}>
+            <AppText style={[styles.textXSmall, { color: colors.textSecondary }]}>
               {assignedVan.vanNumber || assignedVan.name} • {assignedVan.capacity || 'Std'} Tonnages
             </AppText>
           </View>
@@ -201,7 +195,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
           >
             <Ionicons name="briefcase-outline" size={16} color={colors.warning} />
             <AppText
-              style={[styles.textXSmall, { fontSize: 10, color: colors.warning, marginTop: 2 }]}
+              style={[styles.textXSmall, { color: colors.warning, marginTop: 2 }]}
             >
               {otherWorkDuration}
             </AppText>

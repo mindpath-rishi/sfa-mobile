@@ -47,12 +47,11 @@ export const REASON_CATEGORIES = [
 ];
 
 interface NonSaleCategoryScreenProps {
-  customer: Customer;
+  // customer: Customer;
   onCategorySelect?: (category: (typeof REASON_CATEGORIES)[0]) => void;
 }
 
 export const NonSaleCategoryScreen: React.FC<NonSaleCategoryScreenProps> = ({
-  customer,
   onCategorySelect,
 }) => {
   const { colors } = useTheme();
@@ -69,11 +68,11 @@ export const NonSaleCategoryScreen: React.FC<NonSaleCategoryScreenProps> = ({
         router.push({
           pathname: '/checkin/nonsale/second-step',
           params: {
-            customerId: customer.id,
-            customerName: customer.name,
-            customerAddress: customer.address,
-            customerPhone: customer.phone,
-            customerRoute: customer.route,
+            // customerId: customer.id,
+            // customerName: customer.name,
+            // customerAddress: customer.address,
+            // customerPhone: customer.phone,
+            // customerRoute: customer.route,
             categoryId: category.id,
             categoryTitle: category.title.replace('\n', ' '),
             categoryColor: category.color,

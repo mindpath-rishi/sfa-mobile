@@ -1,3 +1,4 @@
+import { Route } from '@/core/store/route.store';
 import { Van } from './van.types';
 
 export interface RouteSelectionModalProps {
@@ -9,9 +10,9 @@ export interface RouteSelectionModalProps {
   onSelectRoute: (route: Route) => void;
 }
 
-export interface Route {
-  routeId: string;
-  name: string;
-  totalShops: number;
-  distance: string;
-}
+// export interface Route {
+//   routeId: string;
+//   name: string;
+//   totalShops: number;
+//   distance: string;
+// }

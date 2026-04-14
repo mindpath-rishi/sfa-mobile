@@ -13,55 +13,24 @@ import {
   ViewStyle,
   BackHandler,
   StatusBar,
-  SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  StyleSheet,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { ModalProps, ModalHeaderProps, ModalFooterProps, ModalContentProps } from './Modal.types';
 import { useModalStyles } from './Modal.styles';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Animation constants - FIXED: Removed duration from timing config
-const ANIMATION_CONFIG = {
-  spring: {
-    tension: 50,
-    friction: 8,
-    useNativeDriver: true,
-  },
-  timing: {
-    useNativeDriver: true, // Duration removed from here to avoid duplication
-  },
-};
+// ─── Animation helpers ────────────────────────────────────────────────────────
 
-/**
- * Modal component for displaying content in an overlay
- *
- * @example
- * ```tsx
- * // Basic modal
- * <Modal visible={isVisible} onClose={() => setIsVisible(false)}>
- *   <Text>Modal Content</Text>
- * </Modal>
- *
- * // Modal with title and footer
- * <Modal
- *   visible={isVisible}
- *   onClose={() => setIsVisible(false)}
- *   title="Confirm Action"
- *   size="sm"
- * >
- *   <Modal.Content>
- *     <Text>Are you sure you want to delete this item?</Text>
- *   </Modal.Content>
- *   <Modal.Footer>
- *     <Button title="Cancel" variant="outline" onPress={() => {}} />
- *     <Button title="Delete" variant="danger" onPress={() => {}} />
- *   </Modal.Footer>
- * </Modal>
- * ```
- */
+const SPRING = { tension: 55, friction: 9, useNativeDriver: true };
+const timing = (duration: number) => ({ duration, useNativeDriver: true });
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export const Modal: React.FC<ModalProps> & {
   Header: React.FC<ModalHeaderProps>;
   Content: React.FC<ModalContentProps>;
@@ -82,7 +51,7 @@ export const Modal: React.FC<ModalProps> & {
   dismissible = true,
   backdropColor,
   backdropOpacity = 0.5,
-  animationDuration = 300,
+  animationDuration = 280,
   zIndex,
   style,
   contentStyle,
@@ -93,14 +62,9 @@ export const Modal: React.FC<ModalProps> & {
   accessibilityLabel,
   onOpen,
   onCloseComplete,
-
-  // New props
   closeIcon,
   hideStatusBar = false,
-  statusBarStyle,
-  swipeToClose = false,
-  swipeThreshold = 100,
-  swipeDirection = 'down',
+  swipeDirection = 'up',
   keyboardAvoiding = true,
   keyboardOffset = 0,
   scrollable = false,
@@ -120,327 +84,292 @@ export const Modal: React.FC<ModalProps> & {
   presentationStyle,
 }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useModalStyles(size, position, backdropOpacity, zIndex, style, contentStyle);
-  const [modalVisible, setModalVisible] = useState(visible);
 
-  // Animation values
-  const backdropOpacityAnim = useRef(new Animated.Value(0)).current;
-  const modalScale = useRef(new Animated.Value(0.8)).current;
-  const modalTranslateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
-  const modalTranslateX = useRef(new Animated.Value(0)).current;
-  const modalOpacity = useRef(new Animated.Value(0)).current;
+  const [modalMounted, setModalMounted] = useState(visible);
 
-  // Pan responder for swipe to close
-  const pan = useRef(new Animated.ValueXY()).current;
+  // ─── Refs ─────────────────────────────────────────────────────────────────
 
-  // Track if modal is mounted
-  const isMounted = useRef(true);
-
+  const isMounted = useRef(false);
   useEffect(() => {
     isMounted.current = true;
-    setModalVisible(visible);
-
-    if (visible) {
-      showModal();
-      onOpen?.();
-      onShow?.();
-    } else {
-      hideModal();
-    }
-
     return () => {
       isMounted.current = false;
     };
+  }, []);
+
+  // ─── Animation values ─────────────────────────────────────────────────────
+
+  const backdropAnim = useRef(new Animated.Value(0)).current;
+  const modalScale = useRef(new Animated.Value(0.88)).current;
+  const modalTranslateY = useRef(new Animated.Value(initialTranslateY())).current;
+  const modalTranslateX = useRef(new Animated.Value(initialTranslateX())).current;
+  const modalOpacity = useRef(new Animated.Value(0)).current;
+
+  function initialTranslateY() {
+    if (animation !== 'slide') return 0;
+    if (swipeDirection === 'up') return SCREEN_HEIGHT;
+    if (swipeDirection === 'down') return -SCREEN_HEIGHT;
+    return 0;
+  }
+  function initialTranslateX() {
+    if (animation !== 'slide') return 0;
+    if (swipeDirection === 'left') return SCREEN_WIDTH;
+    if (swipeDirection === 'right') return -SCREEN_WIDTH;
+    return 0;
+  }
+
+  // ─── Mount → animate ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (visible) setModalMounted(true);
   }, [visible]);
 
-  // Handle hardware back button on Android
   useEffect(() => {
-    if (Platform.OS === 'android') {
-      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-        if (visible && dismissible) {
-          onClose();
-          return true;
-        }
-        return false;
-      });
-
-      return () => backHandler.remove();
+    if (visible && modalMounted) {
+      animateIn();
+      onOpen?.();
+      onShow?.();
+    } else if (!visible && modalMounted) {
+      animateOut();
     }
-  }, [visible, dismissible, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, modalMounted]);
 
-  // Handle escape key on web
-  useEffect(() => {
-    if (Platform.OS === 'web' && closeOnEscape) {
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape' && visible && dismissible) {
-          onClose();
-        }
-      };
-      window.addEventListener('keydown', handleEscape);
-      return () => window.removeEventListener('keydown', handleEscape);
-    }
-  }, [visible, closeOnEscape, dismissible, onClose]);
+  // ─── Animate in ───────────────────────────────────────────────────────────
 
-  // Handle orientation change
-  useEffect(() => {
-    const subscription = Dimensions.addEventListener('change', ({ window }) => {
-      onOrientationChange?.(window.width > window.height ? 'landscape' : 'portrait');
-    });
-
-    return () => subscription?.remove();
-  }, [onOrientationChange]);
-
-  const showModal = useCallback(() => {
-    const animations = [];
-
-    // Reset animations first
-    backdropOpacityAnim.setValue(0);
-    modalScale.setValue(0.8);
-    modalTranslateY.setValue(SCREEN_HEIGHT);
-    modalTranslateX.setValue(0);
+  const animateIn = useCallback(() => {
+    backdropAnim.setValue(0);
     modalOpacity.setValue(0);
+    modalScale.setValue(0.88);
+    modalTranslateY.setValue(initialTranslateY());
+    modalTranslateX.setValue(initialTranslateX());
 
-    // Backdrop animation - FIXED: duration passed separately
-    animations.push(
-      Animated.timing(backdropOpacityAnim, {
-        ...ANIMATION_CONFIG.timing,
-        toValue: 1,
-        duration: backdropTransitionDuration || animationDuration,
-      }),
-    );
+    const bd = backdropTransitionDuration ?? animationDuration;
+    const md = modalTransitionDuration ?? animationDuration;
 
-    // Modal animation based on type
-    switch (animation) {
-      case 'slide':
-        if (swipeDirection === 'down' || swipeDirection === 'up') {
-          animations.push(
-            Animated.spring(modalTranslateY, {
-              ...ANIMATION_CONFIG.spring,
-              toValue: 0,
-            }),
-          );
-        } else if (swipeDirection === 'left' || swipeDirection === 'right') {
-          animations.push(
-            Animated.spring(modalTranslateX, {
-              ...ANIMATION_CONFIG.spring,
-              toValue: 0,
-            }),
-          );
-        }
-        break;
-      case 'scale':
-        animations.push(
-          Animated.spring(modalScale, {
-            ...ANIMATION_CONFIG.spring,
-            toValue: 1,
-          }),
-        );
-        break;
-      case 'fade':
-        animations.push(
-          Animated.timing(modalOpacity, {
-            ...ANIMATION_CONFIG.timing,
-            toValue: 1,
-            duration: modalTransitionDuration || animationDuration,
-          }),
-        );
-        break;
-      case 'none':
-        // No animation
-        break;
+    if (animation === 'none') {
+      backdropAnim.setValue(1);
+      modalOpacity.setValue(1);
+      modalScale.setValue(1);
+      modalTranslateY.setValue(0);
+      modalTranslateX.setValue(0);
+      return;
     }
 
-    Animated.parallel(animations).start();
+    const anims: Animated.CompositeAnimation[] = [
+      Animated.timing(backdropAnim, { ...timing(bd), toValue: 1 }),
+      Animated.timing(modalOpacity, { ...timing(Math.round(md * 0.4)), toValue: 1 }),
+    ];
+
+    if (animation === 'scale') {
+      anims.push(Animated.spring(modalScale, { ...SPRING, toValue: 1 }));
+    } else if (animation === 'slide') {
+      if (swipeDirection === 'up' || swipeDirection === 'down') {
+        anims.push(Animated.spring(modalTranslateY, { ...SPRING, toValue: 0 }));
+      } else {
+        anims.push(Animated.spring(modalTranslateX, { ...SPRING, toValue: 0 }));
+      }
+    }
+
+    Animated.parallel(anims).start();
   }, [
     animation,
     animationDuration,
-    backdropOpacityAnim,
-    modalScale,
-    modalTranslateY,
-    modalTranslateX,
-    modalOpacity,
-    swipeDirection,
     backdropTransitionDuration,
     modalTransitionDuration,
-  ]);
+    swipeDirection,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const hideModal = useCallback(() => {
-    const animations = [];
+  // ─── Animate out ──────────────────────────────────────────────────────────
 
-    // Backdrop animation - FIXED: duration passed separately
-    animations.push(
-      Animated.timing(backdropOpacityAnim, {
-        ...ANIMATION_CONFIG.timing,
-        toValue: 0,
-        duration: backdropTransitionDuration || animationDuration,
-      }),
-    );
+  const animateOut = useCallback(() => {
+    const bd = backdropTransitionDuration ?? animationDuration;
+    const md = modalTransitionDuration ?? animationDuration;
 
-    // Modal animation based on type
-    switch (animation) {
-      case 'slide':
-        if (swipeDirection === 'down' || swipeDirection === 'up') {
-          animations.push(
-            Animated.timing(modalTranslateY, {
-              ...ANIMATION_CONFIG.timing,
-              toValue: swipeDirection === 'down' ? SCREEN_HEIGHT : -SCREEN_HEIGHT,
-              duration: modalTransitionDuration || animationDuration,
-            }),
-          );
-        } else if (swipeDirection === 'left' || swipeDirection === 'right') {
-          animations.push(
-            Animated.timing(modalTranslateX, {
-              ...ANIMATION_CONFIG.timing,
-              toValue: swipeDirection === 'right' ? SCREEN_WIDTH : -SCREEN_WIDTH,
-              duration: modalTransitionDuration || animationDuration,
-            }),
-          );
-        }
-        break;
-      case 'scale':
-        animations.push(
-          Animated.timing(modalScale, {
-            ...ANIMATION_CONFIG.timing,
-            toValue: 0.8,
-            duration: modalTransitionDuration || animationDuration,
-          }),
-        );
-        break;
-      case 'fade':
-        animations.push(
-          Animated.timing(modalOpacity, {
-            ...ANIMATION_CONFIG.timing,
-            toValue: 0,
-            duration: modalTransitionDuration || animationDuration,
-          }),
-        );
-        break;
-      case 'none':
-        // No animation
-        break;
+    if (animation === 'none') {
+      if (isMounted.current) {
+        setModalMounted(false);
+        onCloseComplete?.();
+      }
+      return;
     }
 
-    Animated.parallel(animations).start(() => {
+    const anims: Animated.CompositeAnimation[] = [
+      Animated.timing(backdropAnim, { ...timing(bd), toValue: 0 }),
+      Animated.timing(modalOpacity, { ...timing(Math.round(md * 0.4)), toValue: 0 }),
+    ];
+
+    if (animation === 'scale') {
+      anims.push(Animated.timing(modalScale, { ...timing(md), toValue: 0.88 }));
+    } else if (animation === 'slide') {
+      const toY = swipeDirection === 'up' ? -SCREEN_HEIGHT : SCREEN_HEIGHT;
+      const toX = swipeDirection === 'left' ? SCREEN_WIDTH : -SCREEN_WIDTH;
+      if (swipeDirection === 'up' || swipeDirection === 'down') {
+        anims.push(Animated.timing(modalTranslateY, { ...timing(md), toValue: toY }));
+      } else {
+        anims.push(Animated.timing(modalTranslateX, { ...timing(md), toValue: toX }));
+      }
+    }
+
+    Animated.parallel(anims).start(() => {
       if (isMounted.current) {
-        setModalVisible(false);
+        setModalMounted(false);
         onCloseComplete?.();
       }
     });
   }, [
     animation,
     animationDuration,
-    backdropOpacityAnim,
-    modalScale,
-    modalTranslateY,
-    modalTranslateX,
-    modalOpacity,
-    swipeDirection,
-    onCloseComplete,
     backdropTransitionDuration,
     modalTransitionDuration,
-  ]);
+    swipeDirection,
+    onCloseComplete,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Get modal transform based on animation
-  const getModalTransform = useCallback((): Animated.WithAnimatedObject<ViewStyle> => {
-    switch (animation) {
-      case 'slide':
-        if (swipeDirection === 'down' || swipeDirection === 'up') {
-          return {
-            transform: [{ translateY: modalTranslateY }],
-          };
-        } else if (swipeDirection === 'left' || swipeDirection === 'right') {
-          return {
-            transform: [{ translateX: modalTranslateX }],
-          };
-        }
-        return {};
-      case 'scale':
-        return {
-          transform: [{ scale: modalScale }],
-        };
+  // ─── Transform ────────────────────────────────────────────────────────────
+
+  const modalTransform = useMemo((): Animated.WithAnimatedObject<ViewStyle> => {
+    if (animation === 'scale') return { transform: [{ scale: modalScale }] };
+    if (animation === 'slide') {
+      if (swipeDirection === 'up' || swipeDirection === 'down')
+        return { transform: [{ translateY: modalTranslateY }] };
+      return { transform: [{ translateX: modalTranslateX }] };
+    }
+    return {};
+  }, [animation, modalScale, modalTranslateY, modalTranslateX, swipeDirection]);
+
+  // ─── Platform side effects ────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const h = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (visible && dismissible) {
+        onClose();
+        return true;
+      }
+      return false;
+    });
+    return () => h.remove();
+  }, [visible, dismissible, onClose]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !closeOnEscape) return;
+    const fn = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && visible && dismissible) onClose();
+    };
+    window.addEventListener('keydown', fn);
+    return () => window.removeEventListener('keydown', fn);
+  }, [visible, closeOnEscape, dismissible, onClose]);
+
+  useEffect(() => {
+    if (!onOrientationChange) return;
+    const sub = Dimensions.addEventListener('change', ({ window: w }) => {
+      onOrientationChange(w.width > w.height ? 'landscape' : 'portrait');
+    });
+    return () => sub?.remove();
+  }, [onOrientationChange]);
+
+  // ─── Inset-aware padding per position ────────────────────────────────────
+  // Replaces SafeAreaView — we inject the right inset as padding directly
+  // so Animated.View can be the modal wrapper without nesting a SafeAreaView.
+
+  const safeInsetStyle = useMemo((): ViewStyle => {
+    switch (position) {
+      case 'bottom':
+        return { paddingBottom: insets.bottom };
+      case 'top':
+        return { paddingTop: insets.top };
+      case 'left':
+        return { paddingLeft: insets.left };
+      case 'right':
+        return { paddingRight: insets.right };
       default:
         return {};
     }
-  }, [animation, modalScale, modalTranslateY, modalTranslateX, swipeDirection]);
+  }, [position, insets]);
 
-  const handleBackdropPress = useCallback(() => {
-    if (dismissible && closeOnBackdropPress) {
-      onClose();
-    }
-  }, [dismissible, closeOnBackdropPress, onClose]);
-
-  // Handle swipe to close
-  const handleSwipeComplete = useCallback(() => {
-    onSwipeComplete?.();
-    onClose();
-  }, [onSwipeComplete, onClose]);
-
-  // Memoized modal style
-  const modalAnimatedStyle = useMemo(
-    () => [styles.modal, getModalTransform()],
-    [styles.modal, getModalTransform],
+  // Center modals: add a little top/bottom inset to avoid notch/home indicator
+  const centerInsetStyle = useMemo(
+    (): ViewStyle =>
+      position === 'center' ? { marginTop: insets.top, marginBottom: insets.bottom } : {},
+    [position, insets],
   );
 
-  // Render header if enabled and has content
-  const renderHeader = useCallback(() => {
-    if (!showHeader || (!title && hideCloseButton)) return null;
+  // ─── Outer positioner style ───────────────────────────────────────────────
 
+  const outerStyle = useMemo((): ViewStyle => {
+    switch (position) {
+      case 'top':
+        return { justifyContent: 'flex-start', alignItems: 'center' };
+      case 'bottom':
+        return { justifyContent: 'flex-end', alignItems: 'stretch' };
+      case 'left':
+        return { justifyContent: 'center', alignItems: 'flex-start' };
+      case 'right':
+        return { justifyContent: 'center', alignItems: 'flex-end' };
+      default:
+        return { justifyContent: 'center', alignItems: 'center' };
+    }
+  }, [position]);
+
+  // ─── Render helpers ───────────────────────────────────────────────────────
+
+  const handleBackdropPress = useCallback(() => {
+    if (dismissible && closeOnBackdropPress) onClose();
+  }, [dismissible, closeOnBackdropPress, onClose]);
+
+  const renderHeader = () => {
+    const hasTitle = !!title;
+    const hasClose = showCloseButton && !hideCloseButton;
+    if (!showHeader || (!hasTitle && !hasClose)) return null;
     return (
       <ModalHeader
         title={title}
-        showCloseButton={showCloseButton && !hideCloseButton}
+        showCloseButton={hasClose}
         onClose={onClose}
         titleStyle={titleStyle}
         closeButtonStyle={closeButtonStyle}
         headerStyle={headerStyle}
         closeIcon={closeIcon}
         closeButtonPosition={closeButtonPosition}
+        showDragHandle={position === 'bottom'}
       />
     );
-  }, [
-    showHeader,
-    title,
-    showCloseButton,
-    hideCloseButton,
-    onClose,
-    titleStyle,
-    closeButtonStyle,
-    headerStyle,
-    closeIcon,
-    closeButtonPosition,
-  ]);
+  };
 
-  // Render loading overlay
-  const renderLoading = useCallback(() => {
-    if (!loading) return null;
-
-    return (
-      <View style={styles.loadingOverlay}>
-        {loadingIndicator || <ActivityIndicator size="large" color={colors.primary} />}
-        {loadingText && <Text style={styles.loadingText}>{loadingText}</Text>}
-      </View>
-    );
-  }, [loading, loadingText, loadingIndicator, colors.primary, styles]);
-
-  // Render content with scroll support
-  const renderContent = useCallback(() => {
+  const renderBody = () => {
     if (scrollable) {
       return (
         <ScrollView
           {...scrollViewProps}
           contentContainerStyle={[styles.scrollContent, scrollViewProps?.contentContainerStyle]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
           {children}
         </ScrollView>
       );
     }
-    return children;
-  }, [scrollable, scrollViewProps, children, styles.scrollContent]);
+    return <>{children}</>;
+  };
+
+  const renderLoading = () => {
+    if (!loading) return null;
+    return (
+      <View style={styles.loadingOverlay}>
+        {loadingIndicator ?? <ActivityIndicator size="large" color={colors.primary} />}
+        {loadingText && <Text style={styles.loadingText}>{loadingText}</Text>}
+      </View>
+    );
+  };
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <RNModal
-      visible={modalVisible}
+      visible={modalMounted}
       transparent
       animationType="none"
       onRequestClose={dismissible ? onClose : undefined}
@@ -448,61 +377,64 @@ export const Modal: React.FC<ModalProps> & {
       hardwareAccelerated={hardwareAccelerated}
       presentationStyle={presentationStyle}
       supportedOrientations={supportedOrientations}
-      onShow={onShow}
+      statusBarTranslucent
     >
-      {hideStatusBar && <StatusBar hidden={hideStatusBar} />}
+      {hideStatusBar && <StatusBar hidden />}
 
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingView}
-        behavior={keyboardAvoiding ? (Platform.OS === 'ios' ? 'padding' : undefined) : undefined}
-        keyboardVerticalOffset={keyboardOffset}
-      >
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        {/* ── Backdrop ── */}
         {showBackdrop && (
-          <TouchableWithoutFeedback
-            onPress={handleBackdropPress}
-            testID={`${testID}-backdrop`}
-            accessible={false}
-          >
+          <TouchableWithoutFeedback onPress={handleBackdropPress} accessible={false}>
             <Animated.View
               style={[
-                styles.backdrop,
+                StyleSheet.absoluteFill,
                 {
-                  opacity: backdropOpacityAnim,
-                  backgroundColor: backdropColor || styles.backdrop.backgroundColor,
+                  backgroundColor: backdropColor ?? '#000000',
+                  opacity: Animated.multiply(backdropAnim, backdropOpacity),
                 },
               ]}
             />
           </TouchableWithoutFeedback>
         )}
 
-        <Animated.View
-          style={[
-            styles.container,
-            animation === 'fade' && { opacity: modalOpacity },
-            { pointerEvents: visible ? 'auto' : 'none' },
-          ]}
+        {/* ── Content ── */}
+        <KeyboardAvoidingView
+          style={StyleSheet.absoluteFill}
+          behavior={keyboardAvoiding ? (Platform.OS === 'ios' ? 'padding' : 'height') : undefined}
+          keyboardVerticalOffset={keyboardOffset}
           pointerEvents="box-none"
-          accessibilityLabel={accessibilityLabel}
-          accessibilityRole="none"
         >
-          <SafeAreaView style={styles.modalWrapper}>
-            <Animated.View style={modalAnimatedStyle}>
+          <View style={[StyleSheet.absoluteFill, outerStyle]} pointerEvents="box-none">
+            <Animated.View
+              style={[
+                styles.modal,
+                modalTransform,
+                { opacity: modalOpacity },
+                // Inject safe area as padding directly — no SafeAreaView wrapper needed
+                safeInsetStyle,
+                centerInsetStyle,
+              ]}
+              accessibilityLabel={accessibilityLabel}
+              accessibilityViewIsModal
+            >
               {renderHeader()}
-              <View style={styles.content}>{renderContent()}</View>
+              <View style={styles.content}>{renderBody()}</View>
               {renderLoading()}
             </Animated.View>
-          </SafeAreaView>
-        </Animated.View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
     </RNModal>
   );
 };
 
-// Header subcomponent with improved features
+// ─── Header ───────────────────────────────────────────────────────────────────
+
 const ModalHeader: React.FC<
   ModalHeaderProps & {
     closeIcon?: React.ReactNode;
     closeButtonPosition?: 'left' | 'right';
+    showDragHandle?: boolean;
   }
 > = React.memo(
   ({
@@ -514,33 +446,29 @@ const ModalHeader: React.FC<
     headerStyle,
     closeIcon,
     closeButtonPosition = 'right',
+    showDragHandle = false,
   }) => {
     const { colors } = useTheme();
-    const styles = useModalStyles('md', 'center');
+    const styles = useModalStyles();
 
-    const renderCloseButton = () => {
-      if (!showCloseButton) return null;
-
-      return (
+    const CloseBtn = () =>
+      showCloseButton ? (
         <TouchableOpacity
           onPress={onClose}
           style={[styles.closeButton, closeButtonStyle]}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          accessibilityLabel="Close modal"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Close"
           accessibilityRole="button"
         >
-          {closeIcon || (
-            <Text style={[styles.closeButtonText, { color: colors.textSecondary }]}>×</Text>
-          )}
+          {closeIcon ?? <Text style={styles.closeButtonText}>✕</Text>}
         </TouchableOpacity>
-      );
-    };
+      ) : null;
 
     return (
       <View style={[styles.header, headerStyle]}>
-        {closeButtonPosition === 'left' && renderCloseButton()}
-
-        {title && (
+        {showDragHandle && <View style={styles.dragHandle} />}
+        {closeButtonPosition === 'left' && <CloseBtn />}
+        {title ? (
           <Text
             style={[styles.title, titleStyle, closeButtonPosition === 'left' && { marginLeft: 8 }]}
             numberOfLines={1}
@@ -548,50 +476,46 @@ const ModalHeader: React.FC<
           >
             {title}
           </Text>
+        ) : (
+          <View style={{ flex: 1 }} />
         )}
-
-        {closeButtonPosition === 'right' && renderCloseButton()}
+        {closeButtonPosition === 'right' && <CloseBtn />}
       </View>
     );
   },
 );
-
 ModalHeader.displayName = 'ModalHeader';
 
-// Content subcomponent with scroll support
-const ModalContent: React.FC<
-  ModalContentProps & {
-    scrollable?: boolean;
-    scrollViewProps?: any;
-  }
-> = React.memo(({ children, style, scrollable, scrollViewProps }) => {
-  if (scrollable) {
-    return (
-      <ScrollView
-        {...scrollViewProps}
-        style={style}
-        contentContainerStyle={scrollViewProps?.contentContainerStyle}
-        showsVerticalScrollIndicator={false}
-      >
-        {children}
-      </ScrollView>
-    );
-  }
+// ─── Content ──────────────────────────────────────────────────────────────────
 
-  return <View style={style}>{children}</View>;
-});
-
+const ModalContent: React.FC<ModalContentProps & { scrollable?: boolean; scrollViewProps?: any }> =
+  React.memo(({ children, style, scrollable, scrollViewProps }) => {
+    if (scrollable) {
+      return (
+        <ScrollView
+          {...scrollViewProps}
+          style={style}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {children}
+        </ScrollView>
+      );
+    }
+    return <View style={style}>{children}</View>;
+  });
 ModalContent.displayName = 'ModalContent';
 
-// Footer subcomponent
+// ─── Footer ───────────────────────────────────────────────────────────────────
+
 const ModalFooter: React.FC<ModalFooterProps> = React.memo(({ children, style }) => {
-  const styles = useModalStyles('md', 'center');
+  const styles = useModalStyles();
   return <View style={[styles.footer, style]}>{children}</View>;
 });
-
 ModalFooter.displayName = 'ModalFooter';
 
-// Attach subcomponents
+// ─── Attach subcomponents ─────────────────────────────────────────────────────
+
 Modal.Header = ModalHeader;
 Modal.Content = ModalContent;
 Modal.Footer = ModalFooter;

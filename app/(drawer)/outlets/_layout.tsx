@@ -1,8 +1,16 @@
-import { Stack, router, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { useOutletStore } from '@/core/store/outlet.store';
-import { useEffect } from 'react';
-import { toast } from '@/core/utils';
+import { Header, HeaderProps } from '@/core/components/Header';
+import { useFilterContext } from '@/shared/contexts/FilterContext';
+
+type ScreenOptions = {
+  headerShown?: boolean;
+  title?: string;
+  showBack?: boolean;
+  showMenu?: boolean;
+  showFilter?: boolean;
+  onFilterPress?: () => void;
+};
 
 export default function OutletsLayout() {
   const { colors } = useTheme();
@@ -10,28 +18,45 @@ export default function OutletsLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: {
-          backgroundColor: colors.background,
+        header: ({ options, navigation }) => {
+          const customOptions = options as ScreenOptions;
+
+          if (customOptions.headerShown === false) {
+            return null;
+          }
+
+          return (
+            <Header
+              title={customOptions.title}
+              showBack={
+                customOptions.showBack !== undefined
+                  ? customOptions.showBack
+                  : navigation.canGoBack()
+              }
+              showMenu={customOptions.showMenu || false}
+              showFilter={customOptions.showFilter || false}
+              onFilterPress={customOptions.onFilterPress}
+              centeredTitle={false}
+            />
+          );
         },
-        headerTintColor: colors.textPrimary,
-        headerShadowVisible: false,
-        contentStyle: {
-          backgroundColor: colors.background,
-        },
+        contentStyle: { backgroundColor: colors.background },
       }}
     >
+      {/* INDEX */}
       <Stack.Screen
         name="index"
         options={{
-          headerShown: false,
           title: 'Outlets',
+          headerShown: false,
         }}
       />
 
+      {/* DETAIL */}
       <Stack.Screen
         name="[id]/index"
         options={{
-          title: 'detail',
+          title: 'Detail',
           headerShown: false,
         }}
       />
@@ -42,9 +67,7 @@ export default function OutletsLayout() {
         name="add"
         options={{
           title: 'Add Customer',
-          presentation: 'modal',
           headerShown: true,
-          headerLeft: () => null,
         }}
       />
 
@@ -52,9 +75,7 @@ export default function OutletsLayout() {
         name="edit/[id]"
         options={{
           title: 'Edit Customer',
-          presentation: 'modal',
           headerShown: true,
-          headerLeft: () => null,
         }}
       />
     </Stack>

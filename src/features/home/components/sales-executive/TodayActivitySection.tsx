@@ -13,6 +13,7 @@ import { ActivityItemComponent } from './ActivityItem';
 import { TodayActivitiesSectionProps } from '../../types/activity.types';
 import { AppText, SectionHeader } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { useTodayActivitiesSectionStyles } from '../../styles/TodayActivitiesSection.styles';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -59,6 +60,7 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
   activities = [],
 }) => {
   const { colors } = useTheme();
+  const styles = useTodayActivitiesSectionStyles();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
@@ -134,49 +136,29 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
     setShowAll((prev) => !prev);
   }, []);
 
+  // Helper to get status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'ongoing':
+        return colors.primary;
+      case 'completed':
+        return colors.success;
+      default:
+        return colors.textSecondary;
+    }
+  };
+
   return (
-    <View
-      style={{
-        backgroundColor: colors.background,
-        marginBottom: 16,
-        paddingHorizontal: 16,
-      }}
-    >
+    <View style={styles.container}>
       {/* Header - Always Visible */}
-      <TouchableOpacity
-        onPress={toggleExpand}
-        activeOpacity={0.7}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingVertical: 12,
-          backgroundColor: colors.background,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <AppText
-            style={{
-              fontSize: 14,
-              fontWeight: '500',
-              color: colors.textSecondary,
-            }}
-          >
+      <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7} style={styles.headerContainer}>
+        <View style={styles.headerLeft}>
+          <AppText style={[styles.headerTitle, { color: colors.textSecondary }]}>
             TODAY ACTIVITIES
           </AppText>
           {hasActivities && (
-            <View
-              style={{
-                marginLeft: 8,
-                backgroundColor: colors.primary + '15',
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: 12,
-              }}
-            >
-              <AppText style={{ fontSize: 11, color: colors.primary, fontWeight: '600' }}>
-                {stats.total}
-              </AppText>
+            <View style={[styles.badge, { backgroundColor: colors.primary + '15' }]}>
+              <AppText style={[styles.badgeText, { color: colors.primary }]}>{stats.total}</AppText>
             </View>
           )}
         </View>
@@ -192,25 +174,22 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
         <View>
           {/* Stats Summary - Only show if there are activities */}
           {hasActivities && (
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
+            <View style={styles.statsContainer}>
               {/* Total Duration Card */}
               <View
-                style={{
-                  flex: 1,
-                  backgroundColor: colors.surface,
-                  borderRadius: 10,
-                  padding: 10,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
+                style={[
+                  styles.statCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
               >
                 <Ionicons name="time-outline" size={14} color={colors.primary} />
-                <AppText
-                  style={{ fontSize: 16, fontWeight: '700', color: colors.primary, marginTop: 4 }}
-                >
+                <AppText style={[styles.statValue, { color: colors.primary }]}>
                   {stats.totalDuration}
                 </AppText>
-                <AppText style={{ fontSize: 9, color: colors.textSecondary, marginTop: 2 }}>
+                <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>
                   Total Time
                 </AppText>
               </View>
@@ -218,48 +197,38 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
               {/* Ongoing Card */}
               {stats.ongoing > 0 && (
                 <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: colors.primary + '08',
-                    borderRadius: 10,
-                    padding: 10,
-                    borderWidth: 1,
-                    borderColor: colors.primary + '20',
-                  }}
+                  style={[
+                    styles.statCard,
+                    {
+                      backgroundColor: colors.primary + '08',
+                      borderColor: colors.primary + '20',
+                    },
+                  ]}
                 >
                   <Ionicons name="play-circle" size={14} color={colors.primary} />
-                  <AppText
-                    style={{ fontSize: 16, fontWeight: '700', color: colors.primary, marginTop: 4 }}
-                  >
+                  <AppText style={[styles.statValue, { color: colors.primary }]}>
                     {stats.ongoing}
                   </AppText>
-                  <AppText style={{ fontSize: 9, color: colors.primary, marginTop: 2 }}>
-                    Active
-                  </AppText>
+                  <AppText style={[styles.statLabel, { color: colors.primary }]}>Active</AppText>
                 </View>
               )}
 
               {/* Completion Card */}
               {stats.completed > 0 && (
                 <View
-                  style={{
-                    flex: 1,
-                    backgroundColor: colors.success + '08',
-                    borderRadius: 10,
-                    padding: 10,
-                    borderWidth: 1,
-                    borderColor: colors.success + '20',
-                  }}
+                  style={[
+                    styles.statCard,
+                    {
+                      backgroundColor: colors.success + '08',
+                      borderColor: colors.success + '20',
+                    },
+                  ]}
                 >
                   <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                  <AppText
-                    style={{ fontSize: 16, fontWeight: '700', color: colors.success, marginTop: 4 }}
-                  >
+                  <AppText style={[styles.statValue, { color: colors.success }]}>
                     {stats.completionRate}%
                   </AppText>
-                  <AppText style={{ fontSize: 9, color: colors.success, marginTop: 2 }}>
-                    Completed
-                  </AppText>
+                  <AppText style={[styles.statLabel, { color: colors.success }]}>Completed</AppText>
                 </View>
               )}
             </View>
@@ -267,9 +236,9 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
 
           {/* Activities List */}
           <ScrollView
-            // style={{ maxHeight: showAll ? 500 : 400 }}
+            style={styles.activitiesScrollView}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingVertical: 4 }}
+            contentContainerStyle={styles.activitiesContent}
           >
             {hasActivities ? (
               displayedActivities.map((item, index) => (
@@ -281,30 +250,14 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
                 />
               ))
             ) : (
-              <View
-                style={{
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: 48,
-                }}
-              >
-                <View
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 28,
-                    backgroundColor: colors.surface,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: 12,
-                  }}
-                >
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyStateIconContainer, { backgroundColor: colors.surface }]}>
                   <Ionicons name="time-outline" size={28} color={colors.textSecondary} />
                 </View>
-                <AppText style={{ fontSize: 14, color: colors.textSecondary, marginBottom: 4 }}>
+                <AppText style={[styles.emptyStateTitle, { color: colors.textSecondary }]}>
                   No activities yet
                 </AppText>
-                <AppText style={{ fontSize: 11, color: colors.textSecondary }}>
+                <AppText style={[styles.emptyStateSubtitle, { color: colors.textSecondary }]}>
                   Start your first activity to begin tracking
                 </AppText>
               </View>
@@ -315,28 +268,23 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
           {hasMore && hasActivities && (
             <TouchableOpacity
               onPress={toggleShowAll}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 10,
-                marginTop: 8,
-                marginBottom: 8,
-                borderRadius: 8,
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
+              style={[
+                styles.showMoreButton,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
               activeOpacity={0.7}
             >
-              <AppText style={{ fontSize: 12, color: colors.primary, fontWeight: '500' }}>
+              <AppText style={[styles.showMoreText, { color: colors.primary }]}>
                 {showAll ? 'Show Less' : `Show ${activities.length - 5} More`}
               </AppText>
               <Ionicons
                 name={showAll ? 'chevron-up' : 'chevron-down'}
                 size={14}
                 color={colors.primary}
-                style={{ marginLeft: 4 }}
+                style={styles.showMoreIcon}
               />
             </TouchableOpacity>
           )}

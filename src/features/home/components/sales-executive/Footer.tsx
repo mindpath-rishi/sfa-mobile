@@ -1,7 +1,6 @@
 import { AppText } from '@/core/components';
-import App from 'app';
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 
 interface FooterProps {
   lastUpdated: string;
@@ -21,7 +20,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   textXSmall: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#64748B',
   },
 });

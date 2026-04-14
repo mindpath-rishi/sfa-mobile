@@ -1,83 +1,48 @@
-import { ViewStyle, TextStyle } from 'react-native';
-import { createStyles } from '@/shared/theme/styles';
-import { useTheme } from '@/shared/hooks/useTheme';
+// Updated styles for InvoiceSharing.styles.ts
+import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
 export const useInvoiceSharingStyles = () => {
-  const { colors } = useTheme();
-
-  const styleGenerator = createStyles((utils) => ({
+  return StyleSheet.create({
     container: {
       flex: 1,
     } as ViewStyle,
 
-    // Header
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: utils.spacing[4],
-      paddingBottom: utils.spacing[3],
-      backgroundColor: colors.background,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border + '20',
-    } as ViewStyle,
-
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: 'center',
-      alignItems: 'center',
-    } as ViewStyle,
-
-    headerTitle: {
-      fontSize: utils.fontSize.lg,
-      fontWeight: utils.getFontWeight('600'),
-      color: colors.textPrimary,
-    } as TextStyle,
-
-    headerRight: {
-      width: 40,
-    } as ViewStyle,
-
-    // Scroll Content
     scrollContent: {
-      padding: utils.spacing[4],
-      paddingBottom: utils.spacing[24],
+      padding: 16,
+      paddingBottom: 100,
+      gap: 16,
     } as ViewStyle,
 
-    // Instruction
     instruction: {
-      fontSize: utils.fontSize.md,
-      color: colors.textSecondary,
-      lineHeight: 22,
-      marginBottom: utils.spacing[4],
+      fontSize: 14,
+      lineHeight: 20,
+      color: '#666',
       textAlign: 'center',
+      marginBottom: 8,
     } as TextStyle,
 
-    // Options Card
     optionsCard: {
-      marginBottom: utils.spacing[4],
-      borderRadius: utils.borderRadius.lg,
+      borderRadius: 16,
     } as ViewStyle,
 
     optionItem: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: utils.spacing[3],
-      paddingHorizontal: utils.spacing[2],
-      borderRadius: utils.borderRadius.md,
+      alignItems: 'center',
+      paddingVertical: 16,
     } as ViewStyle,
 
     optionSelected: {
-      backgroundColor: colors.primary + '08',
+      backgroundColor: '#f0f0f0',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      marginHorizontal: -12,
     } as ViewStyle,
 
     optionLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: utils.spacing[3],
+      gap: 16,
     } as ViewStyle,
 
     optionIcon: {
@@ -89,83 +54,194 @@ export const useInvoiceSharingStyles = () => {
     } as ViewStyle,
 
     optionTitle: {
-      fontSize: utils.fontSize.lg,
-      fontWeight: utils.getFontWeight('600'),
-      color: colors.textPrimary,
-      marginBottom: 2,
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#333',
+      marginBottom: 4,
     } as TextStyle,
 
     optionDescription: {
-      fontSize: utils.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: 12,
+      color: '#999',
     } as TextStyle,
 
     divider: {
       height: 1,
-      marginVertical: utils.spacing[2],
+      marginVertical: 8,
     } as ViewStyle,
 
-    // Preview Card
+    submenuCard: {
+      borderRadius: 16,
+      marginTop: 8,
+    } as ViewStyle,
+
+    submenuTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#666',
+      marginBottom: 12,
+    } as TextStyle,
+
+    submenuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#f0f0f0',
+    } as ViewStyle,
+
+    submenuText: {
+      fontSize: 15,
+      color: '#333',
+    } as TextStyle,
+
     previewCard: {
-      borderRadius: utils.borderRadius.lg,
+      borderRadius: 16,
     } as ViewStyle,
 
     previewTitle: {
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('600'),
-      color: colors.textPrimary,
-      marginBottom: utils.spacing[3],
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#333',
+      marginBottom: 16,
     } as TextStyle,
 
     previewRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: utils.spacing[1.5],
+      marginBottom: 12,
     } as ViewStyle,
 
     previewLabel: {
-      fontSize: utils.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: 14,
+      color: '#666',
     } as TextStyle,
 
     previewValue: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('500'),
-      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: '500',
+      color: '#333',
     } as TextStyle,
 
     previewAmount: {
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('700'),
-      color: colors.primary,
+      fontSize: 16,
+      fontWeight: '700',
+      color: '#4CAF50',
     } as TextStyle,
 
-    // Bottom Bar
+    itemsContainer: {
+      marginTop: 16,
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: '#f0f0f0',
+    } as ViewStyle,
+
+    itemsTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#666',
+      marginBottom: 12,
+    } as TextStyle,
+
+    itemRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    } as ViewStyle,
+
+    itemName: {
+      flex: 2,
+      fontSize: 13,
+      color: '#333',
+    } as TextStyle,
+
+    itemQuantity: {
+      flex: 1,
+      fontSize: 13,
+      color: '#666',
+      textAlign: 'center',
+    } as TextStyle,
+
+    itemPrice: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '500',
+      color: '#333',
+      textAlign: 'right',
+    } as TextStyle,
+
     bottomBar: {
       position: 'absolute',
       bottom: 0,
       left: 0,
       right: 0,
-      paddingHorizontal: utils.spacing[4],
-      paddingTop: utils.spacing[3],
-      backgroundColor: colors.background,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      backgroundColor: '#fff',
       borderTopWidth: 1,
-      borderTopColor: colors.border + '20',
+      borderTopColor: '#f0f0f0',
     } as ViewStyle,
 
     proceedButton: {
-      paddingVertical: utils.spacing[3.5],
-      borderRadius: utils.borderRadius.lg,
+      paddingVertical: 16,
+      borderRadius: 12,
       alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    disabledButton: {
+      opacity: 0.6,
     } as ViewStyle,
 
     proceedButtonText: {
       color: 'white',
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('600'),
+      fontSize: 16,
+      fontWeight: '600',
     } as TextStyle,
-  }));
+    // Add these to your InvoiceSharing.styles.ts
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+    } as ViewStyle,
 
-  return styleGenerator(colors);
+    backButton: {
+      padding: 8,
+      marginLeft: -8,
+    } as ViewStyle,
+
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+    } as TextStyle,
+    // Add to your InvoiceSharing.styles.ts
+    shareActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      backgroundColor: '#f8f9fa',
+      borderRadius: 12,
+      gap: 12,
+    } as ViewStyle,
+
+    shareActionTextContainer: {
+      flex: 1,
+    } as ViewStyle,
+
+    shareActionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#333',
+      marginBottom: 4,
+    } as TextStyle,
+
+    shareActionDescription: {
+      fontSize: 12,
+      color: '#666',
+    } as TextStyle,
+  });
 };

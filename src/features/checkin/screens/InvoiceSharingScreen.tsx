@@ -1,24 +1,24 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Share, Alert } from 'react-native';
+// InvoiceSharingScreen.tsx - Clean UI, Details only in PDF
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  Platform,
+  ActivityIndicator,
+  BackHandler,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppCard } from '@/core/components/Card';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useInvoiceSharingStyles } from '../styles/InvoiceSharing.styles';
-
-// Mock invoice data
-const MOCK_INVOICE = {
-  id: '996/25-26/100030',
-  customer: 'John Shop',
-  date: '21 Oct 2025',
-  amount: 39.17,
-  currency: 'ZMW',
-  items: [
-    { name: 'Product 1', quantity: 2, price: 19.585 },
-    { name: 'Product 2', quantity: 1, price: 19.585 },
-  ],
-};
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { ConfirmationModal } from '@/core/components';
 
 export default function InvoiceSharingScreen() {
   const { colors } = useTheme();
@@ -26,63 +26,482 @@ export default function InvoiceSharingScreen() {
   const styles = useInvoiceSharingStyles();
   const params = useLocalSearchParams();
   const [selectedOption, setSelectedOption] = useState<'print' | 'share' | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
-  // Get invoice data from params or use mock
-  const invoice = params.invoice ? JSON.parse(params.invoice as string) : MOCK_INVOICE;
+  // Parse invoice data from params
+  let invoice;
+  try {
+    invoice = params.invoice ? JSON.parse(params.invoice as string) : null;
+  } catch (error) {
+    console.error('Failed to parse invoice data:', error);
+    invoice = null;
+  }
 
-  const handlePrint = () => {
-    setSelectedOption('print');
-    // Handle print logic here
-    Alert.alert('Print', 'Printing functionality will be implemented here');
+  // Get customerId from params or invoice data
+  const customerId = (params.customerId as string) || invoice?.customerId || 'CUST0001';
+
+  // Handle back navigation to check-in screen
+  const handleBackNavigation = () => {
+    router.replace(`/outlets/${customerId}`);
+    return true;
   };
 
-  const handleShare = async () => {
-    setSelectedOption('share');
-    try {
-      const result = await Share.share({
-        message: `Invoice ${invoice.id}\nCustomer: ${invoice.customer}\nDate: ${invoice.date}\nAmount: ${invoice.currency} ${invoice.amount.toFixed(2)}`,
-        title: 'Invoice Details',
-      });
+  // Handle hardware back button (Android)
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBackNavigation();
+      return true;
+    });
 
-      if (result.action === Share.sharedAction) {
-        Alert.alert('Success', 'Invoice shared successfully');
+    return () => backHandler.remove();
+  }, [customerId]);
+
+  // If no invoice data, show error
+  if (!invoice) {
+    return (
+      <View
+        style={[
+          styles.container,
+          { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+        ]}
+      >
+        <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
+        <Text style={{ color: colors.error, marginTop: 16, textAlign: 'center' }}>
+          No invoice data available
+        </Text>
+        <TouchableOpacity onPress={handleBackNavigation} style={{ marginTop: 20 }}>
+          <Text style={{ color: colors.primary }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Company Details (ONLY in PDF, not in UI)
+  const companyDetails = {
+    name: 'TRADEKINGS ZAMBIA',
+    address: 'Plot 1234, Great East Road, Lusaka, Zambia',
+    phone: '+260 211 123456',
+    email: 'info@abcdistributors.com',
+    website: 'www.abcdistributors.com',
+    taxId: '1001234567',
+    vatNumber: 'VG123456789',
+  };
+
+  // Generate PDF HTML with detailed item breakdown
+  const generateInvoiceHTML = () => {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>${companyDetails.name} - Invoice ${invoice.id}</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            padding: 40px;
+            margin: 0;
+            color: #333;
+            background: #f5f5f5;
+          }
+          .invoice-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+          }
+          .company-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+          }
+          .company-name {
+            font-size: 32px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+          }
+          .company-tagline {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 15px;
+          }
+          .company-details {
+            font-size: 11px;
+            opacity: 0.85;
+            line-height: 1.6;
+          }
+          .invoice-title {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid #dee2e6;
+          }
+          .invoice-title h2 {
+            color: #1e3c72;
+            font-size: 24px;
+            margin: 0;
+          }
+          .content {
+            padding: 30px;
+          }
+          .info-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+          }
+          .info-box {
+            flex: 1;
+          }
+          .info-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          .info-value {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: 500;
+          }
+          .payment-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: bold;
+          }
+          .status-paid {
+            background: #28a745;
+            color: white;
+          }
+          .status-credit {
+            background: #ffc107;
+            color: #333;
+          }
+          .status-partial {
+            background: #17a2b8;
+            color: white;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 12px;
+          }
+          th {
+            background-color: #f8f9fa;
+            padding: 10px 8px;
+            text-align: left;
+            font-weight: bold;
+            color: #555;
+            border-bottom: 2px solid #dee2e6;
+          }
+          td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: top;
+          }
+          .product-name {
+            font-weight: 600;
+            color: #333;
+          }
+          .product-details {
+            font-size: 10px;
+            color: #666;
+            margin-top: 4px;
+          }
+          .totals-section {
+            text-align: right;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+          }
+          .total-row {
+            margin-bottom: 8px;
+            font-size: 13px;
+          }
+          .grand-total {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e3c72;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 2px solid #1e3c72;
+          }
+          .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            font-size: 10px;
+            border-top: 1px solid #dee2e6;
+          }
+          @media print {
+            body {
+              padding: 0;
+              background: white;
+            }
+            .invoice-container {
+              box-shadow: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-container">
+          <!-- Company Header -->
+          <div class="company-header">
+            <div class="company-name">${companyDetails.name}</div>
+            <div class="company-tagline">Your Trusted Distribution Partner</div>
+            <div class="company-details">
+              ${companyDetails.address}<br>
+              📞 ${companyDetails.phone} | ✉️ ${companyDetails.email}<br>
+              🌐 ${companyDetails.website} | VAT: ${companyDetails.vatNumber} | TIN: ${companyDetails.taxId}
+            </div>
+          </div>
+          
+          <div class="invoice-title">
+            <h2>TAX INVOICE</h2>
+          </div>
+          
+          <div class="content">
+            <div class="info-section">
+              <div class="info-box">
+                <div class="info-label">Invoice Number</div>
+                <div class="info-value">${invoice.invoiceNumber || invoice.id}</div>
+                <div class="info-label">Invoice Date</div>
+                <div class="info-value">${invoice.date}</div>
+              </div>
+              <div class="info-box">
+                <div class="info-label">Bill To</div>
+                <div class="info-value">${invoice.customer}</div>
+                <div class="info-label">Customer ID</div>
+                <div class="info-value">${invoice.customerId || 'N/A'}</div>
+              </div>
+              <div class="info-box">
+                <div class="info-label">Payment Status</div>
+                <div class="info-value">
+                  <span class="payment-status ${invoice.status === 'PAID' ? 'status-paid' : invoice.status === 'CREDIT' ? 'status-credit' : 'status-partial'}">
+                    ${invoice.status}
+                  </span>
+                </div>
+                <div class="info-label">Payment Mode</div>
+                <div class="info-value">${invoice.paymentMode}</div>
+              </div>
+            </div>
+            
+            <!-- Detailed Items Table -->
+            <table>
+              <thead>
+                <tr>
+                  <th width="35%">Product</th>
+                  <th width="15%">Pieces</th>
+                  <th width="15%">Piece Price</th>
+                  <th width="20%">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${invoice.items
+                  .map(
+                    (item: any) => `
+                  <tr>
+                    <td>
+                      <div class="product-name">${item.name}</div>
+                      <div class="product-details">
+                        ${item.caseQty > 0 ? `${item.caseQty} cases × ${item.unitQtyInCase || 1} pcs/case` : ''}
+                        ${item.caseQty > 0 && item.pieceQty > 0 ? ' + ' : ''}
+                        ${item.pieceQty > 0 ? `${item.pieceQty} pcs` : ''}
+                      </div>
+                    </td>
+                    <td>${item.quantity || 0}</td>
+                    <td>${invoice.currency} ${(item.price / (item.unitQtyInCase || 1)).toFixed(2)}</td>
+                    <td>${invoice.currency} ${item.total.toFixed(2)}</td>
+                  </tr>
+                `,
+                  )
+                  .join('')}
+              </tbody>
+            </table>
+
+            <!-- Summary Table -->
+            <table style="width: auto; margin-left: auto; margin-top: 20px;">
+              <tbody>
+                <tr>
+                  <td style="border: none; text-align: right; font-weight: bold;">Total Cases:</td>
+                  <td style="border: none; text-align: right;">${invoice.summary.totalCases || 0}</td>
+                </tr>
+                <tr>
+                  <td style="border: none; text-align: right; font-weight: bold;">Total Pieces:</td>
+                  <td style="border: none; text-align: right;">${invoice.summary.totalPieces || 0}</td>
+                </tr>
+                <tr>
+                  <td style="border: none; text-align: right; font-weight: bold;">Total Quantity:</td>
+                  <td style="border: none; text-align: right;">${invoice.summary.totalQty || 0}</td>
+                </tr>
+                <tr>
+                  <td style="border: none; text-align: right; font-weight: bold;">Total Net Weight:</td>
+                  <td style="border: none; text-align: right;">${invoice.summary.totalNetWeight || 0} kg</td>
+                </tr>
+              </tbody>
+            </table>
+            
+            <div class="totals-section">
+              <div class="total-row">
+                <strong>Subtotal:</strong> ${invoice.currency} ${invoice.summary.subtotal.toFixed(2)}
+              </div>
+              <div class="total-row">
+                <strong>VAT (0%):</strong> ${invoice.currency} ${invoice.summary.tax.toFixed(2)}
+              </div>
+              <div class="grand-total">
+                Total Amount: ${invoice.currency} ${invoice.summary.total.toFixed(2)}
+              </div>
+              ${
+                invoice.paidAmount < invoice.summary.total
+                  ? `
+                <div class="total-row">
+                  <strong>Paid Amount:</strong> ${invoice.currency} ${invoice.paidAmount.toFixed(2)}
+                </div>
+                <div class="total-row">
+                  <strong>Balance Due:</strong> ${invoice.currency} ${invoice.pendingAmount.toFixed(2)}
+                </div>
+              `
+                  : ''
+              }
+            </div>
+
+            ${
+              invoice.paymentDetails
+                ? `
+              <div style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 8px;">
+                <strong>Remarks:</strong><br>
+                ${invoice.paymentDetails}
+              </div>
+            `
+                : ''
+            }
+          </div>
+          
+          <div class="footer">
+            <p>Thank you for your business!</p>
+            <p>Van: ${invoice.van?.name || 'N/A'} | Processed by: ${invoice.employee?.name || 'N/A'}</p>
+            <p>This is a computer generated invoice. No signature required.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  };
+
+  const handlePrint = async () => {
+    const html = generateInvoiceHTML();
+
+    if (Platform.OS === 'web') {
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(html);
+        newWindow.document.close();
+        newWindow.focus();
+        newWindow.print();
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to share invoice');
-    }
-  };
-
-  const handleProceed = () => {
-    if (!selectedOption) {
-      Alert.alert('Select Option', 'Please select Print or Share to continue');
       return;
     }
 
-    // Navigate based on selected option
-    if (selectedOption === 'print') {
-      // Navigate to print preview or handle print
-      Alert.alert('Print', 'Proceeding with print...');
-    } else {
-      // Share is already handled, maybe navigate to success screen
-      Alert.alert('Share', 'Invoice shared successfully');
+    const { uri } = await Print.printToFileAsync({ html });
+    await Print.printAsync({ uri });
+  };
+
+  const sharePDF = async () => {
+    setIsProcessing(true);
+
+    try {
+      const html = generateInvoiceHTML();
+
+      if (Platform.OS === 'web') {
+        const newWindow = window.open('', '_blank');
+        if (!newWindow) {
+          Alert.alert('Error', 'Popup blocked. Please allow popups.');
+          return;
+        }
+        newWindow.document.write(html);
+        newWindow.document.close();
+        setTimeout(() => {
+          newWindow.focus();
+          newWindow.print();
+        }, 500);
+        return;
+      }
+
+      const { uri } = await Print.printToFileAsync({
+        html,
+        base64: false,
+      });
+
+      if (!(await Sharing.isAvailableAsync())) {
+        Alert.alert('Error', 'Sharing is not available on this device');
+        return;
+      }
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Invoice ${invoice.invoiceNumber || invoice.id}`,
+        UTI: 'com.adobe.pdf',
+      });
+    } catch (error) {
+      console.error('Share error:', error);
+      Alert.alert('Error', 'Failed to share invoice. Please try again.');
+    } finally {
+      setIsProcessing(false);
     }
+  };
+
+  const handleReturnToCheckIn = () => {
+    handleBackNavigation();
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Header */}
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+        ]}
+      >
+        <TouchableOpacity onPress={handleBackNavigation} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Share Invoice</Text>
+        <View style={{ width: 40 }} />
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Instruction Text */}
+        {/* Simple Instruction */}
         <Text style={styles.instruction}>
-          Share your order/invoice confirmation with your depot distributor/manager or print (if
-          mobile printer is available)
+          Share your invoice with the customer or print a copy for your records.
         </Text>
 
         {/* Options Card */}
         <AppCard variant="elevated" padding="lg" style={styles.optionsCard}>
-          {/* Print Option */}
           <TouchableOpacity
             style={[styles.optionItem, selectedOption === 'print' && styles.optionSelected]}
-            onPress={handlePrint}
+            onPress={() => {
+              setSelectedOption('print');
+              handlePrint();
+            }}
             activeOpacity={0.7}
           >
             <View style={styles.optionLeft}>
@@ -90,8 +509,8 @@ export default function InvoiceSharingScreen() {
                 <Ionicons name="print" size={28} color={colors.primary} />
               </View>
               <View>
-                <Text style={styles.optionTitle}>Print</Text>
-                <Text style={styles.optionDescription}>Print invoice if printer is available</Text>
+                <Text style={styles.optionTitle}>Print Invoice</Text>
+                <Text style={styles.optionDescription}>Print a copy for your records</Text>
               </View>
             </View>
             {selectedOption === 'print' && (
@@ -99,13 +518,11 @@ export default function InvoiceSharingScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Divider */}
           <View style={[styles.divider, { backgroundColor: colors.border + '30' }]} />
 
-          {/* Share Option */}
           <TouchableOpacity
             style={[styles.optionItem, selectedOption === 'share' && styles.optionSelected]}
-            onPress={handleShare}
+            onPress={() => setSelectedOption('share')}
             activeOpacity={0.7}
           >
             <View style={styles.optionLeft}>
@@ -113,10 +530,8 @@ export default function InvoiceSharingScreen() {
                 <Ionicons name="share-social" size={28} color={colors.success} />
               </View>
               <View>
-                <Text style={styles.optionTitle}>Share</Text>
-                <Text style={styles.optionDescription}>
-                  Share invoice via WhatsApp, Email, etc.
-                </Text>
+                <Text style={styles.optionTitle}>Share Invoice</Text>
+                <Text style={styles.optionDescription}>Share PDF via WhatsApp, Email, etc.</Text>
               </View>
             </View>
             {selectedOption === 'share' && (
@@ -125,13 +540,35 @@ export default function InvoiceSharingScreen() {
           </TouchableOpacity>
         </AppCard>
 
-        {/* Invoice Preview (Optional) */}
+        {/* Share Options Submenu */}
+        {selectedOption === 'share' && (
+          <AppCard variant="elevated" padding="md" style={styles.submenuCard}>
+            <Text style={styles.submenuTitle}>Share PDF via</Text>
+
+            <TouchableOpacity style={styles.submenuItem} onPress={sharePDF}>
+              <Ionicons name="share-social" size={24} color={colors.primary} />
+              <Text style={styles.submenuText}>Any App</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.submenuItem} onPress={sharePDF}>
+              <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+              <Text style={styles.submenuText}>WhatsApp</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.submenuItem} onPress={sharePDF}>
+              <Ionicons name="mail-outline" size={24} color="#EA4335" />
+              <Text style={styles.submenuText}>Email</Text>
+            </TouchableOpacity>
+          </AppCard>
+        )}
+
+        {/* Invoice Summary Preview */}
         <AppCard variant="elevated" padding="md" style={styles.previewCard}>
-          <Text style={styles.previewTitle}>Invoice Preview</Text>
+          <Text style={styles.previewTitle}>Invoice Summary</Text>
 
           <View style={styles.previewRow}>
             <Text style={styles.previewLabel}>Invoice No:</Text>
-            <Text style={styles.previewValue}>{invoice.id}</Text>
+            <Text style={styles.previewValue}>{invoice.invoiceNumber || invoice.id}</Text>
           </View>
 
           <View style={styles.previewRow}>
@@ -145,24 +582,75 @@ export default function InvoiceSharingScreen() {
           </View>
 
           <View style={styles.previewRow}>
-            <Text style={styles.previewLabel}>Amount:</Text>
+            <Text style={styles.previewLabel}>Total Cases:</Text>
+            <Text style={styles.previewValue}>{invoice.summary?.totalCases || 0}</Text>
+          </View>
+
+          <View style={styles.previewRow}>
+            <Text style={styles.previewLabel}>Total Pieces:</Text>
+            <Text style={styles.previewValue}>{invoice.summary?.totalPieces || 0}</Text>
+          </View>
+
+          <View style={styles.previewRow}>
+            <Text style={styles.previewLabel}>Total Quantity:</Text>
+            <Text style={styles.previewValue}>{invoice.summary?.totalQty || 0}</Text>
+          </View>
+
+          <View style={styles.previewRow}>
+            <Text style={styles.previewLabel}>Total Net Weight:</Text>
+            <Text style={styles.previewValue}>{invoice.summary?.totalNetWeight || 0} kg</Text>
+          </View>
+
+          <View style={styles.previewRow}>
+            <Text style={styles.previewLabel}>Total Amount:</Text>
             <Text style={[styles.previewValue, styles.previewAmount]}>
               {invoice.currency} {invoice.amount.toFixed(2)}
+            </Text>
+          </View>
+
+          <View style={styles.previewRow}>
+            <Text style={styles.previewLabel}>Status:</Text>
+            <Text
+              style={[
+                styles.previewValue,
+                { color: invoice.status === 'PAID' ? colors.success : colors.warning },
+              ]}
+            >
+              {invoice.status}
             </Text>
           </View>
         </AppCard>
       </ScrollView>
 
-      {/* Proceed Button */}
+      {/* Bottom Button - Return to Check In */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom || 16 }]}>
         <TouchableOpacity
-          style={[styles.proceedButton, { backgroundColor: colors.primary }]}
-          onPress={handleProceed}
+          style={[
+            styles.proceedButton,
+            { backgroundColor: colors.primary },
+            isProcessing && styles.disabledButton,
+          ]}
+          onPress={handleReturnToCheckIn}
           activeOpacity={0.9}
         >
-          <Text style={styles.proceedButtonText}>Proceed →</Text>
+          <Text style={styles.proceedButtonText}>Return to Check In →</Text>
         </TouchableOpacity>
       </View>
+
+      <ConfirmationModal
+        visible={showConfirmation}
+        title="Confirm Share"
+        message="Have you shared the invoice with the customer?"
+        confirmText="Yes, Proceed"
+        cancelText="Not Yet"
+        onConfirm={() => {
+          setShowConfirmation(false);
+          Alert.alert('Success', 'Invoice processed successfully', [
+            { text: 'OK', onPress: () => handleBackNavigation() },
+          ]);
+        }}
+        onCancel={() => setShowConfirmation(false)}
+      />
     </View>
   );
 }

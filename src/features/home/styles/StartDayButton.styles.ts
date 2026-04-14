@@ -34,14 +34,14 @@ export const useStartDayButtonStyles = () => {
     } as ViewStyle,
 
     title: {
-      fontSize: utils.fontSize.lg,
+      fontSize: utils.fontSize.md,
       fontWeight: utils.getFontWeight('bold'),
       color: colors.textInverse,
       letterSpacing: 0.4,
     } as TextStyle,
 
     subtitle: {
-      fontSize: utils.fontSize.sm,
+      fontSize: utils.fontSize.xs,
       color: 'rgba(255,255,255,0.9)',
       marginTop: utils.spacing[1],
     } as TextStyle,

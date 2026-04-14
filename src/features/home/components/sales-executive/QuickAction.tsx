@@ -28,11 +28,11 @@ export const QuickAction: React.FC<QuickActionProps> = ({
   const getSize = () => {
     switch (size) {
       case 'small':
-        return { container: 44, icon: 20, fontSize: 10 };
+        return { container: 44, icon: 20, fontSize: 11 };
       case 'large':
         return { container: 68, icon: 28, fontSize: 12 };
       default:
-        return { container: 56, icon: 24, fontSize: 11 };
+        return { container: 56, icon: 24, fontSize: 12 };
     }
   };
 
@@ -85,7 +85,7 @@ export const QuickAction: React.FC<QuickActionProps> = ({
                 borderColor: 'white',
               }}
             >
-              <AppText style={{ color: 'white', fontSize: 10, fontWeight: 'bold' }}>
+              <AppText style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>
                 {badge > 99 ? '99+' : badge}
               </AppText>
             </View>

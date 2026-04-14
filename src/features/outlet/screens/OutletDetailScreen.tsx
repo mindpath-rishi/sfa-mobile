@@ -10,142 +10,270 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
+  FlatList,
+  Modal,
+  TextInput,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  BackHandler,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams, useNavigation } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppButton, AppText } from '@/core/components';
-import { CUSTOMERS_DATA } from '../constants/mockData';
+import { AppText } from '@/core/components';
 import { useOutletDetailStyles } from '../styles/OutletDetail.styles';
 import { OutletAvatar, OutletStatusBadge } from '../components/outlet';
 import { outletService } from '../services/outlet.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { Outlet } from '../types/outlet.types';
 import { useOutletStore } from '@/core/store/outlet.store';
+import { useRouteStore } from '@/core/store/route.store';
+import moment from 'moment';
+import { saleService } from '@/shared/services/sale.service';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
-// Types based on schema
-interface Order {
-  id: string;
-  orderNumber: string;
+// Types
+interface SaleItem {
+  saleId: string;
+  vanId: string;
+  vanName: string;
+  customerId: string;
+  customerName: string;
+  employeeId: string;
+  employeeName: string;
   date: string;
-  amount: string;
-  status: 'completed' | 'pending' | 'cancelled';
-  items: number;
+  totalCases: number;
+  totalPieces: number;
+  totalQty: number;
+  totalWeight: number;
+  totalValue: number;
+  totalReturnCases: number;
+  totalReturnPieces: number;
+  totalReturnQty: number;
+  type: 'CASH' | 'CREDIT';
+  paymentStatus: 'UNPAID' | 'PARTIAL' | 'PAID' | 'OVERDUE';
+  paidAmount: number;
+  pendingAmount: number;
+  remark?: string;
+  status: 'DRAFT' | 'CONFIRMED' | 'RETURNED' | 'CANCELLED';
 }
 
-interface Transaction {
-  id: string;
+interface PaymentTransaction {
+  paymentId: string;
+  customerId: string;
+  vanId: string;
+  employeeId: string;
+  amount: number;
+  paymentMode: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI';
+  status: 'SUCCESS' | 'FAILED' | 'PENDING';
   date: string;
-  type: 'payment' | 'credit' | 'debit';
-  amount: string;
-  description: string;
-  status: 'completed' | 'pending' | 'failed';
-}
-
-interface Contact {
-  id: string;
-  name: string;
-  role: string;
-  phone: string;
-  email: string;
-  isPrimary: boolean;
+  sales: {
+    saleId: string;
+    amount: number;
+  }[];
+  referenceNo?: string;
+  remark?: string;
 }
 
 interface Activity {
-  id: string;
-  type: 'order' | 'visit' | 'payment' | 'note';
-  title: string;
-  description: string;
-  date: string;
-  amount?: string;
-}
-
-interface Customer {
-  customerId: string;
+  activityId: string;
+  workSessionId: string;
+  userId: string;
+  userName: string;
+  vanId: string;
+  vanName: string;
   name: string;
-  ownerName: string;
-  phoneNumber: string;
-  address: {
-    line1: string;
-    line2?: string;
-  };
-  creditLimit: number;
-  outstanding: number;
-  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
-  customerCategoryId: string;
-  channelId: string;
-  customerTypeId: string;
-  marketId: string;
-  provinceId: string;
-  segmentation: string;
-  geoTag?: {
-    lat: number;
-    lng: number;
-  };
-  createdAt?: string;
-  updatedAt?: string;
-  orders?: Order[];
-  transactions?: Transaction[];
-  contacts?: Contact[];
-  recentActivity?: Activity[];
-  tags?: string[];
-  totalOrders?: number;
-  totalValue?: string;
-  creditDays?: number;
-  nextVisit?: string;
-  lastVisit?: string;
+  description: string;
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+  category: string;
+  subCategory: string;
+  startTime: string;
+  endTime?: string;
 }
 
-type TabType = 'overview' | 'orders' | 'transactions' | 'contacts' | 'activity';
+type TabType = 'overview' | 'sales' | 'transactions' | 'contacts' | 'activity';
 
 const TABS: { key: TabType; label: string; icon: string }[] = [
   { key: 'overview', label: 'Overview', icon: 'information-circle-outline' },
-  { key: 'orders', label: 'Orders', icon: 'cart-outline' },
+  { key: 'sales', label: 'Sales', icon: 'receipt-outline' },
   { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
   { key: 'contacts', label: 'Contacts', icon: 'people-outline' },
   { key: 'activity', label: 'Activity', icon: 'time-outline' },
 ];
 
+const PAGE_SIZE = 20;
+
 export default function CustomerDetailScreen() {
   const { colors } = useTheme();
   const styles = useOutletDetailStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const navigation = useNavigation();
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [customer, setCustomer] = useState<Outlet | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const route = useAuthStore((s) => s.selectedRoute);
-  const activeVisit = useOutletStore((s) => s.activeVisit);
+  const [showVisitModal, setShowVisitModal] = useState(false);
+  const [visitNote, setVisitNote] = useState('');
+  const [isStartingVisit, setIsStartingVisit] = useState(false);
+  const [isTabScrolled, setIsTabScrolled] = useState(false);
 
-  const setSelectedOutlet = useOutletStore((s) => s.setSelectedOutlet);
+  // Pagination states
+  const [orders, setOrders] = useState<SaleItem[]>([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [ordersHasMore, setOrdersHasMore] = useState(true);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersTotal, setOrdersTotal] = useState(0);
+
+  const [payments, setPayments] = useState<PaymentTransaction[]>([]);
+  const [paymentsHasMore, setPaymentsHasMore] = useState(true);
+  const [transactionsLoading] = useState(false);
+  const [paymentsTotal] = useState(0);
+
+  const [activities] = useState<Activity[]>([]);
+  const [activitiesHasMore] = useState(true);
+  const [activitiesLoading] = useState(false);
+  const [activitiesTotal] = useState(0);
+
+  const route = useRouteStore((s) => s.selectedRoute);
+  const van = useRouteStore((s) => s.van);
+  const user = useAuthStore((s) => s.user);
+  const activeVisit = useOutletStore((s) => s.activeVisit);
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
+  const { setSelectedOutlet } = useOutletStore();
 
   useEffect(() => {
     loadCustomerData();
   }, [id]);
 
+  useEffect(() => {
+    if (customer) {
+      loadOrders(1, true);
+      loadPayments(1, true);
+    }
+  }, [customer]);
+
+  useEffect(() => {
+    setIsTabScrolled(false);
+  }, [activeTab]);
+
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBackNavigation();
+      return true;
+    });
+
+    return () => backHandler.remove();
+  }, [customer]);
+
+  const handleBackNavigation = () => {
+    router.replace(`/beats`);
+    return true;
+  };
+
   const loadCustomerData = async () => {
-    const response: any = await outletService.getOutletDetail(id);
-    setCustomer(response?.data);
+    setIsLoading(true);
+    const response = await outletService.getOutletDetail(id);
+    if (response?.data) {
+      setCustomer(response.data);
+      setSelectedOutlet(response?.data);
+    } else {
+      setCustomer(null);
+    }
+    setIsLoading(false);
+  };
+
+  const loadOrders = async (page: number, reset: boolean = false) => {
+    if (ordersLoading || (!ordersHasMore && !reset)) return;
+    try {
+      setOrdersLoading(true);
+      const params: any = {
+        page: reset ? 1 : page,
+        limit: PAGE_SIZE,
+        customerId: customer?.customerId,
+        vanId: van?.vanId,
+        employeeId: user?.userId,
+      };
+      const response: any = await saleService.fetchSales(params);
+
+      const newOrders = response?.data || [];
+      const total = response?.total || 0;
+
+      if (reset) {
+        setOrders(newOrders);
+        setOrdersPage(1);
+      } else {
+        setOrders((prev) => [...prev, ...newOrders]);
+      }
+
+      setOrdersTotal(total);
+      setOrdersHasMore(
+        newOrders.length === PAGE_SIZE &&
+          (reset ? newOrders.length : orders.length + newOrders.length) < total,
+      );
+      if (!reset) setOrdersPage(page);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const loadMorePayments = () => {
+    if (ordersHasMore && !ordersLoading) {
+      loadOrders(ordersPage + 1);
+    }
+  };
+
+  const loadPayments = async (page: number, reset: boolean = false) => {
+    if (ordersLoading || (!ordersHasMore && !reset)) return;
+    try {
+      setOrdersLoading(true);
+      const params: any = {
+        page: reset ? 1 : page,
+        limit: PAGE_SIZE,
+        customerId: customer?.customerId,
+        vanId: van?.vanId,
+        employeeId: user?.userId,
+      };
+      const response: any = await saleService.fetchPayments(params);
+
+      const newPayments = response?.data || [];
+      const total = response?.total || 0;
+
+      if (reset) {
+        setPayments(newPayments);
+        // setOr(1);
+      } else {
+        setPayments((prev) => [...prev, ...newPayments]);
+      }
+
+      setOrdersTotal(total);
+      setOrdersHasMore(
+        newPayments.length === PAGE_SIZE &&
+          (reset ? newPayments.length : orders.length + newPayments.length) < total,
+      );
+      // if (!reset) setPayments(page);
+    } catch (error) {
+      console.error('Failed to load orders:', error);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
+  const loadMoreOrders = () => {
+    if (ordersHasMore && !ordersLoading) {
+      loadOrders(ordersPage + 1);
+    }
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadCustomerData();
+    await loadOrders(1, true);
+    await loadPayments(1, true);
     setRefreshing(false);
-  }, [id]);
-
-  const handleLink = useCallback(async (url: string, errorMsg: string) => {
-    try {
-      const supported = await Linking.canOpenURL(url);
-      supported ? await Linking.openURL(url) : Alert.alert('Error', errorMsg);
-    } catch {
-      Alert.alert('Error', errorMsg);
-    }
-  }, []);
+  }, [id, customer]);
 
   const handleShare = useCallback(async () => {
     if (!customer) return;
@@ -161,50 +289,33 @@ export default function CustomerDetailScreen() {
     } = customer;
 
     await Share.share({
-      message: `📋 *Customer Details*\n━━━━━━━━━━━━━━━━━━━━━\n🏢 *Name:* ${name}\n👤 *Owner:* ${ownerName}\n📍 *Address:* ${address.line1}${address.line2 ? ', ' + address.line2 : ''}\n📞 *Phone:* ${phoneNumber}\n🏷️ *Type:* ${segmentation}\n💰 *Credit Limit:* ${creditLimit ? `₹${creditLimit.toLocaleString()}` : 'N/A'}\n💵 *Outstanding:* ${outstanding ? `₹${outstanding.toLocaleString()}` : 'N/A'}\n📊 *Status:* ${status}`,
+      message: `📋 *Customer Details*\n━━━━━━━━━━━━━━━━━━━━━\n🏢 *Name:* ${name}\n👤 *Owner:* ${ownerName}\n📍 *Address:* ${address?.line1 || 'N/A'}${address?.line2 ? ', ' + address.line2 : ''}\n📞 *Phone:* ${phoneNumber}\n🏷️ *Type:* ${segmentation || 'N/A'}\n💰 *Credit Limit:* ${creditLimit ? `K${creditLimit.toLocaleString()}` : 'N/A'}\n💵 *Outstanding:* ${outstanding ? `K${outstanding.toLocaleString()}` : 'N/A'}\n📊 *Status:* ${status}`,
       title: name,
     });
   }, [customer]);
 
-  const handleEdit = useCallback(
-    () => customer?.customerId && router.push(`/customers/edit/${customer.customerId}`),
-    [customer],
-  );
-
-  const handleDelete = useCallback(() => {
-    if (!customer) return;
-    Alert.alert(
-      'Delete Customer',
-      `Are you sure you want to delete ${customer.name}? This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            // Add your delete logic here
-            Alert.alert('Success', 'Customer deleted successfully');
-            router.back();
-          },
-        },
-      ],
-    );
+  const handleEdit = useCallback(() => {
+    if (customer?.customerId) {
+      router.push(`/customers/edit/${customer.customerId}`);
+    }
   }, [customer]);
 
-  const handleVisit = useCallback(async () => {
-    setSelectedOutlet(customer);
-    if (!activeVisit?.visitId) {
+  const handleStartVisit = useCallback(async () => {
+    if (!customer) return;
+    setIsStartingVisit(true);
+
+    try {
       const payload: any = {
         routeSessionId: route?.routeSessionId,
         workSessionId: route?.workSessionId,
         vanId: route?.vanId,
-        outletId: customer?.customerId,
-        // sequence: 1,
+        outletId: customer.customerId,
+        // note: visitNote,
       };
+
       const response = await outletService.startVisit(payload);
       if (response.success) {
         const visit = response?.data;
-        // ✅ map backend → store
         setActiveVisit({
           visitId: visit.visitId,
           outlet: customer as any,
@@ -213,87 +324,151 @@ export default function CustomerDetailScreen() {
           status: visit.status,
           routeSessionId: visit?.routeSessionId,
         });
-        router.push(`/outlets/${customer?.customerId}/visit`);
+        setShowVisitModal(false);
+        setVisitNote('');
+        router.push(`/outlets/${customer.customerId}/visit`);
       }
-    } else {
-      router.push(`/outlets/${customer?.customerId}/visit`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to start visit');
+    } finally {
+      setIsStartingVisit(false);
     }
-  }, [customer, setSelectedOutlet]);
+  }, [customer, route, visitNote]);
 
-  const visitStatus = async () => {
-    const query: any = {
-      workSessionId: route?.workSessionId,
-      vanId: route?.vanId,
-      routeSessionId: route?.routeSessionId,
-      outletId: route?.routeId,
-    };
-    const response = await outletService.visitStatus(query);
-  };
+  const handleVisitAction = useCallback(() => {
+    if (activeVisit) {
+      router.push(`/outlets/${customer?.customerId}/visit`);
+    } else {
+      // setShowVisitModal(true);
+      handleStartVisit();
+    }
+  }, [activeVisit, customer]);
 
-  // useEffect(() => {
-  //   if (customer) {
-  //     navigation.setOptions({
-  //       title: customer.name,
-  //       headerRight: () => (
-  //         <View style={styles.headerActions}>
-  //           <TouchableOpacity onPress={handleShare} style={styles.headerButton} activeOpacity={0.7}>
-  //             <Ionicons name="share-outline" size={22} color={colors.primary} />
-  //           </TouchableOpacity>
-  //           <TouchableOpacity onPress={handleEdit} style={styles.headerButton} activeOpacity={0.7}>
-  //             <Ionicons name="create-outline" size={22} color={colors.primary} />
-  //           </TouchableOpacity>
-  //         </View>
-  //       ),
-  //     });
-  //   }
-  // }, [navigation, customer, handleShare, handleEdit]);
+  const handleTabScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    setIsTabScrolled((previous) => {
+      if (offsetY > 24 && !previous) return true;
+      if (offsetY <= 12 && previous) return false;
+      return previous;
+    });
+  }, []);
 
   if (isLoading) return <LoadingState styles={styles} colors={colors} />;
-  if (!customer) return <EmptyState styles={styles} />;
-
-  // Calculate distance if needed (mock value - you'll need actual distance calculation)
-  const distanceValue = 2.5; // This should come from your actual distance calculation logic
-
-  const startVisit = async () => {};
+  if (!customer) return <EmptyState styles={styles} colors={colors} />;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <CustomerHeader
         customer={customer}
         styles={styles}
         colors={colors}
-        distanceValue={distanceValue}
-        onVisit={handleVisit}
+        onBack={() => router.back()}
+        onEdit={handleEdit}
+        onShare={handleShare}
+        compact={isTabScrolled}
       />
-      <StatsRow customer={customer} styles={styles} colors={colors} />
+
+      {!isTabScrolled ? (
+        <VisitBanner
+          activeVisit={activeVisit}
+          customer={customer}
+          onStartVisit={handleVisitAction}
+          styles={styles}
+          colors={colors}
+        />
+      ) : null}
+
+      {!isTabScrolled ? <StatsRow customer={customer} styles={styles} colors={colors} /> : null}
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} styles={styles} colors={colors} />
+
       <TabContent
         activeTab={activeTab}
         customer={customer}
+        orders={orders}
+        ordersLoading={ordersLoading}
+        ordersHasMore={ordersHasMore}
+        ordersTotal={ordersTotal}
+        onLoadMoreOrders={loadMoreOrders}
+        payments={payments}
+        transactionsLoading={transactionsLoading}
+        transactionsHasMore={paymentsHasMore}
+        transactionsTotal={paymentsTotal}
+        onLoadMoreTransactions={() => {}}
+        activities={activities}
+        activitiesLoading={activitiesLoading}
+        activitiesHasMore={activitiesHasMore}
+        activitiesTotal={activitiesTotal}
+        onLoadMoreActivities={() => {}}
         styles={styles}
         colors={colors}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        onEdit={handleEdit}
-        onShare={handleShare}
-        onDelete={handleDelete}
-        onVisit={handleVisit}
+        onScroll={handleTabScroll}
       />
 
-      {/* Floating Action Button for Quick Visit */}
-      <TouchableOpacity
-        style={styles.floatingActionButton}
-        onPress={handleVisit}
-        activeOpacity={0.9}
+      {/* Visit Modal */}
+      <Modal
+        visible={showVisitModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowVisitModal(false)}
       >
-        <Ionicons name="navigate" size={24} color="#FFFFFF" />
-        {activeVisit ? (
-          <AppText style={styles.floatingButtonText}>Complete Visit</AppText>
-        ) : (
-          <AppText style={styles.floatingButtonText}>Start Visit</AppText>
-        )}
-      </TouchableOpacity>
-    </View>
+        <View style={styles.modalOverlay}>
+          <Animated.View entering={FadeInUp.duration(300)} style={styles.visitModalContent}>
+            <View style={styles.visitModalHeader}>
+              <AppText style={styles.visitModalTitle}>Start Visit</AppText>
+              <TouchableOpacity onPress={() => setShowVisitModal(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.visitModalBody}>
+              <View style={styles.visitCustomerInfo}>
+                <OutletAvatar outlet={customer} />
+                <View>
+                  <AppText style={styles.visitCustomerName}>{customer.name}</AppText>
+                  <AppText style={styles.visitCustomerAddress}>{customer.address?.line1}</AppText>
+                </View>
+              </View>
+
+              <View style={styles.visitNoteContainer}>
+                <AppText style={styles.visitNoteLabel}>Add Note (Optional)</AppText>
+                <TextInput
+                  style={styles.visitNoteInput}
+                  placeholder="Add any notes about this visit..."
+                  placeholderTextColor={colors.textTertiary}
+                  value={visitNote}
+                  onChangeText={setVisitNote}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            <View style={styles.visitModalFooter}>
+              <TouchableOpacity
+                style={[styles.visitModalButton, styles.visitModalCancelButton]}
+                onPress={() => setShowVisitModal(false)}
+              >
+                <AppText style={styles.visitModalCancelText}>Cancel</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.visitModalButton, styles.visitModalStartButton]}
+                onPress={handleStartVisit}
+                disabled={isStartingVisit}
+              >
+                {isStartingVisit ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <AppText style={styles.visitModalStartText}>Start Visit</AppText>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -301,13 +476,13 @@ export default function CustomerDetailScreen() {
 const LoadingState = ({ styles, colors }: any) => (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="large" color={colors.primary} />
-    <AppText style={styles.loadingText}>Loading...</AppText>
+    <AppText style={styles.loadingText}>Loading customer details...</AppText>
   </View>
 );
 
-const EmptyState = ({ styles }: any) => (
+const EmptyState = ({ styles, colors }: any) => (
   <View style={styles.emptyState}>
-    <Ionicons name="alert-circle-outline" size={64} color={styles.emptyState.color} />
+    <Ionicons name="alert-circle-outline" size={64} color={colors.textTertiary} />
     <AppText style={styles.emptyStateTitle}>Customer Not Found</AppText>
     <AppText style={styles.emptyStateText}>The customer doesn't exist or was removed.</AppText>
     <TouchableOpacity
@@ -320,66 +495,165 @@ const EmptyState = ({ styles }: any) => (
   </View>
 );
 
-const CustomerHeader = ({ customer, styles, colors, distanceValue, onVisit }: any) => (
-  <View style={styles.detailHeader}>
-    <OutletAvatar outlet={customer} />
-    <View style={styles.detailHeaderInfo}>
-      <View style={styles.detailTitleRow}>
-        <AppText style={styles.detailName} numberOfLines={1}>
-          {customer.name}
-        </AppText>
-        <OutletStatusBadge status={customer.status} />
-      </View>
-      <AppText style={styles.detailOwner}>{customer.ownerName}</AppText>
-      <View style={styles.detailLocationRow}>
-        <Ionicons name="location-outline" size={14} color={colors.textTertiary} />
-        <AppText style={styles.detailLocation} numberOfLines={1}>
-          {customer.address?.line1}
-        </AppText>
-      </View>
-      <View style={styles.detailDistanceRow}>
-        <Ionicons name="navigate-outline" size={14} color={colors.textTertiary} />
-        <AppText style={styles.detailDistance}>{distanceValue.toFixed(1)} km away</AppText>
+const CustomerHeader = ({ customer, styles, colors, onBack, onEdit, onShare, compact }: any) => (
+  <Animated.View entering={FadeInDown.duration(400)} style={styles.detailHeader}>
+    <View style={[styles.headerTopRow, compact && styles.headerTopRowCompact]}>
+      <TouchableOpacity onPress={onBack} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
+      </TouchableOpacity>
+      <View style={styles.headerPill}>
+        <Ionicons name="storefront-outline" size={14} color={colors.primary} />
+        <AppText style={styles.headerPillText}>Outlet Details</AppText>
       </View>
     </View>
-    {/* Visit Button added in header */}
-    {/* <TouchableOpacity style={styles.visitButton} onPress={onVisit} activeOpacity={0.8}>
-      <Ionicons name="navigate" size={20} color={colors.primary} />
-      <AppText style={[styles.visitButtonText, { color: colors.primary }]}>Visit</AppText>
-    </TouchableOpacity> */}
-  </View>
+
+    <View style={[styles.detailHeroCard, compact && styles.detailHeroCardCompact]}>
+      <View style={styles.detailHeroTop}>
+        <View style={styles.detailAvatarWrap}>
+          <OutletAvatar outlet={customer} />
+        </View>
+        <View style={styles.detailHeaderInfo}>
+          <View style={styles.detailTitleRow}>
+            <AppText style={styles.detailName} numberOfLines={2}>
+              {customer.name}
+            </AppText>
+            <OutletStatusBadge status={customer.status} />
+          </View>
+          <AppText style={styles.detailOwner} numberOfLines={1}>
+            Managed by {customer.ownerName || 'Unknown'}
+          </AppText>
+          <View style={styles.detailMetaRow}>
+            <View style={styles.detailMetaChip}>
+              <Ionicons name="pricetag-outline" size={12} color={colors.primary} />
+              <AppText style={styles.detailMetaChipText}>
+                {customer.segmentation || customer.customerTypeId || 'General'}
+              </AppText>
+            </View>
+            <View style={styles.detailMetaChip}>
+              <Ionicons name="call-outline" size={12} color={colors.primary} />
+              <AppText style={styles.detailMetaChipText}>
+                {customer.phoneNumber || 'No phone'}
+              </AppText>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.detailLocationCard}>
+        <Ionicons name="location-outline" size={16} color={colors.primary} />
+        <AppText style={styles.detailLocation} numberOfLines={2}>
+          {customer.address?.line1 || 'Address not available'}
+        </AppText>
+      </View>
+      {/* <View style={styles.detailHeroActions}>
+        <TouchableOpacity
+          style={[styles.headerActionButtonOutline, { borderColor: colors.primary }]}
+          onPress={onEdit}
+        >
+          <Ionicons name="create-outline" size={16} color={colors.primary} />
+          <AppText style={[styles.headerActionButtonOutlineText, { color: colors.primary }]}>
+            Edit
+          </AppText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.headerActionButtonOutline, { borderColor: colors.error + '45' }]}
+          onPress={onShare}
+        >
+          <Ionicons name="share-social-outline" size={16} color={colors.error} />
+          <AppText style={[styles.headerActionButtonOutlineText, { color: colors.error }]}>
+            Share
+          </AppText>
+        </TouchableOpacity>
+      </View> */}
+    </View>
+  </Animated.View>
 );
 
 const StatsRow = ({ customer, styles, colors }: any) => (
-  <View style={styles.detailStatsRow}>
+  <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.detailStatsRow}>
     {[
       {
         icon: 'cash-outline',
-        value: customer.creditLimit ? `₹${customer.creditLimit.toLocaleString()}` : 'N/A',
+        value: customer.creditLimit ? `K${customer.creditLimit.toLocaleString()}` : 'N/A',
         label: 'Credit Limit',
         color: colors.primary,
+        bgColor: colors.primary + '10',
       },
       {
         icon: 'cart-outline',
         value: customer.totalOrders?.toString() || '0',
-        label: 'Orders',
+        label: 'Sales',
         color: colors.primary,
+        bgColor: colors.primary + '10',
       },
       {
         icon: 'wallet-outline',
-        value: customer.outstanding ? `₹${customer.outstanding.toLocaleString()}` : 'N/A',
+        value: customer.outstanding ? `K${customer.outstanding.toLocaleString()}` : 'N/A',
         label: 'Outstanding',
         color: colors.warning,
+        bgColor: colors.warning + '10',
       },
     ].map((stat, i) => (
       <View key={i} style={styles.detailStatCard}>
-        <Ionicons name={stat.icon as any} size={22} color={stat.color} />
-        <AppText style={styles.detailStatValue}>{stat.value}</AppText>
+        <View style={[styles.detailStatIconWrap, { backgroundColor: stat.bgColor }]}>
+          <Ionicons name={stat.icon as any} size={18} color={stat.color} />
+        </View>
+        <AppText style={styles.detailStatValue} numberOfLines={1}>
+          {stat.value}
+        </AppText>
         <AppText style={styles.detailStatLabel}>{stat.label}</AppText>
       </View>
     ))}
-  </View>
+  </Animated.View>
 );
+
+const VisitBanner = ({ activeVisit, customer, onStartVisit, styles, colors }: any) => {
+  if (activeVisit) {
+    return (
+      <Animated.View
+        entering={FadeInDown.duration(400).delay(200)}
+        style={[styles.visitBanner, styles.visitBannerActive]}
+      >
+        <View style={styles.visitBannerContent}>
+          <View style={styles.visitBannerIcon}>
+            <Ionicons name="time-outline" size={20} color={colors.warning} />
+          </View>
+          <View style={styles.visitBannerInfo}>
+            <AppText style={styles.visitBannerTitle}>Visit in Progress</AppText>
+            <AppText style={styles.visitBannerSubtitle}>
+              Started {moment(activeVisit.checkInTime).fromNow()}
+            </AppText>
+          </View>
+          <TouchableOpacity style={styles.visitBannerButton} onPress={onStartVisit}>
+            <AppText style={styles.visitBannerButtonText}>Continue</AppText>
+            <Ionicons name="arrow-forward" size={16} color="#FFF" />
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  return (
+    <Animated.View entering={FadeInDown.duration(400).delay(200)} style={styles.visitBanner}>
+      <View style={styles.visitBannerContent}>
+        <View style={[styles.visitBannerIcon, { backgroundColor: colors.primary + '10' }]}>
+          <Ionicons name="navigate-outline" size={20} color={colors.primary} />
+        </View>
+        <View style={styles.visitBannerInfo}>
+          <AppText style={styles.visitBannerTitle}>Ready to visit?</AppText>
+          <AppText style={styles.visitBannerSubtitle}>Start your visit to {customer.name}</AppText>
+        </View>
+        <TouchableOpacity
+          style={[styles.visitBannerButton, { backgroundColor: colors.primary }]}
+          onPress={onStartVisit}
+        >
+          <AppText style={styles.visitBannerButtonText}>Start Visit</AppText>
+          <Ionicons name="arrow-forward" size={16} color="#FFF" />
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+};
 
 const TabBar = ({ activeTab, setActiveTab, styles, colors }: any) => (
   <View style={styles.tabBar}>
@@ -408,54 +682,625 @@ const TabBar = ({ activeTab, setActiveTab, styles, colors }: any) => (
 const TabContent = ({
   activeTab,
   customer,
+  orders,
+  ordersLoading,
+  ordersHasMore,
+  ordersTotal,
+  onLoadMoreOrders,
   styles,
   colors,
   refreshing,
   onRefresh,
-  onEdit,
-  onShare,
-  onDelete,
-  onVisit,
+  onScroll,
+  payments,
 }: any) => (
-  <ScrollView
-    style={styles.tabContent}
-    showsVerticalScrollIndicator={false}
-    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-  >
+  <>
     {activeTab === 'overview' && (
-      <OverviewTab
-        customer={customer}
+      <ScrollView
+        style={styles.tabContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <OverviewTab customer={customer} styles={styles} colors={colors} />
+      </ScrollView>
+    )}
+    {activeTab === 'sales' && (
+      <SalesTab
+        sales={orders}
+        loading={ordersLoading}
+        hasMore={ordersHasMore}
+        total={ordersTotal}
+        onLoadMore={onLoadMoreOrders}
         styles={styles}
         colors={colors}
-        onEdit={onEdit}
-        onShare={onShare}
-        onDelete={onDelete}
-        onVisit={onVisit}
+        onScroll={onScroll}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
       />
     )}
-    {activeTab === 'orders' && (
-      <OrdersTab orders={customer.orders || []} styles={styles} colors={colors} />
-    )}
     {activeTab === 'transactions' && (
-      <TransactionsTab transactions={customer.transactions || []} styles={styles} colors={colors} />
+      <ScrollView
+        style={styles.tabContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <TransactionsTab
+          transactions={payments}
+          loading={false}
+          hasMore={false}
+          total={0}
+          onLoadMore={() => {}}
+          styles={styles}
+          colors={colors}
+        />
+      </ScrollView>
     )}
     {activeTab === 'contacts' && (
-      <ContactsTab contacts={customer.contacts || []} styles={styles} colors={colors} />
+      <ScrollView
+        style={styles.tabContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <ContactsTab contacts={customer.contacts || []} styles={styles} colors={colors} />
+      </ScrollView>
     )}
     {activeTab === 'activity' && (
-      <ActivityTab activities={customer.recentActivity || []} styles={styles} colors={colors} />
+      <ScrollView
+        style={styles.tabContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+      >
+        <ActivityTab
+          activities={[]}
+          loading={false}
+          hasMore={false}
+          total={0}
+          onLoadMore={() => {}}
+          styles={styles}
+          colors={colors}
+        />
+      </ScrollView>
     )}
-  </ScrollView>
+  </>
 );
 
-// Tab Components
-const OverviewTab = ({ customer, styles, colors, onEdit, onShare, onDelete, onVisit }: any) => (
+// Orders Tab Component
+const formatDate = (dateString: string) => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const mapSaleStatus = (status: string): 'COMPLETED' | 'RETURNED' | 'CANCELLED' => {
+  switch (status) {
+    case 'CONFIRMED':
+      return 'COMPLETED';
+    case 'RETURNED':
+      return 'RETURNED';
+    case 'CANCELLED':
+      return 'CANCELLED';
+    default:
+      return 'COMPLETED';
+  }
+};
+
+const CURRENCY_CONFIG = {
+  code: 'K',
+  position: 'prefix' as 'prefix' | 'suffix',
+  decimalPlaces: 0,
+};
+
+const formatCurrency = (amount: number): string => {
+  const formattedAmount = amount.toLocaleString('en-IN', {
+    minimumFractionDigits: CURRENCY_CONFIG.decimalPlaces,
+    maximumFractionDigits: CURRENCY_CONFIG.decimalPlaces,
+  });
+  return CURRENCY_CONFIG.position === 'prefix'
+    ? `${CURRENCY_CONFIG.code}${formattedAmount}`
+    : `${formattedAmount}${CURRENCY_CONFIG.code}`;
+};
+
+const SalesTab = ({
+  sales,
+  loading,
+  hasMore,
+  total,
+  onLoadMore,
+  styles,
+  colors,
+  onSalePress,
+  onScroll,
+  refreshing,
+  onRefresh,
+}: any) => {
+  const getSaleStatusConfig = useCallback(
+    (status: string) => {
+      const statusMap: Record<string, { label: string; icon: string; color: string }> = {
+        COMPLETED: { label: 'Completed', icon: 'checkmark-circle-outline', color: colors.success },
+        RETURNED: { label: 'Returned', icon: 'refresh-circle-outline', color: colors.warning },
+        CANCELLED: { label: 'Cancelled', icon: 'close-circle-outline', color: colors.error },
+      };
+      return statusMap[mapSaleStatus(status)] || statusMap.COMPLETED;
+    },
+    [colors],
+  );
+
+  const getTypeConfig = useCallback(
+    (type: SaleItem['type']) =>
+      type === 'CREDIT'
+        ? { label: 'Credit', icon: 'card-outline', color: colors.warning }
+        : { label: 'Cash', icon: 'cash-outline', color: colors.success },
+    [colors],
+  );
+
+  const getPaymentStatusConfig = useCallback(
+    (paymentStatus: SaleItem['paymentStatus']) => {
+      const statusMap: Record<string, { label: string; icon: string; color: string }> = {
+        PAID: { label: 'Paid', icon: 'wallet-outline', color: colors.success },
+        UNPAID: { label: 'Unpaid', icon: 'alert-circle-outline', color: colors.error },
+        PARTIAL: { label: 'Partial', icon: 'time-outline', color: colors.warning },
+        OVERDUE: { label: 'Overdue', icon: 'warning-outline', color: colors.error },
+      };
+      return statusMap[paymentStatus] || statusMap.UNPAID;
+    },
+    [colors],
+  );
+
+  const renderSaleCard = ({ item }: { item: SaleItem }) => {
+    const saleStatusConfig = getSaleStatusConfig(item.status);
+    const typeConfig = getTypeConfig(item.type);
+    const paymentStatusConfig = getPaymentStatusConfig(item.paymentStatus);
+    const hasPendingAmount = item.type === 'CREDIT' && item.pendingAmount > 0;
+
+    return (
+      <TouchableOpacity style={styles.orderCard} onPress={() => onSalePress?.(item.saleId)}>
+        <View style={styles.orderCardHeader}>
+          <View>
+            <AppText style={styles.orderNumber}> #{item.saleId}</AppText>
+            <AppText style={styles.orderDate}>{formatDate(item.date)}</AppText>
+          </View>
+          <AppText style={styles.orderAmount}>{formatCurrency(item.totalValue)}</AppText>
+        </View>
+
+        <View style={styles.saleTagsRow}>
+          {[saleStatusConfig, typeConfig, paymentStatusConfig].map((tag, index) => (
+            <View
+              key={`${tag.label}-${index}`}
+              style={[
+                styles.saleTag,
+                { backgroundColor: tag.color + '12', borderColor: tag.color + '24' },
+              ]}
+            >
+              <Ionicons name={tag.icon as any} size={12} color={tag.color} />
+              <AppText style={[styles.saleTagText, { color: tag.color }]}>{tag.label}</AppText>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.orderCardBody}>
+          <View style={styles.orderStat}>
+            <Ionicons name="cube-outline" size={14} color={colors.textSecondary} />
+            <AppText style={styles.orderStatText}>{item.totalQty} items</AppText>
+          </View>
+          <View style={styles.orderStat}>
+            <Ionicons name="albums-outline" size={14} color={colors.textSecondary} />
+            <AppText style={styles.orderStatText}>{item.totalCases || 0} cases</AppText>
+          </View>
+        </View>
+
+        {hasPendingAmount && (
+          <View style={styles.orderPendingBadge}>
+            <Ionicons name="alert-circle-outline" size={12} color={colors.warning} />
+            <AppText style={styles.orderPendingText}>
+              Pending: {formatCurrency(item.pendingAmount)}
+            </AppText>
+          </View>
+        )}
+
+        <View style={styles.orderCardFooter}>
+          <AppText style={styles.orderViewDetails}>View Sale</AppText>
+          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (sales.length === 0 && !loading) {
+    return (
+      <View style={styles.emptyTabContainer}>
+        <Ionicons name="receipt-outline" size={56} color={colors.textTertiary} />
+        <AppText style={styles.emptyTabTitle}>No Sales</AppText>
+        <AppText style={styles.emptyTabText}>No sales found for this customer</AppText>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={sales}
+      keyExtractor={(item) => item.saleId}
+      renderItem={renderSaleCard}
+      contentContainerStyle={styles.tabContentContainer}
+      style={styles.tabContent}
+      onEndReached={onLoadMore}
+      onEndReachedThreshold={0.3}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      ListFooterComponent={() =>
+        loading && (
+          <View style={styles.footerLoader}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        )
+      }
+      showsVerticalScrollIndicator={false}
+    />
+  );
+};
+
+const TransactionsTab = ({
+  transactions,
+  loading,
+  hasMore,
+  total,
+  onLoadMore,
+  styles,
+  colors,
+}: any) => {
+  const formatCurrency = (amount: number) => {
+    return `K${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const getPaymentModeConfig = (mode: string) => {
+    const configs: Record<string, { label: string; icon: string; color: string; bgColor: string }> =
+      {
+        CASH: {
+          label: 'Cash',
+          icon: 'cash-outline',
+          color: '#10B981',
+          bgColor: '#10B98112',
+        },
+        CHEQUE: {
+          label: 'Cheque',
+          icon: 'document-text-outline',
+          color: '#3B82F6',
+          bgColor: '#3B82F612',
+        },
+        BANK_TRANSFER: {
+          label: 'Bank Transfer',
+          icon: 'business-outline',
+          color: '#8B5CF6',
+          bgColor: '#8B5CF612',
+        },
+        UPI: {
+          label: 'UPI',
+          icon: 'phone-portrait-outline',
+          color: '#EC4899',
+          bgColor: '#EC489912',
+        },
+      };
+    return configs[mode] || configs.CASH;
+  };
+
+  const getStatusConfig = (status: string) => {
+    const configs: Record<string, { label: string; icon: string; color: string; bgColor: string }> =
+      {
+        SUCCESS: {
+          label: 'Success',
+          icon: 'checkmark-circle',
+          color: '#10B981',
+          bgColor: '#10B98112',
+        },
+        FAILED: {
+          label: 'Failed',
+          icon: 'close-circle',
+          color: '#EF4444',
+          bgColor: '#EF444412',
+        },
+        PENDING: {
+          label: 'Pending',
+          icon: 'time-outline',
+          color: '#F59E0B',
+          bgColor: '#F59E0B12',
+        },
+      };
+    return configs[status] || configs.PENDING;
+  };
+
+  const renderTransactionCard = ({ item }: { item: any }) => {
+    const paymentModeConfig = getPaymentModeConfig(item.paymentMode);
+    const statusConfig = getStatusConfig(item.status);
+    const isSuccess = item.status === 'SUCCESS';
+
+    return (
+      <Animated.View entering={FadeInUp.duration(400).delay(0)}>
+        <TouchableOpacity
+          style={styles.transactionCard}
+          activeOpacity={0.7}
+          onPress={() => {
+            // Handle transaction details if needed
+            console.log('Transaction pressed:', item.paymentId);
+          }}
+        >
+          {/* Header with Icon and Amount */}
+          <View style={styles.transactionHeader}>
+            <View
+              style={[
+                styles.transactionIconContainer,
+                { backgroundColor: paymentModeConfig.bgColor },
+              ]}
+            >
+              <Ionicons
+                name={paymentModeConfig.icon as any}
+                size={22}
+                color={paymentModeConfig.color}
+              />
+            </View>
+            <View style={styles.transactionInfo}>
+              <View style={styles.transactionTitleRow}>
+                <AppText style={styles.transactionTitle}>{paymentModeConfig.label}</AppText>
+                <View
+                  style={[styles.transactionStatusBadge, { backgroundColor: statusConfig.bgColor }]}
+                >
+                  <Ionicons name={statusConfig.icon as any} size={12} color={statusConfig.color} />
+                  <AppText style={[styles.transactionStatusText, { color: statusConfig.color }]}>
+                    {statusConfig.label}
+                  </AppText>
+                </View>
+              </View>
+              <AppText style={styles.transactionId}>ID: {item.paymentId}</AppText>
+            </View>
+            <View style={styles.transactionAmountContainer}>
+              <AppText
+                style={[
+                  styles.transactionAmount,
+                  { color: isSuccess ? colors.success : colors.error },
+                ]}
+              >
+                {isSuccess ? '+' : '-'} {formatCurrency(item.amount)}
+              </AppText>
+              <AppText style={styles.transactionDate}>{formatDate(item.date)}</AppText>
+            </View>
+          </View>
+
+          {/* Sales Reference Section */}
+          {item.sales && item.sales.length > 0 && (
+            <View style={styles.transactionSalesSection}>
+              <View style={styles.transactionSalesHeader}>
+                <Ionicons name="receipt-outline" size={14} color={colors.textSecondary} />
+                <AppText style={styles.transactionSalesTitle}>Applied to Sales</AppText>
+              </View>
+              {item.sales.map((sale: any, index: number) => (
+                <View key={sale.saleId || index} style={styles.transactionSaleItem}>
+                  <AppText style={styles.transactionSaleId}>#{sale.saleId?.slice(-8)}</AppText>
+                  <AppText style={styles.transactionSaleAmount}>
+                    {formatCurrency(sale.amount)}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Remark Section */}
+          {item.remark && (
+            <View style={styles.transactionRemarkSection}>
+              <Ionicons name="chatbubble-outline" size={14} color={colors.textTertiary} />
+              <AppText style={styles.transactionRemark} numberOfLines={2}>
+                {item.remark}
+              </AppText>
+            </View>
+          )}
+
+          {/* Footer with Metadata */}
+          <View style={styles.transactionFooter}>
+            <View style={styles.transactionMetaItem}>
+              <Ionicons name="calendar-outline" size={12} color={colors.textTertiary} />
+              <AppText style={styles.transactionMetaText}>
+                {new Date(item.createdAt).toLocaleString()}
+              </AppText>
+            </View>
+            {item.referenceNo && (
+              <View style={styles.transactionMetaItem}>
+                <Ionicons name="document-outline" size={12} color={colors.textTertiary} />
+                <AppText style={styles.transactionMetaText}>Ref: {item.referenceNo}</AppText>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  if (loading && transactions.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <AppText style={styles.loadingText}>Loading transactions...</AppText>
+      </View>
+    );
+  }
+
+  if (transactions.length === 0 && !loading) {
+    return (
+      <View style={styles.emptyTabContainer}>
+        <View style={styles.emptyStateIconContainer}>
+          <Ionicons name="swap-horizontal-outline" size={56} color={colors.textTertiary} />
+        </View>
+        <AppText style={styles.emptyTabTitle}>No Transactions</AppText>
+        <AppText style={styles.emptyTabText}>No transactions found for this customer</AppText>
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={transactions}
+      keyExtractor={(item) => item.paymentId || item._id}
+      renderItem={renderTransactionCard}
+      contentContainerStyle={styles.tabContentContainer}
+      style={styles.tabContent}
+      onEndReached={onLoadMore}
+      onEndReachedThreshold={0.3}
+      showsVerticalScrollIndicator={false}
+      ListHeaderComponent={
+        total > 0 ? (
+          <View style={styles.transactionListHeader}>
+            <View>
+              <AppText style={styles.transactionListTitle}>Payment History</AppText>
+              <AppText style={styles.transactionListSubtitle}>
+                {total} transaction{total !== 1 ? 's' : ''} found
+              </AppText>
+            </View>
+            <View style={styles.transactionStatsBadge}>
+              <Ionicons name="stats-chart-outline" size={14} color={colors.primary} />
+              <AppText style={styles.transactionStatsText}>
+                Total:{' '}
+                {formatCurrency(transactions.reduce((sum: number, t: any) => sum + t.amount, 0))}
+              </AppText>
+            </View>
+          </View>
+        ) : null
+      }
+      ListFooterComponent={() =>
+        loading && transactions.length > 0 ? (
+          <View style={styles.footerLoader}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <AppText style={styles.loadingMoreText}>Loading more transactions...</AppText>
+          </View>
+        ) : hasMore ? (
+          <TouchableOpacity style={styles.loadMoreButton} onPress={onLoadMore}>
+            <AppText style={[styles.loadMoreButtonText, { color: colors.primary }]}>
+              Load More
+            </AppText>
+          </TouchableOpacity>
+        ) : transactions.length > 0 ? (
+          <View style={styles.endOfListContainer}>
+            <View style={styles.endOfListLine} />
+            <View style={styles.endOfListBadge}>
+              <Ionicons name="checkmark-circle-outline" size={14} color={colors.textTertiary} />
+              <AppText style={styles.endOfListText}>End of transactions</AppText>
+            </View>
+            <View style={styles.endOfListLine} />
+          </View>
+        ) : null
+      }
+    />
+  );
+};
+
+const ContactsTab = ({ contacts, styles, colors }: any) => {
+  if (!contacts || contacts.length === 0) {
+    return (
+      <View style={styles.emptyTabContainer}>
+        <Ionicons name="people-outline" size={56} color={colors.textTertiary} />
+        <AppText style={styles.emptyTabTitle}>No Contacts</AppText>
+        <AppText style={styles.emptyTabText}>No contacts found for this customer</AppText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.tabContentContainer}>
+      {contacts.map((contact: any, index: number) => (
+        <View key={`${contact.phone}-${index}`} style={styles.contactCard}>
+          <View style={styles.contactAvatar}>
+            <AppText style={styles.contactInitials}>
+              {contact.name
+                ?.split(' ')
+                .map((part: string) => part[0])
+                .join('')
+                .slice(0, 2)
+                .toUpperCase()}
+            </AppText>
+          </View>
+          <View style={styles.contactInfo}>
+            <View style={styles.contactNameRow}>
+              <AppText style={styles.contactName}>{contact.name}</AppText>
+              {contact.role ? (
+                <View style={styles.contactRoleBadge}>
+                  <AppText style={styles.contactRoleBadgeText}>{contact.role}</AppText>
+                </View>
+              ) : null}
+            </View>
+            <AppText style={styles.contactRole}>{contact.phone}</AppText>
+            <View style={styles.contactActions}>
+              <TouchableOpacity
+                style={styles.contactActionButton}
+                onPress={() => Linking.openURL(`tel:${contact.phone}`)}
+              >
+                <Ionicons name="call-outline" size={14} color={colors.primary} />
+                <AppText style={styles.contactActionText}>Call</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.contactActionButton}
+                onPress={() =>
+                  Linking.openURL(`https://wa.me/${contact.phone?.replace(/[^0-9]/g, '')}`)
+                }
+              >
+                <Ionicons name="logo-whatsapp" size={14} color={colors.success} />
+                <AppText style={styles.contactActionText}>WhatsApp</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
+const ActivityTab = ({ activities, loading, hasMore, total, onLoadMore, styles, colors }: any) => {
+  if (activities.length === 0 && !loading) {
+    return (
+      <View style={styles.emptyTabContainer}>
+        <Ionicons name="time-outline" size={56} color={colors.textTertiary} />
+        <AppText style={styles.emptyTabTitle}>No Activity</AppText>
+        <AppText style={styles.emptyTabText}>No recent activity found</AppText>
+      </View>
+    );
+  }
+  return null;
+};
+
+const OverviewTab = ({ customer, styles, colors }: any) => (
   <View>
-    <View style={styles.detailStatsRow}>
+    <View style={styles.overviewStatsRow}>
       {[
         {
           icon: 'trending-up-outline',
-          value: customer.totalValue || 'N/A',
+          value: customer.totalValue ? `K${customer.totalValue.toLocaleString()}` : 'N/A',
           label: 'Total Value',
           color: colors.success,
         },
@@ -467,397 +1312,109 @@ const OverviewTab = ({ customer, styles, colors, onEdit, onShare, onDelete, onVi
         },
         {
           icon: 'calendar-outline',
-          value: customer.nextVisit || 'N/A',
-          label: 'Next Visit',
+          value: customer.lastVisitedAt
+            ? moment(customer.lastVisitedAt).format('DD MMM YYYY')
+            : 'N/A',
+          label: 'Last Visit',
           color: colors.primary,
         },
       ].map((stat, i) => (
-        <View key={i} style={styles.detailStatCard}>
+        <View key={i} style={[styles.overviewStatCard, { backgroundColor: colors.surface }]}>
           <Ionicons name={stat.icon as any} size={22} color={stat.color} />
-          <AppText style={styles.detailStatValue}>{stat.value}</AppText>
-          <AppText style={styles.detailStatLabel}>{stat.label}</AppText>
+          <AppText style={styles.overviewStatValue}>{stat.value}</AppText>
+          <AppText style={styles.overviewStatLabel}>{stat.label}</AppText>
         </View>
       ))}
     </View>
 
-    {customer.tags?.length > 0 && (
-      <Section title="Tags" styles={styles}>
-        <View style={styles.detailTagsContainer}>
-          {customer.tags.map((tag: string, i: number) => (
-            <View key={i} style={styles.detailTag}>
-              <AppText style={styles.detailTagText}>{tag}</AppText>
-            </View>
-          ))}
-        </View>
-      </Section>
-    )}
-
-    <Section title="Business Details" styles={styles}>
+    <Section
+      title="Business Details"
+      subtitle="Classification and account settings"
+      icon="briefcase-outline"
+      styles={styles}
+      colors={colors}
+    >
       {[
         { label: 'Business Type', value: customer.customerTypeId || 'N/A' },
         { label: 'Category', value: customer.customerCategoryId || 'N/A' },
         { label: 'Channel', value: customer.channelId || 'N/A' },
         { label: 'Market', value: customer.marketId || 'N/A' },
-        { label: 'Province', value: customer.provinceId || 'N/A' },
         { label: 'Segmentation', value: customer.segmentation || 'N/A' },
         {
           label: 'Credit Limit',
-          value: customer.creditLimit ? `₹${customer.creditLimit.toLocaleString()}` : 'N/A',
+          value: customer.creditLimit ? `K${customer.creditLimit.toLocaleString()}` : 'N/A',
         },
         {
           label: 'Outstanding',
-          value: customer.outstanding ? `₹${customer.outstanding.toLocaleString()}` : 'N/A',
+          value: customer.outstanding ? `K${customer.outstanding.toLocaleString()}` : 'N/A',
         },
-        { label: 'Last Visit', value: customer.lastVisit || 'N/A' },
-        { label: 'Total Orders', value: customer.totalOrders?.toString() || '0' },
       ].map((item, i) => (
         <InfoRow key={i} {...item} styles={styles} />
       ))}
     </Section>
 
-    <Section title="Contact Information" styles={styles}>
+    <Section
+      title="Contact Information"
+      subtitle="Quick actions for calling, messaging, and navigation"
+      icon="call-outline"
+      styles={styles}
+      colors={colors}
+    >
       {[
         {
           icon: 'call-outline',
-          color: colors.primary,
           label: customer.phoneNumber,
-          url: `tel:${customer.phoneNumber}`,
+          onPress: () => Linking.openURL(`tel:${customer.phoneNumber}`),
+          color: colors.primary,
         },
         {
           icon: 'logo-whatsapp',
-          color: colors.success,
           label: customer.phoneNumber,
-          url: `https://wa.me/${customer.phoneNumber.replace(/[^0-9]/g, '')}`,
+          onPress: () =>
+            Linking.openURL(`https://wa.me/${customer.phoneNumber?.replace(/[^0-9]/g, '')}`),
+          color: colors.success,
         },
         {
           icon: 'location-outline',
+          label: `${customer.address?.line1 || ''}`,
+          onPress: () => Linking.openURL(getMapUrl(customer.address)),
           color: colors.primary,
-          label: `${customer.address?.line1}${customer.address?.line2 ? ', ' + customer.address.line2 : ''}`,
-          url: getMapUrl(customer.address),
         },
       ].map((contact, i) => (
-        <ContactRow key={i} {...contact} styles={styles} colors={colors} />
+        <TouchableOpacity key={i} style={styles.contactRow} onPress={contact.onPress}>
+          <Ionicons name={contact.icon as any} size={18} color={contact.color} />
+          <AppText style={styles.contactRowText}>{contact.label}</AppText>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
       ))}
     </Section>
-
-    <ActionButtons
-      styles={styles}
-      colors={colors}
-      onEdit={onEdit}
-      onShare={onShare}
-      onDelete={onDelete}
-      onVisit={onVisit}
-    />
-    <View style={{ height: 40 }} />
   </View>
 );
 
-const OrdersTab = ({ orders, styles, colors }: any) => {
-  if (!orders || orders.length === 0)
-    return (
-      <EmptyTab
-        icon="cart-outline"
-        title="No Orders"
-        message="No orders found for this customer"
-        styles={styles}
-        colors={colors}
-      />
-    );
-
-  return (
-    <View style={styles.tabContentContainer}>
-      {orders.map((order: any) => (
-        <TouchableOpacity key={order.id} style={styles.orderCard} activeOpacity={0.7}>
-          <View style={styles.orderHeader}>
-            <View>
-              <AppText style={styles.orderNumber}>#{order.orderNumber}</AppText>
-              <AppText style={styles.orderDate}>{order.date}</AppText>
-            </View>
-            <View
-              style={[
-                styles.orderStatusBadge,
-                styles[
-                  `orderStatus${order.status.charAt(0).toUpperCase() + order.status.slice(1)}`
-                ],
-              ]}
-            >
-              <AppText style={styles.orderStatusText}>{order.status.toUpperCase()}</AppText>
-            </View>
-          </View>
-          <View style={styles.orderDetails}>
-            <View style={styles.orderDetailItem}>
-              <Ionicons name="cube-outline" size={14} color={colors.textSecondary} />
-              <AppText style={styles.orderDetailText}>{order.items} items</AppText>
-            </View>
-            <AppText style={styles.orderAmount}>{order.amount}</AppText>
-          </View>
-          <View style={styles.viewOrderButton}>
-            <AppText style={styles.viewOrderText}>View Details</AppText>
-            <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-          </View>
-        </TouchableOpacity>
-      ))}
+const Section = ({ title, subtitle, icon, children, styles, colors }: any) => (
+  <View style={styles.sectionCard}>
+    <View style={styles.sectionHeader}>
+      <View style={styles.sectionHeaderIcon}>
+        <Ionicons name={icon} size={16} color={colors.primary} />
+      </View>
+      <View style={styles.sectionHeaderText}>
+        <AppText style={styles.sectionTitle}>{title}</AppText>
+        {subtitle ? <AppText style={styles.sectionSubtitle}>{subtitle}</AppText> : null}
+      </View>
     </View>
-  );
-};
-
-const TransactionsTab = ({ transactions, styles, colors }: any) => {
-  if (!transactions || transactions.length === 0)
-    return (
-      <EmptyTab
-        icon="swap-horizontal-outline"
-        title="No Transactions"
-        message="No transactions found for this customer"
-        styles={styles}
-        colors={colors}
-      />
-    );
-
-  return (
-    <View style={styles.tabContentContainer}>
-      {transactions.map((tx: any) => (
-        <View key={tx.id} style={styles.transactionCard}>
-          <View style={styles.transactionHeader}>
-            <View style={styles.transactionIconContainer}>
-              <Ionicons
-                name={tx.type === 'payment' ? 'arrow-down-outline' : 'arrow-up-outline'}
-                size={18}
-                color={tx.type === 'payment' ? colors.success : colors.error}
-              />
-            </View>
-            <View style={styles.transactionInfo}>
-              <AppText style={styles.transactionDescription}>{tx.description}</AppText>
-              <AppText style={styles.transactionDate}>{tx.date}</AppText>
-            </View>
-            <View style={styles.transactionAmountContainer}>
-              <AppText
-                style={[
-                  styles.transactionAmount,
-                  tx.type === 'payment'
-                    ? styles.transactionAmountPositive
-                    : styles.transactionAmountNegative,
-                ]}
-              >
-                {tx.type === 'payment' ? '+' : '-'}
-                {tx.amount}
-              </AppText>
-              <View
-                style={[
-                  styles.transactionStatusBadge,
-                  styles[
-                    `transactionStatus${tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}`
-                  ],
-                ]}
-              >
-                <AppText style={styles.transactionStatusText}>{tx.status}</AppText>
-              </View>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-};
-
-const ContactsTab = ({ contacts, styles, colors }: any) => {
-  if (!contacts || contacts.length === 0)
-    return (
-      <EmptyTab
-        icon="people-outline"
-        title="No Contacts"
-        message="No contacts found for this customer"
-        styles={styles}
-        colors={colors}
-      />
-    );
-
-  return (
-    <View style={styles.tabContentContainer}>
-      {contacts.map((contact: any) => (
-        <View key={contact.id} style={styles.contactCard}>
-          <View style={styles.contactAvatar}>
-            <AppText style={styles.contactInitials}>
-              {contact.name
-                .split(' ')
-                .map((n: string) => n[0])
-                .join('')
-                .toUpperCase()
-                .slice(0, 2)}
-            </AppText>
-          </View>
-          <View style={styles.contactInfo}>
-            <View style={styles.contactNameRow}>
-              <AppText style={styles.contactName}>{contact.name}</AppText>
-              {contact.isPrimary && (
-                <View style={styles.primaryBadge}>
-                  <AppText style={styles.primaryBadgeText}>Primary</AppText>
-                </View>
-              )}
-            </View>
-            <AppText style={styles.contactRole}>{contact.role}</AppText>
-            <View style={styles.contactActions}>
-              {[
-                {
-                  icon: 'call-outline',
-                  action: () => Linking.openURL(`tel:${contact.phone}`),
-                  label: 'Call',
-                },
-                {
-                  icon: 'mail-outline',
-                  action: () => Linking.openURL(`mailto:${contact.email}`),
-                  label: 'Email',
-                },
-              ].map((action, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={styles.contactActionButton}
-                  onPress={action.action}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name={action.icon as any} size={14} color={colors.primary} />
-                  <AppText style={styles.contactActionText}>{action.label}</AppText>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-};
-
-const ActivityTab = ({ activities, styles, colors }: any) => {
-  if (!activities || activities.length === 0)
-    return (
-      <EmptyTab
-        icon="time-outline"
-        title="No Activity"
-        message="No recent activity found"
-        styles={styles}
-        colors={colors}
-      />
-    );
-
-  const getActivityIcon = (type: string) => {
-    const icons: Record<string, { icon: string; color: string }> = {
-      order: { icon: 'cart-outline', color: colors.primary },
-      visit: { icon: 'calendar-outline', color: colors.success },
-      payment: { icon: 'cash-outline', color: colors.warning },
-      note: { icon: 'document-text-outline', color: colors.info },
-    };
-    return icons[type] || { icon: 'information-circle-outline', color: colors.textTertiary };
-  };
-
-  return (
-    <View style={styles.tabContentContainer}>
-      {activities.map((activity: any) => {
-        const { icon, color } = getActivityIcon(activity.type);
-        return (
-          <View key={activity.id} style={styles.activityItem}>
-            <View style={[styles.activityIcon, { backgroundColor: color + '20' }]}>
-              <Ionicons name={icon as any} size={18} color={color} />
-            </View>
-            <View style={styles.activityContent}>
-              <AppText style={styles.activityTitle}>{activity.title}</AppText>
-              <AppText style={styles.activityDescription}>{activity.description}</AppText>
-              <AppText style={styles.activityDate}>{activity.date}</AppText>
-              {activity.amount && (
-                <AppText style={styles.activityAmount}>Amount: {activity.amount}</AppText>
-              )}
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-};
-
-// Reusable Components
-const Section = ({ title, children, styles }: any) => (
-  <View style={styles.detailSection}>
-    <AppText style={styles.detailSectionTitle}>{title}</AppText>
     {children}
   </View>
 );
 
-const InfoRow = ({ label, value, optional, styles }: any) => (
-  <View style={styles.detailInfoRow}>
-    <AppText style={styles.detailInfoLabel}>{label}</AppText>
-    <AppText
-      style={[
-        styles.detailInfoValue,
-        optional && value === 'Not Available' && styles.optionalValue,
-      ]}
-    >
-      {value}
-    </AppText>
+const InfoRow = ({ label, value, styles }: any) => (
+  <View style={styles.infoRow}>
+    <AppText style={styles.infoLabel}>{label}</AppText>
+    <AppText style={styles.infoValue}>{value}</AppText>
   </View>
 );
 
-const ContactRow = ({ icon, color, label, url, styles, colors }: any) => (
-  <TouchableOpacity
-    style={styles.detailContactRow}
-    onPress={() => Linking.openURL(url)}
-    activeOpacity={0.7}
-  >
-    <View style={styles.detailContactIcon}>
-      <Ionicons name={icon as any} size={18} color={color} />
-    </View>
-    <AppText style={styles.detailContactText} numberOfLines={1}>
-      {label}
-    </AppText>
-    <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-  </TouchableOpacity>
-);
-
-// Updated Action Buttons Component with Visit button
-const ActionButtons = ({ styles, colors, onEdit, onShare, onDelete, onVisit }: any) => {
-  return (
-    <View style={styles.actionButtonsContainer}>
-      {/* Secondary Actions Row */}
-      <View style={styles.actionButtonsRow}>
-        <TouchableOpacity
-          style={[styles.actionButtonSecondary, styles.actionButtonEdit]}
-          onPress={onEdit}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="create-outline" size={20} color={colors.primary} />
-          <AppText style={[styles.actionButtonText, { color: colors.primary }]}>Edit</AppText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButtonSecondary, styles.actionButtonShare]}
-          onPress={onShare}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="share-social-outline" size={20} color={colors.primary} />
-          <AppText style={[styles.actionButtonText, { color: colors.primary }]}>Share</AppText>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButtonSecondary, styles.actionButtonDelete]}
-          onPress={onDelete}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="trash-outline" size={20} color={colors.error} />
-          <AppText style={[styles.actionButtonText, { color: colors.error }]}>Delete</AppText>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
-
-const EmptyTab = ({ icon, title, message, styles, colors }: any) => (
-  <View style={styles.emptyTabContainer}>
-    <Ionicons name={icon} size={56} color={colors.textTertiary} />
-    <AppText style={styles.emptyTabTitle}>{title}</AppText>
-    <AppText style={styles.emptyTabText}>{message}</AppText>
-  </View>
-);
-
-// Updated Helper function
 const getMapUrl = (address: { line1: string; line2?: string } | undefined) => {
-  if (!address) return 'https://maps.google.com';
+  if (!address || !address.line1) return 'https://maps.google.com';
   const addressString = `${address.line1}${address.line2 ? ', ' + address.line2 : ''}`;
   const encoded = encodeURIComponent(addressString);
   return Platform.select({

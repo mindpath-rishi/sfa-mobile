@@ -42,7 +42,7 @@ export const useCurrentActivityCardStyles = (props: CurrentActivityCardStyleProp
     } as ViewStyle,
 
     textXSmall: {
-      fontSize: utils.fontSize.sm,
+      fontSize: utils.fontSize.xs,
       color: colors.textSecondary,
     } as TextStyle,
 
@@ -65,14 +65,14 @@ export const useCurrentActivityCardStyles = (props: CurrentActivityCardStyleProp
     } as TextStyle,
 
     titleSmall: {
-      fontSize: utils.fontSize.md,
+      fontSize: utils.fontSize.sm,
       fontWeight: utils.getFontWeight('bold'),
       color: colors.textPrimary,
       letterSpacing: 0.4,
     } as TextStyle,
 
     titleMedium: {
-      fontSize: utils.fontSize.lg,
+      fontSize: utils.fontSize.md,
       fontWeight: utils.getFontWeight('bold'),
       color: colors.textPrimary,
     } as TextStyle,

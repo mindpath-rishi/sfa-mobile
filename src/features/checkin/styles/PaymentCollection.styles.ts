@@ -1,3 +1,4 @@
+// Cleaned up styles - removed unused styles
 import { ViewStyle, TextStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -16,7 +17,6 @@ export const usePaymentCollectionStyles = () => {
       gap: 12,
     } as ViewStyle,
 
-    // Order Header
     orderHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -38,113 +38,6 @@ export const usePaymentCollectionStyles = () => {
       marginTop: 2,
     } as TextStyle,
 
-    // Invoice Card
-    invoiceCard: {
-      borderRadius: 12,
-    } as ViewStyle,
-
-    invoiceHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 16,
-    } as ViewStyle,
-
-    invoiceNumber: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.textPrimary,
-    } as TextStyle,
-
-    invoiceDate: {
-      fontSize: 12,
-      color: colors.textTertiary,
-      marginTop: 2,
-    } as TextStyle,
-
-    statusBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-    } as ViewStyle,
-
-    statusText: {
-      fontSize: 11,
-      fontWeight: '600',
-    } as TextStyle,
-
-    amountRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 8,
-    } as ViewStyle,
-
-    amountLabel: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    } as TextStyle,
-
-    amountValue: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: colors.textPrimary,
-    } as TextStyle,
-
-    dueAmount: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.error,
-    } as TextStyle,
-
-    historyToggle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 12,
-      paddingTop: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border + '20',
-    } as ViewStyle,
-
-    historyToggleText: {
-      fontSize: 13,
-      fontWeight: '500',
-      color: colors.primary,
-    } as TextStyle,
-
-    historySection: {
-      marginTop: 12,
-      gap: 8,
-    } as ViewStyle,
-
-    historyItem: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border + '10',
-    } as ViewStyle,
-
-    historyDate: {
-      fontSize: 12,
-      color: colors.textSecondary,
-    } as TextStyle,
-
-    historyAmount: {
-      fontSize: 12,
-      fontWeight: '500',
-      color: colors.textPrimary,
-    } as TextStyle,
-
-    historyStatus: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: colors.success,
-    } as TextStyle,
-
-    // Payment Modes
     section: {
       gap: 12,
     } as ViewStyle,
@@ -193,13 +86,18 @@ export const usePaymentCollectionStyles = () => {
       color: colors.textPrimary,
     } as TextStyle,
 
+    paymentModeSubLabel: {
+      fontSize: 10,
+      color: colors.textTertiary,
+      marginTop: 2,
+    } as TextStyle,
+
     paymentModeRight: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
     } as ViewStyle,
 
-    // Amount Input
     amountInputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -235,12 +133,6 @@ export const usePaymentCollectionStyles = () => {
       fontWeight: '600',
     } as TextStyle,
 
-    errorText: {
-      fontSize: 11,
-      marginTop: 4,
-    } as TextStyle,
-
-    // Remarks Input
     remarksInput: {
       borderWidth: 1,
       borderRadius: 12,
@@ -250,7 +142,6 @@ export const usePaymentCollectionStyles = () => {
       textAlignVertical: 'top',
     } as TextStyle,
 
-    // Bottom Bar
     bottomBar: {
       position: 'absolute',
       bottom: 0,
@@ -279,7 +170,6 @@ export const usePaymentCollectionStyles = () => {
     bottomSpacer: {
       height: 20,
     } as ViewStyle,
-    // Add these to your PaymentCollection.styles.ts
 
     orderSummaryCard: {
       borderRadius: 12,
@@ -331,9 +221,7 @@ export const usePaymentCollectionStyles = () => {
       fontSize: 18,
       fontWeight: '700',
     } as TextStyle,
-    // Add these styles to your PaymentCollection.styles.ts
 
-    // Credit Card Styles
     creditCard: {
       borderRadius: 12,
     } as ViewStyle,
@@ -427,14 +315,6 @@ export const usePaymentCollectionStyles = () => {
       color: colors.textTertiary,
     } as TextStyle,
 
-    // Payment Mode Sub Label
-    paymentModeSubLabel: {
-      fontSize: 10,
-      color: colors.textTertiary,
-      marginTop: 2,
-    } as TextStyle,
-
-    // Warning and Info Boxes
     warningBox: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -462,6 +342,306 @@ export const usePaymentCollectionStyles = () => {
       fontSize: 12,
       flex: 1,
     } as TextStyle,
+
+    weightTotalRow: {
+      marginBottom: 0,
+    } as ViewStyle,
+
+    // Add these styles to your existing styles object
+    modalOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000,
+    },
+    modalContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+
+    modalContent: {
+      flex: 1,
+      padding: 0,
+    } as ViewStyle,
+
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    modalLabel: {
+      fontSize: 14,
+      fontWeight: '500',
+      marginBottom: 8,
+    },
+    modalAmountInput: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      marginBottom: 8,
+    },
+    modalCurrency: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginRight: 8,
+    },
+    modalInput: {
+      flex: 1,
+      fontSize: 18,
+      paddingVertical: 12,
+    },
+    modalAmountDisplay: {
+      backgroundColor: '#F5F5F5',
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 8,
+    },
+    modalDisplayText: {
+      fontSize: 18,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    modalError: {
+      fontSize: 12,
+      marginBottom: 8,
+    },
+    modalPaymentOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderWidth: 1,
+      borderRadius: 8,
+      marginBottom: 8,
+      gap: 12,
+    },
+    modalPaymentOptionSelected: {
+      borderColor: 'primary',
+      backgroundColor: 'primary',
+    },
+    modalPaymentText: {
+      flex: 1,
+      fontSize: 16,
+    },
+    modalFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 20,
+      gap: 12,
+    },
+    modalCancelButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      alignItems: 'center',
+    },
+    modalCancelText: {
+      fontSize: 16,
+      fontWeight: '500',
+    },
+    modalConfirmButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    modalConfirmText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: '#FFFFFF',
+    },
+    // Add these styles to your existing styles object
+    modalDivider: {
+      height: 1,
+      backgroundColor: '#E0E0E0',
+      marginVertical: 16,
+    },
+    paymentMethodContainer: {
+      marginBottom: 16,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      borderRadius: 8,
+    },
+    paymentMethodHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    paymentMethodTitle: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    paymentMethodRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    paymentMethodSelector: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 10,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      borderRadius: 8,
+      gap: 8,
+    },
+    paymentMethodMode: {
+      flex: 1,
+      fontSize: 14,
+    },
+    paymentAmountInput: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      borderRadius: 8,
+      paddingHorizontal: 10,
+    },
+    paymentAmountField: {
+      flex: 1,
+      fontSize: 14,
+      paddingVertical: 10,
+    },
+    addPaymentButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      borderRadius: 8,
+      borderStyle: 'dashed',
+      gap: 8,
+      marginBottom: 16,
+    },
+    addPaymentText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    splitSummary: {
+      marginTop: 16,
+      padding: 12,
+      backgroundColor: '#F5F5F5',
+      borderRadius: 8,
+    },
+    splitSummaryTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    splitSummaryRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    splitSummaryLabel: {
+      fontSize: 12,
+      color: '#666',
+    },
+    splitSummaryValue: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    splitSummaryDivider: {
+      height: 1,
+      backgroundColor: '#E0E0E0',
+      marginVertical: 8,
+    },
+    splitSummaryTotal: {
+      fontSize: 14,
+      fontWeight: 'bold',
+    },
+    creditToggleContainer: {
+      flexDirection: 'row',
+      gap: 16,
+      marginBottom: 20,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: '#E0E0E0',
+    },
+    creditToggle: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 12,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      borderRadius: 8,
+      gap: 8,
+      backgroundColor: '#FFFFFF',
+    },
+    creditToggleActive: {
+      borderColor: 'primary',
+      backgroundColor: 'primary10',
+    },
+    creditToggleText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    // Add these styles to your existing styles object
+    remainingAmountContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+      padding: 12,
+      backgroundColor: '#F0F8FF',
+      borderRadius: 8,
+    },
+    remainingAmount: {
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    // Add these styles to your existing styles object
+    modePickerContainer: {
+      width: '85%',
+      maxHeight: '70%',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 12,
+      padding: 16,
+      alignSelf: 'center',
+    },
+    modePickerHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#E0E0E0',
+    },
+    modePickerTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    modePickerItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      borderRadius: 8,
+      marginBottom: 8,
+      gap: 12,
+    },
+    modePickerItemText: {
+      flex: 1,
+      fontSize: 16,
+    },
   }));
 
   return styleGenerator(colors);

@@ -35,7 +35,10 @@ export const SelectedCategoryBadge: React.FC<SelectedCategoryBadgeProps> = ({
         borderColor: categoryColor + '30',
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      {/* Left section - Icon and Category Info */}
+      <View
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, marginRight: 12 }}
+      >
         <View
           style={{
             width: 48,
@@ -44,17 +47,32 @@ export const SelectedCategoryBadge: React.FC<SelectedCategoryBadgeProps> = ({
             backgroundColor: categoryColor + '20',
             alignItems: 'center',
             justifyContent: 'center',
+            flexShrink: 0, // Prevent icon from shrinking
           }}
         >
           <Ionicons name={categoryIcon as any} size={28} color={categoryColor} />
         </View>
-        <View>
+
+        <View style={{ flex: 1, flexShrink: 1 }}>
+          {' '}
+          {/* Allow text container to shrink */}
           <Text style={{ fontSize: 12, color: colors.textTertiary }}>Selected Category</Text>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: categoryColor }}>
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: '600',
+              color: categoryColor,
+              flexShrink: 1, // Allow text to shrink
+              flexWrap: 'wrap', // Wrap long text
+            }}
+            numberOfLines={2} // Limit to 2 lines max
+          >
             {categoryTitle}
           </Text>
         </View>
       </View>
+
+      {/* Right section - Change Button */}
       <TouchableOpacity
         onPress={onPressChange}
         style={{
@@ -64,6 +82,7 @@ export const SelectedCategoryBadge: React.FC<SelectedCategoryBadgeProps> = ({
           backgroundColor: colors.surface,
           borderWidth: 0.5,
           borderColor: colors.border,
+          flexShrink: 0,
         }}
       >
         <Text style={{ fontSize: 12, color: colors.textSecondary }}>Change</Text>

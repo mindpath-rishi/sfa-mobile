@@ -729,7 +729,7 @@
 //               </View>
 //               <View style={{ alignItems: 'flex-end' }}>
 //                 <Text style={styles.textXSmall}>REVENUE</Text>
-//                 <Text style={styles.titleSmall}>₹67,500</Text>
+//                 <Text style={styles.titleSmall}>K67,500</Text>
 //               </View>
 //             </View>
 //           </Card>

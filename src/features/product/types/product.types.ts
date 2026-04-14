@@ -93,6 +93,8 @@ export interface Product {
   reviews?: number;
   lastOrdered?: string;
   reorderPoint?: number;
+  caseNetWeight?: number;
+  pieceNetWeight?: number;
 }
 
 /* ======================================================

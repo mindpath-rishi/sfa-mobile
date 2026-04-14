@@ -1,9 +1,11 @@
 // SalesExecutiveScreen.tsx (Fixed)
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, ScrollView, RefreshControl, Alert, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCameraPermissions } from 'expo-camera';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 
 // Components
 import { StartDayButton } from '../components/sales-executive/StartDayButton';
@@ -25,31 +27,32 @@ import {
   QUICK_ACTIONS,
   ACTIVITY_TYPES,
   OTHER_WORK_OPTIONS,
-  RETAILING_ROUTES,
   ASSIGNED_VAN,
   LOAD_SUMMARY_DATA,
 } from '../constants/mockData';
 
 // Types
 import { OtherWorkOption } from '../types/salesExecutive.types';
-import { Route } from '../types/route.types';
+
 import { Van } from '../types/van.types';
 import { ActivityType, TodayActivity } from '../types/activity.types';
 import { CameraModal } from '@/core/components/Camera/CameraModal';
-import { CameraRef } from '@/core/components/Camera/Camera.types';
 import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
 import { homeService } from '../services/home.service';
-import { set } from 'react-hook-form';
-import { useAuthStore } from '@/core/store/auth.store';
-import { storage, StorageKeys } from '@/core/storage';
+import { AppText, ConfirmationModal } from '@/core/components';
 import { ApiResponse } from '@/core/network';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { useOutletStore } from '@/core/store/outlet.store';
-import { QuickAction } from '../types/quickaction.types';
 import { useVisitGuard } from '@/shared/hooks/useVisitGuard';
+import { Route, useRouteStore } from '@/core/store/route.store';
+import { vanService } from '@/shared/services/van.service';
+import { DayEndSummaryModal } from '../components/models/DayEndSummaryModal';
+import { useAuthStore } from '@/core/store/auth.store';
+import { fontSize } from '@/shared/theme';
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [refreshing, setRefreshing] = useState(false);
   const [dayStarted, setDayStarted] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -62,12 +65,11 @@ export default function SalesExecutiveScreen() {
   const [selectedActivity, setSelectedActivity] = useState('');
   const [selectedActivityColor, setSelectedActivityColor] = useState('');
   const [selectedActivityIcon, setSelectedActivityIcon] = useState('');
-  const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
+  // const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
   const [mappedVan, setMappedVan] = useState<Van>(ASSIGNED_VAN);
   const [showOtherOptions, setShowOtherOptions] = useState(false);
   const [showChangeOtherOptions, setShowChangeOtherOptions] = useState(false);
   const [startTime, setStartTime] = useState<string | null>('');
-  const [activityHistory] = useState<any[]>([]);
   const [userPhoto, setUserPhoto] = useState<string | null>(null);
   const [pendingActivity, setPendingActivity] = useState<ActivityType | OtherWorkOption | null>(
     null,
@@ -84,15 +86,47 @@ export default function SalesExecutiveScreen() {
   const [workSessionId, setWorkSessionId] = useState<string>('');
   const [filteredOtherWorkOptions, setFilteredOtherWorkOptions] =
     useState<OtherWorkOption[]>(OTHER_WORK_OPTIONS);
-
-  const greeting = new Date().getHours() < 12 ? 'Good Morning' : 'Good Afternoon';
-  const user: any = useAuthStore((state) => state.user);
   const [routes, setRoutes] = useState<any>();
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
   const clearVisit = useOutletStore((s) => s.clearVisit);
+  const { setSelectedRoute, selectedRoute } = useRouteStore();
+  const [showDayEndConfirm, setShowDayEndConfirm] = useState<boolean>(false);
+  const daySummary: any = {};
+  const currency = 'K';
+  const van = useRouteStore.getState().van;
+  const user = useAuthStore.getState().user;
+  const [dayEndSummary, setDayEndSummary] = useState<any>(null);
 
-  const activeRoute = useAuthStore((s) => s.selectedRoute);
+  // const selectedRoute = useRouteStore((s) => s.selectedRoute);
   const { guard } = useVisitGuard();
+
+  const greeting = (() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  })();
+
+  const overviewChips = [
+    {
+      label: 'Day Status',
+      value: dayStarted ? 'Active' : 'Not Started',
+      icon: dayStarted ? 'checkmark-circle-outline' : 'sunny-outline',
+      color: dayStarted ? colors.success : colors.warning,
+    },
+    {
+      label: 'Current Flow',
+      value: currentActivity || 'Ready to begin',
+      icon: 'flash-outline',
+      color: colors.primary,
+    },
+    {
+      label: 'Today Activities',
+      value: `${todayActivities.length}`,
+      icon: 'time-outline',
+      color: colors.info || colors.primary,
+    },
+  ];
 
   useEffect(() => {
     getDayStatus();
@@ -100,10 +134,10 @@ export default function SalesExecutiveScreen() {
   }, []);
 
   useEffect(() => {
-    if (!activeRoute?.routeSessionId) return;
+    if (!selectedRoute?.routeSessionId) return;
 
     visitStatus();
-  }, [activeRoute?.routeSessionId]);
+  }, [selectedRoute?.routeSessionId]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -169,8 +203,7 @@ export default function SalesExecutiveScreen() {
     openCamera();
   };
 
-  const handleRouteSelect = (route: Route) => {
-    console.log('Selected Route:', route);
+  const handleRouteSelect = (route: any) => {
     setSelectedRoute(route);
     setRouteModalVisible(false);
     openCamera();
@@ -226,7 +259,7 @@ export default function SalesExecutiveScreen() {
         if (selectedRoute) {
           setLoadSummaryVisible(true);
         } else {
-          completeDayStart();
+          handleStartDay();
         }
       }
     } else {
@@ -237,10 +270,10 @@ export default function SalesExecutiveScreen() {
 
   const handleLoadSummaryProceed = () => {
     setLoadSummaryVisible(false);
-    completeDayStart();
+    handleStartDay();
   };
 
-  const completeDayStart = async () => {
+  const handleStartDay = async () => {
     const playlod: DayStartPayload = {
       activityName: selectedActivity,
       routeId: selectedRoute?.routeId,
@@ -249,6 +282,7 @@ export default function SalesExecutiveScreen() {
         : `Started ${pendingActivity?.name}`,
       totalShops: selectedRoute?.totalShops,
       routeName: selectedRoute?.name,
+      vanId: van?.vanId,
     };
     console.log('Day Start Payload:', selectedRoute);
     // return;
@@ -369,15 +403,22 @@ export default function SalesExecutiveScreen() {
   };
 
   const handleQuickAction = (route: string) => {
-    if (route === '/outlets') {
-      return guard(() => {
-        router.push('/outlets');
-      });
-    }
+    // if (route === '/outlets') {
+    //   return guard(() => {
+    //     router.push('/outlets');
+    //   });
+    // }
 
     router.push(route);
     // guard(() => {
     // });
+  };
+
+  const fetchDayEndSummary = async () => {
+    console.log('Selected Route at Day End:', van);
+    const res: any = await vanService.fetchTodayStockSummary({ vanId: van?.vanId });
+    console.log('Stock Summary before day end:', res);
+    setDayEndSummary(res?.data);
   };
 
   const handleEndDay = async () => {
@@ -396,7 +437,7 @@ export default function SalesExecutiveScreen() {
         setSelectedActivityIcon('storefront');
 
         // Reset route
-        useAuthStore.getState().setSelectedRoute(null);
+        useRouteStore.getState().setSelectedRoute(null);
       }
     } catch (error) {
       console.error('Error completing day:', error);
@@ -406,22 +447,39 @@ export default function SalesExecutiveScreen() {
   const getDayStatus = async () => {
     try {
       const response: any = await homeService.getDayStatus(workSessionId);
+
       setDayStarted(response.data.status === 'ACTIVE');
       console.log('Day Status Response:', response);
+
       if (response.statusCode === 200) {
         setWorkSessionId(response.data.workSessionId || '');
+
         console.log('Day Status:', response.data.activeActivity);
+
         setCurrentActivity(response?.data?.activeActivity?.name);
         setTodayActivities(response?.data?.todayActivities || []);
         setStartTime(response?.data?.activeActivity?.startTime);
+
         setSelectedActivityColor('#4158D0');
         setSelectedActivityIcon('storefront');
+
         const selectedRoute = response?.data?.selectedRoute;
+        const van = response?.data?.van; // 👈 assuming API gives this (if not, ignore)
+
+        const routeStore = useRouteStore.getState();
+
+        /* ================= ROUTE ================= */
 
         if (selectedRoute) {
-          useAuthStore.getState().setSelectedRoute(selectedRoute);
+          routeStore.setSelectedRoute(selectedRoute);
         } else {
-          useAuthStore.getState().setSelectedRoute(null);
+          routeStore.setSelectedRoute(null);
+        }
+
+        /* ================= VAN (Optional) ================= */
+
+        if (van) {
+          routeStore.setVan(van);
         }
       }
     } catch (error) {
@@ -446,7 +504,7 @@ export default function SalesExecutiveScreen() {
             response.data.routes.map((item: any) => ({
               name: item.route.name,
               routeId: item.routeId,
-              totalShops: item.route.associatedUsers?.length || 0,
+              totalShops: item.route?.outletCount,
               distance: item.route.distance || 'N/A',
             })),
           );
@@ -461,9 +519,14 @@ export default function SalesExecutiveScreen() {
   const getVan = async () => {
     try {
       const response: any = await homeService.getVan();
+
       if (response.statusCode === 200) {
-        setMappedVan(response.data[0]);
-        console.log('Van:', response.data);
+        const van = response?.data?.[0] || null;
+
+        // ✅ Set in global store
+        useRouteStore.getState().setVan(van);
+
+        console.log('Van set in store:', van);
       }
     } catch (error) {
       console.error('Error fetching van:', error);
@@ -473,9 +536,9 @@ export default function SalesExecutiveScreen() {
   const visitStatus = async () => {
     try {
       const query: any = {
-        workSessionId: activeRoute?.workSessionId,
-        vanId: activeRoute?.vanId,
-        routeSessionId: activeRoute?.routeSessionId,
+        workSessionId: selectedRoute?.workSessionId,
+        vanId: selectedRoute?.vanId,
+        routeSessionId: selectedRoute?.routeSessionId,
       };
 
       const response = await outletService.visitStatus(query);
@@ -519,60 +582,153 @@ export default function SalesExecutiveScreen() {
     }
   };
 
+  const handleDayEndConfirmation = () => {
+    fetchDayEndSummary();
+    setShowDayEndConfirm(true);
+  };
+
+  const getDayEndTitle = () => {
+    return 'Confirm Day End';
+  };
+
+  const getDayEndMessage = () => {
+    let msg = '📊 DAY SUMMARY\n\n';
+
+    // msg += `🛒 Total Orders: ${daySummary?.totalOrders}\n`;
+    // msg += `💰 Total Sales: ${currency} ${daySummary?.totalSales.toFixed(2)}\n`;
+    // msg += `💵 Cash Collected: ${currency} ${daySummary?.cash.toFixed(2)}\n`;
+    // msg += `💳 Card: ${currency} ${daySummary?.card.toFixed(2)}\n`;
+    // msg += `👛 Wallet: ${currency} ${daySummary?.wallet.toFixed(2)}\n`;
+
+    // if (daySummary?.credit > 0) {
+    //   msg += `🏦 Credit: ${currency} ${daySummary?.credit.toFixed(2)}\n`;
+    // }
+
+    // if (daySummary.nonSaleCount > 0) {
+    //   msg += `🚫 Non-Sales: ${daySummary?.nonSaleCount}\n`;
+    // }
+
+    // msg += `\n📦 TOTAL COLLECTION: ${currency} ${daySummary?.totalCollection.toFixed(2)}\n`;
+
+    // msg += `\n⚠️ This will close your day. You cannot modify data after this.`;
+
+    return msg;
+  };
+
+  const getDayEndIcon = () => {
+    return <Ionicons name="clipboard-outline" size={56} color="#3F51B5" />;
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {/* Start Day / Current Activity Section */}
-        <View style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 }}>
-          {!dayStarted ? (
-            <StartDayButton onPress={handleStartDayPress} />
-          ) : (
-            <CurrentActivityCard
-              selectedActivity={currentActivity}
-              selectedActivityColor={selectedActivityColor}
-              selectedActivityIcon={selectedActivityIcon}
-              startTime={startTime}
-              otherWorkStartTime={otherWorkStartTime}
-              selectedRoute={activeRoute}
-              assignedVan={mappedVan}
-              onPressChange={handleChangeActivityPress}
-              onPressEnd={handleEndDay}
-            />
-          )}
-        </View>
+        <LinearGradient
+          colors={[colors.primary + '18', colors.background, colors.background]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0.9, y: 1 }}
+          style={styles.heroSection}
+        >
+          <View style={styles.heroHeaderRow}>
+            <View style={styles.heroTextBlock}>
+              <AppText style={styles.heroEyebrow}>{greeting}</AppText>
+              <AppText style={styles.heroTitle}>{user?.name}</AppText>
+              <AppText style={{ fontSize: 15, fontWeight: 'bold' }}>
+                {van?.name}-{van?.vanId}
+              </AppText>
+              <AppText style={styles.heroSubtitle}>
+                Track your day, jump into key actions fast, and keep route work moving smoothly.
+              </AppText>
+            </View>
+            <View style={styles.heroBadge}>
+              <Ionicons
+                name={dayStarted ? 'play-circle-outline' : 'pause-circle-outline'}
+                size={18}
+                color={dayStarted ? colors.success : colors.warning}
+              />
+              <AppText
+                style={[
+                  styles.heroBadgeText,
+                  { color: dayStarted ? colors.success : colors.warning },
+                ]}
+              >
+                {dayStarted ? 'On Duty' : 'Idle'}
+              </AppText>
+            </View>
+          </View>
 
-        {/* Quick Actions Section */}
-        <QuickActionsSection
-          actions={QUICK_ACTIONS}
-          onPressAction={(route: any) => handleQuickAction(route)}
-        />
+          {/* <View style={styles.heroChipsRow}>
+            {overviewChips.map((chip) => (
+              <View key={chip.label} style={styles.heroChip}>
+                <View style={[styles.heroChipIcon, { backgroundColor: chip.color + '14' }]}>
+                  <Ionicons name={chip.icon as any} size={14} color={chip.color} />
+                </View>
+                <View style={styles.heroChipTextBlock}>
+                  <AppText style={styles.heroChipLabel}>{chip.label}</AppText>
+                  <AppText style={styles.heroChipValue} numberOfLines={1}>
+                    {chip.value}
+                  </AppText>
+                </View>
+              </View>
+            ))}
+          </View> */}
 
-        {/* Stats Overview */}
-        <StatsOverviewSection
-          todayVisits={MOCK_DATA.todayVisits}
-          totalVisits={MOCK_DATA.totalVisits}
-          pendingOrders={MOCK_DATA.pendingOrders}
-          collections={MOCK_DATA.collections}
-          incentives={MOCK_DATA.incentives}
-        />
+          <View style={styles.mainContent}>
+            {!dayStarted ? (
+              <StartDayButton onPress={handleStartDayPress} />
+            ) : (
+              <CurrentActivityCard
+                selectedActivity={currentActivity}
+                selectedActivityColor={selectedActivityColor}
+                selectedActivityIcon={selectedActivityIcon}
+                startTime={startTime}
+                otherWorkStartTime={otherWorkStartTime}
+                selectedRoute={selectedRoute}
+                assignedVan={mappedVan}
+                onPressChange={handleChangeActivityPress}
+                onPressEnd={handleDayEndConfirmation}
+              />
+            )}
+          </View>
 
-        {/* Monthly Budget */}
-        <MonthlyBudgetSection
-          targetAchieved={MOCK_DATA.targetAchieved}
-          completedOrders={MOCK_DATA.completedOrders}
-          onViewDetails={() => router.push('/targets')}
-        />
+          <View style={styles.sectionStack}>
+            <View style={styles.sectionCard}>
+              <QuickActionsSection
+                actions={QUICK_ACTIONS}
+                onPressAction={(route: any) => handleQuickAction(route)}
+              />
+            </View>
 
-        {/* Today's Activities */}
-        <TodayActivitiesSection activities={todayActivities} />
+            <View style={styles.sectionCard}>
+              <StatsOverviewSection
+                todayVisits={MOCK_DATA.todayVisits}
+                totalVisits={MOCK_DATA.totalVisits}
+                pendingOrders={MOCK_DATA.pendingOrders}
+                collections={MOCK_DATA.collections}
+                incentives={MOCK_DATA.incentives}
+              />
+            </View>
 
-        {/* Last Updated */}
-        <Footer lastUpdated={new Date().toLocaleTimeString()} />
+            <View style={styles.sectionCard}>
+              <MonthlyBudgetSection
+                targetAchieved={MOCK_DATA.targetAchieved}
+                completedOrders={MOCK_DATA.completedOrders}
+                onViewDetails={() => router.push('/targets')}
+              />
+            </View>
+
+            <View style={styles.sectionCard}>
+              <TodayActivitiesSection activities={todayActivities} />
+            </View>
+
+            <Footer lastUpdated={new Date().toLocaleTimeString()} />
+          </View>
+        </LinearGradient>
       </ScrollView>
 
       {/* Modals */}
@@ -636,6 +792,144 @@ export default function SalesExecutiveScreen() {
           autofocus: true,
         }}
       />
+
+      <ConfirmationModal
+        visible={showDayEndConfirm}
+        title={getDayEndTitle()}
+        message={getDayEndMessage()}
+        confirmText="Close Day"
+        cancelText="Cancel"
+        onCancel={() => setShowDayEndConfirm(false)}
+        onConfirm={handleEndDay}
+        loading={false}
+        type="info"
+        danger={true}
+        icon={getDayEndIcon()}
+      />
+
+      <DayEndSummaryModal
+        visible={showDayEndConfirm}
+        data={dayEndSummary}
+        onClose={() => setShowDayEndConfirm(false)}
+        onProceed={() => {
+          handleEndDay();
+          setShowDayEndConfirm(false);
+        }}
+      />
     </View>
   );
 }
+
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    scrollContent: {
+      paddingBottom: 32,
+    },
+    heroSection: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 20,
+    },
+    heroHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 16,
+    },
+    heroTextBlock: {
+      flex: 1,
+    },
+    heroEyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+      color: colors.primary,
+      marginBottom: 6,
+    },
+    heroTitle: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginBottom: 6,
+    },
+    heroSubtitle: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textSecondary,
+    },
+    heroBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 999,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    heroBadgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    heroChipsRow: {
+      gap: 10,
+    },
+    heroChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border + '1A',
+    },
+    heroChipIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 10,
+    },
+    heroChipTextBlock: {
+      flex: 1,
+    },
+    heroChipLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 2,
+      textTransform: 'uppercase',
+    },
+    heroChipValue: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    mainContent: {
+      marginBottom: 8,
+    },
+    sectionStack: {
+      gap: 14,
+      paddingBottom: 8,
+    },
+    sectionCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 22,
+      paddingVertical: 6,
+      borderWidth: 1,
+      borderColor: colors.border + '1A',
+      shadowColor: colors.shadow || '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.05,
+      shadowRadius: 16,
+      elevation: 2,
+    },
+  });

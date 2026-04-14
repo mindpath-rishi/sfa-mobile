@@ -11,16 +11,16 @@ export const MOCK_DATA = {
   targetAchieved: 65,
   pendingOrders: 5,
   completedOrders: 12,
-  collections: '₹45,000',
-  incentives: '₹2,500',
+  collections: 'K45,000',
+  incentives: 'K2,500',
 };
 
 export const QUICK_ACTIONS: QuickAction[] = [
   { icon: 'location', label: 'Check In', color: '#4158D0', route: '/checkin' },
   // { icon: 'cart', label: 'New Order', color: '#C850C0', route: '/orders/new', badge: 3 },
-  { icon: 'cash', label: 'Collection', color: '#FF512F', route: '/collections' },
-  { icon: 'people', label: 'Outlets', color: '#11998e', route: '/outlets' },
-  { icon: 'map', label: 'Route', color: '#F37335', route: '/beats' },
+  { icon: 'cash', label: 'Collection', color: '#FF512F', route: '/collection' },
+  // { icon: 'people', label: 'Outlets', color: '#11998e', route: '/outlets' },
+  { icon: 'map', label: 'Route', color: '#F37335', route: '/outlets' },
 ];
 
 export const ACTIVITY_TYPES: ActivityType[] = [

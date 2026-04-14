@@ -14,6 +14,7 @@ import { getAccessToken } from '@/shared/services/tokenStorage';
 import { useLoaderStore } from '../loader/loader.store';
 
 import type { ApiRequestConfig, ApiResponse, HttpMethod } from './api.types';
+import { toast } from '../utils';
 
 /* ======================================================
  * CUSTOM AXIOS CONFIG
@@ -126,10 +127,23 @@ httpClient.interceptors.response.use(
       message: appError.message,
     });
 
-    // ✅ Prevent unhandled rejection
+    /* ======================================================
+     * GLOBAL ERROR HANDLING
+     * ====================================================== */
+
+    toast.error('Error', appError.message || 'Something went wrong');
+
+    /* ======================================================
+     * RETURN SAFE RESPONSE (NO THROW)
+     * ====================================================== */
+
     return Promise.resolve({
-      data: null,
-    } as AxiosResponse);
+      data: {
+        success: false,
+        message: appError.message,
+        data: null,
+      },
+    } as AxiosResponse<ApiResponse<unknown>>);
   },
 );
 
@@ -142,7 +156,7 @@ export const apiRequest = async <TResponse, TBody = unknown>(
   url: string,
   body?: TBody,
   config?: ApiRequestConfig,
-): Promise<ApiResponse<TResponse> | null> => {
+): Promise<ApiResponse<TResponse>> => {
   const res = await httpClient.request<ApiResponse<TResponse>>({
     method,
     url,
@@ -152,7 +166,7 @@ export const apiRequest = async <TResponse, TBody = unknown>(
     showLoader: config?.showLoader !== false,
   } as CustomAxiosRequestConfig);
 
-  return res?.data ?? null;
+  return res.data;
 };
 
 /* ======================================================

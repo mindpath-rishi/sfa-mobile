@@ -4,6 +4,7 @@ export type DayStartPayload = {
   description?: string;
   totalShops?: number;
   routeName?: string;
+  vanId?: string;
 };
 
 export type DayStartResponse = {

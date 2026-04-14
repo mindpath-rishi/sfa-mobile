@@ -54,7 +54,7 @@ export const useStatCardStyles = (props: StatCardStyleProps) => {
 
     title: {
       color: colors.textSecondary,
-      fontSize: 12,
+      fontSize: utils.fontSize.xs,
       fontWeight: '500',
       letterSpacing: 0.3,
     } as TextStyle,
@@ -67,7 +67,7 @@ export const useStatCardStyles = (props: StatCardStyleProps) => {
 
     value: {
       color: colors.textPrimary,
-      fontSize: 20,
+      fontSize: utils.fontSize.lg,
       fontWeight: '700',
       letterSpacing: -0.5,
     } as TextStyle,
@@ -83,13 +83,13 @@ export const useStatCardStyles = (props: StatCardStyleProps) => {
     } as ViewStyle,
 
     trendIcon: {
-      fontSize: 10,
+      fontSize: utils.fontSize.xs,
       color: trendColor,
       fontWeight: '700',
     } as TextStyle,
 
     trendText: {
-      fontSize: 10,
+      fontSize: utils.fontSize.xs,
       color: trendColor,
       fontWeight: '700',
     } as TextStyle,

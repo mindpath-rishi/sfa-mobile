@@ -25,9 +25,10 @@ interface Props {
   product: any;
   index: number;
   onAddToCart?: (items: CartItemWithDetails[]) => void;
+  mode: 'sales' | 'topup';
 }
 
-export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) => {
+export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart, mode }) => {
   const { colors } = useTheme();
   const styles = useProductCardStyles();
   const scale = useSharedValue(1);
@@ -53,7 +54,7 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) =>
       style={[animatedStyle, styles.container]}
     >
       <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
-        <AppCard variant="elevated" padding="md" style={styles.card}>
+        <AppCard variant="elevated" padding="md">
           <View style={styles.contentRow}>
             {/* Product Image - Uncomment if needed */}
             {/* <ProductImage image={product.image} size="medium" discount={product.discount} /> */}
@@ -72,7 +73,7 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) =>
                     </AppText>
                   )}
                 </View>
-                <ProductStatusBadge status={product.status || 'active'} />
+                <ProductStatusBadge status={product.stock ? 'in_stock' : 'out_of_stock'} />
               </View>
 
               {/* SKU and Unit Info - Uncomment if needed */}
@@ -94,7 +95,7 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart }) =>
               )}
 
               {/* Unit Selector */}
-              <ProductUnitSelector product={product} onAddToCart={handleAddToCart} />
+              <ProductUnitSelector product={product} onAddToCart={handleAddToCart} mode={mode} />
             </View>
           </View>
         </AppCard>

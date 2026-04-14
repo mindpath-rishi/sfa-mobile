@@ -72,15 +72,6 @@ export default function NonSaleReasonScreen() {
   const params = useLocalSearchParams() as ReasonScreenParams;
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
 
-  // Extract params
-  const customer = {
-    id: params.customerId || '16295',
-    name: params.customerName || 'Zombela',
-    address: params.customerAddress,
-    phone: params.customerPhone,
-    route: params.customerRoute,
-  };
-
   const categoryId = params.categoryId || 'shop';
   const categoryTitle = params.categoryTitle || 'SHOP RELATED ISSUE';
   const categoryColor = params.categoryColor || '#FFEAA7';
@@ -122,11 +113,6 @@ export default function NonSaleReasonScreen() {
     router.push({
       pathname: '/checkin/nonsale/final-step',
       params: {
-        customerId: customer.id,
-        customerName: customer.name,
-        customerAddress: customer.address,
-        customerPhone: customer.phone,
-        customerRoute: customer.route,
         categoryId,
         categoryTitle,
         categoryColor,
