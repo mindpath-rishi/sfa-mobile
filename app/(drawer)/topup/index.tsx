@@ -1,4 +1,4 @@
-// VanInventoryTopupListingPage.tsx
+// VanInventoryTopupListingPage.tsx - Improved Version
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -8,10 +8,15 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  ScrollView,
+  StatusBar,
+  Animated,
+  Platform,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { FAB, Portal, Provider } from 'react-native-paper';
+import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 
 import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -27,6 +32,7 @@ interface TopupItem {
   vanId: string;
   vanName: string;
   employeeId: string;
+  employeeName?: string;
   warehouseId: string;
   date: string;
   totalRequestedQty: number;
@@ -35,8 +41,14 @@ interface TopupItem {
   totalApprovedQty: number;
   totalApprovedWeight: number;
   totalApprovedValue: number;
+  totalRequestedPieces: number;
+  totalRequestedCases: number;
+  totalApprovedPieces: number;
+  totalApprovedCases: number;
   remark?: string;
   status: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+  approvedByName?: string;
+  approvedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -60,11 +72,11 @@ export const VanInventoryTopupListingPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterOptions>({});
-  const [fabOpen, setFabOpen] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
@@ -72,21 +84,14 @@ export const VanInventoryTopupListingPage: React.FC = () => {
   const van = useRouteStore.getState().van;
 
   const flatListRef = useRef<FlatList>(null);
-
-  /* ============================
-   * HELPERS
-   * ============================ */
+  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const formatCurrency = useCallback((value: number) => {
-    return new Intl.NumberFormat('en-ZM', {
-      style: 'currency',
-      currency: 'ZMW', // Zambian Kwacha
+    return `K ${value.toLocaleString('en-ZM', {
       minimumFractionDigits: 2,
-    }).format(value);
-  }, []);
-
-  const formatWeight = useCallback((weight: number) => {
-    return `${weight.toFixed(2)} kg`;
+      maximumFractionDigits: 2,
+    })}`;
   }, []);
 
   const formatDate = useCallback((dateString: string) => {
@@ -99,67 +104,31 @@ export const VanInventoryTopupListingPage: React.FC = () => {
 
   const formatDateTime = useCallback((dateString: string) => {
     try {
-      return format(new Date(dateString), 'dd MMM yyyy, hh:mm a');
+      return format(new Date(dateString), 'dd MMM, hh:mm a');
     } catch {
       return 'Invalid date';
     }
   }, []);
 
-  const getStatusColor = useCallback((status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case 'APPROVED':
-        return '#10B981';
+        return { color: '#10B981', bg: '#10B98115', icon: 'checkmark-circle', label: 'Approved' };
       case 'SUBMITTED':
-        return '#3B82F6';
+        return { color: '#3B82F6', bg: '#3B82F615', icon: 'time-outline', label: 'Submitted' };
       case 'REJECTED':
-        return '#EF4444';
-      case 'DRAFT':
-        return '#6B7280';
+        return { color: '#EF4444', bg: '#EF444415', icon: 'close-circle', label: 'Rejected' };
       default:
-        return '#6B7280';
+        return { color: '#6B7280', bg: '#6B728015', icon: 'create-outline', label: 'Draft' };
     }
-  }, []);
-
-  const getStatusIcon = useCallback((status: string) => {
-    switch (status) {
-      case 'APPROVED':
-        return 'check-circle';
-      case 'SUBMITTED':
-        return 'clock-outline';
-      case 'REJECTED':
-        return 'close-circle';
-      case 'DRAFT':
-        return 'file-document-outline';
-      default:
-        return 'help-circle';
-    }
-  }, []);
-
-  const getStatusBackgroundColor = useCallback((status: string) => {
-    switch (status) {
-      case 'APPROVED':
-        return '#10B981';
-      case 'SUBMITTED':
-        return '#3B82F6';
-      case 'REJECTED':
-        return '#EF4444';
-      case 'DRAFT':
-        return '#6B7280';
-      default:
-        return '#6B7280';
-    }
-  }, []);
-
-  /* ============================
-   * API CALLS
-   * ============================ */
+  };
 
   const fetchTopups = useCallback(
     async (
       page: number = 1,
       isRefresh: boolean = false,
       currentFilters: FilterOptions = filters,
-      search: string = searchQuery,
+      searchText: string = debouncedSearchQuery,
     ) => {
       try {
         if (isRefresh) setRefreshing(true);
@@ -169,33 +138,30 @@ export const VanInventoryTopupListingPage: React.FC = () => {
         const params: any = {
           page,
           limit: itemsPerPage,
-          vanId: van?.vanId,
         };
 
-        if (search) params.search = search;
-        if (currentFilters.status) params.status = currentFilters.status;
         if (currentFilters.vanId) params.vanId = currentFilters.vanId;
+        if (searchText) params.searchText = searchText;
+        if (currentFilters.status) params.status = currentFilters.status;
         if (currentFilters.warehouseId) params.warehouseId = currentFilters.warehouseId;
         if (currentFilters.startDate) params.startDate = currentFilters.startDate.toISOString();
         if (currentFilters.endDate) params.endDate = currentFilters.endDate.toISOString();
 
-        const response = await vanService.fetchInventoryTopupRequest(params);
-
+        const response = await vanService.fetchInventoryTopupRequests(params);
         const apiData = response?.data;
-
-        const list =
-          apiData?.data || // case 1
-          apiData?.items || // case 2
-          apiData || // case 3 (direct array)
-          [];
-
-        const total = apiData?.total || apiData?.count || list.length;
+        const list = apiData?.data || apiData?.items || apiData || [];
+        const total = apiData?.meta?.total || apiData?.total || apiData?.count || list.length;
 
         if (page === 1) {
           setTopups(list);
           setDisplayedItems(list);
           setTotalItems(total);
           setHasMore(list.length === itemsPerPage && total > list.length);
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
         } else {
           setTopups((prev) => [...prev, ...list]);
           setDisplayedItems((prev) => [...prev, ...list]);
@@ -211,20 +177,35 @@ export const VanInventoryTopupListingPage: React.FC = () => {
         setIsLoadingMore(false);
       }
     },
-    [],
+    [filters, debouncedSearchQuery, itemsPerPage],
   );
+
+  const handleSearchInput = useCallback(
+    (text: string) => {
+      setSearchQuery(text);
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = setTimeout(() => {
+        setDebouncedSearchQuery(text);
+        fetchTopups(1, false, filters, text);
+      }, 500);
+    },
+    [filters, fetchTopups],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchTopups(1, false);
-
-      return () => {
-        // optional cleanup
-      };
     }, [van?.vanId]),
   );
 
   const onRefresh = useCallback(() => {
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     fetchTopups(1, true);
   }, [fetchTopups]);
 
@@ -234,16 +215,10 @@ export const VanInventoryTopupListingPage: React.FC = () => {
     }
   }, [isLoadingMore, hasMore, isLoading, currentPage, fetchTopups]);
 
-  const handleSearch = useCallback(
-    (text: string) => {
-      setSearchQuery(text);
-      fetchTopups(1, false, filters, text);
-    },
-    [filters, fetchTopups],
-  );
-
   const clearSearch = useCallback(() => {
     setSearchQuery('');
+    setDebouncedSearchQuery('');
+    if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
     fetchTopups(1, false, filters, '');
   }, [filters, fetchTopups]);
 
@@ -251,20 +226,262 @@ export const VanInventoryTopupListingPage: React.FC = () => {
     (newFilters: FilterOptions) => {
       setFilters(newFilters);
       setShowFilters(false);
-      fetchTopups(1, false, newFilters, searchQuery);
+      fetchTopups(1, false, newFilters, debouncedSearchQuery);
     },
-    [searchQuery, fetchTopups],
+    [debouncedSearchQuery, fetchTopups],
   );
 
   const clearFilters = useCallback(() => {
     setFilters({});
     setShowFilters(false);
-    fetchTopups(1, false, {}, searchQuery);
-  }, [searchQuery, fetchTopups]);
+    fetchTopups(1, false, {}, debouncedSearchQuery);
+  }, [debouncedSearchQuery, fetchTopups]);
 
-  /* ============================
-   * RENDER FILTER MODAL
-   * ============================ */
+  const handleCreateTopup = () => {
+    setShowCreateModal(false);
+    router.push('/topup/create');
+  };
+
+  const renderTopupItem = ({ item, index }: { item: TopupItem; index: number }) => {
+    const statusConfig = getStatusConfig(item.status);
+    const totalRequestedItems = (item.totalRequestedCases || 0) + (item.totalRequestedPieces || 0);
+    const totalApprovedItems = (item.totalApprovedCases || 0) + (item.totalApprovedPieces || 0);
+
+    const animatedStyle = {
+      opacity: fadeAnim,
+      transform: [
+        { translateY: fadeAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) },
+      ],
+    };
+
+    return (
+      <Animated.View style={animatedStyle}>
+        <TouchableOpacity
+          style={[
+            styles.topupCard,
+            { backgroundColor: colors.surface, borderColor: colors.divider },
+          ]}
+          activeOpacity={0.7}
+          onPress={() => router.push(`/topup/detail?id=${item.vanInventoryTopupId}`)}
+        >
+          <LinearGradient
+            colors={[statusConfig.color + '08', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
+
+          <View style={styles.topupCardHeader}>
+            <View style={styles.topupCardLeft}>
+              <View style={styles.topupCardDate}>
+                <Ionicons name="calendar-outline" size={12} color={colors.textTertiary} />
+                <AppText style={[styles.topupCardDateText, { color: colors.textTertiary }]}>
+                  {formatDate(item.date)}
+                </AppText>
+              </View>
+            </View>
+            <View style={[styles.topupCardStatus, { backgroundColor: statusConfig.bg }]}>
+              <Ionicons name={statusConfig.icon as any} size={12} color={statusConfig.color} />
+              <AppText style={[styles.topupCardStatusText, { color: statusConfig.color }]}>
+                {statusConfig.label}
+              </AppText>
+            </View>
+          </View>
+
+          <View style={styles.topupInfoGrid}>
+            <View style={styles.topupInfoCard}>
+              <View style={[styles.topupInfoIcon, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="truck-outline" size={16} color={colors.primary} />
+              </View>
+              <View style={styles.topupInfoContent}>
+                <AppText style={[styles.topupInfoLabel, { color: colors.textSecondary }]}>
+                  Van
+                </AppText>
+                <AppText
+                  style={[styles.topupInfoValue, { color: colors.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {item.vanName || item.vanId}
+                </AppText>
+              </View>
+            </View>
+            <View style={styles.topupInfoCard}>
+              <View style={[styles.topupInfoIcon, { backgroundColor: colors.primary + '15' }]}>
+                <Ionicons name="person-outline" size={16} color={colors.primary} />
+              </View>
+              <View style={styles.topupInfoContent}>
+                <AppText style={[styles.topupInfoLabel, { color: colors.textSecondary }]}>
+                  Employee
+                </AppText>
+                <AppText
+                  style={[styles.topupInfoValue, { color: colors.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {item.employeeName || item.employeeId}
+                </AppText>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.topupStatsRow}>
+            <View style={styles.topupStat}>
+              <AppText style={[styles.topupStatValue, { color: colors.primary }]}>
+                {totalRequestedItems}
+              </AppText>
+              <AppText style={[styles.topupStatLabel, { color: colors.textSecondary }]}>
+                Requested
+              </AppText>
+            </View>
+            <View style={[styles.topupStatDivider, { backgroundColor: colors.divider }]} />
+            <View style={styles.topupStat}>
+              <AppText style={[styles.topupStatValue, { color: colors.success }]}>
+                {totalApprovedItems}
+              </AppText>
+              <AppText style={[styles.topupStatLabel, { color: colors.textSecondary }]}>
+                Approved
+              </AppText>
+            </View>
+            <View style={[styles.topupStatDivider, { backgroundColor: colors.divider }]} />
+            <View style={styles.topupStat}>
+              <AppText style={[styles.topupStatValue, { color: colors.warning }]}>
+                {formatCurrency(item.totalRequestedValue)}
+              </AppText>
+              <AppText style={[styles.topupStatLabel, { color: colors.textSecondary }]}>
+                Value
+              </AppText>
+            </View>
+          </View>
+
+          {item.status === 'APPROVED' && item.approvedByName && (
+            <View style={styles.topupApprovedRow}>
+              <Ionicons name="shield-checkmark" size={14} color="#10B981" />
+              <AppText style={[styles.topupApprovedLabel, { color: colors.textSecondary }]}>
+                Approved by:
+              </AppText>
+              <AppText style={[styles.topupApprovedValue, { color: '#10B981' }]}>
+                {item.approvedByName}
+              </AppText>
+              {item.approvedAt && (
+                <>
+                  <AppText style={[{ color: colors.textTertiary, fontSize: 10 }]}>•</AppText>
+                  <AppText style={[styles.topupApprovedDate, { color: colors.textTertiary }]}>
+                    {formatDateTime(item.approvedAt)}
+                  </AppText>
+                </>
+              )}
+            </View>
+          )}
+
+          <View style={[styles.topupCardFooter, { borderTopColor: colors.divider }]}>
+            <Ionicons name="time-outline" size={12} color={colors.textTertiary} />
+            <AppText style={[styles.topupCardFooterText, { color: colors.textTertiary }]}>
+              Created {formatDateTime(item.createdAt)}
+            </AppText>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.heroSection}
+      >
+        <View style={styles.heroBackground}>
+          <MaterialCommunityIcons
+            name="truck-fast"
+            size={140}
+            color="rgba(255,255,255,0.08)"
+            style={{ position: 'absolute', right: -20, top: -20 }}
+          />
+        </View>
+        <View style={styles.heroContent}>
+          <View>
+            <AppText style={styles.heroTitle}>Top-ups</AppText>
+            <AppText style={styles.heroSubtitle}>Manage inventory requests</AppText>
+          </View>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => setShowCreateModal(true)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['rgba(255,255,255,0.25)', 'rgba(255,255,255,0.1)']}
+              style={styles.createButtonGradient}
+            >
+              <MaterialCommunityIcons name="plus" size={20} color="#FFF" />
+              <AppText style={styles.createButtonText}>New</AppText>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      <View style={styles.searchSection}>
+        <View
+          style={[
+            styles.searchBar,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Ionicons name="search-outline" size={22} color={colors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            placeholder="Search by van, employee or ID..."
+            placeholderTextColor={colors.textTertiary}
+            value={searchQuery}
+            onChangeText={handleSearchInput}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={clearSearch}>
+              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {debouncedSearchQuery && (
+          <Animated.View style={{ opacity: fadeAnim }}>
+            <AppText style={[styles.searchResultText, { color: colors.primary }]}>
+              Found {totalItems} result{totalItems !== 1 ? 's' : ''}
+            </AppText>
+          </Animated.View>
+        )}
+      </View>
+    </View>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface }]}>
+        <MaterialCommunityIcons
+          name={searchQuery ? 'file-search-outline' : 'truck-fast'}
+          size={56}
+          color={colors.textTertiary}
+        />
+      </View>
+      <AppText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+        {searchQuery ? 'No top-ups found' : 'No inventory top-ups yet'}
+      </AppText>
+      <AppText style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>
+        {searchQuery ? 'Try adjusting your search' : 'Tap the + button to create your first top-up'}
+      </AppText>
+    </View>
+  );
+
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.loadingFooter}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <AppText style={[styles.loadingFooterText, { color: colors.textSecondary }]}>
+          Loading more...
+        </AppText>
+      </View>
+    );
+  };
 
   const renderFilterModal = () => (
     <Modal
@@ -280,55 +497,57 @@ export const VanInventoryTopupListingPage: React.FC = () => {
               Filter Top-ups
             </AppText>
             <TouchableOpacity onPress={() => setShowFilters(false)}>
-              <MaterialCommunityIcons name="close" size={24} color={colors.textSecondary} />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.filterSection}>
-            <AppText style={[styles.filterLabel, { color: colors.textPrimary }]}>Status</AppText>
-            <View style={styles.statusFilterContainer}>
-              {['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'].map((status) => (
-                <TouchableOpacity
-                  key={status}
-                  style={[
-                    styles.statusFilterChip,
-                    {
-                      backgroundColor:
-                        filters.status === status || (status === 'ALL' && !filters.status)
-                          ? colors.primary + '20'
-                          : colors.surface,
-                      borderColor:
-                        filters.status === status || (status === 'ALL' && !filters.status)
-                          ? colors.primary
-                          : colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    if (status === 'ALL') {
-                      const { status: _, ...rest } = filters;
-                      setFilters(rest);
-                    } else {
-                      setFilters({ ...filters, status });
-                    }
-                  }}
-                >
-                  <AppText
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.filterSection}>
+              <AppText style={[styles.filterLabel, { color: colors.textPrimary }]}>Status</AppText>
+              <View style={styles.statusFilterContainer}>
+                {['ALL', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED'].map((status) => (
+                  <TouchableOpacity
+                    key={status}
                     style={[
-                      styles.statusFilterText,
+                      styles.statusFilterChip,
                       {
-                        color:
+                        backgroundColor:
+                          filters.status === status || (status === 'ALL' && !filters.status)
+                            ? colors.primary + '15'
+                            : colors.background,
+                        borderColor:
                           filters.status === status || (status === 'ALL' && !filters.status)
                             ? colors.primary
-                            : colors.textSecondary,
+                            : colors.border,
                       },
                     ]}
+                    onPress={() => {
+                      if (status === 'ALL') {
+                        const { status: _, ...rest } = filters;
+                        setFilters(rest);
+                      } else {
+                        setFilters({ ...filters, status });
+                      }
+                    }}
                   >
-                    {status}
-                  </AppText>
-                </TouchableOpacity>
-              ))}
+                    <AppText
+                      style={[
+                        styles.statusFilterText,
+                        {
+                          color:
+                            filters.status === status || (status === 'ALL' && !filters.status)
+                              ? colors.primary
+                              : colors.textSecondary,
+                        },
+                      ]}
+                    >
+                      {status}
+                    </AppText>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
+          </ScrollView>
 
           <View style={styles.filterActions}>
             <TouchableOpacity
@@ -351,471 +570,106 @@ export const VanInventoryTopupListingPage: React.FC = () => {
     </Modal>
   );
 
-  /* ============================
-   * RENDER TOP-UP CARD
-   * ============================ */
-
-  const renderTopupItem = ({ item, index }: { item: TopupItem; index: number }) => (
-    <TouchableOpacity
-      style={[
-        styles.topupCard,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-        },
-      ]}
-      activeOpacity={0.7}
-      onPress={() => router.push(`/topup/detail?id=${item.vanInventoryTopupId}`)}
+  const renderCreateModal = () => (
+    <Modal
+      visible={showCreateModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowCreateModal(false)}
     >
-      {/* Header */}
-      <View style={styles.cardHeader}>
-        <View style={styles.headerLeft}>
-          <MaterialCommunityIcons name="truck-fast" size={20} color={colors.primary} />
-          <View style={styles.headerInfo}>
-            <AppText style={[styles.topupId, { color: colors.textPrimary }]}>
-              #{item.vanInventoryTopupId}
-            </AppText>
-            <AppText style={[styles.vanName, { color: colors.textSecondary }]}>
-              {item.vanName}
-            </AppText>
-          </View>
-        </View>
-        <View
-          style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusBackgroundColor(item.status) + '15' },
-          ]}
-        >
-          <MaterialCommunityIcons
-            name={getStatusIcon(item.status) as any}
-            size={12}
-            color={getStatusColor(item.status)}
-          />
-          <AppText style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-            {item.status}
-          </AppText>
-        </View>
-      </View>
-
-      {/* Details */}
-      <View style={styles.cardDetails}>
-        <View style={styles.detailRow}>
-          <View style={styles.detailItem}>
-            <MaterialCommunityIcons name="calendar" size={14} color={colors.textSecondary} />
-            <AppText style={[styles.detailText, { color: colors.textSecondary }]}>
-              {formatDate(item.date)}
-            </AppText>
-          </View>
-          <View style={styles.detailItem}>
-            <MaterialCommunityIcons name="warehouse" size={14} color={colors.textSecondary} />
-            <AppText style={[styles.detailText, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.warehouseId}
-            </AppText>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <AppText style={[styles.statValue, { color: colors.primary }]}>
-              {item.totalRequestedQty}
-            </AppText>
-            <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>Qty</AppText>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <AppText style={[styles.statValue, { color: colors.warning }]}>
-              {formatWeight(item.totalRequestedWeight)}
-            </AppText>
-            <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>Weight</AppText>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <AppText style={[styles.statValue, { color: colors.success }]}>
-              {formatCurrency(item.totalRequestedValue)}
-            </AppText>
-            <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>Value</AppText>
-          </View>
-        </View>
-
-        {item.status === 'APPROVED' && (
-          <View style={styles.approvedStats}>
-            <AppText style={[styles.approvedLabel, { color: colors.textSecondary }]}>
-              Approved:
-            </AppText>
-            <AppText style={[styles.approvedValue, { color: colors.success }]}>
-              {item.totalApprovedQty} Qty | {formatWeight(item.totalApprovedWeight)} |{' '}
-              {formatCurrency(item.totalApprovedValue)}
-            </AppText>
-          </View>
-        )}
-
-        {item.remark && (
-          <View style={styles.remarkContainer}>
-            <MaterialCommunityIcons
-              name="note-text-outline"
-              size={14}
-              color={colors.textSecondary}
-            />
-            <AppText style={[styles.remarkText, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.remark}
-            </AppText>
-          </View>
-        )}
-      </View>
-
-      {/* Footer */}
-      <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
-        <MaterialCommunityIcons name="clock-outline" size={12} color={colors.textSecondary} />
-        <AppText style={[styles.footerText, { color: colors.textSecondary }]}>
-          {formatDateTime(item.createdAt)}
-        </AppText>
-      </View>
-    </TouchableOpacity>
-  );
-
-  /* ============================
-   * RENDER HEADER
-   * ============================ */
-
-  const renderHeader = () => (
-    <>
-      {/* Search and Filter Bar */}
-      <View style={styles.searchFilterContainer}>
-        <View
-          style={[
-            styles.searchBar,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.textPrimary }]}
-            placeholder="Search by ID, van or warehouse..."
-            placeholderTextColor={colors.textTertiary}
-            value={searchQuery}
-            onChangeText={handleSearch}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={clearSearch}>
-              <MaterialCommunityIcons name="close-circle" size={18} color={colors.textSecondary} />
+      <View style={styles.modalOverlay}>
+        <View style={[styles.createModalContent, { backgroundColor: colors.surface }]}>
+          <View style={styles.createModalHeader}>
+            <View style={[styles.createModalIcon, { backgroundColor: colors.primary + '15' }]}>
+              <MaterialCommunityIcons name="truck-fast" size={36} color={colors.primary} />
+            </View>
+            <TouchableOpacity
+              onPress={() => setShowCreateModal(false)}
+              style={styles.createModalClose}
+            >
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
 
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-          onPress={() => setShowFilters(true)}
-        >
-          <MaterialCommunityIcons name="filter-variant" size={20} color={colors.primary} />
-          {Object.keys(filters).length > 0 && (
-            <View style={styles.filterBadge}>
-              <AppText style={styles.filterBadgeText}>{Object.keys(filters).length}</AppText>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+          <AppText style={[styles.createModalTitle, { color: colors.textPrimary }]}>
+            Request Top-up
+          </AppText>
+          <AppText style={[styles.createModalSubtitle, { color: colors.textSecondary }]}>
+            Create a new inventory request for your van
+          </AppText>
 
-      {/* Active Filters */}
-      {Object.keys(filters).length > 0 && (
-        <View style={styles.activeFiltersContainer}>
-          {filters.status && (
-            <View style={[styles.activeFilterChip, { backgroundColor: colors.primary + '15' }]}>
-              <AppText style={[styles.activeFilterText, { color: colors.primary }]}>
-                Status: {filters.status}
+          <View style={styles.createModalButtons}>
+            <TouchableOpacity
+              style={[
+                styles.createModalButton,
+                styles.createModalCancelButton,
+                { borderColor: colors.border },
+              ]}
+              onPress={() => setShowCreateModal(false)}
+            >
+              <AppText style={[styles.createModalCancelText, { color: colors.textSecondary }]}>
+                Cancel
               </AppText>
-              <TouchableOpacity
-                onPress={() => {
-                  const { status, ...rest } = filters;
-                  setFilters(rest);
-                  fetchTopups(1, false, rest, searchQuery);
-                }}
-              >
-                <MaterialCommunityIcons name="close" size={14} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-      )}
-
-      {/* Stats Summary */}
-      <View style={styles.statsSummary}>
-        <View style={styles.statSummaryItem}>
-          <AppText style={[styles.statSummaryValue, { color: colors.primary }]}>
-            {totalItems}
-          </AppText>
-          <AppText style={[styles.statSummaryLabel, { color: colors.textSecondary }]}>
-            Total Top-ups
-          </AppText>
-        </View>
-        <View style={styles.statSummaryDivider} />
-        <View style={styles.statSummaryItem}>
-          <AppText style={[styles.statSummaryValue, { color: colors.success }]}>
-            {topups.filter((t) => t.status === 'APPROVED').length}
-          </AppText>
-          <AppText style={[styles.statSummaryLabel, { color: colors.textSecondary }]}>
-            Approved
-          </AppText>
-        </View>
-        <View style={styles.statSummaryDivider} />
-        <View style={styles.statSummaryItem}>
-          <AppText style={[styles.statSummaryValue, { color: colors.warning }]}>
-            {topups.filter((t) => t.status === 'SUBMITTED').length}
-          </AppText>
-          <AppText style={[styles.statSummaryLabel, { color: colors.textSecondary }]}>
-            Pending
-          </AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.createModalButton,
+                styles.createModalConfirmButton,
+                { backgroundColor: colors.primary },
+              ]}
+              onPress={handleCreateTopup}
+            >
+              <AppText style={styles.createModalConfirmText}>Continue</AppText>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </>
+    </Modal>
   );
-
-  /* ============================
-   * RENDER LOADING FOOTER
-   * ============================ */
-
-  const renderFooter = () => {
-    if (!isLoadingMore) return null;
-
-    return (
-      <View style={styles.loadingFooter}>
-        <ActivityIndicator size="small" color={colors.primary} />
-        <AppText style={[styles.loadingFooterText, { color: colors.textSecondary }]}>
-          Loading more top-ups...
-        </AppText>
-      </View>
-    );
-  };
-
-  /* ============================
-   * RENDER EMPTY STATE
-   * ============================ */
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface }]}>
-        <MaterialCommunityIcons
-          name={searchQuery ? 'file-search-outline' : 'truck-fast'}
-          size={60}
-          color={colors.textSecondary}
-        />
-      </View>
-      <AppText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-        {searchQuery ? 'No matching top-ups found' : 'No inventory top-ups'}
-      </AppText>
-      <AppText style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>
-        {searchQuery ? 'Try a different search term' : 'Pull to refresh or create a new top-up'}
-      </AppText>
-    </View>
-  );
-
-  /* ============================
-   * MAIN RENDER
-   * ============================ */
 
   return (
-    <Provider>
-      <View style={styles.pageContainer}>
-        <FlatList
-          ref={flatListRef}
-          data={displayedItems}
-          renderItem={renderTopupItem}
-          keyExtractor={(item) => item.vanInventoryTopupId}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={true}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
-            />
-          }
-          ListHeaderComponent={renderHeader()}
-          ListFooterComponent={renderFooter()}
-          ListEmptyComponent={!isLoading ? renderEmptyState() : null}
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={0.3}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-          removeClippedSubviews={true}
-        />
-        {renderFilterModal()}
-
-        {/* FAB Button */}
-        <Portal>
-          <FAB.Group
-            visible={true}
-            open={fabOpen}
-            icon={fabOpen ? 'close' : 'plus'}
-            actions={[
-              {
-                icon: 'plus',
-                label: 'Create Top-up',
-                onPress: () => {
-                  setFabOpen(false);
-                  router.push('/topup/create');
-                },
-              },
-              {
-                icon: 'file-import',
-                label: 'Import from Excel',
-                onPress: () => {
-                  setFabOpen(false);
-                  console.log('Import from Excel');
-                },
-              },
-            ]}
-            onStateChange={({ open }) => setFabOpen(open)}
-            onPress={() => {
-              if (fabOpen) {
-                // Do nothing if open
-              }
-            }}
-            fabStyle={[styles.fab, { backgroundColor: colors.primary }]}
-            color="#FFFFFF"
-            backdropColor="rgba(0, 0, 0, 0.5)"
+    <View style={styles.fullscreenContainer}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <FlatList
+        ref={flatListRef}
+        data={displayedItems}
+        renderItem={renderTopupItem}
+        keyExtractor={(item) => item.vanInventoryTopupId}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+            progressBackgroundColor={colors.surface}
           />
-        </Portal>
-      </View>
-    </Provider>
+        }
+        ListHeaderComponent={renderHeader()}
+        ListFooterComponent={renderFooter()}
+        ListEmptyComponent={!isLoading ? renderEmptyState() : null}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.3}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+      />
+      {renderFilterModal()}
+      {renderCreateModal()}
+
+      {isLoading && !refreshing && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <AppText style={[styles.loadingText, { color: colors.textSecondary }]}>
+              Loading top-ups...
+            </AppText>
+          </View>
+        </View>
+      )}
+    </View>
   );
-};
-
-// Mock API function (replace with actual service call)
-const mockGetTopups = async (params: any) => {
-  // Simulate API delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
-
-  const mockData: TopupItem[] = [
-    {
-      vanInventoryTopupId: 'TOP-001',
-      vanId: 'VAN-001',
-      vanName: 'Van 1 - North Zone',
-      employeeId: 'EMP-001',
-      warehouseId: 'WH-001',
-      date: new Date().toISOString(),
-      totalRequestedQty: 150,
-      totalRequestedWeight: 1250.5,
-      totalRequestedValue: 125000,
-      totalApprovedQty: 150,
-      totalApprovedWeight: 1250.5,
-      totalApprovedValue: 125000,
-      status: 'APPROVED',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      vanInventoryTopupId: 'TOP-002',
-      vanId: 'VAN-002',
-      vanName: 'Van 2 - South Zone',
-      employeeId: 'EMP-002',
-      warehouseId: 'WH-002',
-      date: new Date().toISOString(),
-      totalRequestedQty: 200,
-      totalRequestedWeight: 1800.75,
-      totalRequestedValue: 250000,
-      totalApprovedQty: 0,
-      totalApprovedWeight: 0,
-      totalApprovedValue: 0,
-      status: 'SUBMITTED',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      vanInventoryTopupId: 'TOP-003',
-      vanId: 'VAN-003',
-      vanName: 'Van 3 - East Zone',
-      employeeId: 'EMP-003',
-      warehouseId: 'WH-001',
-      date: new Date().toISOString(),
-      totalRequestedQty: 75,
-      totalRequestedWeight: 625.25,
-      totalRequestedValue: 75000,
-      totalApprovedQty: 0,
-      totalApprovedWeight: 0,
-      totalApprovedValue: 0,
-      remark: 'Urgent restock needed',
-      status: 'REJECTED',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      vanInventoryTopupId: 'TOP-004',
-      vanId: 'VAN-004',
-      vanName: 'Van 4 - West Zone',
-      employeeId: 'EMP-001',
-      warehouseId: 'WH-003',
-      date: new Date().toISOString(),
-      totalRequestedQty: 300,
-      totalRequestedWeight: 2500.0,
-      totalRequestedValue: 500000,
-      totalApprovedQty: 300,
-      totalApprovedWeight: 2500.0,
-      totalApprovedValue: 500000,
-      status: 'APPROVED',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      vanInventoryTopupId: 'TOP-005',
-      vanId: 'VAN-001',
-      vanName: 'Van 1 - North Zone',
-      employeeId: 'EMP-002',
-      warehouseId: 'WH-002',
-      date: new Date().toISOString(),
-      totalRequestedQty: 100,
-      totalRequestedWeight: 850.0,
-      totalRequestedValue: 100000,
-      totalApprovedQty: 0,
-      totalApprovedWeight: 0,
-      totalApprovedValue: 0,
-      status: 'DRAFT',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
-
-  // Apply filters
-  let filtered = [...mockData];
-
-  if (params.search) {
-    const search = params.search.toLowerCase();
-    filtered = filtered.filter(
-      (item) =>
-        item.vanInventoryTopupId.toLowerCase().includes(search) ||
-        item.vanName.toLowerCase().includes(search) ||
-        item.warehouseId.toLowerCase().includes(search),
-    );
-  }
-
-  if (params.status) {
-    filtered = filtered.filter((item) => item.status === params.status);
-  }
-
-  if (params.vanId) {
-    filtered = filtered.filter((item) => item.vanId === params.vanId);
-  }
-
-  if (params.warehouseId) {
-    filtered = filtered.filter((item) => item.warehouseId === params.warehouseId);
-  }
-
-  // Paginate
-  const start = (params.page - 1) * params.limit;
-  const end = start + params.limit;
-  const paginatedData = filtered.slice(start, end);
-
-  return {
-    data: paginatedData,
-    total: filtered.length,
-    page: params.page,
-    limit: params.limit,
-  };
 };
 
 export default VanInventoryTopupListingPage;

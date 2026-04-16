@@ -710,10 +710,10 @@ export const ProductUnitSelector: React.FC<Props> = ({
   // Stock limits only apply to sales mode
   const isMaxStock = !isUnlimitedMode && totalUnits >= availableStock;
   const maxCases = isUnlimitedMode
-    ? 999999 // No limit for topup
+    ? 10 // No limit for topup
     : Math.floor((availableStock - unitQuantity) / UNITS_PER_CASE);
   const maxUnits = isUnlimitedMode
-    ? 999999 // No limit for topup
+    ? 10 // No limit for topup
     : availableStock - caseQuantity * UNITS_PER_CASE;
 
   useEffect(() => {
@@ -735,7 +735,7 @@ export const ProductUnitSelector: React.FC<Props> = ({
 
     // For topup mode, always send cart update even if quantities are 0
     // For sales mode, only send if quantities > 0
-    if (caseQuantity > 0 || unitQuantity > 0 || isUnlimitedMode) {
+    // if (caseQuantity > 0 || unitQuantity > 0 || isUnlimitedMode) {
       onAddToCart([
         {
           productId: product.productId,
@@ -748,9 +748,9 @@ export const ProductUnitSelector: React.FC<Props> = ({
           stock: availableStock,
         },
       ]);
-    } else if (product.caseQty > 0 || product.pieceQty > 0) {
-      onAddToCart([]);
-    }
+    // } else if (product.caseQty > 0 || product.pieceQty > 0) {
+    //   onAddToCart([]);
+    // }
   }, [caseQuantity, unitQuantity]);
 
   const setMaxQuantity = useCallback(() => {
@@ -780,19 +780,7 @@ export const ProductUnitSelector: React.FC<Props> = ({
 
   return (
     <View
-      style={{
-        backgroundColor: colors.surface,
-        marginBottom: 8,
-        padding: 12,
-        borderRadius: 10,
-        borderWidth: 1,
-        borderColor: colors.border + '20',
-        shadowColor: colors.textPrimary,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 1,
-      }}
+
     >
       {/* Row 1: Product Name and Action Icons */}
       <View
@@ -804,14 +792,14 @@ export const ProductUnitSelector: React.FC<Props> = ({
         }}
       >
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          {showName && (
+          {/* {showName && (
             <AppText
-              style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}
+              style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '600' }}
               numberOfLines={2}
             >
               {product.productName}
             </AppText>
-          )}
+          )} */}
           {!isUnlimitedMode && availableStock < 10 && availableStock > 0 && (
             <View
               style={{
@@ -884,7 +872,7 @@ export const ProductUnitSelector: React.FC<Props> = ({
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="cube-outline" size={16} color={colors.primary} />
+              {/* <Ionicons name="cube-outline" size={16} color={colors.primary} /> */}
               <AppText style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }}>
                 Cases
               </AppText>
@@ -964,7 +952,7 @@ export const ProductUnitSelector: React.FC<Props> = ({
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons name="grid-outline" size={16} color={colors.warning} />
+              {/* <Ionicons name="grid-outline" size={16} color={colors.warning} /> */}
               <AppText style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }}>
                 Pieces
               </AppText>
@@ -1048,7 +1036,7 @@ export const ProductUnitSelector: React.FC<Props> = ({
       >
         {/* Stock Info with Icons */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {!isUnlimitedMode ? (
+          {/* {!isUnlimitedMode ? ( */}
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Ionicons name="cube-outline" size={14} color={colors.primary} />
@@ -1068,22 +1056,6 @@ export const ProductUnitSelector: React.FC<Props> = ({
                 </View>
               )}
             </>
-          ) : (
-            <>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="infinite" size={14} color={colors.primary} />
-                <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>
-                  No quantity limit
-                </AppText>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Ionicons name="options-outline" size={12} color={colors.textSecondary} />
-                <AppText style={{ color: colors.textSecondary, fontSize: 11 }}>
-                  {UNITS_PER_CASE} pcs/case
-                </AppText>
-              </View>
-            </>
-          )}
 
           {/* Selected Total */}
           {/* {totalUnits > 0 && (
@@ -1113,30 +1085,6 @@ export const ProductUnitSelector: React.FC<Props> = ({
         </View>
       </View>
       {/* Progress Bar - Sales Mode Only */}
-      {!isUnlimitedMode && availableStock > 0 && totalUnits > 0 && (
-        <View style={{ marginTop: 8 }}>
-          <View
-            style={{
-              height: 3,
-              backgroundColor: colors.divider,
-              borderRadius: 2,
-              overflow: 'hidden',
-            }}
-          >
-            <View
-              style={{
-                width: `${(totalUnits / availableStock) * 100}%`,
-                height: '100%',
-                backgroundColor: totalUnits === availableStock ? colors.success : colors.primary,
-                borderRadius: 2,
-              }}
-            />
-          </View>
-          <AppText style={{ color: colors.textTertiary, fontSize: 10, marginTop: 4 }}>
-            {Math.round((totalUnits / availableStock) * 100)}% of available stock
-          </AppText>
-        </View>
-      )}
     </View>
   );
 

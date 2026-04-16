@@ -1,5 +1,5 @@
-// styles/PaymentsScreen.styles.ts
-import { ViewStyle, TextStyle } from 'react-native';
+// shared/styles/Payments.styles.ts
+import { ViewStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 
@@ -12,14 +12,14 @@ export const usePaymentsScreenStyles = () => {
     } as ViewStyle,
 
     searchWrapper: {
-      paddingHorizontal: utils.spacing[4],
-      paddingTop: utils.spacing[4],
+      padding: utils.spacing[4],
       paddingBottom: utils.spacing[2],
     } as ViewStyle,
 
     listContent: {
-      paddingHorizontal: utils.spacing[4],
+      padding: utils.spacing[4],
       paddingBottom: utils.spacing[20],
+      gap: utils.spacing[3],
     } as ViewStyle,
 
     footerLoader: {
@@ -29,18 +29,18 @@ export const usePaymentsScreenStyles = () => {
 
     fab: {
       position: 'absolute',
-      bottom: utils.spacing[4],
-      right: utils.spacing[4],
+      bottom: 20,
+      right: 20,
       width: 56,
       height: 56,
       borderRadius: 28,
-      alignItems: 'center',
       justifyContent: 'center',
-      elevation: 4,
+      alignItems: 'center',
       shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 5,
     } as ViewStyle,
   }));
 

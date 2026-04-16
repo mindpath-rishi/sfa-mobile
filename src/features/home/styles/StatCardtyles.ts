@@ -1,107 +1,71 @@
-import { ViewStyle, TextStyle } from 'react-native';
-import { createStyles } from '@/shared/theme/styles';
-import { useTheme } from '@/shared/hooks/useTheme';
+// StatCardStyles.ts
+import { StyleSheet } from 'react-native';
 
-interface StatCardStyleProps {
-  color: string;
-  trend?: number;
-}
-
-export const useStatCardStyles = (props: StatCardStyleProps) => {
-  const { colors } = useTheme();
-  const { color, trend } = props;
-
-  // Determine trend color based on trend value
-  const trendColor = trend ? (trend > 0 ? colors.success : colors.error) : colors.textTertiary;
-
-  // Get the appropriate semantic background for the trend
-  const trendBgColor = trend
-    ? trend > 0
-      ? colors.successLight
-      : colors.errorLight
-    : colors.surface;
-
-  const styleGenerator = createStyles((utils) => ({
+export const useStatCardStyles = ({ color, trend }: any) => {
+  const styles = StyleSheet.create({
     card: {
-      flex: 1,
-      backgroundColor: colors.card,
+      backgroundColor: '#FFFFFF',
       borderRadius: 16,
-      padding: 14,
-      shadowColor: colors.textPrimary,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.05,
       shadowRadius: 8,
       elevation: 2,
-      borderWidth: 1,
-      borderColor: colors.border,
-    } as ViewStyle,
-
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 10,
-    } as ViewStyle,
-
-    iconContainer: {
-      width: 32,
-      height: 32,
-      borderRadius: 10,
-      backgroundColor: color + '15',
+    },
+    loadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(255,255,255,0.8)',
+      borderRadius: 16,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 8,
-    } as ViewStyle,
-
+      zIndex: 1,
+    },
+    iconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: `${color}15`,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    content: {
+      flex: 1,
+    },
     title: {
-      color: colors.textSecondary,
-      fontSize: utils.fontSize.xs,
+      fontSize: 13,
       fontWeight: '500',
-      letterSpacing: 0.3,
-    } as TextStyle,
-
-    valueRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    } as ViewStyle,
-
+      color: '#6B7280',
+      marginBottom: 4,
+    },
     value: {
-      color: colors.textPrimary,
-      fontSize: utils.fontSize.lg,
+      fontSize: 28,
       fontWeight: '700',
-      letterSpacing: -0.5,
-    } as TextStyle,
-
-    trendBadge: {
+      color: '#111827',
+      marginBottom: 4,
+    },
+    subtitle: {
+      fontSize: 12,
+      color: '#9CA3AF',
+    },
+    trendContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: trendBgColor,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 20,
-      gap: 2,
-    } as ViewStyle,
-
-    trendIcon: {
-      fontSize: utils.fontSize.xs,
-      color: trendColor,
-      fontWeight: '700',
-    } as TextStyle,
-
+      marginTop: 6,
+      gap: 4,
+    },
     trendText: {
-      fontSize: utils.fontSize.xs,
-      color: trendColor,
-      fontWeight: '700',
-    } as TextStyle,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+  });
 
-    footerLine: {
-      height: 2,
-      width: 40,
-      backgroundColor: color + '25',
-      borderRadius: 2,
-      marginTop: 10,
-    } as ViewStyle,
-  }));
-
-  return styleGenerator(colors);
+  return styles;
 };

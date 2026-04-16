@@ -56,4 +56,5 @@ export interface HeaderProps {
   filterIcon?: keyof typeof Ionicons.glyphMap;
   filterActiveIcon?: keyof typeof Ionicons.glyphMap;
   filterPosition?: 'left' | 'right';
+  headerBackgroundColor?: string;
 }

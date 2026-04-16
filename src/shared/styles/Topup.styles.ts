@@ -1,4 +1,4 @@
-// VanInventoryTopupListingPage.styles.ts
+// Topup.styles.ts
 import { ViewStyle, TextStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -7,451 +7,675 @@ export const useVanInventoryTopupStyles = () => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
-    // Container
-    pageContainer: {
+    fullscreenContainer: {
       flex: 1,
       backgroundColor: colors.background,
     } as ViewStyle,
 
-    // Header
-    pageHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: utils.spacing[4],
-      paddingTop: utils.spacing[12],
+    listContainer: {
       paddingBottom: utils.spacing[4],
-      borderBottomWidth: 1,
     } as ViewStyle,
 
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
+    headerContainer: {
+      paddingBottom: utils.spacing[3],
     } as ViewStyle,
 
-    pageTitle: {
-      fontSize: utils.fontSize.xl,
-      fontWeight: '700',
+    // Hero Section
+    heroSection: {
+      paddingTop: utils.spacing[8],
+      paddingBottom: utils.spacing[6],
+      paddingHorizontal: utils.spacing[5],
+      borderBottomLeftRadius: 32,
+      borderBottomRightRadius: 32,
+      position: 'relative',
+      overflow: 'hidden',
+    } as ViewStyle,
+
+    heroBackground: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      opacity: 0.1,
+    } as ViewStyle,
+
+    heroContent: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+    } as ViewStyle,
+
+    heroTitle: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: '#FFF',
+      letterSpacing: -0.5,
     } as TextStyle,
 
-    refreshButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
+    heroSubtitle: {
+      fontSize: utils.fontSize.md,
+      color: '#FFF',
+      opacity: 0.85,
+      marginTop: 6,
+    } as TextStyle,
+
+    createButton: {
+      borderRadius: 30,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 8,
+      elevation: 4,
     } as ViewStyle,
 
-    // Search and Filter
-    searchFilterContainer: {
+    createButtonGradient: {
       flexDirection: 'row',
+      alignItems: 'center',
       paddingHorizontal: utils.spacing[4],
-      paddingTop: utils.spacing[4],
-      paddingBottom: utils.spacing[2],
-      gap: utils.spacing[2],
+      paddingVertical: utils.spacing[2.5],
+      gap: 6,
+      borderRadius: 30,
+    } as ViewStyle,
+
+    createButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#FFF',
+    } as TextStyle,
+
+    // Search Section
+    searchSection: {
+      paddingHorizontal: utils.spacing[4],
+      marginTop: -utils.spacing[5],
+      marginBottom: utils.spacing[4],
+      zIndex: 10,
     } as ViewStyle,
 
     searchBar: {
-      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: utils.spacing[3],
-      paddingVertical: utils.spacing[2],
-      borderRadius: 12,
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[3.5],
+      borderRadius: 20,
       borderWidth: 1,
-      gap: utils.spacing[2],
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 4,
     } as ViewStyle,
 
     searchInput: {
       flex: 1,
       fontSize: utils.fontSize.md,
-      paddingVertical: utils.spacing[1],
+      paddingVertical: 0,
+      fontWeight: '400',
     } as TextStyle,
 
-    filterButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
-      borderWidth: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      position: 'relative',
-    } as ViewStyle,
-
-    filterBadge: {
-      position: 'absolute',
-      top: -4,
-      right: -4,
-      backgroundColor: colors.primary,
-      borderRadius: 10,
-      minWidth: 18,
-      height: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 4,
-    } as ViewStyle,
-
-    filterBadgeText: {
-      color: '#FFFFFF',
-      fontSize: 10,
-      fontWeight: '700',
-    } as TextStyle,
-
-    // Active Filters
-    activeFiltersContainer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      paddingHorizontal: utils.spacing[4],
-      paddingVertical: utils.spacing[2],
-      gap: utils.spacing[2],
-    } as ViewStyle,
-
-    activeFilterChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: utils.spacing[2],
-      paddingVertical: utils.spacing[1],
-      borderRadius: 16,
-      gap: utils.spacing[1],
-    } as ViewStyle,
-
-    activeFilterText: {
+    searchResultText: {
       fontSize: utils.fontSize.xs,
+      marginTop: utils.spacing[2],
+      marginLeft: utils.spacing[1.5],
       fontWeight: '500',
     } as TextStyle,
 
-    // Stats Summary
-    statsSummary: {
-      flexDirection: 'row',
-      marginHorizontal: utils.spacing[4],
-      marginTop: utils.spacing[2],
-      marginBottom: utils.spacing[3],
-      padding: utils.spacing[3],
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    } as ViewStyle,
-
-    statSummaryItem: {
-      flex: 1,
-      alignItems: 'center',
-    } as ViewStyle,
-
-    statSummaryValue: {
-      fontSize: utils.fontSize.xl,
-      fontWeight: '700',
-      marginBottom: utils.spacing[0.5],
-    } as TextStyle,
-
-    statSummaryLabel: {
-      fontSize: utils.fontSize.xs,
-    } as TextStyle,
-
-    statSummaryDivider: {
-      width: 1,
-      backgroundColor: colors.border,
-      marginHorizontal: utils.spacing[2],
-    } as ViewStyle,
-
-    // List
-    listContainer: {
-      paddingHorizontal: utils.spacing[4],
-      paddingBottom: utils.spacing[4],
-      gap: utils.spacing[3],
-    } as ViewStyle,
-
-    // Top-up Card
+    // Top-up Card - Enhanced
     topupCard: {
-      borderRadius: 12,
+      marginHorizontal: utils.spacing[4],
+      marginBottom: utils.spacing[3],
+      borderRadius: 20,
       borderWidth: 1,
       overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      elevation: 2,
     } as ViewStyle,
 
-    cardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: utils.spacing[3],
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    } as ViewStyle,
-
-    headerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: utils.spacing[2],
-    } as ViewStyle,
-
-    headerInfo: {
-      gap: utils.spacing[0.5],
-    } as ViewStyle,
-
-    topupId: {
-      fontSize: utils.fontSize.md,
-      fontWeight: '600',
-    } as TextStyle,
-
-    vanName: {
-      fontSize: utils.fontSize.xs,
-    } as TextStyle,
-
-    statusBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: utils.spacing[2],
-      paddingVertical: utils.spacing[1],
-      borderRadius: 12,
-      gap: utils.spacing[0.5],
-    } as ViewStyle,
-
-    statusText: {
-      fontSize: utils.fontSize.xs,
-      fontWeight: '600',
-    } as TextStyle,
-
-    cardDetails: {
-      padding: utils.spacing[3],
-      gap: utils.spacing[2],
-    } as ViewStyle,
-
-    detailRow: {
+    topupCardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      padding: utils.spacing[4],
+      paddingBottom: utils.spacing[3],
+      backgroundColor: colors.surface,
     } as ViewStyle,
 
-    detailItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: utils.spacing[1],
-    } as ViewStyle,
-
-    detailText: {
-      fontSize: utils.fontSize.xs,
-    } as TextStyle,
-
-    statsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      paddingVertical: utils.spacing[2],
-    } as ViewStyle,
-
-    statItem: {
+    topupCardLeft: {
       flex: 1,
-      alignItems: 'center',
     } as ViewStyle,
 
-    statValue: {
-      fontSize: utils.fontSize.md,
-      fontWeight: '700',
-      marginBottom: utils.spacing[0.5],
+    topupCardId: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 6,
     } as TextStyle,
 
-    statLabel: {
-      fontSize: utils.fontSize.xs,
+    topupCardDate: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    } as ViewStyle,
+
+    topupCardDateText: {
+      fontSize: 11,
     } as TextStyle,
 
-    statDivider: {
+    topupCardStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: utils.spacing[3],
+      paddingVertical: utils.spacing[1.5],
+      borderRadius: 20,
+      gap: 6,
+    } as ViewStyle,
+
+    statusDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    } as ViewStyle,
+
+    topupCardStatusText: {
+      fontSize: 12,
+      fontWeight: '600',
+    } as TextStyle,
+
+    // Info Grid - 2 Column Layout
+    topupInfoGrid: {
+      flexDirection: 'row',
+      paddingHorizontal: utils.spacing[4],
+      paddingBottom: utils.spacing[3],
+      gap: 12,
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    topupInfoCard: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: utils.spacing[2.5],
+      backgroundColor: colors.background,
+      borderRadius: 12,
+    } as ViewStyle,
+
+    topupInfoIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      backgroundColor: colors.primary + '15',
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    topupInfoContent: {
+      flex: 1,
+    } as ViewStyle,
+
+    topupInfoLabel: {
+      fontSize: 10,
+      fontWeight: '500',
+      marginBottom: 2,
+    } as TextStyle,
+
+    topupInfoValue: {
+      fontSize: 13,
+      fontWeight: '600',
+    } as TextStyle,
+
+    // Stats Row
+    topupStatsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      paddingVertical: utils.spacing[3],
+      paddingHorizontal: utils.spacing[4],
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.divider,
+    } as ViewStyle,
+
+    topupStat: {
+      alignItems: 'center',
+      flex: 1,
+    } as ViewStyle,
+
+    topupStatValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      marginBottom: 4,
+    } as TextStyle,
+
+    topupStatLabel: {
+      fontSize: 10,
+      fontWeight: '500',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    } as TextStyle,
+
+    topupStatDivider: {
       width: 1,
       height: 30,
-      backgroundColor: colors.border,
     } as ViewStyle,
 
-    approvedStats: {
+    // Approved Row
+    topupApprovedRow: {
       flexDirection: 'row',
       alignItems: 'center',
       flexWrap: 'wrap',
-      paddingTop: utils.spacing[2],
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-      gap: utils.spacing[1],
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[2.5],
+      gap: 6,
+      backgroundColor: '#10B98108',
     } as ViewStyle,
 
-    approvedLabel: {
-      fontSize: utils.fontSize.xs,
+    topupApprovedLabel: {
+      fontSize: 11,
     } as TextStyle,
 
-    approvedValue: {
-      fontSize: utils.fontSize.xs,
-      fontWeight: '500',
+    topupApprovedValue: {
+      fontSize: 11,
+      fontWeight: '600',
     } as TextStyle,
 
-    remarkContainer: {
+    topupApprovedDate: {
+      fontSize: 10,
+    } as TextStyle,
+
+    // Card Footer
+    topupCardFooter: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingTop: utils.spacing[1],
-      gap: utils.spacing[1],
-    } as ViewStyle,
-
-    remarkText: {
-      flex: 1,
-      fontSize: utils.fontSize.xs,
-      fontStyle: 'italic',
-    } as TextStyle,
-
-    cardFooter: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: utils.spacing[2],
-      paddingHorizontal: utils.spacing[3],
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[2.5],
+      gap: 6,
       borderTopWidth: 1,
-      gap: utils.spacing[1],
     } as ViewStyle,
 
-    footerText: {
-      fontSize: utils.fontSize.xs,
+    topupCardFooterText: {
+      fontSize: 10,
     } as TextStyle,
 
-    // Modal
+    // Modal Styles
     modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'rgba(0,0,0,0.5)',
       justifyContent: 'flex-end',
     } as ViewStyle,
 
     modalContent: {
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
-      padding: utils.spacing[4],
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: utils.spacing[5],
       maxHeight: '80%',
     } as ViewStyle,
 
     modalHeader: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: utils.spacing[4],
+      alignItems: 'center',
+      marginBottom: utils.spacing[5],
     } as ViewStyle,
 
     modalTitle: {
-      fontSize: utils.fontSize.lg,
-      fontWeight: '600',
+      fontSize: 20,
+      fontWeight: '700',
     } as TextStyle,
 
     filterSection: {
-      marginBottom: utils.spacing[4],
+      marginBottom: utils.spacing[5],
     } as ViewStyle,
 
     filterLabel: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '500',
-      marginBottom: utils.spacing[2],
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: utils.spacing[3],
     } as TextStyle,
 
     statusFilterContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: utils.spacing[2],
+      gap: 10,
     } as ViewStyle,
 
     statusFilterChip: {
-      paddingHorizontal: utils.spacing[3],
-      paddingVertical: utils.spacing[1.5],
+      paddingHorizontal: utils.spacing[3.5],
+      paddingVertical: utils.spacing[2],
       borderRadius: 20,
       borderWidth: 1,
     } as ViewStyle,
 
     statusFilterText: {
-      fontSize: utils.fontSize.sm,
+      fontSize: 13,
+      fontWeight: '500',
     } as TextStyle,
 
     filterActions: {
       flexDirection: 'row',
-      gap: utils.spacing[3],
-      marginTop: utils.spacing[4],
+      gap: 12,
+      marginTop: utils.spacing[6],
     } as ViewStyle,
 
     clearFilterButton: {
       flex: 1,
       paddingVertical: utils.spacing[3],
-      borderRadius: 10,
+      borderRadius: 12,
       borderWidth: 1,
       alignItems: 'center',
     } as ViewStyle,
 
     clearFilterText: {
-      fontSize: utils.fontSize.sm,
+      fontSize: 14,
       fontWeight: '600',
     } as TextStyle,
 
     applyFilterButton: {
-      flex: 2,
+      flex: 1,
       paddingVertical: utils.spacing[3],
-      borderRadius: 10,
+      borderRadius: 12,
       alignItems: 'center',
     } as ViewStyle,
 
     applyFilterText: {
-      color: '#FFFFFF',
-      fontSize: utils.fontSize.sm,
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#FFF',
+    } as TextStyle,
+
+    // Create Modal
+    createModalContent: {
+      margin: utils.spacing[5],
+      borderRadius: 28,
+      padding: utils.spacing[6],
+      alignItems: 'center',
+    } as ViewStyle,
+
+    createModalHeader: {
+      width: '100%',
+      alignItems: 'center',
+      marginBottom: utils.spacing[4],
+      position: 'relative',
+    } as ViewStyle,
+
+    createModalIcon: {
+      width: 70,
+      height: 70,
+      borderRadius: 35,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    createModalClose: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      padding: 4,
+    } as ViewStyle,
+
+    createModalTitle: {
+      fontSize: 22,
+      fontWeight: '700',
+      marginBottom: utils.spacing[2],
+    } as TextStyle,
+
+    createModalSubtitle: {
+      fontSize: 14,
+      textAlign: 'center',
+      marginBottom: utils.spacing[6],
+    } as TextStyle,
+
+    createModalButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      width: '100%',
+    } as ViewStyle,
+
+    createModalButton: {
+      flex: 1,
+      paddingVertical: utils.spacing[3],
+      borderRadius: 14,
+      alignItems: 'center',
+    } as ViewStyle,
+
+    createModalCancelButton: {
+      borderWidth: 1,
+    } as ViewStyle,
+
+    createModalCancelText: {
+      fontSize: 15,
       fontWeight: '600',
     } as TextStyle,
 
+    createModalConfirmButton: {
+      backgroundColor: colors.primary,
+    } as ViewStyle,
+
+    createModalConfirmText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#FFF',
+    } as TextStyle,
+
     // Loading States
+    loadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background + 'F2',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000,
+    } as ViewStyle,
+
+    loadingCard: {
+      backgroundColor: colors.surface,
+      padding: utils.spacing[6],
+      borderRadius: 24,
+      alignItems: 'center',
+      gap: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.1,
+      shadowRadius: 24,
+      elevation: 8,
+    } as ViewStyle,
+
+    loadingText: {
+      marginTop: 8,
+      fontSize: utils.fontSize.md,
+      fontWeight: '500',
+    } as TextStyle,
+
     loadingFooter: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: utils.spacing[4],
-      gap: utils.spacing[2],
+      paddingVertical: utils.spacing[5],
+      gap: 12,
     } as ViewStyle,
 
     loadingFooterText: {
       fontSize: utils.fontSize.sm,
+      fontWeight: '500',
     } as TextStyle,
 
     // Empty State
     emptyState: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: utils.spacing[12],
+      paddingVertical: utils.spacing[16],
+      gap: 12,
     } as ViewStyle,
 
     emptyIconContainer: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: 90,
+      height: 90,
+      borderRadius: 45,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: utils.spacing[3],
+      marginBottom: 8,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      elevation: 2,
     } as ViewStyle,
 
     emptyStateText: {
-      fontSize: utils.fontSize.md,
-      fontWeight: '500',
-      marginBottom: utils.spacing[1],
+      fontSize: 16,
+      fontWeight: '600',
     } as TextStyle,
 
     emptyStateSubtext: {
-      fontSize: utils.fontSize.sm,
+      fontSize: 13,
+      textAlign: 'center',
+      paddingHorizontal: 40,
+    } as TextStyle,
+
+    // Timeline Styles (for detail page)
+    timelineContainer: {
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[5],
+    } as ViewStyle,
+
+    timelineItem: {
+      flexDirection: 'row',
+      marginBottom: utils.spacing[4],
+    } as ViewStyle,
+
+    timelineLeft: {
+      alignItems: 'center',
+      marginRight: utils.spacing[3],
+    } as ViewStyle,
+
+    timelineDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      borderWidth: 2,
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    timelineLine: {
+      width: 2,
+      flex: 1,
+      marginTop: 4,
+    } as ViewStyle,
+
+    timelineContent: {
+      flex: 1,
+      paddingBottom: utils.spacing[3],
+    } as ViewStyle,
+
+    timelineTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      marginBottom: 4,
+    } as TextStyle,
+
+    timelineDescription: {
+      fontSize: 13,
+      marginBottom: 4,
+    } as TextStyle,
+
+    timelineDate: {
+      fontSize: 11,
+    } as TextStyle,
+
+    timelineStatus: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 4,
+    } as TextStyle,
+
+    // Detail Card
+    detailCard: {
+      margin: utils.spacing[4],
+      padding: utils.spacing[5],
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      elevation: 2,
+    } as ViewStyle,
+
+    detailSection: {
+      marginBottom: utils.spacing[5],
+    } as ViewStyle,
+
+    detailSectionTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      marginBottom: utils.spacing[3],
+    } as TextStyle,
+
+    detailRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: utils.spacing[2],
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    } as ViewStyle,
+
+    detailLabel: {
+      fontSize: 13,
+    } as TextStyle,
+
+    detailValue: {
+      fontSize: 13,
+      fontWeight: '500',
+    } as TextStyle,
+
+    productTable: {
+      marginTop: utils.spacing[3],
+      borderRadius: 12,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.divider,
+    } as ViewStyle,
+
+    productHeader: {
+      flexDirection: 'row',
+      padding: utils.spacing[3],
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    } as ViewStyle,
+
+    productHeaderText: {
+      fontSize: 12,
+      fontWeight: '600',
+    } as TextStyle,
+
+    productRow: {
+      flexDirection: 'row',
+      padding: utils.spacing[3],
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    } as ViewStyle,
+
+    productName: {
+      flex: 2,
+      fontSize: 13,
+    } as TextStyle,
+
+    productQty: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '500',
       textAlign: 'center',
     } as TextStyle,
-    // Add to your Topup.styles.ts
-
-    fabContainer: {
-      position: 'absolute',
-      bottom: 20,
-      right: 20,
-      zIndex: 999, // 🔥 important
-      elevation: 5, // Android
-    },
-
-    fab: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      alignItems: 'center',
-      justifyContent: 'center',
-      elevation: 8,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 4,
-    } as ViewStyle,
   }));
 
   return styleGenerator(colors);

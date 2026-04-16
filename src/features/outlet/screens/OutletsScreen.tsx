@@ -15,10 +15,12 @@ import { outletService } from '../services/outlet.service';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { toast } from '@/shared/utils/toast';
 import { useRouteStore } from '@/core/store/route.store';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 
 const LIMIT = 10;
 
 export default function OutletsScreen() {
+  const { setHeader } = useHeader();
   const { colors } = useTheme();
   const styles = useOutletsScreenStyles();
 
@@ -99,6 +101,17 @@ export default function OutletsScreen() {
       // },
     ];
   }, [filters]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setHeader({
+        title: 'Outlets',
+        showMenu: true,
+        showFilter: true,
+        onFilterPress: () => setShowFilters(true),
+      });
+    }, []),
+  );
 
   /* ================= API CALL ================= */
 

@@ -108,7 +108,7 @@ export default function CreateTopupScreen() {
         <MaterialCommunityIcons name="truck" size={20} color={colors.primary} />
         <View>
           <AppText style={[styles.vanName, { color: colors.textPrimary }]}>
-            {van?.vanName || 'No van selected'}
+            {van?.name || 'No van selected'}
           </AppText>
           <AppText style={[styles.vanId, { color: colors.textSecondary }]}>
             ID: {van?.vanId}
@@ -120,7 +120,7 @@ export default function CreateTopupScreen() {
 
   return (
     <View style={styles.container}>
-      {renderHeader()}
+      {/* {renderHeader()} */}
       {renderVanInfo()}
 
       <View style={styles.productsContainer}>

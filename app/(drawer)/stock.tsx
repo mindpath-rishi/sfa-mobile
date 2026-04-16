@@ -8,15 +8,21 @@ import {
   Animated,
   RefreshControl,
   TextInput,
+  Dimensions,
+  ScrollView,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { vanService } from '@/shared/services/van.service';
 import { useRouteStore } from '@/core/store/route.store';
 import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useStockPageStyles } from '@/shared/styles/Stock.styles';
+import { debounce } from 'lodash';
+
+const { width } = Dimensions.get('window');
 
 interface StockPageProps {
   loadNumber?: string;
@@ -29,199 +35,157 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   const route = useRoute();
   const van = useRouteStore.getState().van;
 
-  // Get load number from props or route params
   const loadNumber = propLoadNumber || (route.params as any)?.loadNumber;
 
   const [vanStock, setVanStock] = useState<any[]>([]);
-  const [filteredStock, setFilteredStock] = useState<any[]>([]);
-  const [displayedItems, setDisplayedItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
 
-  // Infinite scroll pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [hasMore, setHasMore] = useState(true);
+  const [totalItems, setTotalItems] = useState(0);
 
   const [summary, setSummary] = useState({
     totalCases: 0,
     totalPiece: 0,
     totalValue: 0,
     totalNetWeight: 0,
+    totalItems: 0,
   });
 
-  // Animation for content entrance
   const opacityAnim = useState(new Animated.Value(0))[0];
   const flatListRef = useRef<FlatList>(null);
-
-  /* ============================
-   * HELPERS
-   * ============================ */
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const formatStock = useCallback((cases = 0, pieces = 0) => {
-    if (cases === 0 && pieces === 0) return 'Out of Stock';
-    return `${cases} Cases ${pieces} Pcs`;
+    if (cases === 0 && pieces === 0) return 'Out';
+    if (cases === 0) return `${pieces}P`;
+    if (pieces === 0) return `${cases}C`;
+    return `${cases}C ${pieces}P`;
   }, []);
 
   const formatCurrency = useCallback((value: number) => {
-    return new Intl.NumberFormat('en-ZM', {
-      style: 'currency',
-      currency: 'ZMW', // Zambian Kwacha
+    return `K ${value.toLocaleString('en-ZM', {
       minimumFractionDigits: 2,
-    }).format(value);
+      maximumFractionDigits: 2,
+    })}`;
   }, []);
 
-  const formatWeight = useCallback((weight: number) => {
-    return `${weight.toFixed(2)} kg`;
-  }, []);
-
-  // Check if item is out of stock
   const isOutOfStock = useCallback((item: any) => {
     return (!item.cases || item.cases === 0) && (!item.pieces || item.pieces === 0);
   }, []);
 
-  // Search and filter logic
-  const filterProducts = useCallback((products: any[], query: string) => {
-    if (!query.trim()) return products;
+  // Server-side search with debounce
+  const searchProducts = useCallback(
+    debounce(async (query: string, page: number = 1, reset: boolean = true) => {
+      if (!van?.vanId) return;
 
-    const lowerQuery = query.toLowerCase();
-    return products.filter(
-      (item) =>
-        item.name?.toLowerCase().includes(lowerQuery) ||
-        item.productSysCode?.toLowerCase().includes(lowerQuery) ||
-        item.productId?.toLowerCase().includes(lowerQuery),
-    );
-  }, []);
+      try {
+        if (reset) {
+          setIsSearching(true);
+          setIsLoading(true);
+        } else {
+          setIsLoadingMore(true);
+        }
 
-  // Load more items for infinite scroll
-  const loadMoreItems = useCallback(() => {
-    if (isLoadingMore || !hasMore || isSearching) return;
+        const response = await vanService.fetchVanStocks(van.vanId, {
+          searchText: query,
+          page: page,
+          limit: itemsPerPage,
+        });
 
-    const nextPage = currentPage + 1;
-    const startIndex = (nextPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const nextItems = filteredStock.slice(startIndex, endIndex);
+        const resData = response?.data;
+        const products = resData?.products || [];
+        const total = resData?.total || 0;
 
-    if (nextItems.length > 0) {
-      setDisplayedItems((prev) => [...prev, ...nextItems]);
-      setCurrentPage(nextPage);
-      setHasMore(endIndex < filteredStock.length);
-    } else {
-      setHasMore(false);
-    }
+        if (reset) {
+          setVanStock(products);
+          setTotalItems(total);
+          setHasMore(products.length === itemsPerPage && products.length < total);
+          setCurrentPage(page);
 
-    setIsLoadingMore(false);
-  }, [currentPage, filteredStock, itemsPerPage, hasMore, isLoadingMore, isSearching]);
+          // Update summary when searching
+          setSummary({
+            totalCases: resData?.totalCases || 0,
+            totalPiece: resData?.totalPieces || 0,
+            totalValue: resData?.totalValue || 0,
+            totalNetWeight: resData?.totalNetWeight || 0,
+            totalItems: (resData?.totalCases || 0) + (resData?.totalPieces || 0),
+          });
+        } else {
+          setVanStock((prev) => [...prev, ...products]);
+          setHasMore(products.length === itemsPerPage && vanStock.length + products.length < total);
+          setCurrentPage(page);
+        }
 
-  // Reset pagination when filter changes
-  const resetPagination = useCallback(
-    (filteredData: any[]) => {
-      const initialItems = filteredData.slice(0, itemsPerPage);
-      setDisplayedItems(initialItems);
-      setCurrentPage(1);
-      setHasMore(filteredData.length > itemsPerPage);
-      setIsLoadingMore(false);
-    },
-    [itemsPerPage],
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }).start();
+      } catch (error) {
+        console.log('Error searching products:', error);
+        if (reset) {
+          setVanStock([]);
+          setTotalItems(0);
+        }
+      } finally {
+        if (reset) {
+          setIsSearching(false);
+          setIsLoading(false);
+        } else {
+          setIsLoadingMore(false);
+        }
+      }
+    }, 1200),
+    [van, itemsPerPage],
   );
-
-  // Calculate summary statistics
-  const summaryStats = useMemo(
-    () => [
-      {
-        id: 'cases',
-        label: 'Total Cases',
-        value: summary.totalCases,
-        icon: 'package-variant',
-        color: colors.primary,
-      },
-      {
-        id: 'pieces',
-        label: 'Total Pieces',
-        value: summary.totalPiece,
-        icon: 'package-multiple',
-        color: colors.success,
-      },
-      {
-        id: 'value',
-        label: 'Total Value',
-        value: formatCurrency(summary.totalValue),
-        icon: 'currency-inr',
-        color: colors.warning,
-      },
-      {
-        id: 'weight',
-        label: 'Net Weight',
-        value: formatWeight(summary.totalNetWeight),
-        icon: 'weight',
-        color: colors.info,
-      },
-    ],
-    [summary, formatCurrency, formatWeight, colors],
-  );
-
-  // Get stock statistics
-  const stockStats = useMemo(() => {
-    const totalProducts = vanStock.length;
-    const outOfStockCount = vanStock.filter((item) => isOutOfStock(item)).length;
-    const inStockCount = totalProducts - outOfStockCount;
-    const stockRate = totalProducts > 0 ? (inStockCount / totalProducts) * 100 : 0;
-
-    return {
-      totalProducts,
-      inStockCount,
-      outOfStockCount,
-      stockRate: Math.round(stockRate),
-    };
-  }, [vanStock, isOutOfStock]);
-
-  /* ============================
-   * API CALL
-   * ============================ */
 
   const getVanStock = useCallback(
-    async (isRefreshing = false) => {
+    async (isRefreshing = false, page: number = 1) => {
       try {
-        if (isRefreshing) {
-          setRefreshing(true);
-        } else {
-          setIsLoading(true);
-        }
+        if (isRefreshing) setRefreshing(true);
+        else if (page === 1) setIsLoading(true);
+        else setIsLoadingMore(true);
 
         if (!van?.vanId) {
           setVanStock([]);
-          setFilteredStock([]);
-          setDisplayedItems([]);
+          setTotalItems(0);
           return;
         }
 
-        const response = await vanService.fetchVanStocks(van.vanId);
-        const resData = response?.data;
-
-        setSummary({
-          totalCases: resData?.totalCases || 0,
-          totalPiece: resData?.totalPieces || 0,
-          totalValue: resData?.totalValue || 0,
-          totalNetWeight: resData?.totalNetWeight || 0,
+        const response = await vanService.fetchVanStocks(van.vanId, {
+          page: page,
+          limit: itemsPerPage,
+          search: searchQuery || undefined,
         });
 
-        // Sort products by name for better UX
-        const sortedProducts = (resData?.products || []).sort((a: any, b: any) =>
-          a.name.localeCompare(b.name),
-        );
-        setVanStock(sortedProducts);
+        const resData = response?.data;
+        const products = resData?.products || [];
+        const total = resData?.total || 0;
+        const totalItemsCount = (resData?.totalCases || 0) + (resData?.totalPieces || 0);
 
-        // Apply search filter
-        const filtered = filterProducts(sortedProducts, searchQuery);
-        setFilteredStock(filtered);
+        if (page === 1) {
+          setVanStock(products);
+          setTotalItems(total);
+          setSummary({
+            totalCases: resData?.totalCases || 0,
+            totalPiece: resData?.totalPieces || 0,
+            totalValue: resData?.totalValue || 0,
+            totalNetWeight: resData?.totalNetWeight || 0,
+            totalItems: totalItemsCount,
+          });
+        } else {
+          setVanStock((prev) => [...prev, ...products]);
+        }
 
-        // Reset pagination with filtered data
-        resetPagination(filtered);
+        setHasMore(products.length === itemsPerPage && vanStock.length + products.length < total);
+        setCurrentPage(page);
 
-        // Trigger animation
         Animated.timing(opacityAnim, {
           toValue: 1,
           duration: 400,
@@ -229,448 +193,268 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         }).start();
       } catch (error) {
         console.log('Error fetching van stock:', error);
-        setVanStock([]);
-        setFilteredStock([]);
-        setDisplayedItems([]);
+        if (page === 1) {
+          setVanStock([]);
+          setTotalItems(0);
+        }
       } finally {
-        setIsLoading(false);
-        setRefreshing(false);
+        if (isRefreshing) setRefreshing(false);
+        else if (page === 1) setIsLoading(false);
+        else setIsLoadingMore(false);
       }
     },
-    [van, opacityAnim, filterProducts, searchQuery, resetPagination],
+    [van, itemsPerPage, searchQuery, opacityAnim],
   );
 
+  // Initial load
   useEffect(() => {
-    getVanStock();
-  }, [getVanStock]);
+    getVanStock(false, 1);
+  }, [van]);
 
   // Handle search
-  useEffect(() => {
-    const filtered = filterProducts(vanStock, searchQuery);
-    setFilteredStock(filtered);
-    resetPagination(filtered);
-    setIsSearching(searchQuery.length > 0);
-  }, [searchQuery, vanStock, filterProducts, resetPagination]);
-
-  const onRefresh = useCallback(() => {
-    getVanStock(true);
-  }, [getVanStock]);
-
   const handleSearch = (text: string) => {
     setSearchQuery(text);
+    if (text.length > 0) {
+      searchProducts(text, 1, true);
+    } else {
+      getVanStock(false, 1);
+    }
   };
 
   const clearSearch = () => {
     setSearchQuery('');
+    getVanStock(false, 1);
   };
 
-  // Handle load more for infinite scroll
+  const onRefresh = useCallback(() => {
+    getVanStock(true, 1);
+  }, [getVanStock]);
+
   const handleLoadMore = useCallback(() => {
-    if (!isLoadingMore && hasMore && !isSearching && !isLoading) {
-      setIsLoadingMore(true);
-      loadMoreItems();
+    if (!isLoadingMore && hasMore && !isLoading && !isSearching) {
+      getVanStock(false, currentPage + 1);
     }
-  }, [isLoadingMore, hasMore, isSearching, isLoading, loadMoreItems]);
+  }, [isLoadingMore, hasMore, isLoading, isSearching, getVanStock, currentPage]);
 
-  /* ============================
-   * RENDER SUMMARY STAT CARD
-   * ============================ */
-
-  const renderSummaryStat = ({
-    item,
-    index,
-  }: {
-    item: (typeof summaryStats)[0];
-    index: number;
-  }) => (
-    <Animated.View
-      style={[
-        styles.statCard,
-        {
-          backgroundColor: colors.surface,
-          borderColor: colors.border,
-          opacity: opacityAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
-          }),
-          transform: [
-            {
-              translateY: opacityAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [10, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      <View style={styles.statIconContainer}>
-        <View style={[styles.statIconWrapper, { backgroundColor: item.color + '15' }]}>
-          <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
-        </View>
-      </View>
-
-      <View style={styles.statContent}>
-        <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>{item.label}</AppText>
-        <AppText style={[styles.statValue, { color: item.color }]}>
-          {typeof item.value === 'number' ? item.value.toLocaleString('en-IN') : item.value}
-        </AppText>
-      </View>
-    </Animated.View>
-  );
-
-  /* ============================
-   * RENDER SKU ITEM
-   * ============================ */
-
-  const renderSkuItem = ({ item, index }: { item: any; index: number }) => {
-    const outOfStock = isOutOfStock(item);
-
-    return (
-      <Animated.View
-        style={[
-          styles.skuCard,
-          {
-            backgroundColor: colors.surface,
-            borderColor: outOfStock ? colors.error + '40' : colors.border,
-            opacity: opacityAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 1],
-            }),
-            transform: [
-              {
-                translateY: opacityAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [8, 0],
-                }),
-              },
-            ],
-          },
-        ]}
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      {/* Hero Section */}
+      <LinearGradient
+        colors={[colors.primary, colors.primaryDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.heroSection}
       >
-        <View style={styles.skuHeaderCompact}>
-          <View style={styles.skuLeftSection}>
-            <View
-              style={[
-                styles.skuIndexBadgeCompact,
-                {
-                  backgroundColor: outOfStock ? colors.error + '15' : colors.primary + '15',
-                  borderColor: outOfStock ? colors.error + '30' : colors.primary + '30',
-                },
-              ]}
-            >
-              <AppText
-                style={[
-                  styles.skuIndexTextCompact,
-                  { color: outOfStock ? colors.error : colors.primary },
-                ]}
-              >
-                {index + 1}
-              </AppText>
-            </View>
-
-            <View style={styles.skuProductInfo}>
-              <AppText
-                style={[
-                  styles.skuNameCompact,
-                  { color: outOfStock ? colors.textSecondary : colors.textPrimary },
-                ]}
-                numberOfLines={2}
-              >
-                {item.name}
-              </AppText>
-              {item.productSysCode && (
-                <AppText style={[styles.skuCodeCompact, { color: colors.textSecondary }]}>
-                  {item.productSysCode}
-                </AppText>
-              )}
-            </View>
+        <View style={styles.heroContent}>
+          <View>
+            <AppText style={styles.heroTitle}>Stock Inventory</AppText>
+            <AppText style={styles.heroSubtitle}>Manage your van stock</AppText>
           </View>
-
-          <View
-            style={[
-              styles.skuStatusBadge,
-              { backgroundColor: outOfStock ? colors.error + '10' : colors.success + '10' },
-            ]}
-          >
-            <MaterialCommunityIcons
-              name={outOfStock ? 'close-circle' : 'check-circle'}
-              size={14}
-              color={outOfStock ? colors.error : colors.success}
-            />
-          </View>
-        </View>
-
-        <View style={styles.skuDetailsGrid}>
-          <View style={styles.skuDetailItem}>
-            <AppText style={[styles.skuDetailLabel, { color: colors.textSecondary }]}>
-              Stock
-            </AppText>
-            {outOfStock ? (
-              <View style={styles.outOfStockBadge}>
-                <MaterialCommunityIcons
-                  name="alert-circle-outline"
-                  size={14}
-                  color={colors.error}
-                />
-                <AppText style={[styles.outOfStockText, { color: colors.error }]}>
-                  Out of Stock
-                </AppText>
-              </View>
-            ) : (
-              <AppText style={[styles.skuDetailValue, { color: colors.textPrimary }]}>
-                {formatStock(item.cases, item.pieces)}
-              </AppText>
-            )}
-          </View>
-
-          {item.price ? (
-            <View style={styles.skuDetailItem}>
-              <AppText style={[styles.skuDetailLabel, { color: colors.textSecondary }]}>
-                Price
-              </AppText>
-              <AppText
-                style={[
-                  styles.skuDetailValue,
-                  { color: outOfStock ? colors.textSecondary : colors.primary, fontWeight: '600' },
-                ]}
-              >
-                {formatCurrency(item.price)}
-              </AppText>
-            </View>
-          ) : (
-            <View style={styles.skuDetailItem}>
-              <AppText style={[styles.skuDetailLabel, { color: colors.textSecondary }]}>
-                Status
-              </AppText>
-              <AppText
-                style={[
-                  styles.skuDetailValue,
-                  { color: outOfStock ? colors.error : colors.success },
-                ]}
-              >
-                {outOfStock ? 'Unavailable' : 'Available'}
-              </AppText>
+          {loadNumber && (
+            <View style={styles.loadNumberChip}>
+              <Ionicons name="cube-outline" size={16} color={colors.surface} />
+              <AppText style={styles.loadNumberChipText}>Load #{loadNumber}</AppText>
             </View>
           )}
         </View>
+      </LinearGradient>
 
-        {outOfStock && (
-          <View style={[styles.outOfStockOverlay, { backgroundColor: colors.error + '05' }]} />
+      {/* Search Bar */}
+      <View style={styles.searchSection}>
+        <View
+          style={[
+            styles.searchBar,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.textPrimary }]}
+            placeholder="Search products..."
+            placeholderTextColor={colors.textTertiary}
+            value={searchQuery}
+            onChangeText={handleSearch}
+            returnKeyType="search"
+          />
+          {isSearching && (
+            <TouchableOpacity onPress={clearSearch}>
+              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {searchQuery.length > 0 && (
+          <AppText style={[styles.searchResultText, { color: colors.textSecondary }]}>
+            {totalItems} product{totalItems !== 1 ? 's' : ''} found
+          </AppText>
         )}
+      </View>
+
+      {/* All Metrics in Single Horizontal Scrollable Row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.metricsScrollContainer}
+        style={styles.metricsWrapper}
+      >
+        {/* Total Items */}
+        <View style={styles.metricItem}>
+          <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Total Items
+          </AppText>
+          <AppText style={[styles.metricValue, { color: colors.primary }]}>
+            {summary.totalItems.toLocaleString()}
+          </AppText>
+        </View>
+
+        <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
+
+        {/* Total Cases */}
+        <View style={styles.metricItem}>
+          <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Total Cases
+          </AppText>
+          <AppText style={[styles.metricValue, { color: colors.primary }]}>
+            {summary.totalCases.toLocaleString()}
+          </AppText>
+        </View>
+
+        <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
+
+        {/* Total Pieces */}
+        <View style={styles.metricItem}>
+          <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Total Pieces
+          </AppText>
+          <AppText style={[styles.metricValue, { color: colors.success }]}>
+            {summary.totalPiece.toLocaleString()}
+          </AppText>
+        </View>
+
+        <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
+
+        {/* Net Weight */}
+        <View style={styles.metricItem}>
+          <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Net Weight
+          </AppText>
+          <AppText style={[styles.metricValue, { color: colors.info }]}>
+            {summary.totalNetWeight.toFixed(2)} kg
+          </AppText>
+        </View>
+
+        <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
+
+        {/* Total Value */}
+        <View style={styles.metricItem}>
+          <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            Total Value
+          </AppText>
+          <AppText style={[styles.metricValue, { color: colors.warning }]}>
+            {formatCurrency(summary.totalValue)}
+          </AppText>
+        </View>
+      </ScrollView>
+    </View>
+  );
+
+  const renderProductItem = ({ item, index }: { item: any; index: number }) => {
+    const outOfStock = isOutOfStock(item);
+    const animatedStyle = {
+      opacity: opacityAnim,
+      transform: [
+        { translateY: opacityAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+      ],
+    };
+
+    return (
+      <Animated.View style={[styles.productRow, animatedStyle]}>
+        <View style={styles.productLeft}>
+          <AppText style={[styles.productIndex, { color: colors.textTertiary }]}>
+            {index + 1}
+          </AppText>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: outOfStock ? colors.error : colors.success },
+            ]}
+          />
+        </View>
+
+        <View style={styles.productCenter}>
+          <AppText
+            style={[styles.productName, outOfStock && { color: colors.textSecondary }]}
+            numberOfLines={2}
+          >
+            {item.name}
+          </AppText>
+          {item.productId && (
+            <AppText style={[styles.productCode, { color: colors.textTertiary }]}>
+              {item.productId}
+            </AppText>
+          )}
+        </View>
+
+        <View style={styles.productRight}>
+          {outOfStock ? (
+            <AppText style={[styles.outOfStockText, { color: colors.error }]}>Out</AppText>
+          ) : (
+            <>
+              <AppText style={[styles.productStock, { color: colors.primary }]}>
+                {formatStock(item.cases, item.pieces)}
+              </AppText>
+              {item.price && (
+                <AppText style={[styles.productPrice, { color: colors.textTertiary }]}>
+                  {formatCurrency(item.price)}
+                </AppText>
+              )}
+            </>
+          )}
+        </View>
       </Animated.View>
     );
   };
 
-  /* ============================
-   * RENDER LOADING FOOTER
-   * ============================ */
-
   const renderFooter = () => {
     if (!isLoadingMore) return null;
-
     return (
       <View style={styles.loadingFooter}>
         <ActivityIndicator size="small" color={colors.primary} />
         <AppText style={[styles.loadingFooterText, { color: colors.textSecondary }]}>
-          Loading more items...
+          Loading more...
         </AppText>
       </View>
     );
   };
 
-  /* ============================
-   * RENDER SEARCH BAR
-   * ============================ */
-
-  const renderSearchBar = () => (
-    <View style={styles.searchContainer}>
-      <View
-        style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      >
-        <MaterialCommunityIcons name="magnify" size={20} color={colors.textSecondary} />
-        <TextInput
-          style={[styles.searchInput, { color: colors.textPrimary }]}
-          placeholder="Search by name, code or ID..."
-          placeholderTextColor={colors.textTertiary}
-          value={searchQuery}
-          onChangeText={handleSearch}
-          returnKeyType="search"
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity
-            onPress={clearSearch}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <MaterialCommunityIcons name="close-circle" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-      </View>
-      {isSearching && (
-        <AppText style={[styles.searchResultsText, { color: colors.textSecondary }]}>
-          Found {filteredStock.length} result{filteredStock.length !== 1 ? 's' : ''}
-        </AppText>
-      )}
-    </View>
-  );
-
-  /* ============================
-   * RENDER HEADER
-   * ============================ */
-
-  const renderHeader = () => (
-    <>
-      {/* Header Title */}
-      {/* <View style={[styles.pageHeader, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <AppText style={[styles.pageTitle, { color: colors.textPrimary }]}>Stock</AppText>
-        <TouchableOpacity
-          onPress={onRefresh}
-          style={styles.refreshButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <MaterialCommunityIcons name="refresh" size={22} color={colors.primary} />
-        </TouchableOpacity>
-      </View> */}
-
-      {/* Load Number Badge */}
-      {loadNumber && (
-        <View style={styles.loadNumberContainer}>
-          <View style={[styles.loadNumberBadge, { backgroundColor: colors.primary + '15' }]}>
-            <MaterialCommunityIcons
-              name="checkbox-marked-circle"
-              size={16}
-              color={colors.primary}
-            />
-            <AppText style={[styles.loadNumberText, { color: colors.primary }]}>
-              Load #{loadNumber}
-            </AppText>
-          </View>
-        </View>
-      )}
-
-      {/* Stock Overview Card */}
-      <View style={styles.stockOverviewCard}>
-        <AppText style={[styles.overviewTitle, { color: colors.textPrimary }]}>
-          Stock Overview
-        </AppText>
-        <View style={styles.stockStatsRow}>
-          <View style={styles.stockStatItem}>
-            <AppText style={[styles.stockStatValue, { color: colors.primary }]}>
-              {stockStats.totalProducts}
-            </AppText>
-            <AppText style={[styles.stockStatLabel, { color: colors.textSecondary }]}>
-              Total SKUs
-            </AppText>
-          </View>
-          <View style={styles.stockStatItem}>
-            <AppText style={[styles.stockStatValue, { color: colors.success }]}>
-              {stockStats.inStockCount}
-            </AppText>
-            <AppText style={[styles.stockStatLabel, { color: colors.textSecondary }]}>
-              In Stock
-            </AppText>
-          </View>
-          <View style={styles.stockStatItem}>
-            <AppText style={[styles.stockStatValue, { color: colors.error }]}>
-              {stockStats.outOfStockCount}
-            </AppText>
-            <AppText style={[styles.stockStatLabel, { color: colors.textSecondary }]}>
-              Out of Stock
-            </AppText>
-          </View>
-          <View style={styles.stockStatItem}>
-            <AppText style={[styles.stockStatValue, { color: colors.warning }]}>
-              {stockStats.stockRate}%
-            </AppText>
-            <AppText style={[styles.stockStatLabel, { color: colors.textSecondary }]}>
-              Stock Rate
-            </AppText>
-          </View>
-        </View>
-      </View>
-
-      {/* Summary Metrics Section */}
-      <View style={styles.summarySection}>
-        <AppText style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-          Summary Metrics
-        </AppText>
-        {isLoading && !refreshing ? (
-          renderLoadingState()
-        ) : (
-          <FlatList
-            data={summaryStats}
-            renderItem={renderSummaryStat}
-            keyExtractor={(item) => item.id}
-            numColumns={2}
-            columnWrapperStyle={styles.statsGrid}
-            scrollEnabled={false}
-            contentContainerStyle={styles.statsContainer}
-          />
-        )}
-      </View>
-
-      {/* SKU Details Section Header */}
-      <View style={styles.skuSectionHeader}>
-        <View style={styles.skuTitleContainer}>
-          <MaterialCommunityIcons name="format-list-bulleted" size={22} color={colors.primary} />
-          <AppText style={[styles.sectionTitle, { color: colors.textPrimary }]}>
-            SKU Details
-          </AppText>
-        </View>
-        <View style={[styles.skuCountBadge, { backgroundColor: colors.primary + '10' }]}>
-          <AppText style={[styles.skuCountText, { color: colors.primary }]}>
-            {filteredStock.length} Items
-          </AppText>
-        </View>
-      </View>
-
-      {/* Search Bar */}
-      {renderSearchBar()}
-    </>
-  );
-
-  /* ============================
-   * RENDER EMPTY STATE
-   * ============================ */
-
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface }]}>
-        <MaterialCommunityIcons
-          name={searchQuery ? 'file-search-outline' : 'inbox-multiple-outline'}
-          size={60}
-          color={colors.textSecondary}
-        />
-      </View>
+    <View style={styles.emptyStateContainer}>
+      <Ionicons
+        name={searchQuery ? 'search-outline' : 'cube-outline'}
+        size={48}
+        color={colors.textTertiary}
+      />
       <AppText style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-        {searchQuery ? 'No matching products found' : 'No products loaded'}
+        {searchQuery ? 'No products found' : 'No stock available'}
       </AppText>
-      <AppText style={[styles.emptyStateSubtext, { color: colors.textTertiary }]}>
-        {searchQuery ? 'Try a different search term' : 'Pull to refresh or check back later'}
-      </AppText>
+      {searchQuery && (
+        <TouchableOpacity onPress={clearSearch} style={styles.clearSearchButton}>
+          <AppText style={[styles.clearSearchText, { color: colors.primary }]}>
+            Clear search
+          </AppText>
+        </TouchableOpacity>
+      )}
     </View>
   );
-
-  /* ============================
-   * MAIN RENDER
-   * ============================ */
 
   return (
-    <View style={styles.pageContainer}>
+    <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={displayedItems}
-        renderItem={renderSkuItem}
+        data={vanStock}
+        renderItem={renderProductItem}
         keyExtractor={(item, index) => `${item.productId || item.id}-${index}`}
-        contentContainerStyle={styles.skuListContainer}
-        showsVerticalScrollIndicator={true}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -687,21 +471,17 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={10}
-        removeClippedSubviews={true}
       />
+      {isLoading && !refreshing && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <AppText style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading stock...
+          </AppText>
+        </View>
+      )}
     </View>
   );
-
-  function renderLoadingState() {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <AppText style={[styles.loadingText, { color: colors.textSecondary }]}>
-          Loading stock...
-        </AppText>
-      </View>
-    );
-  }
 };
 
 export default StockPage;

@@ -63,69 +63,74 @@ export type AppColors = {
   gradientError: readonly [string, string];
 };
 
+
 export const lightColors: AppColors = {
-  // Primary
-  primary: '#3B82F6',
-  primaryLight: '#60A5FA',
-  primaryDark: '#2563EB',
+  // Primary (more premium blue)
+  primary: '#2563EB',
+  primaryLight: '#3B82F6',
+  primaryDark: '#1D4ED8',
   primaryContrast: '#FFFFFF',
 
-  // Secondary
-  secondary: '#8B5CF6',
-  secondaryLight: '#A78BFA',
-  secondaryDark: '#7C3AED',
+  // Secondary (modern violet accent)
+  secondary: '#7C3AED',
+  secondaryLight: '#8B5CF6',
+  secondaryDark: '#6D28D9',
   secondaryContrast: '#FFFFFF',
 
-  // Backgrounds
+  // Backgrounds (clean + neutral)
   background: '#FFFFFF',
-  backgroundSecondary: '#F9FAFB',
-  backgroundTertiary: '#F3F4F6',
+  backgroundSecondary: '#F8FAFC',
+  backgroundTertiary: '#F1F5F9',
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
   card: '#FFFFFF',
 
-  // Text
-  textPrimary: '#111827',
-  textSecondary: '#374151',
-  textTertiary: '#6B7280',
-  textQuaternary: '#9CA3AF',
+  // Text (better readability)
+  textPrimary: '#0F172A',
+  textSecondary: '#1E293B',
+  textTertiary: '#475569',
+  textQuaternary: '#94A3B8',
   textInverse: '#FFFFFF',
-  textLink: '#3B82F6',
+  textLink: '#2563EB',
 
   // UI Elements
-  border: '#E5E7EB',
-  borderLight: '#F3F4F6',
-  divider: '#F3F4F6',
-  placeholder: '#9CA3AF',
-  overlay: 'rgba(0, 0, 0, 0.5)',
-  overlayLight: 'rgba(0, 0, 0, 0.3)',
-  shadow: 'rgba(0, 0, 0, 0.1)',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
+  divider: '#E2E8F0',
+  placeholder: '#94A3B8',
+  overlay: 'rgba(15, 23, 42, 0.5)',
+  overlayLight: 'rgba(15, 23, 42, 0.3)',
+  shadow: 'rgba(15, 23, 42, 0.08)',
 
-  // Status
-  success: '#10B981',
-  successLight: '#D1FAE5',
-  successDark: '#059669',
-  error: '#EF4444',
+  // Status (more balanced tones)
+  success: '#16A34A',
+  successLight: '#DCFCE7',
+  successDark: '#15803D',
+
+  error: '#DC2626',
   errorLight: '#FEE2E2',
-  errorDark: '#DC2626',
-  warning: '#F59E0B',
+  errorDark: '#B91C1C',
+
+  warning: '#D97706',
   warningLight: '#FEF3C7',
-  warningDark: '#D97706',
-  info: '#3B82F6',
+  warningDark: '#B45309',
+
+  info: '#2563EB',
   infoLight: '#DBEAFE',
-  infoDark: '#2563EB',
+  infoDark: '#1D4ED8',
 
-  // Interactive States
-  hover: 'rgba(0, 0, 0, 0.05)',
-  active: 'rgba(0, 0, 0, 0.1)',
-  focus: 'rgba(59, 130, 246, 0.2)',
-  disabled: 'rgba(0, 0, 0, 0.3)',
+  // Interactive
+  hover: 'rgba(15, 23, 42, 0.04)',
+  active: 'rgba(15, 23, 42, 0.08)',
+  focus: 'rgba(37, 99, 235, 0.25)',
+  disabled: 'rgba(15, 23, 42, 0.3)',
 
-  // Gradients
-  gradientPrimary: ['#3B82F6', '#2563EB'] as const,
-  gradientSuccess: ['#10B981', '#059669'] as const,
-  gradientError: ['#EF4444', '#DC2626'] as const,
+  // Gradients (subtle, premium)
+  gradientPrimary: ['#3B82F6', '#1D4ED8'] as const,
+  gradientSuccess: ['#22C55E', '#15803D'] as const,
+  gradientError: ['#EF4444', '#B91C1C'] as const,
 };
+
 
 export const darkColors: AppColors = {
   // Primary

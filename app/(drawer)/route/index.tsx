@@ -2095,7 +2095,7 @@ export default function BeatsScreen() {
       return; // stop navigation
     }
 
-    router.push(`/outlets/detail`);
+    router.push(`/route/${customerId}`);
   };
 
   const handleCreateCustomer = async (formValue: any) => {
@@ -2574,7 +2574,7 @@ export default function BeatsScreen() {
                     onPress={() => {
                       setSelectedOutlet(null);
                       if (selectedOutlet) {
-                        router.push(`/outlets/${selectedOutlet.customerId}`);
+                        router.push(`/route/${selectedOutlet.customerId}`);
                       }
                     }}
                     style={{ flex: 1 }}

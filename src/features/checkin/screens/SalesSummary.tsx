@@ -402,6 +402,7 @@ import { useRouteStore } from '@/core/store/route.store';
 import { ConfirmationModal } from '@/core/components';
 import { vanService } from '@/shared/services/van.service';
 import { useAuthStore } from '@/core/store/auth.store';
+import { toast } from '@/core/utils';
 
 type ScreenMode = 'sales' | 'topup';
 
@@ -481,6 +482,14 @@ export default function OrderSummary() {
 
   /* ================= BUILD TOP-UP PAYLOAD ================= */
   const buildTopupPayload = useCallback(() => {
+    const totalRequestedCases = items.reduce((acc, item) => {
+      return acc + (item.caseQty || 0);
+    }, 0);
+
+    const totalRequestedPieces = items.reduce((acc, item) => {
+      return acc + (item.pieceQty || 0);
+    }, 0);
+
     const totalRequestedQty = items.reduce((acc, item) => {
       return acc + (item.caseQty || 0) * item.unitQtyInCase + (item.pieceQty || 0);
     }, 0);
@@ -500,36 +509,54 @@ export default function OrderSummary() {
     const topupItems = items.map((item) => ({
       productId: item.productId,
       productName: item.productName,
+
+      // ✅ CASES & PIECES
       requestedCaseQty: item.caseQty || 0,
       requestedPieceQty: item.pieceQty || 0,
+
+      // ✅ DERIVED QTY
       requestedQty: (item.caseQty || 0) * item.unitQtyInCase + (item.pieceQty || 0),
+
+      unitQtyInCase: item.unitQtyInCase,
+
+      // ✅ PRICING
       piecePrice: item.piecePrice,
       casePrice: item.casePrice,
+
+      // ✅ WEIGHT
       pieceNetWeight: item.pieceNetWeight || 0,
       caseNetWeight: item.caseNetWeight || 0,
-      unitQtyInCase: item.unitQtyInCase,
+
       requestedWeight:
         (item.caseQty || 0) * (item.caseNetWeight || 0) +
         (item.pieceQty || 0) * (item.pieceNetWeight || 0),
+
+      // ✅ VALUE
       requestedValue: (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice,
     }));
 
-    console.log(van, '==============van==============');
     return {
       vanId: van?.vanId,
       vanName: van?.name,
       employeeId: user?.userId,
       warehouseId: 'WH-001',
       date: new Date().toISOString(),
+
+      // ✅ NEW TOTALS
+      totalRequestedCases,
+      totalRequestedPieces,
+
       totalRequestedQty,
       totalRequestedWeight,
       totalRequestedValue,
+
       remark: `Top-up request for ${van?.vanName} - ${new Date().toLocaleDateString()}`,
       status: 'DRAFT',
+
       items: topupItems,
       workSessionId: selectedRoute?.workSessionId,
     };
-  }, [items, van]);
+  }, [items, van, user, selectedRoute]);
 
   /* ================= HANDLE TOP-UP SUBMIT ================= */
   const handleTopupSubmit = useCallback(async () => {
@@ -542,6 +569,8 @@ export default function OrderSummary() {
       if (!response?.success) {
         return;
       }
+      toast.success('Your topup request approved successfully.');
+      router.replace('topup');
     } catch (error) {
       console.error('Error submitting top-up:', error);
       Alert.alert('Error', 'Failed to submit top-up request. Please try again.');
@@ -666,7 +695,7 @@ export default function OrderSummary() {
         hasItems={hasItems}
         isProcessing={isSubmitting}
         total={currentMode === 'sales' ? summary.totalValue : summary.totalValue}
-        units={summary.totalSkus}
+        units={summary.totalItems}
         onPress={handleSubmit}
         buttonText={currentConfig.submitButtonText}
         mode={currentMode}
@@ -678,11 +707,12 @@ export default function OrderSummary() {
         visible={showConfirmation}
         title="Confirm Top-up Request"
         message={
-          `Submit top-up request with ${summary.totalSkus} item(s)?\n\n` +
-          `Total Value: ₹${summary.totalValue.toLocaleString()}\n` +
+          `Submit top-up request with ${summary.totalSkus} skus(s)?\n\n` +
+          `Total Value: K ${summary.totalValue.toLocaleString()}\n` +
           `Total Weight: ${totalWeight.toFixed(2)} kg\n` +
           `Total Cases: ${summary.totalCases}\n` +
-          `Total Pieces: ${summary.totalPieces}`
+          `Total Pieces: ${summary.totalPieces}\n` +
+          `Total Items: ${summary.totalItems}\n`
         }
         confirmText="Submit Request"
         cancelText="Cancel"

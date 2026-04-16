@@ -77,9 +77,9 @@ const getToken = async (): Promise<string | null> => {
 httpClient.interceptors.request.use(
   async (config: CustomAxiosRequestConfig): Promise<CustomAxiosRequestConfig> => {
     try {
-      if (config.showLoader !== false) {
-        useLoaderStore.getState().show({ message: 'Loading...' });
-      }
+      // if (config.showLoader !== false) {
+      //   useLoaderStore.getState().show({ message: 'Loading...' });
+      // }
 
       const token = await getToken();
 

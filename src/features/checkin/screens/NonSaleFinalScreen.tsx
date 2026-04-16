@@ -117,7 +117,7 @@ export const NonSaleFinalScreen: React.FC = () => {
     const response = await nonSaleService.markNonSale(payload);
     if (response.success) {
       clearVisit();
-      router.push('/outlets');
+      router.replace('/route');
     }
   };
 

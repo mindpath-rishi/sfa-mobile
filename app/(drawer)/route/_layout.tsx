@@ -64,7 +64,7 @@ export default function VanInventoryTopupLayout() {
 
       {/* CREATE */}
       <Stack.Screen
-        name="create"
+        name="[id]"
         options={{
           title: 'Create Top-up',
           headerShown: true,

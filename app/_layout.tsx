@@ -19,6 +19,7 @@ import { useGlobalErrorStore } from '@/core/store/error.store';
 import AppErrorScreen from '@/core/screens/error/Error';
 import LoaderOverlay from '@/core/screens/LoaderOverlay';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { HeaderProvider } from '@/shared/contexts/HeaderContext';
 
 export default function RootLayout() {
   const router = useRouter();
@@ -161,21 +162,23 @@ export default function RootLayout() {
           <ThemeProvider>
             <AppProviders>
               <FilterProvider>
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: {
-                      backgroundColor: 'transparent',
-                    },
-                  }}
-                >
-                  <Stack.Screen name="(auth)" />
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="(drawer)" />
-                </Stack>
+                <HeaderProvider>
+                  <Stack
+                    screenOptions={{
+                      headerShown: false,
+                      contentStyle: {
+                        backgroundColor: 'transparent',
+                      },
+                    }}
+                  >
+                    <Stack.Screen name="(auth)" />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen name="(drawer)" />
+                  </Stack>
+                </HeaderProvider>
 
-                <LoaderOverlay />
-                <Toast position="bottom" />
+                {/* <LoaderOverlay /> */}
+                <Toast position="top" />
               </FilterProvider>
             </AppProviders>
           </ThemeProvider>

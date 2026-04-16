@@ -1,38 +1,75 @@
+// StatCard.tsx
 import React from 'react';
-import { View, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-
-import Animated, { FadeInDown } from 'react-native-reanimated';
-import { StatCardProps } from '../../types/stat.types';
-import { useStatCardStyles } from '../../styles/StatCardtyles';
+import { View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
+import { useStatCardStyles } from '../../styles/StatCardtyles';
 
-export const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, trend }) => {
+interface StatCardProps {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: string;
+  color: string;
+  trend?: number;
+  loading?: boolean;
+  onPress?: () => void;
+}
+
+export const StatCard: React.FC<StatCardProps> = ({
+  title,
+  value,
+  subtitle,
+  icon,
+  color,
+  trend,
+  loading = false,
+  onPress,
+}) => {
   const styles = useStatCardStyles({ color, trend });
 
-  return (
-    <Animated.View entering={FadeInDown.delay(100).springify()} style={{ flex: 1 }}>
-      <View style={styles.card}>
-        <View style={styles.headerRow}>
-          <View style={styles.iconContainer}>
-            <Ionicons name={icon as any} size={16} color={color} />
-          </View>
-          <AppText style={styles.title}>{title}</AppText>
+  const CardContent = () => (
+    <View style={styles.card}>
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="small" color={color} />
         </View>
+      )}
 
-        <View style={styles.valueRow}>
-          <AppText style={styles.value}>{value}</AppText>
-
-          {trend !== undefined && (
-            <View style={styles.trendBadge}>
-              <AppText style={styles.trendIcon}>{trend > 0 ? '↑' : '↓'}</AppText>
-              <AppText style={styles.trendText}>{Math.abs(trend)}%</AppText>
-            </View>
-          )}
-        </View>
-
-        <View style={[styles.footerLine, { backgroundColor: color + '30' }]} />
+      <View style={styles.iconContainer}>
+        <MaterialCommunityIcons name={icon as any} size={28} color={color} />
       </View>
-    </Animated.View>
+
+      <View style={styles.content}>
+        <AppText style={styles.title}>{title}</AppText>
+        <AppText style={styles.value}>{value}</AppText>
+
+        {subtitle && <AppText style={styles.subtitle}>{subtitle}</AppText>}
+
+        {trend !== undefined && trend !== 0 && (
+          <View style={styles.trendContainer}>
+            <MaterialCommunityIcons
+              name={trend > 0 ? 'arrow-up' : 'arrow-down'}
+              size={14}
+              color={trend > 0 ? '#10B981' : '#EF4444'}
+            />
+            <AppText style={[styles.trendText, { color: trend > 0 ? '#10B981' : '#EF4444' }]}>
+              {trend > 0 ? '+' : ''}
+              {trend}%
+            </AppText>
+          </View>
+        )}
+      </View>
+    </View>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        <CardContent />
+      </TouchableOpacity>
+    );
+  }
+
+  return <CardContent />;
 };

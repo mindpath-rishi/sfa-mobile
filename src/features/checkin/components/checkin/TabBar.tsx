@@ -17,8 +17,6 @@ export const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
     switch (tab) {
       case 'sale':
         return 'Sale';
-      case 'non-sale':
-        return 'Non Sale';
       case 'collection':
         return 'Collection';
       default:

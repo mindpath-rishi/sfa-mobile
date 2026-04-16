@@ -37,7 +37,7 @@ export const useProductCardStyles = () => {
     } as ViewStyle,
 
     productName: {
-      fontSize: utils.fontSize.md,
+      fontSize: utils.fontSize.sm,
       fontWeight: utils.getFontWeight('600'),
       color: colors.textPrimary,
       marginBottom: 2,

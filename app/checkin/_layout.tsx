@@ -123,8 +123,7 @@ export default function SaleLayout() {
       <Stack.Screen
         name="nonsale/final-step"
         options={createScreenOptions({
-          useCustomerTitle: true,
-          showBack: true,
+          showBack: false,
           centeredTitle: false,
         })}
       />

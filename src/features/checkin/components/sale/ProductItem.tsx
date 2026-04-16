@@ -231,21 +231,6 @@ export const ProductItem: React.FC<ProductItemProps> = ({
       const totalValue = caseQty * product.casePrice + pieceQty * product.piecePrice;
       const totalWeight =
         caseQty * (product.caseNetWeight || 0) + pieceQty * (product.pieceNetWeight || 0);
-
-      // Different messages based on mode
-      if (mode === 'topup') {
-        Alert.alert(
-          '✅ Added to Top-up',
-          `${totalItems} item(s) added\nTotal: K${totalValue.toFixed(2)}${totalWeight > 0 ? `\nWeight: ${totalWeight.toFixed(2)} kg` : ''}`,
-          [{ text: 'OK' }],
-        );
-      } else {
-        Alert.alert(
-          '✅ Added to Cart',
-          `${totalItems} item(s) added\nTotal: K${totalValue.toFixed(2)}`,
-          [{ text: 'OK' }],
-        );
-      }
     },
     [product, addItems, removeItem, mode, onUpdate],
   );
@@ -382,7 +367,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
               product={product}
               onAddToCart={handleAddToCart}
               mode={mode}
-              showName={false}
+              showName={true}
             />
           </View>
         </Animated.View>

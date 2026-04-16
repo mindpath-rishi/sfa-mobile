@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { jwtDecode } from 'jwt-decode';
 
 import { clearTokens, getAccessToken, setTokens } from '@/shared/services/tokenStorage';
+import { resetAllStores } from './reset.store';
+import { storage } from '../storage';
 
 /* ======================================================
  * TYPES
@@ -121,15 +123,24 @@ export const useAuthStore = create<{
     });
   },
 
-  /**
-   * 🚪 Logout
-   */
   logout: async () => {
-    await clearTokens();
+    try {
+      // 🔐 clear auth tokens
+      await clearTokens();
 
-    set({
-      accessToken: null,
-      user: null,
-    });
+      // 🧹 reset all zustand stores (cart, outlet, route, etc.)
+      resetAllStores();
+
+      // 🗑️ clear persisted storage (VERY IMPORTANT)
+      await storage.clear();
+
+      // 🔄 reset auth state
+      set({
+        accessToken: null,
+        user: null,
+      });
+    } catch (error) {
+      console.log('Logout error:', error);
+    }
   },
 }));

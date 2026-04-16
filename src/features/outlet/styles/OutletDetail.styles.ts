@@ -229,54 +229,50 @@ export const useOutletDetailStyles = () => {
       marginLeft: utils.spacing[1],
     } as TextStyle,
 
-    // ────────────────────────────────────────────────────────────────────────────
-    // Stats Cards
-    // ────────────────────────────────────────────────────────────────────────────
+    // Update the detailStatsRow style to handle 4 items
     detailStatsRow: {
       flexDirection: 'row',
-      paddingHorizontal: utils.spacing[4],
-      paddingBottom: utils.spacing[3],
+      flexWrap: 'wrap',
       gap: utils.spacing[2],
+      paddingHorizontal: utils.spacing[4],
+      marginBottom: utils.spacing[4],
     } as ViewStyle,
+
     detailStatCard: {
       flex: 1,
+      minWidth:   '23%',
       backgroundColor: colors.surface,
-      borderRadius: utils.borderRadius.xl,
-      paddingVertical: utils.spacing[3],
-      paddingHorizontal: utils.spacing[2],
+      borderRadius: utils.borderRadius.lg,
+      padding: utils.spacing[3],
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: colors.border + '24',
-      ...Platform.select({
-        ios: {
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-        },
-        android: {
-          elevation: 1,
-        },
-      }),
+      borderColor: colors.divider,
     } as ViewStyle,
+
     detailStatIconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: utils.borderRadius.full,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       justifyContent: 'center',
       alignItems: 'center',
       marginBottom: utils.spacing[2],
     } as ViewStyle,
+
     detailStatValue: {
       fontSize: utils.fontSize.md,
       fontWeight: utils.getFontWeight('bold'),
       color: colors.textPrimary,
-    } as TextStyle,
-    detailStatLabel: {
-      fontSize: utils.fontSize.xs,
-      color: colors.textTertiary,
       textAlign: 'center',
     } as TextStyle,
+
+    detailStatLabel: {
+      fontSize: utils.fontSize.xs,
+      color: colors.textSecondary,
+      marginTop: 2,
+      textAlign: 'center',
+    } as TextStyle,
+
+    // ────────────────────────────────────────────────────────────────────────────
 
     // ────────────────────────────────────────────────────────────────────────────
     // Visit Banner
@@ -1835,6 +1831,94 @@ export const useOutletDetailStyles = () => {
       fontSize: utils.fontSize.sm,
       fontWeight: utils.getFontWeight('semibold'),
     } as TextStyle,
+    // Add these to your useOutletDetailStyles return object (before the closing }))
+
+// Financial Grid
+financialGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  gap: utils.spacing[2],
+} as ViewStyle,
+
+financialCard: {
+  flex: 1,
+  minWidth: '48%',
+  backgroundColor: colors.background,
+  borderRadius: utils.borderRadius.lg,
+  padding: utils.spacing[3],
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: colors.divider,
+} as ViewStyle,
+
+financialLabel: {
+  fontSize: utils.fontSize.xs,
+  color: colors.textSecondary,
+  marginBottom: utils.spacing[1],
+} as TextStyle,
+
+financialValue: {
+  fontSize: utils.fontSize.md,
+  fontWeight: utils.getFontWeight('bold'),
+} as TextStyle,
+
+// Credit Utilization
+creditUtilization: {
+  marginTop: utils.spacing[3],
+  gap: utils.spacing[2],
+} as ViewStyle,
+
+creditUtilizationHeader: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+} as ViewStyle,
+
+creditUtilizationLabel: {
+  fontSize: utils.fontSize.xs,
+  color: colors.textSecondary,
+} as TextStyle,
+
+creditUtilizationPercent: {
+  fontSize: utils.fontSize.xs,
+  fontWeight: utils.getFontWeight('semibold'),
+  color: colors.textPrimary,
+} as TextStyle,
+
+creditUtilizationBar: {
+  height: 6,
+  backgroundColor: colors.divider,
+  borderRadius: 3,
+  overflow: 'hidden',
+} as ViewStyle,
+
+creditUtilizationFill: {
+  height: '100%',
+  borderRadius: 3,
+} as ViewStyle,
+
+// Info Grid
+infoGrid: {
+  gap: utils.spacing[2],
+} as ViewStyle,
+
+// Segmentation Badge
+segmentationBadge: {
+  paddingHorizontal: utils.spacing[2],
+  paddingVertical: utils.spacing[1],
+  borderRadius: utils.borderRadius.full,
+} as ViewStyle,
+
+segmentationText: {
+  fontSize: utils.fontSize.xs,
+  fontWeight: utils.getFontWeight('semibold'),
+} as TextStyle,
+
+// Overview Container
+overviewContainer: {
+  paddingBottom: utils.spacing[4],
+  gap: utils.spacing[4],
+} as ViewStyle,
   }));
 
   return styleGenerator(colors);

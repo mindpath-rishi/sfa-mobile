@@ -1,109 +1,174 @@
-import { ViewStyle, TextStyle } from 'react-native';
-import { createStyles } from '@/shared/theme/styles';
-import { useTheme } from '@/shared/hooks/useTheme';
+// VanChangeModel.styles.ts
+import { StyleSheet } from 'react-native';
 
-interface VanChangeModalStyleProps {
-  vanChangeReason?: string;
-}
-
-export const useVanChangeModalStyles = (props: VanChangeModalStyleProps = {}) => {
-  const { colors } = useTheme();
+export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}) => {
   const { vanChangeReason } = props;
 
-  const styleGenerator = createStyles((utils) => ({
-    centeredModalOverlay: {
+  return StyleSheet.create({
+    modalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+
+    bottomModalContent: {
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 24,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 5,
+    },
+
+    // Drag Indicator
+    dragIndicator: {
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    dragIndicatorBar: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+    },
+
+    // Icon
+    iconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       justifyContent: 'center',
       alignItems: 'center',
-    } as ViewStyle,
+      alignSelf: 'center',
+      marginBottom: 16,
+    },
 
-    centeredModalContent: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: utils.spacing[5],
-      width: '85%',
-      maxWidth: 360,
-    } as ViewStyle,
-
-    titleMedium: {
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('bold'),
-      color: colors.textPrimary,
+    // Title
+    title: {
+      fontSize: 22,
+      fontWeight: '700',
       textAlign: 'center',
-      marginBottom: utils.spacing[3],
-    } as TextStyle,
+      marginBottom: 8,
+    },
 
     questionText: {
-      fontSize: utils.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: 14,
       textAlign: 'center',
-      marginBottom: utils.spacing[3],
-    } as TextStyle,
+      marginBottom: 24,
+      lineHeight: 20,
+      paddingHorizontal: 16,
+    },
 
-    selectLabel: {
-      fontSize: utils.fontSize.xs,
-      fontWeight: utils.getFontWeight('semibold'),
-      color: colors.textSecondary,
-      letterSpacing: 0.4,
-      marginBottom: utils.spacing[2],
-    } as TextStyle,
-
+    // Options Container
     optionsContainer: {
-      borderWidth: 1,
-      borderColor: colors.divider,
-      borderRadius: utils.borderRadius.md,
-      marginBottom: utils.spacing[3],
-      backgroundColor: colors.surface,
-      overflow: 'hidden',
-    } as ViewStyle,
+      gap: 12,
+      marginBottom: 20,
+    },
 
     optionItem: {
-      padding: utils.spacing[4],
-      borderBottomWidth: 1,
-      borderBottomColor: colors.divider,
-    } as ViewStyle,
-
-    lastOptionItem: {
-      padding: utils.spacing[4],
-      borderBottomWidth: 0,
-    } as ViewStyle,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#E5E7EB',
+      padding: 16,
+      backgroundColor: '#FFFFFF',
+    },
 
     optionItemSelected: {
-      backgroundColor: colors.primary + '10',
-    } as ViewStyle,
+      borderColor: '#3B82F6',
+      backgroundColor: '#EFF6FF',
+    },
 
-    optionText: {
-      fontSize: utils.fontSize.sm,
-      color: colors.textPrimary,
-    } as TextStyle,
+    optionContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+
+    optionIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    optionTextContainer: {
+      flex: 1,
+    },
+
+    optionTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#1F2937',
+      marginBottom: 2,
+    },
+
+    optionDescription: {
+      fontSize: 12,
+    },
 
     optionTextSelected: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('semibold'),
-      color: colors.primary,
-    } as TextStyle,
+      color: '#3B82F6',
+    },
 
-    submitButton: {
-      backgroundColor: colors.primary,
-      borderRadius: utils.borderRadius.md,
-      padding: utils.spacing[4],
+    // Error
+    errorContainer: {
+      flexDirection: 'row',
       alignItems: 'center',
-    } as ViewStyle,
-
-    submitButtonText: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('semibold'),
-      color: colors.textInverse,
-    } as TextStyle,
+      justifyContent: 'center',
+      gap: 6,
+      marginBottom: 20,
+      paddingVertical: 8,
+      backgroundColor: '#FEF2F2',
+      borderRadius: 8,
+    },
 
     errorText: {
-      fontSize: utils.fontSize.xs,
-      color: colors.error,
-      marginBottom: utils.spacing[3],
-      fontStyle: 'italic',
-    } as TextStyle,
-  }));
+      fontSize: 12,
+      fontWeight: '500',
+    },
 
-  return styleGenerator(colors);
+    // Buttons
+    buttonContainer: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+
+    cancelButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+
+    cancelButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+
+    submitButton: {
+      flex: 1.5,
+      flexDirection: 'row',
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+
+    submitButtonDisabled: {
+      opacity: 0.5,
+    },
+
+    submitButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+  });
 };

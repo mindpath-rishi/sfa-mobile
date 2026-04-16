@@ -1,15 +1,130 @@
 // DayEndSummaryModal.styles.ts
-import { ViewStyle, TextStyle } from 'react-native';
-import { createStyles } from '@/shared/theme/styles';
+import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 export const useDayEndSummaryModalStyles = () => {
   const { colors } = useTheme();
 
-  const styleGenerator = createStyles((utils) => ({
+  return StyleSheet.create({
+    // DayEndSummaryModal.styles.ts - Update these specific styles
+
+    // Product Stats - Increased font sizes
+    productStatLabel: {
+      fontSize: 12, // Increased from 10
+      marginBottom: 6, // Increased from 4
+      color: colors.textSecondary,
+      fontWeight: '500',
+    } as TextStyle,
+
+    productStatValue: {
+      fontSize: 16, // Increased from 13
+      fontWeight: '700',
+    } as TextStyle,
+
+    productStatSub: {
+      fontSize: 11, // Increased from 9
+      marginTop: 3, // Increased from 2
+      color: colors.textTertiary,
+    } as TextStyle,
+
+    // Product Name - Increased size
+    productName: {
+      fontSize: 15, // Increased from 14
+      fontWeight: '600',
+      marginBottom: 3, // Increased from 2
+      color: colors.textPrimary,
+    } as TextStyle,
+
+    // Product Code
+    productCode: {
+      fontSize: 12, // Increased from 11
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    // Product Index
+    productIndexText: {
+      fontSize: 15, // Increased from 14
+      fontWeight: '700',
+      color: colors.primary,
+    } as TextStyle,
+
+    // Product Value Labels
+    productValueLabel: {
+      fontSize: 11, // Increased from 10
+      color: colors.textSecondary,
+      flex: 1,
+    } as TextStyle,
+
+    productValueAmount: {
+      fontSize: 14, // Increased from 13
+      fontWeight: '700',
+    } as TextStyle,
+
+    // Stats Card Items
+    statsCardItemLabel: {
+      fontSize: 11, // Increased from 10
+      marginBottom: 3,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    statsCardItemValue: {
+      fontSize: 16, // Increased from 15
+      fontWeight: '700',
+    } as TextStyle,
+
+    // Financial Row Text
+    financialLabelText: {
+      fontSize: 15, // Increased from 14
+      fontWeight: '500',
+      color: colors.textPrimary,
+    } as TextStyle,
+
+    financialStockText: {
+      width: 85,
+      fontSize: 15, // Increased from 14
+      fontWeight: '600',
+      textAlign: 'center',
+    } as TextStyle,
+
+    financialItemsText: {
+      width: 55,
+      fontSize: 15, // Increased from 14
+      fontWeight: '700',
+      textAlign: 'center',
+    } as TextStyle,
+
+    financialValueText: {
+      width: 75,
+      fontSize: 15, // Increased from 14
+      fontWeight: '700',
+      textAlign: 'right',
+    } as TextStyle,
+
+    // Tab Text
+    tabText: {
+      fontSize: 15, // Increased from 14
+      fontWeight: '600',
+    } as TextStyle,
+
+    // Card Title
+    cardTitle: {
+      fontSize: 17, // Increased from 16
+      fontWeight: '600',
+      color: colors.textPrimary,
+    } as TextStyle,
+
+    // Stats Card Title
+    statsCardTitle: {
+      fontSize: 17, // Increased from 16
+      fontWeight: '600',
+      color: colors.textPrimary,
+    } as TextStyle,
+    container: {
+      flex: 1,
+    } as ViewStyle,
+
     modalContainer: {
       flex: 1,
-      backgroundColor: colors.background,
     } as ViewStyle,
 
     modalContent: {
@@ -17,309 +132,550 @@ export const useDayEndSummaryModalStyles = () => {
       padding: 0,
     } as ViewStyle,
 
-    container: {
+    scrollContent: {
+      padding: 16,
+      paddingBottom: 24,
+    } as ViewStyle,
+
+    // ============================
+    // Tab Bar
+    // ============================
+    tabBar: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    } as ViewStyle,
+
+    tab: {
       flex: 1,
-      paddingHorizontal: utils.spacing[4],
-      paddingTop: utils.spacing[2],
-    } as ViewStyle,
-
-    dateSection: {
-      alignItems: 'center',
-      marginBottom: utils.spacing[5],
-      marginTop: utils.spacing[2],
-    } as ViewStyle,
-
-    dateBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: utils.spacing[2],
-      paddingHorizontal: utils.spacing[4],
-      borderRadius: 20,
-      gap: utils.spacing[2],
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 14,
     } as ViewStyle,
 
-    dateText: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '500',
-    } as TextStyle,
-
-    summaryGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      gap: utils.spacing[3],
-      marginBottom: utils.spacing[5],
+    tabActive: {
+      borderBottomWidth: 2,
+      borderBottomColor: colors.primary,
     } as ViewStyle,
 
-    summaryCard: {
-      width: '48%',
+    // ============================
+    // Cards
+    // ============================
+    card: {
       borderRadius: 16,
-      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.divider,
+      padding: 16,
+      marginBottom: 16,
+      backgroundColor: colors.surface,
     } as ViewStyle,
 
-    summaryGradient: {
+    cardHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      padding: utils.spacing[3],
-      gap: utils.spacing[3],
+      gap: 10,
+      marginBottom: 16,
     } as ViewStyle,
 
-    summaryIcon: {
-      width: 46,
-      height: 46,
-      borderRadius: 23,
+    // ============================
+    // Stats Card (Reusable component)
+    // ============================
+    statsCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      marginBottom: 16,
+      overflow: 'hidden',
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    statsCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    } as ViewStyle,
+
+    statsCardIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
     } as ViewStyle,
 
-    summaryContent: {
-      flex: 1,
+    statsCardGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      padding: 12,
+      gap: 12,
     } as ViewStyle,
 
-    summaryValue: {
-      fontSize: utils.fontSize.md,
-      fontWeight: '700',
-      marginBottom: utils.spacing[0.5],
-    } as TextStyle,
-
-    summaryLabel: {
-      fontSize: utils.fontSize.xs,
-    } as TextStyle,
-
-    productsSection: {
+    statsCardItem: {
       flex: 1,
-      marginBottom: utils.spacing[4],
-    } as ViewStyle,
-
-    sectionHeader: {
+      minWidth: '30%',
       flexDirection: 'row',
       alignItems: 'center',
-      gap: utils.spacing[2],
-      marginBottom: utils.spacing[3],
+      gap: 10,
+      padding: 10,
+      borderRadius: 10,
     } as ViewStyle,
 
-    sectionTitle: {
-      fontSize: utils.fontSize.md,
+    statsCardItemIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    // ============================
+    // Financial Summary Header & Rows
+    // ============================
+    financialHeader: {
+      flexDirection: 'row',
+      paddingBottom: 10,
+      marginBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    } as ViewStyle,
+
+    financialHeaderLabel: {
+      flex: 1,
+      fontSize: 12,
       fontWeight: '600',
-      flex: 1,
+      color: colors.textSecondary,
     } as TextStyle,
 
-    productBadge: {
-      paddingHorizontal: utils.spacing[2],
-      paddingVertical: utils.spacing[0.5],
-      borderRadius: 12,
-      minWidth: 32,
-      alignItems: 'center',
-    } as ViewStyle,
-
-    productBadgeText: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '700',
+    financialHeaderStock: {
+      width: 85,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+      color: colors.textSecondary,
     } as TextStyle,
 
-    productsList: {
-      gap: utils.spacing[2],
-    } as ViewStyle,
+    financialHeaderItems: {
+      width: 55,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+      color: colors.textSecondary,
+    } as TextStyle,
 
-    productItem: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: utils.spacing[3],
-      borderWidth: 1,
-      borderColor: colors.border,
-    } as ViewStyle,
+    financialHeaderValue: {
+      width: 75,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'right',
+      color: colors.textSecondary,
+    } as TextStyle,
 
-    productHeader: {
+    financialRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: utils.spacing[2],
-      gap: utils.spacing[2],
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
     } as ViewStyle,
 
-    productNumber: {
-      width: 28,
-      height: 28,
+    financialRowLabel: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    } as ViewStyle,
+
+    // ============================
+    // Stat Dot
+    // ============================
+    statDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    } as ViewStyle,
+
+    // ============================
+    // Products List
+    // ============================
+    productsList: {
+      padding: 16,
+      paddingBottom: 24,
+      gap: 10,
+    } as ViewStyle,
+
+    productCard: {
+      padding: 14,
       borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    productRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+    } as ViewStyle,
+
+    productIndex: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
       backgroundColor: colors.primary + '10',
       alignItems: 'center',
       justifyContent: 'center',
     } as ViewStyle,
 
-    productNumberText: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '700',
-    } as TextStyle,
-
-    productInfo: {
+    productDetails: {
       flex: 1,
     } as ViewStyle,
 
-    productName: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '600',
-      marginBottom: utils.spacing[0.5],
-    } as TextStyle,
+    productStats: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    } as ViewStyle,
 
-    productMeta: {
+    productStat: {
+      flex: 1,
+      alignItems: 'center',
+    } as ViewStyle,
+
+    productValueRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    } as ViewStyle,
+
+    productValueItem: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: utils.spacing[1],
+      gap: 6,
     } as ViewStyle,
 
-    productId: {
-      fontSize: utils.fontSize.xs,
+    // ============================
+    // Footer
+    // ============================
+    footer: {
+      flexDirection: 'row',
+      padding: 16,
+      paddingBottom: 24,
+      gap: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    cancelButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      alignItems: 'center',
+      backgroundColor: colors.background,
+    } as ViewStyle,
+
+    cancelButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
     } as TextStyle,
 
-    dot: {
-      width: 3,
-      height: 3,
-      borderRadius: 1.5,
-      backgroundColor: colors.textTertiary,
+    proceedButton: {
+      flex: 2,
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+      backgroundColor: colors.primary,
     } as ViewStyle,
 
-    productUnit: {
-      fontSize: utils.fontSize.xs,
-    } as TextStyle,
-
-    productValue: {
-      alignItems: 'flex-end',
-    } as ViewStyle,
-
-    productValueText: {
-      fontSize: utils.fontSize.sm,
+    proceedButtonText: {
+      fontSize: 14,
       fontWeight: '700',
+      color: '#FFFFFF',
+    } as TextStyle,
+
+    // ============================
+    // Empty State
+    // ============================
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 60,
+      gap: 12,
+    } as ViewStyle,
+
+    emptyText: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    // ============================
+    // Legacy/Deprecated Styles (Keep for compatibility)
+    // ============================
+    soldGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    } as ViewStyle,
+
+    soldItem: {
+      flex: 1,
+      minWidth: '47%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.background,
+      padding: 12,
+      borderRadius: 12,
+    } as ViewStyle,
+
+    soldIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    soldLabel: {
+      fontSize: 11,
+      marginBottom: 2,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    soldValue: {
+      fontSize: 18,
+      fontWeight: '800',
+    } as TextStyle,
+
+    closingGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    } as ViewStyle,
+
+    closingItem: {
+      flex: 1,
+      minWidth: '30%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.background,
+      padding: 12,
+      borderRadius: 12,
+    } as ViewStyle,
+
+    closingIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    closingLabel: {
+      fontSize: 10,
+      marginBottom: 2,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    closingValue: {
+      fontSize: 16,
+      fontWeight: '800',
+    } as TextStyle,
+
+    currentStockGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    } as ViewStyle,
+
+    currentStockItem: {
+      flex: 1,
+      minWidth: '30%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: colors.background,
+      padding: 12,
+      borderRadius: 12,
+    } as ViewStyle,
+
+    currentStockIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    currentStockLabel: {
+      fontSize: 10,
+      marginBottom: 2,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    currentStockValue: {
+      fontSize: 16,
+      fontWeight: '800',
+    } as TextStyle,
+
+    statsHeader: {
+      flexDirection: 'row',
+      paddingBottom: 10,
+      marginBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
+    } as ViewStyle,
+
+    statsHeaderLabel: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    statsHeaderValue: {
+      width: 90,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    statsHeaderItems: {
+      width: 60,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'right',
+      color: colors.textSecondary,
     } as TextStyle,
 
     statsRow: {
       flexDirection: 'row',
-      gap: utils.spacing[2],
-      paddingTop: utils.spacing[2],
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.divider,
     } as ViewStyle,
 
-    statChip: {
+    statsRowLabel: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: utils.spacing[1],
-      paddingVertical: utils.spacing[1.5],
-      paddingHorizontal: utils.spacing[2],
-      borderRadius: 8,
+      gap: 8,
     } as ViewStyle,
 
-    statChipLabel: {
-      fontSize: utils.fontSize.xs,
-    } as TextStyle,
-
-    statChipValue: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '600',
-      marginLeft: 'auto',
-    } as TextStyle,
-
-    emptyState: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: utils.spacing[8],
-    } as ViewStyle,
-
-    emptyIcon: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: utils.spacing[3],
-    } as ViewStyle,
-
-    emptyTitle: {
-      fontSize: utils.fontSize.md,
+    statLabelText: {
+      fontSize: 14,
       fontWeight: '500',
-      marginBottom: utils.spacing[1],
+      color: colors.textPrimary,
     } as TextStyle,
 
-    emptySubtitle: {
-      fontSize: utils.fontSize.sm,
+    statValueText: {
+      width: 90,
+      fontSize: 14,
+      fontWeight: '600',
       textAlign: 'center',
     } as TextStyle,
 
-    footer: {
-      flexDirection: 'row',
-      gap: utils.spacing[3],
-      paddingHorizontal: utils.spacing[4],
-      paddingVertical: utils.spacing[4],
-      borderTopWidth: 1,
-    } as ViewStyle,
-
-    closeButton: {
-      flex: 1,
-      paddingVertical: utils.spacing[3],
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      flexDirection: 'row',
-      gap: utils.spacing[1],
-    } as ViewStyle,
-
-    closeButtonText: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '600',
+    statItemsText: {
+      width: 60,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'right',
     } as TextStyle,
 
-    confirmButton: {
-      flex: 2,
-      borderRadius: 12,
-      overflow: 'hidden',
+    statsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
     } as ViewStyle,
 
-    confirmGradient: {
+    statItem: {
+      flex: 1,
+      minWidth: '22%',
+      alignItems: 'center',
+      gap: 4,
+    } as ViewStyle,
+
+    statLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    statValue: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    } as TextStyle,
+
+    valueGrid: {
+      gap: 14,
+    } as ViewStyle,
+
+    valueItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: utils.spacing[2],
-      paddingVertical: utils.spacing[3],
+      gap: 12,
     } as ViewStyle,
 
-    confirmButtonText: {
-      color: '#FFFFFF',
-      fontSize: utils.fontSize.sm,
+    valueIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    valueLabel: {
+      fontSize: 12,
+      marginBottom: 2,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    valueAmount: {
+      fontSize: 16,
       fontWeight: '700',
     } as TextStyle,
-    // Add to DayEndSummaryModal.styles.ts
 
-    valueRow: {
-      flexDirection: 'row',
-      gap: utils.spacing[2],
-      marginTop: utils.spacing[2],
-      paddingTop: utils.spacing[2],
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    } as ViewStyle,
-
-    valueChip: {
-      flex: 1,
+    quickStatsRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: utils.spacing[1],
-      backgroundColor: colors.background,
-      paddingVertical: utils.spacing[1.5],
-      paddingHorizontal: utils.spacing[2],
-      borderRadius: 8,
+      justifyContent: 'space-around',
     } as ViewStyle,
 
-    valueChipLabel: {
-      fontSize: utils.fontSize.xs,
+    quickStat: {
+      flex: 1,
+      alignItems: 'center',
+    } as ViewStyle,
+
+    quickStatValue: {
+      fontSize: 22,
+      fontWeight: '800',
+      marginBottom: 4,
     } as TextStyle,
 
-    valueChipAmount: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '600',
-      marginLeft: 'auto',
+    quickStatLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
     } as TextStyle,
-  }));
 
-  return styleGenerator(colors);
+    quickDivider: {
+      width: 1,
+      height: 40,
+      backgroundColor: colors.divider,
+    } as ViewStyle,
+  });
 };

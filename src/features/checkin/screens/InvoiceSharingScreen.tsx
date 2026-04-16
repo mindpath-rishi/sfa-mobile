@@ -41,10 +41,15 @@ export default function InvoiceSharingScreen() {
   // Get customerId from params or invoice data
   const customerId = (params.customerId as string) || invoice?.customerId || 'CUST0001';
 
-  // Handle back navigation to check-in screen
   const handleBackNavigation = () => {
-    router.replace(`/outlets/${customerId}`);
-    return true;
+    // Step 1: go to outlets root
+    router.replace('/route');
+
+    // Step 2: then push detail screen
+    setTimeout(() => {
+      // router.push(`/outlets/${customerId}/visit`);
+      router.push(`/route/${customerId}`);
+    }, 0);
   };
 
   // Handle hardware back button (Android)

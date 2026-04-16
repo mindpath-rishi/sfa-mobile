@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { registerStoreReset } from './reset.store';
 
 /* ======================================================
  * TYPES
@@ -8,6 +9,7 @@ export type Van = {
   vanId: string;
   name?: string;
   vanName?: string;
+  vanNumber?: string;
 };
 
 export type Route = {
@@ -31,35 +33,52 @@ type RouteStore = {
   setSelectedRoute: (route: Route | null) => void;
 
   /* ================= RESET ================= */
-  resetRouteStore: () => void;
+  reset: () => void;              // ✅ global reset support
+  resetRouteStore: () => void;    // ✅ manual reset (existing)
+};
+
+/* ======================================================
+ * INITIAL STATE
+ * ====================================================== */
+
+const initialState = {
+  van: null,
+  selectedRoute: null,
 };
 
 /* ======================================================
  * STORE
  * ====================================================== */
 
-export const useRouteStore = create<RouteStore>((set) => ({
-  van: null,
-  selectedRoute: null,
+export const useRouteStore = create<RouteStore>((set) => {
+  // 🔥 AUTO REGISTER FOR GLOBAL RESET
+  registerStoreReset('route', () => {
+    set(initialState);
+  });
 
-  /* ================= VAN ================= */
+  return {
+    ...initialState,
 
-  setVan: (van) => {
-    set({ van });
-  },
+    /* ================= RESET ================= */
 
-  /* ================= ROUTE ================= */
+    reset: () => {
+      set(initialState);
+    },
 
-  setSelectedRoute: (route) => {
-    set({ selectedRoute: route });
-  },
+    resetRouteStore: () => {
+      set(initialState);
+    },
 
-  /* ================= RESET ================= */
+    /* ================= VAN ================= */
 
-  resetRouteStore: () => {
-    set({
-      van: null,
-      selectedRoute: null,
-    });
-  },
-}));
+    setVan: (van) => {
+      set({ van });
+    },
+
+    /* ================= ROUTE ================= */
+
+    setSelectedRoute: (route) => {
+      set({ selectedRoute: route });
+    },
+  };
+});

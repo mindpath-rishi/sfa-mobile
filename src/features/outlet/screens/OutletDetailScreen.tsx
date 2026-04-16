@@ -323,10 +323,11 @@ export default function CustomerDetailScreen() {
           checkOutTime: visit.checkOutTime ? new Date(visit.checkOutTime) : undefined,
           status: visit.status,
           routeSessionId: visit?.routeSessionId,
+          customerId: visit?.customerId,
         });
         setShowVisitModal(false);
         setVisitNote('');
-        router.push(`/outlets/${customer.customerId}/visit`);
+        router.push(`/route/visit`);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to start visit');
@@ -337,7 +338,7 @@ export default function CustomerDetailScreen() {
 
   const handleVisitAction = useCallback(() => {
     if (activeVisit) {
-      router.push(`/outlets/${customer?.customerId}/visit`);
+      router.push(`/route/visit`);
     } else {
       // setShowVisitModal(true);
       handleStartVisit();
@@ -378,7 +379,7 @@ export default function CustomerDetailScreen() {
         />
       ) : null}
 
-      {!isTabScrolled ? <StatsRow customer={customer} styles={styles} colors={colors} /> : null}
+      {/* {!isTabScrolled ? <StatsRow customer={customer} styles={styles} colors={colors} /> : null} */}
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} styles={styles} colors={colors} />
 
       <TabContent
@@ -498,13 +499,9 @@ const EmptyState = ({ styles, colors }: any) => (
 const CustomerHeader = ({ customer, styles, colors, onBack, onEdit, onShare, compact }: any) => (
   <Animated.View entering={FadeInDown.duration(400)} style={styles.detailHeader}>
     <View style={[styles.headerTopRow, compact && styles.headerTopRowCompact]}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
+      {/* <TouchableOpacity onPress={onBack} style={styles.backButton}>
         <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-      </TouchableOpacity>
-      <View style={styles.headerPill}>
-        <Ionicons name="storefront-outline" size={14} color={colors.primary} />
-        <AppText style={styles.headerPillText}>Outlet Details</AppText>
-      </View>
+      </TouchableOpacity> */}
     </View>
 
     <View style={[styles.detailHeroCard, compact && styles.detailHeroCardCompact]}>
@@ -569,43 +566,7 @@ const CustomerHeader = ({ customer, styles, colors, onBack, onEdit, onShare, com
   </Animated.View>
 );
 
-const StatsRow = ({ customer, styles, colors }: any) => (
-  <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.detailStatsRow}>
-    {[
-      {
-        icon: 'cash-outline',
-        value: customer.creditLimit ? `K${customer.creditLimit.toLocaleString()}` : 'N/A',
-        label: 'Credit Limit',
-        color: colors.primary,
-        bgColor: colors.primary + '10',
-      },
-      {
-        icon: 'cart-outline',
-        value: customer.totalOrders?.toString() || '0',
-        label: 'Sales',
-        color: colors.primary,
-        bgColor: colors.primary + '10',
-      },
-      {
-        icon: 'wallet-outline',
-        value: customer.outstanding ? `K${customer.outstanding.toLocaleString()}` : 'N/A',
-        label: 'Outstanding',
-        color: colors.warning,
-        bgColor: colors.warning + '10',
-      },
-    ].map((stat, i) => (
-      <View key={i} style={styles.detailStatCard}>
-        <View style={[styles.detailStatIconWrap, { backgroundColor: stat.bgColor }]}>
-          <Ionicons name={stat.icon as any} size={18} color={stat.color} />
-        </View>
-        <AppText style={styles.detailStatValue} numberOfLines={1}>
-          {stat.value}
-        </AppText>
-        <AppText style={styles.detailStatLabel}>{stat.label}</AppText>
-      </View>
-    ))}
-  </Animated.View>
-);
+
 
 const VisitBanner = ({ activeVisit, customer, onStartVisit, styles, colors }: any) => {
   if (activeVisit) {
@@ -1295,101 +1256,253 @@ const ActivityTab = ({ activities, loading, hasMore, total, onLoadMore, styles, 
 };
 
 const OverviewTab = ({ customer, styles, colors }: any) => (
-  <View>
-    <View style={styles.overviewStatsRow}>
-      {[
-        {
-          icon: 'trending-up-outline',
-          value: customer.totalValue ? `K${customer.totalValue.toLocaleString()}` : 'N/A',
-          label: 'Total Value',
-          color: colors.success,
-        },
-        {
-          icon: 'time-outline',
-          value: customer.creditDays ? `${customer.creditDays}d` : 'N/A',
-          label: 'Credit Days',
-          color: colors.primary,
-        },
-        {
-          icon: 'calendar-outline',
-          value: customer.lastVisitedAt
-            ? moment(customer.lastVisitedAt).format('DD MMM YYYY')
-            : 'N/A',
-          label: 'Last Visit',
-          color: colors.primary,
-        },
-      ].map((stat, i) => (
-        <View key={i} style={[styles.overviewStatCard, { backgroundColor: colors.surface }]}>
-          <Ionicons name={stat.icon as any} size={22} color={stat.color} />
-          <AppText style={styles.overviewStatValue}>{stat.value}</AppText>
-          <AppText style={styles.overviewStatLabel}>{stat.label}</AppText>
+  <View style={styles.overviewContainer}>
+    {/* Stats Row - Credit Limit, Credit Days, Outstanding, Last Visit */}
+    {/* <StatsRow customer={customer} styles={styles} colors={colors} /> */}
+
+    {/* Financial Overview Section */}
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeaderIcon, { backgroundColor: colors.primary + '10' }]}>
+          <Ionicons name="wallet-outline" size={18} color={colors.primary} />
         </View>
-      ))}
+        <View style={styles.sectionHeaderText}>
+          <AppText style={styles.sectionTitle}>Financial Overview</AppText>
+          <AppText style={styles.sectionSubtitle}>Credit and payment summary</AppText>
+        </View>
+      </View>
+
+      <View style={styles.financialGrid}>
+        <View style={styles.financialCard}>
+          <AppText style={styles.financialLabel}>Credit Limit</AppText>
+          <AppText style={[styles.financialValue, { color: colors.primary }]}>
+            {customer.creditLimit ? formatCurrency(customer.creditLimit) : 'K 0'}
+          </AppText>
+        </View>
+        <View style={styles.financialCard}>
+          <AppText style={styles.financialLabel}>Credit Days</AppText>
+          <AppText style={[styles.financialValue, { color: colors.info }]}>
+            {customer.creditDays ? `${customer.creditDays} days` : 'N/A'}
+          </AppText>
+        </View>
+        <View style={styles.financialCard}>
+          <AppText style={styles.financialLabel}>Outstanding</AppText>
+          <AppText style={[styles.financialValue, { color: colors.warning }]}>
+            {customer.outstanding ? formatCurrency(customer.outstanding) : 'K 0'}
+          </AppText>
+        </View>
+        <View style={styles.financialCard}>
+          <AppText style={styles.financialLabel}>Last Visit</AppText>
+          <AppText style={[styles.financialValue, { color: colors.success }]}>
+            {customer.lastVisitedAt ? moment(customer.lastVisitedAt).format('DD MMM YYYY') : 'Never'}
+          </AppText>
+        </View>
+      </View>
+
+      {/* {customer.outstanding && customer.creditLimit && (
+        <View style={styles.creditUtilization}>
+          <View style={styles.creditUtilizationHeader}>
+            <AppText style={styles.creditUtilizationLabel}>Credit Utilization</AppText>
+            <AppText style={styles.creditUtilizationPercent}>
+              {Math.round((customer.outstanding / customer.creditLimit) * 100)}%
+            </AppText>
+          </View>
+          <View style={styles.creditUtilizationBar}>
+            <View 
+              style={[
+                styles.creditUtilizationFill, 
+                { 
+                  width: `${Math.min((customer.outstanding / customer.creditLimit) * 100, 100)}%`,
+                  backgroundColor: (customer.outstanding / customer.creditLimit) > 0.8 ? colors.error : colors.success
+                }
+              ]} 
+            />
+          </View>
+        </View>
+      )} */}
     </View>
 
-    <Section
-      title="Business Details"
-      subtitle="Classification and account settings"
-      icon="briefcase-outline"
-      styles={styles}
-      colors={colors}
-    >
-      {[
-        { label: 'Business Type', value: customer.customerTypeId || 'N/A' },
-        { label: 'Category', value: customer.customerCategoryId || 'N/A' },
-        { label: 'Channel', value: customer.channelId || 'N/A' },
-        { label: 'Market', value: customer.marketId || 'N/A' },
-        { label: 'Segmentation', value: customer.segmentation || 'N/A' },
-        {
-          label: 'Credit Limit',
-          value: customer.creditLimit ? `K${customer.creditLimit.toLocaleString()}` : 'N/A',
-        },
-        {
-          label: 'Outstanding',
-          value: customer.outstanding ? `K${customer.outstanding.toLocaleString()}` : 'N/A',
-        },
-      ].map((item, i) => (
-        <InfoRow key={i} {...item} styles={styles} />
-      ))}
-    </Section>
+    {/* Business Details Section */}
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeaderIcon, { backgroundColor: colors.primary + '10' }]}>
+          <Ionicons name="business-outline" size={18} color={colors.primary} />
+        </View>
+        <View style={styles.sectionHeaderText}>
+          <AppText style={styles.sectionTitle}>Business Details</AppText>
+          <AppText style={styles.sectionSubtitle}>Classification and account settings</AppText>
+        </View>
+      </View>
 
-    <Section
-      title="Contact Information"
-      subtitle="Quick actions for calling, messaging, and navigation"
-      icon="call-outline"
-      styles={styles}
-      colors={colors}
-    >
-      {[
-        {
-          icon: 'call-outline',
-          label: customer.phoneNumber,
-          onPress: () => Linking.openURL(`tel:${customer.phoneNumber}`),
-          color: colors.primary,
-        },
-        {
-          icon: 'logo-whatsapp',
-          label: customer.phoneNumber,
-          onPress: () =>
-            Linking.openURL(`https://wa.me/${customer.phoneNumber?.replace(/[^0-9]/g, '')}`),
-          color: colors.success,
-        },
-        {
-          icon: 'location-outline',
-          label: `${customer.address?.line1 || ''}`,
-          onPress: () => Linking.openURL(getMapUrl(customer.address)),
-          color: colors.primary,
-        },
-      ].map((contact, i) => (
-        <TouchableOpacity key={i} style={styles.contactRow} onPress={contact.onPress}>
-          <Ionicons name={contact.icon as any} size={18} color={contact.color} />
-          <AppText style={styles.contactRowText}>{contact.label}</AppText>
+      <View style={styles.infoGrid}>
+        <View style={styles.infoRow}>
+          <AppText style={styles.infoLabel}>Business Type</AppText>
+          <AppText style={styles.infoValue}>{customer.customerTypeId || 'N/A'}</AppText>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <AppText style={styles.infoLabel}>Category</AppText>
+          <AppText style={styles.infoValue}>{customer.customerCategoryId || 'N/A'}</AppText>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <AppText style={styles.infoLabel}>Channel</AppText>
+          <AppText style={styles.infoValue}>{customer.channelId || 'N/A'}</AppText>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <AppText style={styles.infoLabel}>Market</AppText>
+          <AppText style={styles.infoValue}>{customer.marketId || 'N/A'}</AppText>
+        </View>
+        
+        <View style={styles.infoRow}>
+          <AppText style={styles.infoLabel}>Segmentation</AppText>
+          <View style={[styles.segmentationBadge, { backgroundColor: getSegmentationColor(customer.segmentation) + '15' }]}>
+            <AppText style={[styles.segmentationText, { color: getSegmentationColor(customer.segmentation) }]}>
+              {customer.segmentation || 'Standard'}
+            </AppText>
+          </View>
+        </View>
+      </View>
+    </View>
+
+    {/* Contact Information Section */}
+    <View style={styles.sectionCard}>
+      <View style={styles.sectionHeader}>
+        <View style={[styles.sectionHeaderIcon, { backgroundColor: colors.primary + '10' }]}>
+          <Ionicons name="call-outline" size={18} color={colors.primary} />
+        </View>
+        <View style={styles.sectionHeaderText}>
+          <AppText style={styles.sectionTitle}>Contact Information</AppText>
+          <AppText style={styles.sectionSubtitle}>Quick actions for calling and navigation</AppText>
+        </View>
+      </View>
+
+      {customer.phoneNumber && (
+        <TouchableOpacity 
+          style={styles.contactRow} 
+          onPress={() => Linking.openURL(`tel:${customer.phoneNumber}`)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.detailContactIcon}>
+            <Ionicons name="call-outline" size={18} color={colors.primary} />
+          </View>
+          <AppText style={styles.detailContactText}>{customer.phoneNumber}</AppText>
           <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
-      ))}
-    </Section>
+      )}
+
+      {customer.phoneNumber && (
+        <TouchableOpacity 
+          style={styles.contactRow} 
+          onPress={() => Linking.openURL(`https://wa.me/${customer.phoneNumber.replace(/[^0-9]/g, '')}`)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.detailContactIcon, { backgroundColor: colors.success + '10' }]}>
+            <Ionicons name="logo-whatsapp" size={18} color={colors.success} />
+          </View>
+          <AppText style={styles.detailContactText}>{customer.phoneNumber}</AppText>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+      )}
+
+      {customer.address?.line1 && (
+        <TouchableOpacity 
+          style={styles.contactRow} 
+          onPress={() => Linking.openURL(getMapUrl(customer.address))}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.detailContactIcon, { backgroundColor: colors.info + '10' }]}>
+            <Ionicons name="location-outline" size={18} color={colors.info} />
+          </View>
+          <AppText style={styles.detailContactText} numberOfLines={1}>
+            {customer.address.line1}{customer.address.line2 ? `, ${customer.address.line2}` : ''}
+          </AppText>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+      )}
+
+      {customer.email && (
+        <TouchableOpacity 
+          style={styles.contactRow} 
+          onPress={() => Linking.openURL(`mailto:${customer.email}`)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.detailContactIcon, { backgroundColor: colors.warning + '10' }]}>
+            <Ionicons name="mail-outline" size={18} color={colors.warning} />
+          </View>
+          <AppText style={styles.detailContactText} numberOfLines={1}>{customer.email}</AppText>
+          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
+      )}
+    </View>
   </View>
 );
+
+// StatsRow Component - Shows Credit Limit, Credit Days, Outstanding, Last Visit
+const StatsRow = ({ customer, styles, colors }: any) => (
+  <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.detailStatsRow}>
+    {[
+      {
+        icon: 'cash-outline',
+        value: customer.creditLimit ? formatCurrency(customer.creditLimit) : 'N/A',
+        label: 'Credit Limit',
+        color: colors.primary,
+      },
+      {
+        icon: 'calendar-outline',
+        value: customer.creditDays ? `${customer.creditDays}d` : 'N/A',
+        label: 'Credit Days',
+        color: colors.info,
+      },
+      {
+        icon: 'wallet-outline',
+        value: customer.outstanding ? formatCurrency(customer.outstanding) : 'K 0',
+        label: 'Outstanding',
+        color: colors.warning,
+      },
+      {
+        icon: 'time-outline',
+        value: customer.lastVisitedAt ? moment(customer.lastVisitedAt).format('DD MMM') : 'Never',
+        label: 'Last Visit',
+        color: colors.success,
+      },
+    ].map((stat, i) => (
+      <View key={i} style={styles.detailStatCard}>
+        <View style={[styles.detailStatIconWrap, { backgroundColor: stat.color + '10' }]}>
+          <Ionicons name={stat.icon as any} size={20} color={stat.color} />
+        </View>
+        <AppText style={styles.detailStatValue} numberOfLines={1}>
+          {stat.value}
+        </AppText>
+        <AppText style={styles.detailStatLabel}>{stat.label}</AppText>
+      </View>
+    ))}
+  </Animated.View>
+);
+
+// Helper function for segmentation colors
+const getSegmentationColor = (segmentation: string): string => {
+  const { colors } = useTheme();
+  switch (segmentation?.toLowerCase()) {
+    case 'platinum':
+    case 'premium':
+      return colors?.success || '#10B981';
+    case 'gold':
+    case 'high':
+      return colors?.warning || '#F59E0B';
+    case 'silver':
+    case 'medium':
+      return colors?.info || '#3B82F6';
+    case 'bronze':
+    case 'low':
+      return colors?.error || '#EF4444';
+    default:
+      return colors?.primary || '#8B5CF6';
+  }
+};
+
+
 
 const Section = ({ title, subtitle, icon, children, styles, colors }: any) => (
   <View style={styles.sectionCard}>

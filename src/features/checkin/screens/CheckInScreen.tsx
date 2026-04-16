@@ -14,6 +14,7 @@ import { TabBar } from '../components/checkin/TabBar';
 import { NonSaleCategoryScreen } from './NonSaleCategoryScreen';
 import { useOutletStore } from '@/core/store/outlet.store';
 import PaymentsScreen from 'app/(drawer)/collection';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 
 export default function CheckInScreen() {
   const { colors } = useTheme();
@@ -29,6 +30,17 @@ export default function CheckInScreen() {
 
   const productsScreenRef = useRef<ProductsScreenRef>(null);
   const [productsCount, setProductsCount] = useState(0);
+  const { setHeader } = useHeader();
+
+  useFocusEffect(
+    useCallback(() => {
+      setHeader({
+        title: outlet?.name,
+        showBack: true,
+        showFilter: true,
+      });
+    }, [outlet]),
+  );
 
   useFocusEffect(
     useCallback(() => {

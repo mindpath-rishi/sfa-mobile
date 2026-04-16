@@ -1,42 +1,56 @@
 // DayEndSummaryModal.tsx
-import React, { useEffect, useMemo, useCallback, useState } from 'react';
-import { View, TouchableOpacity, Animated, ScrollView } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import {
+  View,
+  TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  Animated,
+  SafeAreaView,
+  ScrollView,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useDayEndSummaryModalStyles } from '../../styles/DayEndSummaryModal.styles';
-import { LinearGradient } from 'expo-linear-gradient';
 
 interface DayEndSummaryModalProps {
   visible: boolean;
   data?: {
     summary: {
-      totalProducts: number;
-      stock: {
-        openingQty: number;
-        openingCases: number;
-        openingPieces: number;
-        inQty: number;
-        inCases: number;
-        inPieces: number;
-        outQty: number;
-        outCases: number;
-        outPieces: number;
-        adjustmentQty: number;
-        closingQty: number;
-        closingCases: number;
-        closingPieces: number;
+      opening: {
+        qty: number;
+        cases: number;
+        pieces: number;
+        items: number;
+        value: number;
+        weight: number;
       };
-      value: {
-        totalValue: number;
-        totalWeight: number;
-        saleTotal: number;
-        leftStockTotal: number;
+      received: {
+        qty: number;
+        cases: number;
+        pieces: number;
+        items: number;
+        value: number;
+        weight: number;
       };
-      analytics: {
-        totalStockMoved: number;
-        expectedClosing: number;
-        variance: number;
+      sold: {
+        qty: number;
+        cases: number;
+        pieces: number;
+        items: number;
+        value: number;
+        weight: number;
+      };
+      closing: {
+        qty: number;
+        cases: number;
+        pieces: number;
+        items: number;
+        value: number;
+        weight: number;
       };
     };
     products: Array<{
@@ -46,19 +60,27 @@ interface DayEndSummaryModalProps {
       openingQty: number;
       openingCases: number;
       openingPieces: number;
+      openingValue: number;
+      openingWeight: number;
+      openingItems: number;
       inQty: number;
       inCases: number;
       inPieces: number;
+      receivedValue: number;
+      receivedWeight: number;
+      receivedItems: number;
       outQty: number;
       outCases: number;
       outPieces: number;
+      soldValue: number;
+      soldWeight: number;
+      soldItems: number;
       closingQty: number;
       closingCases: number;
       closingPieces: number;
-      totalValue: number;
-      totalWeight: number;
-      saleValue: number;
-      leftStockValue: number;
+      closingValue: number;
+      closingWeight: number;
+      closingItems: number;
     }>;
   };
   onClose: () => void;
@@ -74,294 +96,113 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
   const styles = useDayEndSummaryModalStyles();
   const { colors } = useTheme();
 
-  const opacityAnim = useState(new Animated.Value(0))[0];
+  const [activeTab, setActiveTab] = useState<'overview' | 'products'>('overview');
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
   const formatCurrency = useCallback((value: number) => {
-    if (value >= 1000000) {
-      return `ZMW ${(value / 1000000).toFixed(1)}M`;
-    }
-    if (value >= 1000) {
-      return `ZMW ${(value / 1000).toFixed(1)}K`;
-    }
-    return `ZMW ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `K ${value.toLocaleString()}`;
   }, []);
 
   const formatStock = useCallback((cases: number, pieces: number) => {
-    const parts = [];
-    if (cases > 0) parts.push(`${cases} Case${cases > 1 ? 's' : ''}`);
-    if (pieces > 0) parts.push(`${pieces} Pcs`);
-    return parts.length > 0 ? parts.join(' • ') : '-';
+    if (cases === 0 && pieces === 0) return '-';
+    return `${cases}C ${pieces}P`;
   }, []);
 
   useEffect(() => {
-    if (visible && data) {
-      opacityAnim.setValue(0);
-      Animated.timing(opacityAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
+    if (visible) {
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+    } else {
+      fadeAnim.setValue(0);
     }
-  }, [visible, data, opacityAnim]);
+  }, [visible, fadeAnim]);
 
-  const summaryStats = useMemo(() => {
-    if (!data?.summary) return [];
+  if (!data?.summary) return null;
 
-    const { stock, value } = data.summary;
+  const { opening, received, sold, closing } = data.summary;
 
-    return [
-      {
-        id: 'sold',
-        label: 'Quantity Sold',
-        value: formatStock(stock.outCases, stock.outPieces),
-        icon: 'trending-up',
-        color: colors.warning,
-      },
-      {
-        id: 'sales',
-        label: 'Sales Value',
-        value: formatCurrency(value.saleTotal),
-        icon: 'cash',
-        color: colors.success,
-      },
-      {
-        id: 'remaining',
-        label: 'Remaining Stock',
-        value: formatStock(stock.closingCases, stock.closingPieces),
-        icon: 'check-circle',
-        color: colors.info,
-      },
-      {
-        id: 'remainingValue',
-        label: 'Remaining Value',
-        value: formatCurrency(value.leftStockTotal),
-        icon: 'currency-usd',
-        color: colors.info,
-      },
-    ];
-  }, [data, colors, formatCurrency, formatStock]);
+  // Stock Movement Stats
+  const stockStats = [
+    {
+      label: 'Opening',
+      cases: opening.cases,
+      pieces: opening.pieces,
+      items: opening.items,
+      value: opening.value,
+      color: '#6B7280',
+    },
+    {
+      label: 'Topup',
+      cases: received.cases,
+      pieces: received.pieces,
+      items: received.items,
+      value: received.value,
+      color: '#3B82F6',
+    },
+    {
+      label: 'Sold',
+      cases: sold.cases,
+      pieces: sold.pieces,
+      items: sold.items,
+      value: sold.value,
+      color: '#F59E0B',
+    },
+    {
+      label: 'Closing',
+      cases: closing.cases,
+      pieces: closing.pieces,
+      items: closing.items,
+      value: closing.value,
+      color: '#10B981',
+    },
+  ];
 
-  const renderSummaryCard = ({ item }: { item: (typeof summaryStats)[0] }) => (
-    <Animated.View
-      style={[
-        styles.summaryCard,
-        {
-          opacity: opacityAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
-          }),
-          transform: [
-            {
-              translateY: opacityAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [15, 0],
-              }),
-            },
-          ],
-        },
-      ]}
+  // Stats Card Component - Same UI, Different Color
+  const StatsCard = ({ title, icon, data: statsData, color }: any) => (
+    <View
+      style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
     >
-      <LinearGradient
-        colors={[colors.surface, colors.background]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.summaryGradient}
-      >
-        <View style={[styles.summaryIcon, { backgroundColor: item.color + '10' }]}>
-          <MaterialCommunityIcons name={item.icon as any} size={22} color={item.color} />
+      <View style={styles.statsCardHeader}>
+        <View style={[styles.statsCardIcon, { backgroundColor: color + '15' }]}>
+          <MaterialCommunityIcons name={icon} size={22} color={color} />
         </View>
-        <View style={styles.summaryContent}>
-          <AppText style={[styles.summaryValue, { color: item.color }]}>{item.value}</AppText>
-          <AppText style={[styles.summaryLabel, { color: colors.textSecondary }]}>
-            {item.label}
-          </AppText>
-        </View>
-      </LinearGradient>
-    </Animated.View>
-  );
-
-  const renderProductItem = ({ item, index }: { item: any; index: number }) => (
-    <Animated.View
-      style={[
-        styles.productItem,
-        {
-          opacity: opacityAnim.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0, 1],
-          }),
-          transform: [
-            {
-              translateY: opacityAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [8, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-    >
-      <View style={styles.productHeader}>
-        <View style={styles.productNumber}>
-          <AppText style={[styles.productNumberText, { color: colors.primary }]}>
-            {index + 1}
-          </AppText>
-        </View>
-        <View style={styles.productInfo}>
-          <AppText style={[styles.productName, { color: colors.textPrimary }]} numberOfLines={2}>
-            {item.productName}
-          </AppText>
-          <View style={styles.productMeta}>
-            <MaterialCommunityIcons name="barcode" size={11} color={colors.textTertiary} />
-            <AppText style={[styles.productId, { color: colors.textSecondary }]}>
-              {item.productId}
-            </AppText>
-            <View style={styles.dot} />
-            <MaterialCommunityIcons name="cube-outline" size={11} color={colors.textTertiary} />
-            <AppText style={[styles.productUnit, { color: colors.textSecondary }]}>
-              {item.unitQtyInCase} Pcs/Case
-            </AppText>
+        <AppText style={[styles.statsCardTitle, { color: colors.textPrimary }]}>{title}</AppText>
+      </View>
+      <View style={styles.statsCardGrid}>
+        {statsData.map((item: any, index: number) => (
+          <View key={index} style={styles.statsCardItem}>
+            <View style={[styles.statsCardItemIcon, { backgroundColor: color + '10' }]}>
+              <MaterialCommunityIcons name={item.icon} size={18} color={color} />
+            </View>
+            <View>
+              <AppText style={[styles.statsCardItemLabel, { color: colors.textSecondary }]}>
+                {item.label}
+              </AppText>
+              <AppText style={[styles.statsCardItemValue, { color: color }]}>{item.value}</AppText>
+            </View>
           </View>
-        </View>
-      </View>
-
-      {/* Stats Row - Sold & Remaining */}
-      <View style={styles.statsRow}>
-        <View style={[styles.statChip, { backgroundColor: colors.warning + '8' }]}>
-          <MaterialCommunityIcons name="arrow-up-bold" size={12} color={colors.warning} />
-          <AppText style={[styles.statChipLabel, { color: colors.textSecondary }]}>Sold</AppText>
-          <AppText style={[styles.statChipValue, { color: colors.warning }]}>
-            {formatStock(item.outCases, item.outPieces)}
-          </AppText>
-        </View>
-        <View style={[styles.statChip, { backgroundColor: colors.success + '8' }]}>
-          <MaterialCommunityIcons name="check-circle" size={12} color={colors.success} />
-          <AppText style={[styles.statChipLabel, { color: colors.textSecondary }]}>Left</AppText>
-          <AppText style={[styles.statChipValue, { color: colors.success }]}>
-            {formatStock(item.closingCases, item.closingPieces)}
-          </AppText>
-        </View>
-      </View>
-
-      {/* Value Row - Sale Value & Left Value */}
-      <View style={styles.valueRow}>
-        <View style={styles.valueChip}>
-          <MaterialCommunityIcons name="cash" size={12} color={colors.success} />
-          <AppText style={[styles.valueChipLabel, { color: colors.textSecondary }]}>Sale</AppText>
-          <AppText style={[styles.valueChipAmount, { color: colors.success }]}>
-            {formatCurrency(item.saleValue)}
-          </AppText>
-        </View>
-        <View style={styles.valueChip}>
-          <MaterialCommunityIcons name="currency-usd" size={12} color={colors.info} />
-          <AppText style={[styles.valueChipLabel, { color: colors.textSecondary }]}>
-            Left Value
-          </AppText>
-          <AppText style={[styles.valueChipAmount, { color: colors.info }]}>
-            {formatCurrency(item.leftStockValue)}
-          </AppText>
-        </View>
-      </View>
-    </Animated.View>
-  );
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={[styles.emptyIcon, { backgroundColor: colors.surface }]}>
-        <MaterialCommunityIcons
-          name="clipboard-list-outline"
-          size={48}
-          color={colors.textSecondary}
-        />
-      </View>
-      <AppText style={[styles.emptyTitle, { color: colors.textSecondary }]}>
-        No Data Available
-      </AppText>
-      <AppText style={[styles.emptySubtitle, { color: colors.textTertiary }]}>
-        No sales recorded for this period
-      </AppText>
-    </View>
-  );
-
-  const renderContent = () => (
-    <ScrollView showsVerticalScrollIndicator={false} style={styles.container}>
-      {/* Date Header */}
-      {/* <View style={styles.dateSection}>
-        <LinearGradient
-          colors={[colors.primary + '10', colors.surface]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.dateBadge}
-        >
-          <MaterialCommunityIcons name="calendar-today" size={16} color={colors.primary} />
-          <AppText style={[styles.dateText, { color: colors.textPrimary }]}>
-            {new Date().toLocaleDateString('en-IN', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </AppText>
-        </LinearGradient>
-      </View> */}
-
-      {/* Summary Grid */}
-      <View style={styles.summaryGrid}>
-        {summaryStats.map((item) => (
-          <React.Fragment key={item.id}>{renderSummaryCard({ item })}</React.Fragment>
         ))}
       </View>
-
-      {/* Products Section */}
-      <View style={styles.productsSection}>
-        <View style={styles.sectionHeader}>
-          <MaterialCommunityIcons name="format-list-bulleted" size={18} color={colors.primary} />
-          <AppText style={[styles.sectionTitle, { color: colors.textPrimary }]}>Products</AppText>
-          <View style={[styles.productBadge, { backgroundColor: colors.primary + '10' }]}>
-            <AppText style={[styles.productBadgeText, { color: colors.primary }]}>
-              {data?.products?.length || 0}
-            </AppText>
-          </View>
-        </View>
-
-        {data?.products && data.products.length > 0 ? (
-          <View style={styles.productsList}>
-            {data.products.map((item, index) => (
-              <View key={item.productId}>{renderProductItem({ item, index })}</View>
-            ))}
-          </View>
-        ) : (
-          renderEmptyState()
-        )}
-      </View>
-    </ScrollView>
-  );
-
-  const renderFooter = () => (
-    <View style={[styles.footer, { borderTopColor: colors.border }]}>
-      <TouchableOpacity
-        onPress={onClose}
-        style={[styles.closeButton, { borderColor: colors.border }]}
-        activeOpacity={0.7}
-      >
-        <MaterialCommunityIcons name="close" size={18} color={colors.textSecondary} />
-        <AppText style={[styles.closeButtonText, { color: colors.textSecondary }]}>Close</AppText>
-      </TouchableOpacity>
-
-      {onProceed && (
-        <TouchableOpacity onPress={onProceed} style={styles.confirmButton} activeOpacity={0.85}>
-          <LinearGradient
-            colors={[colors.primary, colors.primaryDark || colors.primary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.confirmGradient}
-          >
-            <MaterialCommunityIcons name="check-circle" size={18} color="#FFFFFF" />
-            <AppText style={styles.confirmButtonText}>Confirm</AppText>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
     </View>
   );
+
+  // Sold Data
+  const soldData = [
+    { label: 'Sold Cases', value: sold.cases, icon: 'cube-outline' },
+    { label: 'Sold Pieces', value: sold.pieces, icon: 'layers-outline' },
+    { label: 'Sold Items', value: sold.items, icon: 'package' },
+    { label: 'Sale Value', value: formatCurrency(sold.value), icon: 'cash' },
+    { label: 'Sold Weight', value: `${sold.weight.toFixed(2)} kg`, icon: 'weight-kilogram' },
+  ];
+
+  // Closing Data
+  const closingData = [
+    { label: 'Closing Cases', value: closing.cases, icon: 'cube-outline' },
+    { label: 'Closing Pieces', value: closing.pieces, icon: 'layers-outline' },
+    { label: 'Total Items', value: closing.items, icon: 'package' },
+    { label: 'Stock Value', value: formatCurrency(closing.value), icon: 'currency-usd' },
+    { label: 'Total Weight', value: `${closing.weight.toFixed(2)} kg`, icon: 'weight-kilogram' },
+    { label: 'Products', value: data.products?.length || 0, icon: 'format-list-bulleted' },
+  ];
 
   return (
     <AppModal
@@ -379,8 +220,263 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       contentStyle={styles.modalContent}
       style={styles.modalContainer}
     >
-      {renderContent()}
-      {renderFooter()}
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Tab Bar */}
+        <View style={[styles.tabBar, { borderBottomColor: colors.divider }]}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
+            onPress={() => setActiveTab('overview')}
+          >
+            <MaterialCommunityIcons
+              name="chart-box"
+              size={18}
+              color={activeTab === 'overview' ? colors.primary : colors.textSecondary}
+            />
+            <AppText
+              style={[
+                styles.tabText,
+                { color: activeTab === 'overview' ? colors.primary : colors.textSecondary },
+              ]}
+            >
+              Overview
+            </AppText>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'products' && styles.tabActive]}
+            onPress={() => setActiveTab('products')}
+          >
+            <MaterialCommunityIcons
+              name="format-list-bulleted"
+              size={18}
+              color={activeTab === 'products' ? colors.primary : colors.textSecondary}
+            />
+            <AppText
+              style={[
+                styles.tabText,
+                { color: activeTab === 'products' ? colors.primary : colors.textSecondary },
+              ]}
+            >
+              Products
+            </AppText>
+          </TouchableOpacity>
+        </View>
+
+        {activeTab === 'overview' ? (
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <Animated.View style={{ opacity: fadeAnim }}>
+              {/* Stock Movement Card */}
+              <View
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.surface, borderColor: colors.divider },
+                ]}
+              >
+                <View style={styles.cardHeader}>
+                  <MaterialCommunityIcons name="chart-line" size={20} color={colors.primary} />
+                  <AppText style={[styles.cardTitle, { color: colors.textPrimary }]}>
+                    Stock Movement
+                  </AppText>
+                </View>
+
+                {/* Header Row */}
+                <View style={styles.financialHeader}>
+                  <AppText style={[styles.financialHeaderLabel, { color: colors.textSecondary }]}>
+                    Type
+                  </AppText>
+                  <AppText style={[styles.financialHeaderStock, { color: colors.textSecondary }]}>
+                    Stock
+                  </AppText>
+                  <AppText style={[styles.financialHeaderItems, { color: colors.textSecondary }]}>
+                    Items
+                  </AppText>
+                  <AppText style={[styles.financialHeaderValue, { color: colors.textSecondary }]}>
+                    Value
+                  </AppText>
+                </View>
+
+                {stockStats.map((stat, index) => (
+                  <View
+                    key={stat.label}
+                    style={[
+                      styles.financialRow,
+                      index !== stockStats.length - 1 && { borderBottomColor: colors.divider },
+                    ]}
+                  >
+                    <View style={styles.financialRowLabel}>
+                      <View style={[styles.statDot, { backgroundColor: stat.color }]} />
+                      <AppText style={[styles.financialLabelText, { color: colors.textPrimary }]}>
+                        {stat.label}
+                      </AppText>
+                    </View>
+                    <AppText style={[styles.financialStockText, { color: stat.color }]}>
+                      {formatStock(stat.cases, stat.pieces)}
+                    </AppText>
+                    <AppText style={[styles.financialItemsText, { color: stat.color }]}>
+                      {stat.items}
+                    </AppText>
+                    <AppText style={[styles.financialValueText, { color: stat.color }]}>
+                      {stat.value > 0 ? formatCurrency(stat.value) : '-'}
+                    </AppText>
+                  </View>
+                ))}
+              </View>
+
+              {/* Sold Card - Orange Theme */}
+              <StatsCard title="Sold Details" icon="trending-up" data={soldData} color="#F59E0B" />
+
+              {/* Closing Card - Green Theme */}
+              <StatsCard
+                title="Closing Stock"
+                icon="package-variant"
+                data={closingData}
+                color="#10B981"
+              />
+            </Animated.View>
+          </ScrollView>
+        ) : (
+          /* Products Tab */
+          <FlatList
+            data={data.products}
+            keyExtractor={(item) => item.productId}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.productsList}
+            renderItem={({ item, index }) => (
+              <Animated.View
+                style={[
+                  styles.productCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.divider,
+                    opacity: fadeAnim,
+                  },
+                ]}
+              >
+                <View style={styles.productRow}>
+                  <View style={styles.productIndex}>
+                    <AppText style={[styles.productIndexText, { color: colors.primary }]}>
+                      {index + 1}
+                    </AppText>
+                  </View>
+                  <View style={styles.productDetails}>
+                    <AppText
+                      style={[styles.productName, { color: colors.textPrimary }]}
+                      numberOfLines={2}
+                    >
+                      {item.productName}
+                    </AppText>
+                    <AppText style={[styles.productCode, { color: colors.textSecondary }]}>
+                      {item.productId}
+                    </AppText>
+                  </View>
+                </View>
+
+                <View style={styles.productStats}>
+                  <View style={styles.productStat}>
+                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
+                      Opening
+                    </AppText>
+                    <AppText style={[styles.productStatValue, { color: '#6B7280' }]}>
+                      {formatStock(item.openingCases, item.openingPieces)}
+                    </AppText>
+                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
+                      {item.openingItems} items
+                    </AppText>
+                  </View>
+                  <View style={styles.productStat}>
+                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
+                      Received
+                    </AppText>
+                    <AppText style={[styles.productStatValue, { color: '#3B82F6' }]}>
+                      {formatStock(item.inCases, item.inPieces)}
+                    </AppText>
+                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
+                      {item.receivedItems} items
+                    </AppText>
+                  </View>
+                  <View style={styles.productStat}>
+                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
+                      Sold
+                    </AppText>
+                    <AppText style={[styles.productStatValue, { color: '#F59E0B' }]}>
+                      {formatStock(item.outCases, item.outPieces)}
+                    </AppText>
+                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
+                      {item.soldItems} items
+                    </AppText>
+                  </View>
+                  <View style={styles.productStat}>
+                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
+                      Closing
+                    </AppText>
+                    <AppText style={[styles.productStatValue, { color: '#10B981' }]}>
+                      {formatStock(item.closingCases, item.closingPieces)}
+                    </AppText>
+                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
+                      {item.closingItems} items
+                    </AppText>
+                  </View>
+                </View>
+
+                <View style={styles.productValueRow}>
+                  <View style={styles.productValueItem}>
+                    <MaterialCommunityIcons name="cash" size={14} color="#F59E0B" />
+                    <AppText style={[styles.productValueLabel, { color: colors.textSecondary }]}>
+                      Sale Value
+                    </AppText>
+                    <AppText style={[styles.productValueAmount, { color: '#F59E0B' }]}>
+                      {formatCurrency(item.soldValue)}
+                    </AppText>
+                  </View>
+                  <View style={styles.productValueItem}>
+                    <MaterialCommunityIcons name="currency-usd" size={14} color="#10B981" />
+                    <AppText style={[styles.productValueLabel, { color: colors.textSecondary }]}>
+                      Stock Value
+                    </AppText>
+                    <AppText style={[styles.productValueAmount, { color: '#10B981' }]}>
+                      {formatCurrency(item.closingValue)}
+                    </AppText>
+                  </View>
+                </View>
+              </Animated.View>
+            )}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons
+                  name="package-variant"
+                  size={48}
+                  color={colors.textTertiary}
+                />
+                <AppText style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  No products found
+                </AppText>
+              </View>
+            }
+          />
+        )}
+
+        {/* Footer Buttons */}
+        <View style={[styles.footer, { borderTopColor: colors.divider }]}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.cancelButton, { borderColor: colors.divider }]}
+          >
+            <AppText style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+              Close
+            </AppText>
+          </TouchableOpacity>
+          {onProceed && (
+            <TouchableOpacity
+              onPress={onProceed}
+              style={[styles.proceedButton, { backgroundColor: colors.primary }]}
+            >
+              <AppText style={styles.proceedButtonText}>Confirm Day End</AppText>
+            </TouchableOpacity>
+          )}
+        </View>
+      </SafeAreaView>
     </AppModal>
   );
 };

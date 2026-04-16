@@ -14,33 +14,12 @@ type ScreenOptions = {
 
 export default function OutletsLayout() {
   const { colors } = useTheme();
+  
 
   return (
     <Stack
       screenOptions={{
-        header: ({ options, navigation }) => {
-          const customOptions = options as ScreenOptions;
-
-          if (customOptions.headerShown === false) {
-            return null;
-          }
-
-          return (
-            <Header
-              title={customOptions.title}
-              showBack={
-                customOptions.showBack !== undefined
-                  ? customOptions.showBack
-                  : navigation.canGoBack()
-              }
-              showMenu={customOptions.showMenu || false}
-              showFilter={customOptions.showFilter || false}
-              onFilterPress={customOptions.onFilterPress}
-              centeredTitle={false}
-            />
-          );
-        },
-        contentStyle: { backgroundColor: colors.background },
+         headerShown: false
       }}
     >
       {/* INDEX */}
@@ -56,12 +35,12 @@ export default function OutletsLayout() {
       <Stack.Screen
         name="[id]/index"
         options={{
-          title: 'Detail',
+          title: '',
           headerShown: false,
         }}
       />
 
-      <Stack.Screen name="visit" options={{ title: 'Check In' }} />
+      <Stack.Screen name="visit" options={{ title: 'Check In', headerShown: true}} />
 
       <Stack.Screen
         name="add"

@@ -65,6 +65,7 @@ export const useProductsScreenStyles = () => {
     searchWrapper: {
       paddingHorizontal: utils.spacing[2],
       marginBottom: utils.spacing[2],
+      marginTop: utils.spacing[2],
     } as ViewStyle,
 
     // Quick Filters

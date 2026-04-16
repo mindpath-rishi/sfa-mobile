@@ -1,3 +1,6 @@
+// app/(drawer)/(tabs)/_layout.tsx
+
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +11,7 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: false, // ✅ we use Drawer Header
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.divider,
