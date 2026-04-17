@@ -1,320 +1,270 @@
 // src/core/components/Header/Header.tsx
 
-import React, { useState } from 'react';
-import { View, Text, Pressable, TextInput, Platform } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import React from 'react';
+import { View, Text, Pressable, TextInput, Platform, StatusBar } from 'react-native';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  interpolate,
-  Extrapolate,
   useSharedValue,
   withSequence,
 } from 'react-native-reanimated';
-import { HeaderProps } from './Header.types';
 import { useHeaderStyles } from './Header.styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { router } from 'expo-router';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const Header: React.FC<HeaderProps> = (props: any) => {
+const Header: React.FC = () => {
   const { config } = useHeader();
   const navigation = useNavigation();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Animation values
+  /* ============================
+   * SAFE CONFIG (prevents leakage)
+   * ============================ */
+  const safeConfig = {
+    title: config?.title ?? '',
+    subtitle: config?.subtitle,
+
+    showBack: config?.showBack ?? false,
+    showMenu: config?.showMenu ?? false,
+    showSearch: config?.showSearch ?? false,
+    showFilter: config?.showFilter ?? false,
+
+    rightIcon: config?.rightIcon,
+    rightIcon2: config?.rightIcon2,
+    onRightPress: config?.onRightPress,
+    onRightPress2: config?.onRightPress2,
+
+    filterActive: config?.filterActive ?? false,
+    filterCount: config?.filterCount ?? 0,
+
+    useGradient: config?.useGradient ?? false,
+    gradientColors: config?.gradientColors,
+
+    hidden: config?.hidden ?? true,
+    backgroundColor: config?.backgroundColor,
+
+    searchValue: config?.searchValue,
+    searchPlaceholder: config?.searchPlaceholder,
+    onSearchChange: config?.onSearchChange,
+    onSearchClear: config?.onSearchClear,
+    onSearchPress: config?.onSearchPress,
+  };
+
+  /* ============================
+   * ANIMATION
+   * ============================ */
   const backButtonScale = useSharedValue(1);
   const menuButtonScale = useSharedValue(1);
   const filterButtonScale = useSharedValue(1);
+  const searchScale = useSharedValue(1);
 
   const styles = useHeaderStyles({
-    elevated: props.elevated,
-    centeredTitle: props.centeredTitle,
-    transparent: props.transparent,
-    size: props.size,
-    showBorder: props.showBorder,
+    elevated: config.elevated ?? true,
+    centeredTitle: config.centeredTitle ?? true,
+    transparent: config.transparent ?? false,
+    size: config.size ?? 'md',
+    showBorder: config.showBorder ?? true,
   });
 
-  // Merge logic
-  const title = config.title ?? props.title;
-  const subtitle = config.subtitle ?? props.subtitle;
+  const useGradient = safeConfig.useGradient;
+  const gradientColors =
+    safeConfig.gradientColors || [colors.primary, colors.primaryDark || '#1E3A8A'];
 
-  const showBack = config.showBack ?? props.showBack ?? navigation.canGoBack();
-  const showMenu = config.showMenu ?? props.showMenu;
-  const showFilter = config.showFilter ?? props.showFilter;
-  const filterActive = config.filterActive ?? props.filterActive;
-  const filterCount = config.filterCount ?? props.filterCount;
-  const onFilterPress = config.onFilterPress ?? props.onFilterPress;
-  const badgeCount = config.badgeCount ?? props.badgeCount;
-
-  const bgColor = props.transparent
-    ? 'transparent'
-    : config.backgroundColor || props.headerBackgroundColor || colors.background;
-
-  const Container = props.transparent ? BlurView : View;
-
-  // Animation handlers
   const handlePressIn = (scaleValue: any) => {
-    scaleValue.value = withSpring(0.92, { damping: 10, stiffness: 300 });
+    scaleValue.value = withSpring(0.92);
   };
 
   const handlePressOut = (scaleValue: any) => {
-    scaleValue.value = withSpring(1, { damping: 10, stiffness: 300 });
+    scaleValue.value = withSpring(1);
   };
 
   const handleBackPress = () => {
-    backButtonScale.value = withSequence(
-      withTiming(0.8, { duration: 100 }),
-      withTiming(1, { duration: 150 }),
-    );
-    navigation.goBack();
+    backButtonScale.value = withSequence(withTiming(0.8), withTiming(1));
+    router.back();
   };
 
   const handleMenuPress = () => {
-    menuButtonScale.value = withSequence(
-      withTiming(0.8, { duration: 100 }),
-      withTiming(1, { duration: 150 }),
-    );
+    menuButtonScale.value = withSequence(withTiming(0.8), withTiming(1));
     navigation.dispatch(DrawerActions.toggleDrawer());
   };
 
   const handleFilterPress = () => {
-    filterButtonScale.value = withSequence(
-      withTiming(0.8, { duration: 100 }),
-      withTiming(1, { duration: 150 }),
-    );
-    onFilterPress?.();
+    filterButtonScale.value = withSequence(withTiming(0.8), withTiming(1));
+    config.onFilterPress?.();
   };
 
-  const backButtonAnimatedStyle = useAnimatedStyle(() => ({
+  const handleSearchPress = () => {
+    searchScale.value = withSequence(withTiming(0.8), withTiming(1));
+    safeConfig.onSearchPress?.();
+  };
+
+  const backStyle = useAnimatedStyle(() => ({
     transform: [{ scale: backButtonScale.value }],
   }));
 
-  const menuButtonAnimatedStyle = useAnimatedStyle(() => ({
+  const menuStyle = useAnimatedStyle(() => ({
     transform: [{ scale: menuButtonScale.value }],
   }));
 
-  const filterButtonAnimatedStyle = useAnimatedStyle(() => ({
+  const filterStyle = useAnimatedStyle(() => ({
     transform: [{ scale: filterButtonScale.value }],
   }));
 
-  return (
-    <View style={{ paddingTop: insets.top, backgroundColor: bgColor }}>
-      <Container
-        intensity={props.transparent ? 80 : undefined}
-        style={[
-          styles.container,
-          {
-            backgroundColor: bgColor,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-          },
-          props.style,
-        ]}
-      >
-        {/* LEFT SECTION - Modern Back/Menu Button */}
-        <View style={styles.leftSection}>
-          {showBack ? (
-            <AnimatedPressable
-              onPress={handleBackPress}
-              onPressIn={() => handlePressIn(backButtonScale)}
-              onPressOut={() => handlePressOut(backButtonScale)}
-              style={[
-                backButtonAnimatedStyle,
-                {
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  // backgroundColor: props.transparent ? 'rgba(255,255,255,0.15)' : colors.surface,
-                  // shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
-                },
-              ]}
-            >
-              <Feather
-                name="chevron-left"
-                size={24}
-                color={colors.textPrimary}
-                style={{ marginLeft: -2 }}
-              />
-            </AnimatedPressable>
-          ) : showMenu ? (
-            <AnimatedPressable
-              onPress={handleMenuPress}
-              onPressIn={() => handlePressIn(menuButtonScale)}
-              onPressOut={() => handlePressOut(menuButtonScale)}
-              style={[
-                menuButtonAnimatedStyle,
-                {
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  // backgroundColor: props.transparent ? 'rgba(255,255,255,0.15)' : colors.surface,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 4,
-                  elevation: 2,
-                },
-              ]}
-            >
-              <Feather name="menu" size={22} color={colors.textPrimary} />
-            </AnimatedPressable>
-          ) : (
-            <View style={{ width: 40 }} /> // Spacer for alignment
-          )}
-        </View>
+  const searchStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: searchScale.value }],
+  }));
 
-        {/* CENTER SECTION - Modern Typography */}
-        <View style={styles.centerSection}>
-          <View style={{ alignItems: 'flex-start' }}>
-            <Text
-              style={[
-                styles.title,
-                {
-                  fontSize: props.size === 'small' ? 16 : props.size === 'large' ? 10 : 18,
-                  fontWeight: '500',
-                  letterSpacing: -0.3,
-                  color: colors.textPrimary,
-                },
-              ]}
-            >
-              {title}
-            </Text>
-            {subtitle && (
-              <Text
-                style={[
-                  styles.subtitle,
-                  {
-                    fontSize: 13,
-                    color: colors.textSecondary,
-                    marginTop: 2,
-                    letterSpacing: -0.2,
-                  },
-                ]}
-              >
-                {subtitle}
-              </Text>
-            )}
-          </View>
-        </View>
+  const bgColor = config.transparent ? 'transparent' : safeConfig.backgroundColor || colors.background;
 
-        {/* RIGHT SECTION - Modern Actions */}
-        <View style={styles.rightSection}>
-          {showFilter && (
-            <AnimatedPressable
-              onPress={handleFilterPress}
-              onPressIn={() => handlePressIn(filterButtonScale)}
-              onPressOut={() => handlePressOut(filterButtonScale)}
-              style={[
-                filterButtonAnimatedStyle,
-                {
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  // backgroundColor: filterActive
-                  //   ? colors.primary + '15'
-                  //   : props.transparent
-                  //     ? 'rgba(255,255,255,0.15)'
-                  //     : colors.surface,
-                  position: 'relative',
-                },
-              ]}
-            >
-              <Feather
-                name="sliders"
-                size={20}
-                color={filterActive ? colors.primary : colors.textPrimary}
-              />
-              {filterCount ? (
-                <View
-                  style={[
-                    styles.badge,
-                    {
-                      position: 'absolute',
-                      top: -2,
-                      right: -2,
-                      backgroundColor: colors.error,
-                      borderRadius: 12,
-                      minWidth: 20,
-                      height: 20,
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      paddingHorizontal: 6,
-                      borderWidth: 2,
-                      borderColor: bgColor,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[styles.badgeText, { color: 'white', fontSize: 11, fontWeight: '600' }]}
-                  >
-                    {filterCount > 99 ? '99+' : filterCount}
-                  </Text>
-                </View>
-              ) : null}
-            </AnimatedPressable>
-          )}
+  /* ============================
+   * BADGE
+   * ============================ */
+  const renderFilterBadge = () => {
+    if (!safeConfig.filterCount) return null;
 
-          {props.rightIcon && (
+    const badgeText = safeConfig.filterCount > 99 ? '99+' : safeConfig.filterCount.toString();
+
+    return (
+      <View style={[styles.filterBadge, { backgroundColor: colors.success || '#10B981' }]}>
+        <Text style={styles.filterBadgeText}>{badgeText}</Text>
+      </View>
+    );
+  };
+
+  /* ============================
+   * HEADER CONTENT
+   * ============================ */
+  const renderHeaderContent = () => (
+    <>
+      {/* LEFT */}
+      <View style={styles.leftSection}>
+        {safeConfig.showBack ? (
+          <AnimatedPressable
+            onPress={handleBackPress}
+            onPressIn={() => handlePressIn(backButtonScale)}
+            onPressOut={() => handlePressOut(backButtonScale)}
+            style={[backStyle, styles.buttonBase]}
+          >
+            <Feather
+              name="chevron-left"
+              size={24}
+              color={useGradient ? '#fff' : colors.surface}
+            />
+          </AnimatedPressable>
+        ) : safeConfig.showMenu ? (
+          <AnimatedPressable
+            onPress={handleMenuPress}
+            onPressIn={() => handlePressIn(menuButtonScale)}
+            onPressOut={() => handlePressOut(menuButtonScale)}
+            style={[menuStyle, styles.buttonBase]}
+          >
+            <Feather name="menu" size={22} color={useGradient ? '#fff' : colors.surface} />
+          </AnimatedPressable>
+        ) : (
+          <View style={{ width: 44 }} />
+        )}
+      </View>
+
+      {/* CENTER */}
+      <View style={styles.centerSection}>
+        <Text style={styles.title}>{safeConfig.title}</Text>
+        {safeConfig.subtitle && (
+          <Text style={styles.subtitle}>{safeConfig.subtitle}</Text>
+        )}
+      </View>
+
+      {/* RIGHT */}
+      <View style={[styles.rightSection, { flexDirection: 'row', alignItems: 'center' }]}>
+        {safeConfig.showSearch && (
+          <AnimatedPressable
+            onPress={handleSearchPress}
+            onPressIn={() => handlePressIn(searchScale)}
+            onPressOut={() => handlePressOut(searchScale)}
+            style={[searchStyle, styles.buttonBase]}
+          >
+            <Feather name="search" size={20} color={colors.textPrimary} />
+          </AnimatedPressable>
+        )}
+
+        {safeConfig.showFilter && (
+          <AnimatedPressable
+            onPress={handleFilterPress}
+            onPressIn={() => handlePressIn(filterButtonScale)}
+            onPressOut={() => handlePressOut(filterButtonScale)}
+            style={[filterStyle, styles.buttonBase]}
+          >
+            <Feather name="sliders" size={20} color={colors.surface} />
+            {renderFilterBadge()}
+          </AnimatedPressable>
+        )}
+
+        {[safeConfig.rightIcon, safeConfig.rightIcon2]
+          .filter(Boolean)
+          .map((icon, i) => (
             <Pressable
-              onPress={props.onRightPress}
-              style={({ pressed }) => ({
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                justifyContent: 'center',
-                alignItems: 'center',
-                backgroundColor: pressed
-                  ? props.transparent
-                    ? 'rgba(255,255,255,0.2)'
-                    : colors.surface
-                  : 'transparent',
-                transform: [{ scale: pressed ? 0.95 : 1 }],
-              })}
+              key={i}
+              onPress={i === 0 ? safeConfig.onRightPress : safeConfig.onRightPress2}
+              style={({ pressed }) => [
+                styles.buttonBase,
+                { marginLeft: 6, transform: [{ scale: pressed ? 0.95 : 1 }] },
+              ]}
             >
-              <Feather name={props.rightIcon as any} size={22} color={colors.textPrimary} />
-              {badgeCount ? (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 4,
-                    backgroundColor: colors.error,
-                    borderRadius: 10,
-                    width: 18,
-                    height: 18,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    borderWidth: 2,
-                    borderColor: bgColor,
-                  }}
-                >
-                  <Text style={{ color: 'white', fontSize: 10, fontWeight: '600' }}>
-                    {badgeCount}
-                  </Text>
-                </View>
-              ) : null}
+              <Feather
+                name={icon as any}
+                size={22}
+                color={useGradient ? '#fff' : colors.surface}
+              />
             </Pressable>
-          )}
-        </View>
-      </Container>
-    </View>
+          ))}
+      </View>
+    </>
+  );
+
+  if (safeConfig.hidden) return null;
+
+  return (
+    <>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+
+      <View style={{ paddingTop: insets.top, backgroundColor: bgColor }}>
+        {useGradient ? (
+          <LinearGradient colors={gradientColors} style={styles.container}>
+            {renderHeaderContent()}
+          </LinearGradient>
+        ) : (
+          <View style={styles.container}>{renderHeaderContent()}</View>
+        )}
+
+        {/* SEARCH BAR */}
+        {safeConfig.showSearch && config.showSearchBar && (
+          <View style={{ padding: 16 }}>
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color={colors.textTertiary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder={safeConfig.searchPlaceholder || 'Search...'}
+                value={safeConfig.searchValue}
+                onChangeText={safeConfig.onSearchChange}
+              />
+              {safeConfig.searchValue && safeConfig.onSearchClear && (
+                <Pressable onPress={safeConfig.onSearchClear}>
+                  <Ionicons name="close-circle" size={18} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+      </View>
+    </>
   );
 };
 

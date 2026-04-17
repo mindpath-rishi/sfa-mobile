@@ -988,6 +988,7 @@ import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '../components/models/DayEndSummaryModal';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
+import { DayEndConfirmationModal } from '@/shared/components/models/DayEndConfirmationModal';
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
@@ -1035,6 +1036,7 @@ export default function SalesExecutiveScreen() {
   const van = useRouteStore.getState().van;
   const user = useAuthStore.getState().user;
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
+  const [finalConfirmation, setFinalConfirmation] = useState(false);
   const { setVan } = useRouteStore();
 
   const { guard } = useVisitGuard();
@@ -1312,9 +1314,9 @@ export default function SalesExecutiveScreen() {
     setDayEndSummary(res?.data);
   };
 
-  const handleEndDay = async () => {
+  const handleEndDay = async (carryForwardStock?: boolean) => {
     try {
-      const response = await homeService.dayComplete();
+      const response = await homeService.dayComplete(carryForwardStock);
 
       if (response.success) {
         toast.success('Your day successfully completed');
@@ -1610,12 +1612,12 @@ export default function SalesExecutiveScreen() {
       />
 
       <ConfirmationModal
-        visible={showDayEndConfirm}
+        visible={finalConfirmation}
         title={getDayEndTitle()}
         message={getDayEndMessage()}
         confirmText="Close Day"
         cancelText="Cancel"
-        onCancel={() => setShowDayEndConfirm(false)}
+        onCancel={() => setFinalConfirmation(false)}
         onConfirm={handleEndDay}
         loading={false}
         type="info"
@@ -1623,13 +1625,22 @@ export default function SalesExecutiveScreen() {
         icon={getDayEndIcon()}
       />
 
+      <DayEndConfirmationModal
+        visible={finalConfirmation}
+        onClose={() => setFinalConfirmation(false)}
+        onConfirm={handleEndDay}
+        vanName="Van #001"
+        date={new Date().toLocaleDateString()}
+
+      />
+
       <DayEndSummaryModal
         visible={showDayEndConfirm}
         data={dayEndSummary}
         onClose={() => setShowDayEndConfirm(false)}
         onProceed={() => {
-          handleEndDay();
-          setShowDayEndConfirm(false);
+          setDayEndSummary(false);
+          setFinalConfirmation(true);
         }}
       />
     </View>

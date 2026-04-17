@@ -1,6 +1,6 @@
 // app/(drawer)/_layout.tsx
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { View, Text, Platform } from 'react-native';
@@ -33,14 +33,14 @@ const getRouteName = (segments: string[]) => {
 
 const isProfileScreen = (segments: string[]) => {
   const clean = getCleanSegments(segments);
-  return clean[0] === 'profile';
+  return clean[0] === 'home';
 };
 
 const isDetailScreen = (segments: string[]) => {
   const clean = getCleanSegments(segments);
-  return clean.some((seg) =>
-    ['[id]', 'detail', 'edit', 'approve', 'create', 'visit'].includes(seg),
-  );
+
+  // any route deeper than root = detail
+  return clean.length > 1;
 };
 
 /* ============================
@@ -154,7 +154,8 @@ export default function DrawerLayout() {
       title: '',
       showMenu: true,
       showBack: false,
-      // backgroundColor: colors.primary + '13',
+      backgroundColor: colors.primary,
+      hidden: false,
     },
 
     stock: {
@@ -162,25 +163,41 @@ export default function DrawerLayout() {
       showMenu: false,
       showFilter: false,
       showBack: true,
+      backgroundColor: colors.primary,
     },
-    topup: {
-      title: 'Topup',
-      showMenu: false,
-      showFilter: false,
-      showBack: false,
-    },
+    // topup: {
+    //   title: 'Topup',
+    //   showMenu: false,
+    //   showFilter: true,
+    //   showBack: true,
+    //   backgroundColor: colors.primary,
+    //   rightIcon: 'plus'
+    // },
     collection: {
       title: 'Collection',
       showMenu: false,
-      showFilter: false,
+      showFilter: true,
       showBack: true,
+      backgroundColor: colors.primary,
     },
 
+    'stock-count': {
+      title: 'Van Stock Settlement',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
     route: {
       title: 'My Route',
       showMenu: false,
       showFilter: true,
       showBack: true,
+      rightIcon: 'map',
+      rightIcon2: 'plus',
+      showRightIcon: true,
+      showLeftIcon: true,
+      backgroundColor: colors.primary,
     },
   };
 
@@ -188,29 +205,25 @@ export default function DrawerLayout() {
    * HEADER CONFIG
    * ============================ */
 
-  useFocusEffect(
-    useCallback(() => {
-      if (isProfile || isDetail) {
-        setHeader({ hidden: true });
-        return;
-      }
+  useEffect(() => {
+    // if (isProfile) {
+    //   setHeader({ hidden: true });
+    //   return;
+    // }
 
+    // ONLY apply header for ROOT screens
+    if (isProfile) {
       const routeName = getRouteName(segments);
-
+      console.log(isProfile, '============profile============', routeName);
       const config = HEADER_MAP[routeName];
 
+      console.log('===============config=========', config);
+
       if (config) {
-        setHeader({
-          hidden: config?.hidden,
-          title: config.title,
-          showMenu: config.showMenu ?? true,
-          showBack: config.showBack ?? false,
-          showFilter: config.showFilter ?? false,
-          backgroundColor: colors.primary,
-        });
+        setHeader(config);
       }
-    }, [segments]),
-  );
+    }
+  }, [segments]);
 
   /* ============================
    * MODERN ICON MAP
@@ -282,7 +295,7 @@ export default function DrawerLayout() {
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={({ route }) => ({
         header: () => {
-          if (isProfile || isDetail) return null;
+          // if (isProfile) return null;
           return <Header />;
         },
 
@@ -328,13 +341,7 @@ export default function DrawerLayout() {
           drawerLabel: 'Stock',
         }}
       />
-      <Drawer.Screen
-        name="topup"
-        options={{
-          title: 'Topup',
-          drawerLabel: 'Topup',
-        }}
-      />
+
       <Drawer.Screen
         name="route"
         options={{
@@ -348,6 +355,13 @@ export default function DrawerLayout() {
         options={{
           title: 'Cash Collection',
           drawerLabel: 'Collection',
+        }}
+      />
+      <Drawer.Screen
+        name="topup"
+        options={{
+          title: 'Topup',
+          drawerLabel: 'Topup',
         }}
       />
       <Drawer.Screen

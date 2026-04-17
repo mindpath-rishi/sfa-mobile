@@ -16,7 +16,7 @@ export interface HomeService {
   getRoutes: (vanId: string) => Promise<ApiResponse<any>>;
   getVanMappedRoutes: () => Promise<ApiResponse<any>>;
   getVan: () => Promise<ApiResponse<any>>;
-  dayComplete(): Promise<ApiResponse<any>>;
+  dayComplete(carryForwardStock: any): Promise<ApiResponse<any>>;
   getEmployeeStats(employeeId: string): Promise<ApiResponse<any>>;
 }
 
@@ -38,7 +38,7 @@ export const homeService: HomeService = {
   getVanMappedRoutes: () => api.get<any>(`/van/mapped-routes`, {}) as Promise<ApiResponse<any>>,
   getVan: () =>
     api.get<any>(`/van`, { params: { limit: 1, page: 1 } }) as Promise<ApiResponse<any>>,
-  dayComplete: () => api.post('/work-session/complete', {}) as Promise<ApiResponse<any>>,
+  dayComplete: (carryForwardStock) => api.post('/work-session/complete', {carryForwardStock}) as Promise<ApiResponse<any>>,
   getEmployeeStats: (employeeId: string) =>
     api.get<any>(`/employee/${employeeId}/stats`, {}) as Promise<ApiResponse<any>>,
 };

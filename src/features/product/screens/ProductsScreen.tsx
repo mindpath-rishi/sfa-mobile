@@ -113,15 +113,19 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
 
   const { setHeader } = useHeader();
 
-  useFocusEffect(
-    useCallback(() => {
-      setHeader({
-        onFilterPress: () => {
-          setShowFilters(true);
-        },
-      });
-    }, []),
-  );
+useFocusEffect(
+  useCallback(() => {
+    const filterCount = calculateActiveFilterCount()
+    setHeader({
+      onFilterPress: () => {
+        setShowFilters(true);
+      },
+      badgeCount: filterCount,
+      filterActive: !!filterCount,
+      filterCount: filterCount
+    });
+  }, [filters, searchQuery])
+);
 
   // Fetch products from API
   const fetchProducts = useCallback(
@@ -403,9 +407,9 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
     (items: CartItemWithDetails[], product: Product) => {
       if (!items?.length || !product) return;
 
-      if (!product?.stock && !isUnlimitedMode) {
-        toast.error(`${product?.name} is out of stock.`);
-      }
+      // if (!product?.stock && !isUnlimitedMode) {
+      //   toast.error(`${product?.name} is out of stock.`);
+      // }
 
       let caseQty = 0;
       let pieceQty = 0;
@@ -430,7 +434,7 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
         },
       ]);
     },
-    [addItems, isUnlimitedMode],
+    [addItems],
   );
 
   const handleApplyFilters = useCallback(
@@ -517,36 +521,7 @@ const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props
     );
   };
 
-  // const renderActionButton = () => {
-  //   if (items.length === 0) return null;
 
-  //   const buttonText = isUnlimitedMode
-  //     ? submitButtonText || `Submit Top-up (${cartSummary.totalItems} items)`
-  //     : `Proceed to Checkout (${cartSummary.totalItems} items)`;
-
-  //   return (
-  //     <TouchableOpacity
-  //       style={[styles.cartButton, { backgroundColor: colors.primary }]}
-  //       onPress={handleSubmit}
-  //       activeOpacity={0.9}
-  //     >
-  //       <View style={styles.cartButtonContent}>
-  //         <View>
-  //           <Text style={styles.cartButtonLabel}>
-  //             {isUnlimitedMode ? 'Ready to submit' : 'Ready to checkout'}
-  //           </Text>
-  //           <Text style={styles.cartButtonTotal}>
-  //             {cartSummary.totalUnits} units • K{cartSummary.totalValue.toFixed(2)}
-  //             {isUnlimitedMode &&
-  //               cartSummary.totalWeight > 0 &&
-  //               ` • ${cartSummary.totalWeight.toFixed(2)} kg`}
-  //           </Text>
-  //         </View>
-  //         <Ionicons name="arrow-forward-circle" size={28} color="white" />
-  //       </View>
-  //     </TouchableOpacity>
-  //   );
-  // };
 
   const renderActionButton = () => {
     const isNoSale = mode === 'sales' && items.length === 0;

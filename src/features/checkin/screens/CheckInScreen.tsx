@@ -34,12 +34,10 @@ export default function CheckInScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setHeader({
-        title: outlet?.name,
-        showBack: true,
-        showFilter: true,
-      });
-    }, [outlet]),
+      // setHeader({
+      //   title: outlet?.name,
+      // });
+    }, []),
   );
 
   useFocusEffect(

@@ -30,7 +30,7 @@ export default function CreateTopupScreen() {
   const fetchVanStock = useCallback(async () => {
     try {
       if (!van?.vanId) return;
-      const response = await vanService.fetchVanStocks(van.vanId);
+      const response = await vanService.fetchVanStocks(van.vanId, {});
       const stockData = response?.data?.products || [];
 
       const stockMap = new Map();

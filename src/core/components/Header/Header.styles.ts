@@ -1,160 +1,3 @@
-// // src/core/components/Header/Header.styles.ts
-// import { ViewStyle, TextStyle } from 'react-native';
-// import { createStyles } from '@/shared/theme/styles';
-// import { useTheme } from '@/shared/hooks/useTheme';
-
-// interface HeaderStylesProps {
-//   elevated: boolean;
-//   centeredTitle: boolean;
-//   transparent: boolean;
-//   size: 'sm' | 'md' | 'lg';
-//   showBorder: boolean;
-// }
-
-// export const useHeaderStyles = (props: HeaderStylesProps) => {
-//   const { colors } = useTheme();
-
-//   const styleGenerator = createStyles((utils) => ({
-//     container: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'space-between',
-//       height: props.size === 'sm' ? 56 : props.size === 'lg' ? 80 : 50,
-//       backgroundColor: props.transparent ? 'transparent' : colors.background,
-//       // borderBottomWidth: props.showBorder ? 1 : 0,
-//       // borderBottomColor: colors.border + '30',
-//     } as ViewStyle,
-
-//     leftSection: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       minWidth: 40,
-//     } as ViewStyle,
-
-//     centerSection: {
-//       flex: 1,
-//       alignItems: props.centeredTitle ? 'center' : 'flex-start',
-//       justifyContent: 'center',
-//     } as ViewStyle,
-
-//     centerContent: {
-//       alignItems: props.centeredTitle ? 'center' : 'flex-start',
-//     } as ViewStyle,
-
-//     rightSection: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'flex-end',
-//       minWidth: 40,
-//       gap: utils.spacing[2],
-//     } as ViewStyle,
-
-//     iconButton: {
-//       padding: utils.spacing[1.5],
-//       borderRadius: utils.borderRadius.md,
-//     } as ViewStyle,
-
-//     iconButtonPressed: {
-//       backgroundColor: colors.border + '20',
-//     } as ViewStyle,
-
-//     icon: {
-//       color: colors.textPrimary,
-//     } as TextStyle,
-
-//     title: {
-//       fontSize: props.size === 'sm' ? 16 : props.size === 'lg' ? 22 : 18,
-//       fontWeight: utils.getFontWeight('600'),
-//       color: colors.textPrimary,
-//     } as TextStyle,
-
-//     subtitle: {
-//       fontSize: 12,
-//       color: colors.textSecondary,
-//       marginTop: 2,
-//     } as TextStyle,
-
-//     avatar: {
-//       width: 36,
-//       height: 36,
-//       borderRadius: 18,
-//       backgroundColor: colors.primary,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     } as ViewStyle,
-
-//     avatarText: {
-//       fontSize: 16,
-//       fontWeight: utils.getFontWeight('600'),
-//       color: 'white',
-//     } as TextStyle,
-
-//     searchContainer: {
-//       flex: 1,
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       backgroundColor: colors.surface,
-//       borderRadius: utils.borderRadius.md,
-//       paddingHorizontal: utils.spacing[2.5],
-//       paddingVertical: utils.spacing[1.5],
-//       borderWidth: 1,
-//       borderColor: colors.border + '30',
-//     } as ViewStyle,
-
-//     searchInput: {
-//       flex: 1,
-//       marginLeft: utils.spacing[1.5],
-//       fontSize: utils.fontSize.md,
-//       color: colors.textPrimary,
-//       padding: 0,
-//     } as ViewStyle,
-
-//     badge: {
-//       position: 'absolute',
-//       top: -4,
-//       right: -4,
-//       minWidth: 18,
-//       height: 18,
-//       borderRadius: 9,
-//       backgroundColor: colors.error,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//       paddingHorizontal: 4,
-//     } as ViewStyle,
-
-//     badgeText: {
-//       color: 'white',
-//       fontSize: 10,
-//       fontWeight: utils.getFontWeight('600'),
-//     } as TextStyle,
-
-//     // Filter button styles
-//     filterButtonActive: {
-//       backgroundColor: colors.primary + '15',
-//     } as ViewStyle,
-
-//     filterBadge: {
-//       position: 'absolute',
-//       top: -4,
-//       right: -4,
-//       minWidth: 18,
-//       height: 18,
-//       borderRadius: 9,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//       paddingHorizontal: 4,
-//     } as ViewStyle,
-
-//     filterBadgeText: {
-//       color: 'white',
-//       fontSize: 10,
-//       fontWeight: utils.getFontWeight('600'),
-//     } as TextStyle,
-//   }));
-
-//   return styleGenerator(colors);
-// };
-
 // src/core/components/Header/Header.styles.ts
 
 import { ViewStyle, TextStyle } from 'react-native';
@@ -173,20 +16,55 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
+
+    filterBadge: {
+      position: 'absolute',
+      top: 0,
+      right: 2,
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.surface || 'white', // Green instead of error red
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+      borderWidth: 2,
+      zIndex: 10,
+    } as ViewStyle,
+
+    filterBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '700',
+      textAlign: 'center',
+    } as TextStyle,
+
+    // Filter dot for active state without count
+    filterDot: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.success || '#10B981', // Green instead of error red
+      zIndex: 10,
+    } as ViewStyle,
+
+    // Active filter button style
+    filterButtonActive: {
+      backgroundColor: colors.success + '15' || '#10B98115', // Green tint
+    } as ViewStyle,
     container: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       height: props.size === 'sm' ? 56 : props.size === 'lg' ? 80 : 50,
-
-      // ✅ REMOVE backgroundColor from here
-      // It will be controlled by Header component
-
       borderBottomWidth: props.showBorder ? 1 : 0,
-      borderBottomColor: colors.border + '30',
-
+      borderBottomColor: colors.divider + '40',
       ...(props.elevated && {
         shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
@@ -196,53 +74,48 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
     leftSection: {
       flexDirection: 'row',
       alignItems: 'center',
-      minWidth: 40,
+      minWidth: 44,
     } as ViewStyle,
 
     centerSection: {
       flex: 1,
-      alignItems:  'flex-start',
-      justifyContent: 'center',
-    } as ViewStyle,
-
-    centerContent: {
       alignItems: props.centeredTitle ? 'center' : 'flex-start',
+      justifyContent: 'center',
     } as ViewStyle,
 
     rightSection: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-end',
-      minWidth: 40,
+      minWidth: 44,
       gap: utils.spacing[2],
     } as ViewStyle,
 
-    iconButton: {
-      padding: utils.spacing[1.5],
-      borderRadius: utils.borderRadius.md,
+    // Button base styles
+    buttonBase: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
     } as ViewStyle,
 
-    iconButtonPressed: {
-      backgroundColor: colors.border + '20',
-    } as ViewStyle,
-
-    icon: {
-      color: colors.textPrimary,
-    } as TextStyle,
-
+    // Title styles
     title: {
-      fontSize: props.size === 'sm' ? 16 : props.size === 'lg' ? 22 : 18,
-      fontWeight: utils.getFontWeight('600'),
-      color: colors.textPrimary,
-      marginLeft: 12,
+      fontSize: props.size === 'sm' ? 18 : props.size === 'lg' ? 28 : 22,
+      fontWeight: props.size === 'lg' ? '700' : '600',
+      letterSpacing: props.size === 'lg' ? 0.5 : -0.3,
+      color: colors.backgroundSecondary,
     } as TextStyle,
 
     subtitle: {
-      fontSize: 12,
+      fontSize: 13,
       color: colors.textSecondary,
-      marginTop: 2,
+      marginTop: 4,
+      letterSpacing: -0.2,
     } as TextStyle,
 
+    // Avatar styles (if needed)
     avatar: {
       width: 36,
       height: 36,
@@ -254,30 +127,36 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
 
     avatarText: {
       fontSize: 16,
-      fontWeight: utils.getFontWeight('600'),
-      color: 'white',
+      fontWeight: '600',
+      color: '#FFFFFF',
     } as TextStyle,
 
+    // Search styles
     searchContainer: {
-      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surface,
-      borderRadius: utils.borderRadius.md,
-      paddingHorizontal: utils.spacing[2.5],
-      paddingVertical: utils.spacing[1.5],
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      height: 50,
       borderWidth: 1,
-      borderColor: colors.border + '30',
+      borderColor: colors.border || 'transparent',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
     } as ViewStyle,
 
     searchInput: {
       flex: 1,
-      marginLeft: utils.spacing[1.5],
-      fontSize: utils.fontSize.md,
+      marginLeft: 10,
+      fontSize: 15,
       color: colors.textPrimary,
       padding: 0,
     } as ViewStyle,
 
+    // Badge styles
     badge: {
       position: 'absolute',
       top: -4,
@@ -285,39 +164,21 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       minWidth: 18,
       height: 18,
       borderRadius: 9,
-      backgroundColor: colors.error,
+      backgroundColor: colors.error || '#EF4444',
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 4,
+      borderWidth: 2,
+      zIndex: 10,
     } as ViewStyle,
 
     badgeText: {
-      color: 'white',
+      color: '#FFFFFF',
       fontSize: 10,
-      fontWeight: utils.getFontWeight('600'),
+      fontWeight: '700',
+      textAlign: 'center',
     } as TextStyle,
 
-    filterButtonActive: {
-      backgroundColor: colors.primary + '15',
-    } as ViewStyle,
-
-    filterBadge: {
-      position: 'absolute',
-      top: -4,
-      right: -4,
-      minWidth: 18,
-      height: 18,
-      borderRadius: 9,
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 4,
-    } as ViewStyle,
-
-    filterBadgeText: {
-      color: 'white',
-      fontSize: 10,
-      fontWeight: utils.getFontWeight('600'),
-    } as TextStyle,
   }));
 
   return styleGenerator(colors);

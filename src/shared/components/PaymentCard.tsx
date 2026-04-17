@@ -29,35 +29,54 @@ export const PaymentCard: React.FC<PaymentCardProps> = ({ payment, index }) => {
 
   const getPaymentModeIcon = (mode: string) => {
     switch (mode) {
-      case 'CASH': return 'cash-outline';
-      case 'CARD': return 'card-outline';
-      case 'CHEQUE': return 'document-outline';
-      case 'BANK_TRANSFER': return 'business-outline';
-      case 'UPI': return 'phone-portrait-outline';
-      case 'MOBILE_MONEY': return 'phone-outline';
-      default: return 'cash-outline';
+      case 'CASH':
+        return 'cash-outline';
+      case 'CARD':
+        return 'card-outline';
+      case 'CHEQUE':
+        return 'document-outline';
+      case 'BANK_TRANSFER':
+        return 'business-outline';
+      case 'UPI':
+        return 'phone-portrait-outline';
+      case 'MOBILE_MONEY':
+        return 'phone-outline';
+      default:
+        return 'cash-outline';
     }
   };
 
   const getPaymentModeColor = (mode: string) => {
     switch (mode) {
-      case 'CASH': return '#10B981';
-      case 'CARD': return '#8B5CF6';
-      case 'CHEQUE': return '#3B82F6';
-      case 'BANK_TRANSFER': return '#EC4899';
-      case 'UPI': return '#F59E0B';
-      case 'MOBILE_MONEY': return '#06B6D4';
-      default: return colors.primary;
+      case 'CASH':
+        return '#10B981';
+      case 'CARD':
+        return '#8B5CF6';
+      case 'CHEQUE':
+        return '#3B82F6';
+      case 'BANK_TRANSFER':
+        return '#EC4899';
+      case 'UPI':
+        return '#F59E0B';
+      case 'MOBILE_MONEY':
+        return '#06B6D4';
+      default:
+        return colors.primary;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'SUCCESS': return '#10B981';
-      case 'PENDING': return '#F59E0B';
-      case 'FAILED': return '#EF4444';
-      case 'REFUNDED': return '#6B7280';
-      default: return '#6B7280';
+      case 'SUCCESS':
+        return '#10B981';
+      case 'PENDING':
+        return '#F59E0B';
+      case 'FAILED':
+        return '#EF4444';
+      case 'REFUNDED':
+        return '#6B7280';
+      default:
+        return '#6B7280';
     }
   };
 
@@ -110,9 +129,16 @@ export const PaymentCard: React.FC<PaymentCardProps> = ({ payment, index }) => {
         {/* Content */}
         <View style={{ flex: 1 }}>
           {/* Header Row */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 4,
+            }}
+          >
             <AppText style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>
-              {payment.paymentId.slice(-8)}
+              {payment.customerName || payment.customerId}
             </AppText>
             <View
               style={{
@@ -125,7 +151,9 @@ export const PaymentCard: React.FC<PaymentCardProps> = ({ payment, index }) => {
                 backgroundColor: statusColor + '12',
               }}
             >
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
+              <View
+                style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }}
+              />
               <AppText style={{ fontSize: 10, fontWeight: '600', color: statusColor }}>
                 {payment.status}
               </AppText>
@@ -133,9 +161,16 @@ export const PaymentCard: React.FC<PaymentCardProps> = ({ payment, index }) => {
           </View>
 
           {/* Customer & Amount Row */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              marginBottom: 4,
+            }}
+          >
             <AppText style={{ fontSize: 13, color: colors.textSecondary }} numberOfLines={1}>
-              {payment.customerName || payment.customerId.slice(-8)}
+              {payment.paymentId}
             </AppText>
             <AppText style={{ fontSize: 16, fontWeight: '700', color: colors.success }}>
               {formatCurrency(payment.amount)}
@@ -177,7 +212,12 @@ export const PaymentCard: React.FC<PaymentCardProps> = ({ payment, index }) => {
       </View>
 
       {/* Right - Chevron */}
-      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} style={{ marginLeft: 8 }} />
+      <Ionicons
+        name="chevron-forward"
+        size={18}
+        color={colors.textTertiary}
+        style={{ marginLeft: 8 }}
+      />
     </TouchableOpacity>
   );
 };

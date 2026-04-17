@@ -1,60 +1,36 @@
 // src/core/components/Header/Header.types.ts
-import { ReactNode } from 'react';
-import { ViewStyle, TextStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 export interface HeaderProps {
-  // Basic props
   title?: string;
   subtitle?: string;
   showBack?: boolean;
   showMenu?: boolean;
-
-  // Icons
-  rightIcon?: keyof typeof Ionicons.glyphMap;
-  secondRightIcon?: keyof typeof Ionicons.glyphMap;
-  onRightPress?: () => void;
-  onSecondRightPress?: () => void;
-
-  // Custom components
-  leftComponent?: ReactNode;
-  rightComponent?: ReactNode;
-  centerComponent?: ReactNode;
-
-  // Styling
-  elevated?: boolean;
-  centeredTitle?: boolean;
-  transparent?: boolean;
-  size?: 'sm' | 'md' | 'lg';
-  showBorder?: boolean;
-  style?: ViewStyle;
-  titleStyle?: TextStyle;
-
-  // Search
+  showFilter?: boolean;
   showSearch?: boolean;
+  showSearchBar?: boolean; // New: Show search bar below header
   searchValue?: string;
   searchPlaceholder?: string;
   onSearchChange?: (text: string) => void;
-  onSearchSubmit?: () => void;
-
-  // Badge
-  badgeCount?: number;
-  badgeColor?: string;
-
-  // Avatar
-  avatar?: boolean;
-  avatarText?: string;
-
-  // Testing
-  testID?: string;
-
-  // Filter props for customers and products
-  showFilter?: boolean;
+  onSearchClear?: () => void;
+  onSearchPress?: () => void;
   filterActive?: boolean;
   filterCount?: number;
   onFilterPress?: () => void;
-  filterIcon?: keyof typeof Ionicons.glyphMap;
-  filterActiveIcon?: keyof typeof Ionicons.glyphMap;
-  filterPosition?: 'left' | 'right';
+  rightIcon?: string;
+  onRightPress?: () => void;
+  badgeCount?: number;
+  elevated?: boolean;
+  centeredTitle?: boolean;
+  transparent?: boolean;
+  size?: 'small' | 'medium' | 'large';
+  showBorder?: boolean;
   headerBackgroundColor?: string;
+  style?: any;
+  
+  // New props for modern gradient design
+  useGradient?: boolean;
+  gradientColors?: string[];
+  
+  // Deprecated/legacy
+  [key: string]: any;
 }

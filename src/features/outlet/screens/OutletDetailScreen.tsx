@@ -327,7 +327,7 @@ export default function CustomerDetailScreen() {
         });
         setShowVisitModal(false);
         setVisitNote('');
-        router.push(`/route/visit`);
+        router.push(`/route/${customer?.customerId}/visit`);
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to start visit');
@@ -338,9 +338,8 @@ export default function CustomerDetailScreen() {
 
   const handleVisitAction = useCallback(() => {
     if (activeVisit) {
-      router.push(`/route/visit`);
+      router.push(`/route/${customer?.customerId}/visit`);
     } else {
-      // setShowVisitModal(true);
       handleStartVisit();
     }
   }, [activeVisit, customer]);
@@ -565,8 +564,6 @@ const CustomerHeader = ({ customer, styles, colors, onBack, onEdit, onShare, com
     </View>
   </Animated.View>
 );
-
-
 
 const VisitBanner = ({ activeVisit, customer, onStartVisit, styles, colors }: any) => {
   if (activeVisit) {
@@ -1294,7 +1291,9 @@ const OverviewTab = ({ customer, styles, colors }: any) => (
         <View style={styles.financialCard}>
           <AppText style={styles.financialLabel}>Last Visit</AppText>
           <AppText style={[styles.financialValue, { color: colors.success }]}>
-            {customer.lastVisitedAt ? moment(customer.lastVisitedAt).format('DD MMM YYYY') : 'Never'}
+            {customer.lastVisitedAt
+              ? moment(customer.lastVisitedAt).format('DD MMM YYYY')
+              : 'Never'}
           </AppText>
         </View>
       </View>
@@ -1339,26 +1338,36 @@ const OverviewTab = ({ customer, styles, colors }: any) => (
           <AppText style={styles.infoLabel}>Business Type</AppText>
           <AppText style={styles.infoValue}>{customer.customerTypeId || 'N/A'}</AppText>
         </View>
-        
+
         <View style={styles.infoRow}>
           <AppText style={styles.infoLabel}>Category</AppText>
           <AppText style={styles.infoValue}>{customer.customerCategoryId || 'N/A'}</AppText>
         </View>
-        
+
         <View style={styles.infoRow}>
           <AppText style={styles.infoLabel}>Channel</AppText>
           <AppText style={styles.infoValue}>{customer.channelId || 'N/A'}</AppText>
         </View>
-        
+
         <View style={styles.infoRow}>
           <AppText style={styles.infoLabel}>Market</AppText>
           <AppText style={styles.infoValue}>{customer.marketId || 'N/A'}</AppText>
         </View>
-        
+
         <View style={styles.infoRow}>
           <AppText style={styles.infoLabel}>Segmentation</AppText>
-          <View style={[styles.segmentationBadge, { backgroundColor: getSegmentationColor(customer.segmentation) + '15' }]}>
-            <AppText style={[styles.segmentationText, { color: getSegmentationColor(customer.segmentation) }]}>
+          <View
+            style={[
+              styles.segmentationBadge,
+              { backgroundColor: getSegmentationColor(customer.segmentation) + '15' },
+            ]}
+          >
+            <AppText
+              style={[
+                styles.segmentationText,
+                { color: getSegmentationColor(customer.segmentation) },
+              ]}
+            >
               {customer.segmentation || 'Standard'}
             </AppText>
           </View>
@@ -1379,8 +1388,8 @@ const OverviewTab = ({ customer, styles, colors }: any) => (
       </View>
 
       {customer.phoneNumber && (
-        <TouchableOpacity 
-          style={styles.contactRow} 
+        <TouchableOpacity
+          style={styles.contactRow}
           onPress={() => Linking.openURL(`tel:${customer.phoneNumber}`)}
           activeOpacity={0.7}
         >
@@ -1393,9 +1402,11 @@ const OverviewTab = ({ customer, styles, colors }: any) => (
       )}
 
       {customer.phoneNumber && (
-        <TouchableOpacity 
-          style={styles.contactRow} 
-          onPress={() => Linking.openURL(`https://wa.me/${customer.phoneNumber.replace(/[^0-9]/g, '')}`)}
+        <TouchableOpacity
+          style={styles.contactRow}
+          onPress={() =>
+            Linking.openURL(`https://wa.me/${customer.phoneNumber.replace(/[^0-9]/g, '')}`)
+          }
           activeOpacity={0.7}
         >
           <View style={[styles.detailContactIcon, { backgroundColor: colors.success + '10' }]}>
@@ -1407,8 +1418,8 @@ const OverviewTab = ({ customer, styles, colors }: any) => (
       )}
 
       {customer.address?.line1 && (
-        <TouchableOpacity 
-          style={styles.contactRow} 
+        <TouchableOpacity
+          style={styles.contactRow}
           onPress={() => Linking.openURL(getMapUrl(customer.address))}
           activeOpacity={0.7}
         >
@@ -1416,22 +1427,25 @@ const OverviewTab = ({ customer, styles, colors }: any) => (
             <Ionicons name="location-outline" size={18} color={colors.info} />
           </View>
           <AppText style={styles.detailContactText} numberOfLines={1}>
-            {customer.address.line1}{customer.address.line2 ? `, ${customer.address.line2}` : ''}
+            {customer.address.line1}
+            {customer.address.line2 ? `, ${customer.address.line2}` : ''}
           </AppText>
           <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
       )}
 
       {customer.email && (
-        <TouchableOpacity 
-          style={styles.contactRow} 
+        <TouchableOpacity
+          style={styles.contactRow}
           onPress={() => Linking.openURL(`mailto:${customer.email}`)}
           activeOpacity={0.7}
         >
           <View style={[styles.detailContactIcon, { backgroundColor: colors.warning + '10' }]}>
             <Ionicons name="mail-outline" size={18} color={colors.warning} />
           </View>
-          <AppText style={styles.detailContactText} numberOfLines={1}>{customer.email}</AppText>
+          <AppText style={styles.detailContactText} numberOfLines={1}>
+            {customer.email}
+          </AppText>
           <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
         </TouchableOpacity>
       )}
@@ -1501,8 +1515,6 @@ const getSegmentationColor = (segmentation: string): string => {
       return colors?.primary || '#8B5CF6';
   }
 };
-
-
 
 const Section = ({ title, subtitle, icon, children, styles, colors }: any) => (
   <View style={styles.sectionCard}>

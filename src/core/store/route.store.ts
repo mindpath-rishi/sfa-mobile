@@ -20,6 +20,7 @@ export type Route = {
   totalShops: number;
   distance: string;
   vanId?: string;
+  routeName?: string
 };
 
 type RouteStore = {

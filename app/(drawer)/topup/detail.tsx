@@ -74,7 +74,7 @@ export const VanInventoryTopupDetailPage: React.FC = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
   const route = useRoute();
-  const { id } = route.params as { id: string };
+  const { id } = route?.params as { id: string };
 
   const [detail, setDetail] = useState<TopupDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);

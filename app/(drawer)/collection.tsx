@@ -18,6 +18,7 @@ import { SearchBar } from '@/features/outlet';
 import { PaymentCard } from '@/shared/components/PaymentCard';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { PaymentCollectionModal } from '@/shared/components/PaymentCollectionModal';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 
 const LIMIT = 10;
 
@@ -52,6 +53,7 @@ export default function PaymentsScreen({
   const route = useRouteStore((s) => s.selectedRoute);
   const { user } = useAuthStore();
   const { selectedOutlet: outlet } = useOutletStore();
+  const { setHeader } = useHeader();
 
   const { setOpenPaymentFilterHandler, updatePaymentsFilterCount, resetPaymentsFilterCount } =
     useFilterContext();
@@ -72,34 +74,49 @@ export default function PaymentsScreen({
   }, [hideFilters]);
 
   // Filter sections
-  const filterSections: any = useMemo(() => [
-    {
-      id: 'paymentMode',
-      title: 'Payment Mode',
-      type: 'multiple',
-      options: [
-        { id: 'CASH', label: 'Cash' },
-        { id: 'CARD', label: 'Card' },
-        { id: 'CHEQUE', label: 'Cheque' },
-        { id: 'BANK_TRANSFER', label: 'Bank Transfer' },
-        { id: 'UPI', label: 'UPI' },
-        { id: 'MOBILE_MONEY', label: 'Mobile Money' },
-      ],
-      selectedIds: filters.paymentMode,
-    },
-    {
-      id: 'status',
-      title: 'Payment Status',
-      type: 'multiple',
-      options: [
-        { id: 'SUCCESS', label: 'Success' },
-        { id: 'PENDING', label: 'Pending' },
-        { id: 'FAILED', label: 'Failed' },
-        { id: 'REFUNDED', label: 'Refunded' },
-      ],
-      selectedIds: filters.status,
-    },
-  ], [filters]);
+  const filterSections: any = useMemo(
+    () => [
+      {
+        id: 'paymentMode',
+        title: 'Payment Mode',
+        type: 'multiple',
+        options: [
+          { id: 'CASH', label: 'Cash' },
+          { id: 'CARD', label: 'Card' },
+          { id: 'CHEQUE', label: 'Cheque' },
+          { id: 'BANK_TRANSFER', label: 'Bank Transfer' },
+          { id: 'UPI', label: 'UPI' },
+          { id: 'MOBILE_MONEY', label: 'Mobile Money' },
+        ],
+        selectedIds: filters.paymentMode,
+      },
+      {
+        id: 'status',
+        title: 'Payment Status',
+        type: 'multiple',
+        options: [
+          { id: 'SUCCESS', label: 'Success' },
+          { id: 'PENDING', label: 'Pending' },
+          { id: 'FAILED', label: 'Failed' },
+          { id: 'REFUNDED', label: 'Refunded' },
+        ],
+        selectedIds: filters.status,
+      },
+    ],
+    [filters],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log('===============95============');
+      setHeader({
+        showFilter: true,
+        onFilterPress: () => setShowFilters(true),
+        rightIcon: 'plus',
+        onRightPress: () => handleAddPayment(),
+      });
+    }, [setHeader]),
+  );
 
   // Fetch payments
   const getPayments = async (pageNumber = 1, isRefresh = false) => {
@@ -110,17 +127,32 @@ export default function PaymentsScreen({
       const payload: any = {
         page: pageNumber,
         limit: LIMIT,
-        filters,
         vanId: user?.vanId,
         employeeId: user?.userId,
         customerId,
       };
 
+      // ✅ Flatten filters
+      if (filters?.status?.length) {
+        payload.status = filters.status;
+      }
+
+      if (filters?.paymentMode?.length) {
+        payload.paymentMode = filters.paymentMode;
+      }
+
+      // ✅ Search
+      if (searchQuery) {
+        payload.searchText = searchQuery;
+      }
+
       const response = await saleService.fetchPayments(payload);
 
       if (response.statusCode === 200) {
         const newData = response.data || [];
-        setPayments(prev => isRefresh ? newData : [...prev, ...newData]);
+
+        setPayments((prev) => (isRefresh ? newData : [...prev, ...newData]));
+
         setHasMore(newData.length === LIMIT);
         setPage(pageNumber);
       }
@@ -136,7 +168,7 @@ export default function PaymentsScreen({
   useFocusEffect(
     useCallback(() => {
       getPayments(1, true);
-    }, [route, user, customerId])
+    }, [route, user, customerId]),
   );
 
   // Handle search & filters
@@ -165,7 +197,7 @@ export default function PaymentsScreen({
     const newFilters = { paymentMode: [], status: [] };
     let count = 0;
 
-    sections.forEach(section => {
+    sections.forEach((section) => {
       if (section.selectedIds?.length) count += section.selectedIds.length;
       if (section.id === 'paymentMode') newFilters.paymentMode = section.selectedIds || [];
       if (section.id === 'status') newFilters.status = section.selectedIds || [];
@@ -202,13 +234,12 @@ export default function PaymentsScreen({
     getPayments(1, true);
   }, []);
 
-  const renderFooter = () => (
+  const renderFooter = () =>
     loading ? (
       <View style={styles.footerLoader}>
         <ActivityIndicator color={colors.primary} size="small" />
       </View>
-    ) : null
-  );
+    ) : null;
 
   const renderEmptyState = () => (
     <EmptyState
