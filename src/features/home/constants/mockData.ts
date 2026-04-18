@@ -16,7 +16,7 @@ export const MOCK_DATA = {
 };
 
 export const QUICK_ACTIONS: QuickAction[] = [
-  { icon: 'location', label: 'Active Visit', color: '#4158D0', route: '/checkin' },
+  // { icon: 'location', label: 'Active Visit', color: '#4158D0', route: '/checkin' },
   // { icon: 'cart', label: 'New Order', color: '#C850C0', route: '/orders/new', badge: 3 },
   { icon: 'cash', label: 'Collection', color: '#FF512F', route: '/collection' },
   // { icon: 'people', label: 'Outlets', color: '#11998e', route: '/outlets' },

@@ -1195,15 +1195,22 @@ export default function SalesExecutiveScreen() {
     if (photo && photo.uri) {
       setUserPhoto(photo.uri);
       setCameraVisible(false);
-
       if (isChangingActivity) {
-        completeActivityChange();
-      } else {
         if (selectedRoute) {
           setLoadSummaryVisible(true);
         } else {
-          handleStartDay();
+          // handleStartDay();
+          completeActivityChange();
         }
+        return;
+      }
+
+      //Revert me
+
+      if (selectedRoute) {
+        setLoadSummaryVisible(true);
+      } else {
+        handleStartDay();
       }
     } else {
       console.error('No photo captured');
@@ -1213,6 +1220,10 @@ export default function SalesExecutiveScreen() {
 
   const handleLoadSummaryProceed = () => {
     setLoadSummaryVisible(false);
+    if (isChangingActivity) {
+      completeActivityChange();
+      return;
+    }
     handleStartDay();
   };
 
@@ -1631,7 +1642,6 @@ export default function SalesExecutiveScreen() {
         onConfirm={handleEndDay}
         vanName="Van #001"
         date={new Date().toLocaleDateString()}
-
       />
 
       <DayEndSummaryModal

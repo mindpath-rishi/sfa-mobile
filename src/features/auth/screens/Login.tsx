@@ -445,14 +445,14 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
       />
 
       {/* Forgot Password Link */}
-      {!keyboardVisible && (
-        <Pressable
+      {/* {!keyboardVisible && (
+        <
           onPress={handleForgotPassword}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <AppText style={styles.forgotLink}>{t('auth.login.forgotPassword')}</AppText>
         </Pressable>
-      )}
+      )} */}
 
       {/* Submit Button */}
       <Animated.View style={[styles.buttonContainer, animatedButton]}>
@@ -492,7 +492,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
     <View style={[styles.scrollContentInner, { backgroundColor: 'transparent' }]}>
       {renderHeader()}
       {renderForm()}
-      {!shouldHideFooter && renderFooter()}
+      {/* {!shouldHideFooter && renderFooter()} */}
       {keyboardVisible && <View style={{ height: 20 }} />}
     </View>
   );

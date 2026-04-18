@@ -1,19 +1,30 @@
 // StatCardStyles.ts
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Dimensions } from 'react-native';
 
-export const useStatCardStyles = ({ color, trend }: any) => {
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+export const useStatCardStyles = ({ color, trend, compact }: any) => {
+  // Fixed card dimensions
+  const cardWidth = compact ? SCREEN_WIDTH * 0.42 : SCREEN_WIDTH * 0.44;
+  const cardHeight = compact ? 100 : 110;
+  
   const styles = StyleSheet.create({
     card: {
+      width: cardWidth,
+      height: cardHeight,
       backgroundColor: '#FFFFFF',
-      borderRadius: 16,
-      padding: 16,
+      borderRadius: 12,
+      padding: compact ? 10 : 12,
       flexDirection: 'row',
       alignItems: 'center',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
       elevation: 2,
+      borderWidth: 1,
+      borderColor: '#F0F0F0',
+      overflow: 'hidden',
     },
     loadingOverlay: {
       position: 'absolute',
@@ -21,49 +32,64 @@ export const useStatCardStyles = ({ color, trend }: any) => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(255,255,255,0.8)',
-      borderRadius: 16,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+      borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1,
     },
     iconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: `${color}15`,
+      width: compact ? 44 : 48,
+      height: compact ? 44 : 48,
+      borderRadius: compact ? 10 : 12,
+      backgroundColor: `${color}12`,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 12,
+      marginRight: 10,
     },
     content: {
       flex: 1,
+      height: '100%',
+      justifyContent: 'center',
     },
     title: {
-      fontSize: 13,
+      fontSize: compact ? 10 : 11,
       fontWeight: '500',
       color: '#6B7280',
       marginBottom: 4,
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+    },
+    valueRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      flexWrap: 'nowrap',
+      gap: 6,
     },
     value: {
-      fontSize: 28,
+      fontSize: compact ? 20 : 24,
       fontWeight: '700',
       color: '#111827',
-      marginBottom: 4,
+      flexShrink: 1,
     },
     subtitle: {
-      fontSize: 12,
+      fontSize: 9,
       color: '#9CA3AF',
+      marginTop: 2,
     },
     trendContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: 6,
-      gap: 4,
+      backgroundColor: trend && trend > 0 ? '#10B98112' : '#EF444412',
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 10,
+      gap: 2,
     },
     trendText: {
-      fontSize: 12,
+      fontSize: 9,
       fontWeight: '600',
+      color: trend && trend > 0 ? '#10B981' : '#EF4444',
     },
   });
 

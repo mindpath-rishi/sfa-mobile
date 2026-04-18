@@ -21,6 +21,7 @@ import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useStockPageStyles } from '@/shared/styles/Stock.styles';
 import { debounce } from 'lodash';
+import { useFocusEffect } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -207,9 +208,15 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   );
 
   // Initial load
-  useEffect(() => {
+  // useEffect(() => {
+  //   getVanStock(false, 1);
+  // }, [van]);
+
+  useFocusEffect(
+  useCallback(() => {
     getVanStock(false, 1);
-  }, [van]);
+  }, [van])
+);
 
   // Handle search
   const handleSearch = (text: string) => {

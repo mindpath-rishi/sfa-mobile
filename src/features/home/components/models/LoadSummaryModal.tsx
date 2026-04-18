@@ -424,7 +424,7 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
     <AppModal
       visible={visible}
       onClose={onClose}
-      title="Kitwe Van - Opening Balance"
+      title="Delivery Van 1 - Opening Balance"
       size="full"
       position="center"
       animation="slide"

@@ -525,7 +525,8 @@ export default function BeatsScreen() {
       showBack: true,
       showFilter: true,
       rightIcon: 'plus',
-      rightIcon2: 'map'
+      rightIcon2: 'map',
+      title: activeRoute?.routeName || 'Active Route'
     });
   }, [setHeader]);
 

@@ -651,6 +651,7 @@ export default function TopupScreen({
         onFilterPress: () => setShowFilters(true),
         rightIcon: 'plus',
         onRightPress: () => handleCreateTopup(),
+        title: 'Topup'
       });
     }, [setHeader]),
   );

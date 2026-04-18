@@ -19,7 +19,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText } from '@/core/components';
 import { useOutletDetailStyles } from '../styles/OutletDetail.styles';
@@ -146,12 +146,21 @@ export default function CustomerDetailScreen() {
     loadCustomerData();
   }, [id]);
 
-  useEffect(() => {
+  // useEffect(() => {
+  //   if (customer) {
+  //     loadOrders(1, true);
+  //     loadPayments(1, true);
+  //   }
+  // }, [customer]);
+
+  useFocusEffect(
+  useCallback(() => {
     if (customer) {
       loadOrders(1, true);
       loadPayments(1, true);
     }
-  }, [customer]);
+  }, [customer])
+);
 
   useEffect(() => {
     setIsTabScrolled(false);

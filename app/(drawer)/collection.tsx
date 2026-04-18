@@ -114,6 +114,7 @@ export default function PaymentsScreen({
         onFilterPress: () => setShowFilters(true),
         rightIcon: 'plus',
         onRightPress: () => handleAddPayment(),
+        title: 'Collection'
       });
     }, [setHeader]),
   );

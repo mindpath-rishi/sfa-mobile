@@ -101,13 +101,14 @@ export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
 
   const baseConfig: HeaderConfig = useMemo(() => {
     const isRoot = segments.length <= 1;
+    const isHome = segments.includes('home');
 
-    console.log(isRoot, "==================root=====================")
+    console.log(isRoot, "==================root=====================", isHome )
 
     return {
       title: '',
-      showBack: !isRoot,
-      showMenu: isRoot,
+      showBack: !isHome,
+      showMenu: isHome,
       showSearch: false,
       showFilter: false,
       searchValue: '',
