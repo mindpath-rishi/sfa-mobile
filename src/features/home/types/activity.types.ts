@@ -103,8 +103,6 @@ export interface CurrentActivityCardProps {
   otherWorkStartTime: string | null;
   selectedRoute: any | null;
   assignedVan: Van;
-  onPressChange: () => void;
-  onPressEnd: () => void;
   onPressRoute?: () => void;
   onPressVan?: () => void;
   compact?: boolean;

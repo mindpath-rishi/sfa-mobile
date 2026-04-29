@@ -7,6 +7,429 @@ export const useOutletDetailStyles = () => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
+// Add/update these styles in your useOutletDetailStyles.ts
+
+// Consistent card styling for all tabs
+saleCard: {
+  backgroundColor: colors.surface,
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: colors.divider,
+  ...Platform.select({
+    ios: {
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 1,
+    },
+  }),
+},
+visitCard: {
+  backgroundColor: colors.surface,
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: colors.divider,
+  ...Platform.select({
+    ios: {
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 1,
+    },
+  }),
+},
+invoiceCard: {
+  backgroundColor: colors.surface,
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 12,
+  borderWidth: 1,
+  borderColor: colors.divider,
+  ...Platform.select({
+    ios: {
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 1,
+    },
+  }),
+},
+salesSectionCard: {
+  backgroundColor: colors.surface,
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: colors.divider,
+},
+actionButtonsContainer: {
+  flexDirection: 'row',
+  gap: 12,
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  backgroundColor: colors.background,
+},
+actionButton: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  paddingVertical: 12,
+  borderRadius: 12,
+  ...Platform.select({
+    ios: {
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 2,
+    },
+  }),
+},
+actionButtonText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#FFF',
+},
+summaryContainer: {
+  padding: 16,
+  paddingBottom: 24,
+},
+salesSectionCard: {
+  backgroundColor: colors.surface,
+  borderRadius: 12,
+  padding: 16,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: colors.divider,
+},
+salesSectionTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: colors.textPrimary,
+  marginBottom: 16,
+},
+statsRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 20,
+},
+statBox: {
+  flex: 1,
+  alignItems: 'center',
+},
+statValue: {
+  fontSize: 24,
+  fontWeight: 'bold',
+  color: colors.textPrimary,
+  marginBottom: 4,
+},
+statLabel: {
+  fontSize: 11,
+  fontWeight: '500',
+  color: colors.textSecondary,
+  letterSpacing: 0.5,
+},
+statSubLabel: {
+  fontSize: 9,
+  color: colors.textTertiary,
+  marginTop: 2,
+},
+statDivider: {
+  width: 1,
+  height: 50,
+  backgroundColor: colors.divider,
+},
+statsRowSmall: {
+  flexDirection: 'row',
+  gap: 12,
+},
+statBoxSmall: {
+  flex: 1,
+  alignItems: 'center',
+  backgroundColor: colors.background,
+  borderRadius: 8,
+  padding: 10,
+},
+statValueSmall: {
+  fontSize: 16,
+  fontWeight: 'bold',
+  color: colors.textPrimary,
+  marginBottom: 4,
+},
+statLabelSmall: {
+  fontSize: 9,
+  fontWeight: '500',
+  color: colors.textSecondary,
+  textAlign: 'center',
+  letterSpacing: 0.3,
+},
+statSubLabelSmall: {
+  fontSize: 8,
+  color: colors.textTertiary,
+  textAlign: 'center',
+  marginTop: 2,
+},
+vanSalesFooter: {
+  marginTop: 8,
+  paddingVertical: 16,
+  alignItems: 'center',
+  borderTopWidth: 1,
+  borderTopColor: colors.divider,
+},
+vanSalesText: {
+  fontSize: 12,
+  fontWeight: '600',
+  color: colors.textSecondary,
+  letterSpacing: 1,
+},
+welcomeCard: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  backgroundColor: colors.primary + '10',
+  borderRadius: 16,
+  padding: 16,
+  marginBottom: 16,
+},
+welcomeTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: colors.textPrimary,
+},
+welcomeSubtitle: {
+  fontSize: 12,
+  color: colors.textSecondary,
+  marginTop: 4,
+},
+welcomeIcon: {
+  width: 48,
+  height: 48,
+  borderRadius: 24,
+  backgroundColor: colors.surface,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+sectionHeaderRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginBottom: 16,
+  gap: 8,
+},
+sectionIconBadge: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  backgroundColor: colors.primary + '15',
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+statPeriodSmall: {
+  fontSize: 9,
+  color: colors.textTertiary,
+  marginTop: 2,
+},
+quickStatsFooter: {
+  flexDirection: 'row',
+  backgroundColor: colors.surface,
+  borderRadius: 16,
+  padding: 16,
+  marginTop: 8,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: colors.divider,
+},
+quickStatItem: {
+  flex: 1,
+  alignItems: 'center',
+  gap: 4,
+},
+quickStatLabel: {
+  fontSize: 11,
+  color: colors.textSecondary,
+},
+quickStatValue: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: colors.textPrimary,
+},
+quickStatDivider: {
+  width: 1,
+  height: 40,
+  backgroundColor: colors.divider,
+},
+    detailDatesRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 6,
+      marginBottom: 4,
+    },
+    detailDateChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(0,0,0,0.05)',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    detailDateLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+    detailDateValue: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: colors.textPrimary,
+    },
+    shareButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    },
+    shareButtonText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    // Sales Tab Styles
+    saleCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+    },
+    saleCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 8,
+    },
+    saleId: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.textPrimary,
+    },
+    saleDate: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    saleAmount: {
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    saleCardBody: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    saleStat: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    saleStatText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    saleStatusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+      marginLeft: 'auto',
+    },
+    saleStatusText: {
+      fontSize: 11,
+      fontWeight: '500',
+    },
+    // Visits Tab Styles
+    visitCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+    },
+    visitCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    visitStatusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    visitDate: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.textPrimary,
+      flex: 1,
+    },
+    visitDurationBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    visitDuration: {
+      fontSize: 11,
+      color: colors.primary,
+    },
+    visitNote: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 8,
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    },
+    visitNoteText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      flex: 1,
+    },
+    listHeader: {
+      marginBottom: 16,
+    },
+    listHeaderTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    listHeaderSubtitle: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
     // ────────────────────────────────────────────────────────────────────────────
     // Container & Layout
     // ────────────────────────────────────────────────────────────────────────────
@@ -240,7 +663,7 @@ export const useOutletDetailStyles = () => {
 
     detailStatCard: {
       flex: 1,
-      minWidth:   '23%',
+      minWidth: '23%',
       backgroundColor: colors.surface,
       borderRadius: utils.borderRadius.lg,
       padding: utils.spacing[3],
@@ -1406,14 +1829,85 @@ export const useOutletDetailStyles = () => {
     // ────────────────────────────────────────────────────────────────────────────
     // List Header
     // ────────────────────────────────────────────────────────────────────────────
-    listHeader: {
+
+    // Add to your styles object
+    summaryContainer: {
+      padding: 16,
+    },
+    curatedSection: {
+      marginBottom: 20,
+    },
+    curatedTitle: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 12,
+      letterSpacing: 1,
+    },
+    curatedTags: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    curatedTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.primary + '10',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    curatedTagText: {
+      fontSize: 12,
+      color: colors.primary,
+      fontWeight: '500',
+    },
+   
+    invoiceCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 12,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+    },
+    invoiceCardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'flex-end',
-      marginBottom: utils.spacing[3],
-      paddingHorizontal: utils.spacing[1],
-    } as ViewStyle,
-
+      alignItems: 'flex-start',
+      marginBottom: 8,
+    },
+    invoiceNumber: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    invoiceDate: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    invoiceAmount: {
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    invoiceCardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    },
+    invoiceStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    invoiceStatusText: {
+      fontSize: 11,
+      color: colors.success,
+    },
     orderCountTitle: {
       fontSize: utils.fontSize.lg,
       fontWeight: utils.getFontWeight('bold'),
@@ -1529,23 +2023,23 @@ export const useOutletDetailStyles = () => {
       justifyContent: 'center',
     } as ViewStyle,
 
-    statDivider: {
-      width: 1,
-      height: 30,
-      backgroundColor: colors.divider,
-    } as ViewStyle,
+    // statDivider: {
+    //   width: 1,
+    //   height: 30,
+    //   backgroundColor: colors.divider,
+    // } as ViewStyle,
 
-    statLabel: {
-      fontSize: utils.fontSize.xs,
-      color: colors.textSecondary,
-      marginBottom: utils.spacing[0.5],
-    } as TextStyle,
+    // statLabel: {
+    //   fontSize: utils.fontSize.xs,
+    //   color: colors.textSecondary,
+    //   marginBottom: utils.spacing[0.5],
+    // } as TextStyle,
 
-    statValue: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('semibold'),
-      color: colors.textPrimary,
-    } as TextStyle,
+    // statValue: {
+    //   fontSize: utils.fontSize.sm,
+    //   fontWeight: utils.getFontWeight('semibold'),
+    //   color: colors.textPrimary,
+    // } as TextStyle,
 
     amountValue: {
       color: colors.primary,
@@ -1833,92 +2327,137 @@ export const useOutletDetailStyles = () => {
     } as TextStyle,
     // Add these to your useOutletDetailStyles return object (before the closing }))
 
-// Financial Grid
-financialGrid: {
-  flexDirection: 'row',
-  flexWrap: 'wrap',
-  gap: utils.spacing[2],
-} as ViewStyle,
+    // Financial Grid
+    financialGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: utils.spacing[2],
+    } as ViewStyle,
 
-financialCard: {
-  flex: 1,
-  minWidth: '48%',
+    financialCard: {
+      flex: 1,
+      minWidth: '48%',
+      backgroundColor: colors.background,
+      borderRadius: utils.borderRadius.lg,
+      padding: utils.spacing[3],
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.divider,
+    } as ViewStyle,
+
+    financialLabel: {
+      fontSize: utils.fontSize.xs,
+      color: colors.textSecondary,
+      marginBottom: utils.spacing[1],
+    } as TextStyle,
+
+    financialValue: {
+      fontSize: utils.fontSize.md,
+      fontWeight: utils.getFontWeight('bold'),
+    } as TextStyle,
+
+    // Credit Utilization
+    creditUtilization: {
+      marginTop: utils.spacing[3],
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    creditUtilizationHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    } as ViewStyle,
+
+    creditUtilizationLabel: {
+      fontSize: utils.fontSize.xs,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    creditUtilizationPercent: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: utils.getFontWeight('semibold'),
+      color: colors.textPrimary,
+    } as TextStyle,
+
+    creditUtilizationBar: {
+      height: 6,
+      backgroundColor: colors.divider,
+      borderRadius: 3,
+      overflow: 'hidden',
+    } as ViewStyle,
+
+    creditUtilizationFill: {
+      height: '100%',
+      borderRadius: 3,
+    } as ViewStyle,
+
+    // Info Grid
+    infoGrid: {
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    // Segmentation Badge
+    segmentationBadge: {
+      paddingHorizontal: utils.spacing[2],
+      paddingVertical: utils.spacing[1],
+      borderRadius: utils.borderRadius.full,
+    } as ViewStyle,
+
+    segmentationText: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: utils.getFontWeight('semibold'),
+    } as TextStyle,
+
+    // Overview Container
+    overviewContainer: {
+      paddingBottom: utils.spacing[4],
+      gap: utils.spacing[4],
+    } as ViewStyle,
+    // Add to your styles in useOutletDetailStyles.ts
+
+// Footer Buttons
+footerButtons: {
+  flexDirection: 'row',
+  gap: 12,
+  paddingHorizontal: 16,
+  paddingVertical: 12,
   backgroundColor: colors.background,
-  borderRadius: utils.borderRadius.lg,
-  padding: utils.spacing[3],
-  alignItems: 'center',
-  borderWidth: 1,
-  borderColor: colors.divider,
+  borderTopWidth: 1,
+  borderTopColor: colors.divider,
 } as ViewStyle,
-
-financialLabel: {
-  fontSize: utils.fontSize.xs,
-  color: colors.textSecondary,
-  marginBottom: utils.spacing[1],
-} as TextStyle,
-
-financialValue: {
-  fontSize: utils.fontSize.md,
-  fontWeight: utils.getFontWeight('bold'),
-} as TextStyle,
-
-// Credit Utilization
-creditUtilization: {
-  marginTop: utils.spacing[3],
-  gap: utils.spacing[2],
-} as ViewStyle,
-
-creditUtilizationHeader: {
+footerButton: {
+  flex: 1,
   flexDirection: 'row',
-  justifyContent: 'space-between',
   alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  paddingVertical: 12,
+  borderRadius: 12,
+  ...Platform.select({
+    ios: {
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    android: {
+      elevation: 2,
+    },
+  }),
 } as ViewStyle,
-
-creditUtilizationLabel: {
-  fontSize: utils.fontSize.xs,
-  color: colors.textSecondary,
+footerButtonText: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#FFF',
 } as TextStyle,
 
-creditUtilizationPercent: {
-  fontSize: utils.fontSize.xs,
-  fontWeight: utils.getFontWeight('semibold'),
+// Consistent section title
+sectionTitle: {
+  fontSize: 16,
+  fontWeight: '600',
   color: colors.textPrimary,
+  marginBottom: 16,
 } as TextStyle,
-
-creditUtilizationBar: {
-  height: 6,
-  backgroundColor: colors.divider,
-  borderRadius: 3,
-  overflow: 'hidden',
-} as ViewStyle,
-
-creditUtilizationFill: {
-  height: '100%',
-  borderRadius: 3,
-} as ViewStyle,
-
-// Info Grid
-infoGrid: {
-  gap: utils.spacing[2],
-} as ViewStyle,
-
-// Segmentation Badge
-segmentationBadge: {
-  paddingHorizontal: utils.spacing[2],
-  paddingVertical: utils.spacing[1],
-  borderRadius: utils.borderRadius.full,
-} as ViewStyle,
-
-segmentationText: {
-  fontSize: utils.fontSize.xs,
-  fontWeight: utils.getFontWeight('semibold'),
-} as TextStyle,
-
-// Overview Container
-overviewContainer: {
-  paddingBottom: utils.spacing[4],
-  gap: utils.spacing[4],
-} as ViewStyle,
   }));
 
   return styleGenerator(colors);

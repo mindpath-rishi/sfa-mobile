@@ -71,13 +71,15 @@ const Header: React.FC = () => {
     elevated: config.elevated ?? true,
     centeredTitle: config.centeredTitle ?? true,
     transparent: config.transparent ?? false,
-    size: config.size ?? 'md',
+    size: config.size ?? 'sm',
     showBorder: config.showBorder ?? true,
   });
 
   const useGradient = safeConfig.useGradient;
-  const gradientColors =
-    safeConfig.gradientColors || [colors.primary, colors.primaryDark || '#1E3A8A'];
+  const gradientColors = safeConfig.gradientColors || [
+    colors.primary,
+    colors.primaryDark || '#1E3A8A',
+  ];
 
   const handlePressIn = (scaleValue: any) => {
     scaleValue.value = withSpring(0.92);
@@ -123,7 +125,9 @@ const Header: React.FC = () => {
     transform: [{ scale: searchScale.value }],
   }));
 
-  const bgColor = config.transparent ? 'transparent' : safeConfig.backgroundColor || colors.background;
+  const bgColor = config.transparent
+    ? 'transparent'
+    : safeConfig.backgroundColor || colors.background;
 
   /* ============================
    * BADGE
@@ -154,11 +158,7 @@ const Header: React.FC = () => {
             onPressOut={() => handlePressOut(backButtonScale)}
             style={[backStyle, styles.buttonBase]}
           >
-            <Feather
-              name="chevron-left"
-              size={24}
-              color={useGradient ? '#fff' : colors.surface}
-            />
+            <Feather name="chevron-left" size={24} color={useGradient ? '#fff' : colors.surface} />
           </AnimatedPressable>
         ) : safeConfig.showMenu ? (
           <AnimatedPressable
@@ -177,9 +177,7 @@ const Header: React.FC = () => {
       {/* CENTER */}
       <View style={styles.centerSection}>
         <Text style={styles.title}>{safeConfig.title}</Text>
-        {safeConfig.subtitle && (
-          <Text style={styles.subtitle}>{safeConfig.subtitle}</Text>
-        )}
+        {safeConfig.subtitle && <Text style={styles.subtitle}>{safeConfig.subtitle}</Text>}
       </View>
 
       {/* RIGHT */}
@@ -207,24 +205,18 @@ const Header: React.FC = () => {
           </AnimatedPressable>
         )}
 
-        {[safeConfig.rightIcon, safeConfig.rightIcon2]
-          .filter(Boolean)
-          .map((icon, i) => (
-            <Pressable
-              key={i}
-              onPress={i === 0 ? safeConfig.onRightPress : safeConfig.onRightPress2}
-              style={({ pressed }) => [
-                styles.buttonBase,
-                { marginLeft: 6, transform: [{ scale: pressed ? 0.95 : 1 }] },
-              ]}
-            >
-              <Feather
-                name={icon as any}
-                size={22}
-                color={useGradient ? '#fff' : colors.surface}
-              />
-            </Pressable>
-          ))}
+        {[safeConfig.rightIcon, safeConfig.rightIcon2].filter(Boolean).map((icon, i) => (
+          <Pressable
+            key={i}
+            onPress={i === 0 ? safeConfig.onRightPress : safeConfig.onRightPress2}
+            style={({ pressed }) => [
+              styles.buttonBase,
+              { marginLeft: 6, transform: [{ scale: pressed ? 0.95 : 1 }] },
+            ]}
+          >
+            <Feather name={icon as any} size={22} color={useGradient ? '#fff' : colors.surface} />
+          </Pressable>
+        ))}
       </View>
     </>
   );

@@ -5,7 +5,7 @@ import type { ApiResponse } from '@/core/network/api.types';
 
 export interface FetchCategoryParams {
   limit: number;
-  skip: number;
+  page: number;
   searchText?: string;
 }
 

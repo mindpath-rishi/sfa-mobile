@@ -1,3 +1,5 @@
+// ProductsScreen.tsx
+
 import React, {
   useState,
   useMemo,
@@ -8,198 +10,124 @@ import React, {
 } from 'react';
 import {
   View,
-  Text,
   FlatList,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { AppText, SearchBar, Skeleton } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { ProductCard, SearchBar } from '../components/product';
 import { useProductsScreenStyles } from '../styles/ProductsScreen.styles';
-import { CartItemWithDetails, Product } from '../types/product.types';
-import { FilterSection } from '@/shared/types/filter.types';
+import { ProductCard } from '../components/product';
 import { FilterModal } from '@/shared/components/models/Filter.modal';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
+import { useCartStore } from '@/core/store/cart.store';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 import { categoryService } from '@/shared/services/category.service';
 import { productService } from '@/shared/services/product.service';
-import { useCartStore } from '@/core/store/cart.store';
+import { ProductsScreenRef, ProductsScreenProps } from '../types/product.types';
+import { EmptyState } from '@/core/components/EmptyState';
 
-import { useHeader } from '@/shared/contexts/HeaderContext';
-import { useFocusEffect } from 'expo-router';
-import { toast } from '@/core/utils';
-import { useOutletStore } from '@/core/store/outlet.store';
-import { fontWeight } from '@/shared/theme';
-
-// Constants
-const LOAD_MORE_THRESHOLD = 0.5;
+const { width } = Dimensions.get('window');
 const PAGE_SIZE = 20;
+const LOAD_MORE_THRESHOLD = 0.5;
+const CATEGORY_WIDTH = 50;
+const PRODUCT_WIDTH = width - CATEGORY_WIDTH;
 
-// Types
-export type ScreenMode = 'sales' | 'topup';
+type QuickFilterType = 'all' | 'focused';
 
-interface FilterState {
-  categories: {
-    name: string;
-    categoryId: string;
-  }[];
-  brands: string[];
-}
+/**
+ * Mapper: UI filters → API params
+ */
+const mapFiltersToParams = (
+  filters: {
+    searchText?: string;
+    categoryIds?: string[];
+    brandIds?: string[];
+  },
+  page: number,
+  limit: number,
+) => ({
+  page,
+  limit,
+  searchText: filters.searchText?.trim() || undefined,
+  categoryIds: filters.categoryIds?.length ? filters.categoryIds.join(',') : undefined,
+  brandIds: filters.brandIds?.length ? filters.brandIds.join(',') : undefined,
+});
 
-export interface ProductsScreenRef {
-  clearFilters: () => void;
-  applyFilters: (filters: any) => void;
-  getFilteredCount: () => number;
-  openFilters: () => void;
-  getCartItems: () => any[];
-  clearCart: () => void;
-}
+// Helper to get initials from category name
+const getInitials = (name: string) => {
+  if (!name) return '?';
+  const words = name.split(' ');
+  if (words.length === 1) return name.charAt(0).toUpperCase();
+  return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
+};
 
-interface ProductsScreenProps {
-  mode?: ScreenMode;
-  onProductsCountChange?: (count: number) => void;
-  onCartUpdate?: (
-    items: any[],
-    summary: { totalUnits: number; totalValue: number; totalWeight: number; totalItems: number },
-  ) => void;
-  onSubmit?: (items: any[]) => void;
-  warehouseId?: string;
-  vanId?: string;
-  submitButtonText?: string;
-  maxQuantityLimit?: number; // New prop for max quantity limit
-}
-
-const ProductsScreen = forwardRef<ProductsScreenRef, ProductsScreenProps>((props, ref) => {
+function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<ProductsScreenRef>) {
   const { colors } = useTheme();
   const styles = useProductsScreenStyles();
-  const {
-    mode = 'sales',
-    onProductsCountChange,
-    onCartUpdate,
-    onSubmit,
-    warehouseId,
-    vanId,
-    submitButtonText,
-    maxQuantityLimit = 999999, // Default high limit for top-up
-  } = props;
+  const { setHeader } = useHeader();
   const { setOpenProductFilterHandler, resetProductsFilterCount } = useFilterContext();
+  const { items, addItems, clearCart } = useCartStore();
+
+  const { mode = 'sales', onCartUpdate, onSubmit, submitButtonText } = props;
 
   // State
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<FilterState>({
-    categories: [],
-    brands: [],
-  });
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<QuickFilterType>('all');
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [filters, setFilters] = useState({
+    categories: [] as { name: string; categoryId: string }[],
+    brands: [] as string[],
+  });
 
-  // API Data States
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [brands, setBrands] = useState<string[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [categoriesList, setCategoriesList] = useState<any[]>([]);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
   const [hasMore, setHasMore] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const { addItems, items, hydrate, clearCart } = useCartStore();
-  const [categoriesList, setCategoriesList] = useState<any[]>([]);
-  const outlet = useOutletStore.getState().selectedOutlet;
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // Check if mode is topup (unlimited)
-  const isUnlimitedMode = mode === 'topup';
+  /**
+   * Cart Summary
+   */
+  const cartSummary = useMemo(() => {
+    return items.reduce(
+      (acc, item) => {
+        const caseQty = item.caseQty || 0;
+        const pieceQty = item.pieceQty || 0;
 
-  const { setHeader } = useHeader();
+        acc.totalUnits += caseQty * item.unitQtyInCase + pieceQty;
+        acc.totalItems += caseQty + pieceQty;
+        acc.totalWeight +=
+          caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0);
+        acc.totalValue += caseQty * item.casePrice + pieceQty * item.piecePrice;
 
-useFocusEffect(
-  useCallback(() => {
-    const filterCount = calculateActiveFilterCount()
-    setHeader({
-      onFilterPress: () => {
-        setShowFilters(true);
+        return acc;
       },
-      badgeCount: filterCount,
-      filterActive: !!filterCount,
-      filterCount: filterCount
-    });
-  }, [filters, searchQuery])
-);
+      { totalUnits: 0, totalValue: 0, totalItems: 0, totalWeight: 0 },
+    );
+  }, [items]);
 
-  // Fetch products from API
-  const fetchProducts = useCallback(
-    async (
-      page: number = 1,
-      shouldAppend: boolean = false,
-      search: string = searchQuery,
-      categoryIds?: string[],
-      brandNames?: string[],
-    ) => {
-      try {
-        if (page === 1) {
-          setLoading(true);
-        } else {
-          setLoadingMore(true);
-        }
-
-        const params: any = {
-          page,
-          limit: PAGE_SIZE,
-          searchText: search || undefined,
-        };
-
-        if (categoryIds?.length) {
-          params.categoryIds = categoryIds.join(',');
-        }
-
-        if (brandNames?.length) {
-          params.brands = brandNames.join(',');
-        }
-
-        const response: any = await productService.fetchProducts(params);
-
-        if (response?.success) {
-          const newProducts = response.data || [];
-          const total = response.total || 0;
-
-          if (shouldAppend) {
-            setProducts((prev) => [...prev, ...newProducts]);
-          } else {
-            setProducts(newProducts);
-          }
-
-          setTotalCount(total);
-          setHasMore(page * PAGE_SIZE < total);
-          setCurrentPage(page);
-        } else {
-          console.error('Failed to fetch products:', response?.message);
-          if (page === 1) {
-            setProducts([]);
-            setHasMore(false);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        Alert.alert('Error', 'Failed to load products. Please try again.');
-        if (page === 1) {
-          setProducts([]);
-        }
-      } finally {
-        if (page === 1) {
-          setLoading(false);
-        } else {
-          setLoadingMore(false);
-        }
-      }
-    },
-    [searchQuery],
-  );
-
+  /**
+   * Merge cart data into products
+   */
   const productsWithCart = useMemo(() => {
     return products.map((product) => {
       const cartItem = items.find((i) => i.productId === product.productId);
-
       return {
         ...product,
         caseQty: cartItem?.caseQty || 0,
@@ -208,27 +136,100 @@ useFocusEffect(
     });
   }, [products, items]);
 
-  useEffect(() => {
-    useCartStore.getState().hydrate();
-  }, []);
+  /**
+   * Filter sections for modal
+   */
+  const filterSections: any = useMemo(
+    () => [
+      {
+        id: 'brands',
+        title: 'Brands',
+        type: 'multiple' as const,
+        icon: 'business-outline',
+        options: brands.map((brand: string) => ({
+          id: brand,
+          label: brand,
+        })),
+        selectedIds: filters.brands,
+      },
+    ],
+    [brands, filters],
+  );
 
-  const fetchBrands = useCallback(async () => {
-    try {
-      // API call for brands
-    } catch (error) {
-      console.error('Error fetching brands:', error);
-    }
-  }, []);
+  /**
+   * Filter count
+   */
+  const calculateActiveFilterCount = useCallback(() => {
+    let count = 0;
+    count += filters.categories.length;
+    count += filters.brands.length;
+    if (searchQuery.trim()) count++;
+    if (quickFilter !== 'all') count++;
+    return count;
+  }, [filters, searchQuery, quickFilter]);
 
+  /**
+   * Fetch Products
+   */
+  const fetchProducts = useCallback(
+    async (page: number = 1, shouldAppend: boolean = false) => {
+      try {
+        if (page === 1) setIsLoading(true);
+        else setIsLoadingMore(true);
+
+        let categoryIds = filters.categories.map((c) => c.categoryId);
+        if (selectedCategory) {
+          categoryIds = [selectedCategory.categoryId];
+        }
+
+        // Apply quick filter logic
+        let extraParams: any = {};
+        if (quickFilter === 'focused') {
+          // Add focused pack logic here (e.g., specific category or tag)
+          // For example: extraParams.tags = ['focused'];
+        }
+
+        const params = mapFiltersToParams(
+          {
+            searchText: searchQuery,
+            categoryIds: categoryIds,
+            brandIds: filters.brands,
+          },
+          page,
+          PAGE_SIZE,
+        );
+
+        const response = await productService.fetchProducts({ ...params, ...extraParams });
+
+        if (response?.success) {
+          const newProducts = response.data || [];
+          const total = response?.meta?.total || 0;
+
+          setProducts((prev) => (shouldAppend ? [...prev, ...newProducts] : newProducts));
+          setTotalCount(total);
+          setHasMore(page * PAGE_SIZE < total);
+          setCurrentPage(page);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        if (page === 1) setProducts([]);
+      } finally {
+        if (page === 1) setIsLoading(false);
+        else setIsLoadingMore(false);
+      }
+    },
+    [searchQuery, filters, selectedCategory, quickFilter],
+  );
+
+  /**
+   * Fetch Categories
+   */
   const fetchCategories = useCallback(async () => {
     try {
-      const params: any = {
+      const response = await categoryService.fetchCategory({
         page: 1,
         limit: 100,
-      };
-
-      const response: any = await categoryService.fetchCategory(params);
-
+      });
       if (response?.success) {
         setCategoriesList(response.data);
       }
@@ -237,184 +238,58 @@ useFocusEffect(
     }
   }, []);
 
-  useEffect(() => {
-    fetchProducts(1, false);
-    fetchBrands();
-    fetchCategories();
+  /**
+   * Handle category selection
+   */
+  const handleCategorySelect = useCallback((category: any) => {
+    if (selectedCategory?.categoryId === category.categoryId) {
+      setSelectedCategory(null);
+      setFilters(prev => ({ ...prev, categories: [] }));
+    } else {
+      setSelectedCategory(category);
+      setFilters(prev => ({ ...prev, categories: [] }));
+    }
+  }, [selectedCategory]);
+
+  /**
+   * Handle quick filter change
+   */
+  const handleQuickFilterChange = useCallback((filter: QuickFilterType) => {
+    setQuickFilter(filter);
+    setSelectedCategory(null);
+    setFilters({ categories: [], brands: [] });
+    setSearchQuery('');
   }, []);
 
-  useEffect(() => {
-    const categoryIds = filters.categories.map((cat) => cat.categoryId);
-    const brandNames = filters.brands;
-    fetchProducts(1, false, searchQuery, categoryIds, brandNames);
-  }, [filters, searchQuery]);
-
-  useEffect(() => {
-    setOpenProductFilterHandler(() => {
-      setShowFilters(true);
-    });
-
-    return () => {
-      setOpenProductFilterHandler(() => {});
-    };
-  }, [setOpenProductFilterHandler]);
-
-  const calculateActiveFilterCount = useCallback(() => {
-    let count = 0;
-    count += filters.categories.length;
-    count += filters.brands.length;
-    if (searchQuery.trim()) count++;
-    return count;
-  }, [filters, searchQuery]);
-
-  useEffect(() => {
-    return () => {
-      resetProductsFilterCount();
-    };
-  }, [resetProductsFilterCount]);
-
-  const filterSections = useMemo(
-    (): any[] => [
-      {
-        id: 'categories',
-        title: 'Categories',
-        type: 'multiple',
-        icon: 'apps-outline',
-        options: categoriesList.map((item) => ({
-          label: item.name,
-          id: item.categoryId,
-        })),
-        selectedIds: filters.categories.map((cat) => cat.categoryId),
-      },
-      {
-        id: 'brands',
-        title: 'Brands',
-        type: 'multiple',
-        icon: 'business-outline',
-        options: brands.map((brand) => ({
-          id: brand,
-          label: brand,
-        })),
-        selectedIds: filters.brands,
-      },
-    ],
-    [brands, filters, categoriesList],
-  );
-
-  // const cartSummary = useMemo(() => {
-  //   const summary = items.reduce(
-  //     (acc, item) => {
-  //       const caseUnits = (item.caseQty || 0) * item.unitQtyInCase;
-  //       const pieceUnits = item.pieceQty || 0;
-
-  //       acc.totalUnits += caseUnits + pieceUnits;
-  //       acc.totalItems += 1;
-  //       acc.totalWeight +=
-  //         (item.caseQty || 0) * (item.caseNetWeight || 0) +
-  //         (item.pieceQty || 0) * (item.pieceNetWeight || 0);
-  //       acc.totalValue +=
-  //         (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice;
-  //       item?.caseQty + item?.pieceQty;
-
-  //       return acc;
-  //     },
-  //     { totalUnits: 0, totalValue: 0, totalItems: 0, totalWeight: 0, caseUnits: 0, pieceUnits: 0 },
-  //   );
-  //   return summary;
-  // }, [items]);
-
-  const cartSummary = useMemo(() => {
-    const summary = items.reduce(
-      (acc, item) => {
-        const caseQty = item.caseQty || 0;
-        const pieceQty = item.pieceQty || 0;
-
-        const caseUnits = caseQty * item.unitQtyInCase;
-        const pieceUnits = pieceQty;
-
-        // ✅ Units
-        acc.totalUnits += caseUnits + pieceUnits;
-
-        // ✅ Items (cases + pieces)
-        acc.totalItems += caseQty + pieceQty;
-
-        // ✅ SKU (only if product has qty)
-        if (caseQty > 0 || pieceQty > 0) {
-          acc.totalSku += 1;
-        }
-
-        // ✅ Weight
-        acc.totalWeight +=
-          caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0);
-
-        // ✅ Value
-        acc.totalValue += caseQty * item.casePrice + pieceQty * item.piecePrice;
-
-        return acc;
-      },
-      {
-        totalUnits: 0,
-        totalValue: 0,
-        totalItems: 0,
-        totalWeight: 0,
-        totalSku: 0, // ✅ new field
-      },
-    );
-
-    return summary;
-  }, [items]);
-  useEffect(() => {
-    if (onCartUpdate) {
-      onCartUpdate(items, cartSummary);
-    }
-  }, [items, cartSummary, onCartUpdate]);
-
-  useImperativeHandle(ref, () => ({
-    clearFilters: () => {
-      setFilters({
-        categories: [],
-        brands: [],
-      });
-      setSearchQuery('');
-      resetProductsFilterCount();
-    },
-    applyFilters: (newFilters: any) => {
-      console.log('Apply filters called from parent', newFilters);
-    },
-    getFilteredCount: () => products.length,
-    openFilters: () => {
-      setShowFilters(true);
-    },
-    getCartItems: () => items,
-    clearCart: () => {
-      clearCart();
-    },
-  }));
-
+  /**
+   * Refresh
+   */
   const onRefresh = useCallback(async () => {
-    setRefreshing(true);
+    setIsRefreshing(true);
     await fetchProducts(1, false);
-    setRefreshing(false);
+    setIsRefreshing(false);
   }, [fetchProducts]);
 
-  const handleLoadMore = useCallback(() => {
-    if (!loadingMore && hasMore && !loading) {
+  /**
+   * Load More
+   */
+  const loadMore = useCallback(() => {
+    if (!isLoadingMore && hasMore && !isLoading) {
       fetchProducts(currentPage + 1, true);
     }
-  }, [loadingMore, hasMore, loading, currentPage, fetchProducts]);
+  }, [isLoadingMore, hasMore, isLoading, currentPage, fetchProducts]);
 
+  /**
+   * Add to Cart
+   */
   const handleAddToCart = useCallback(
-    (items: CartItemWithDetails[], product: Product) => {
-      if (!items?.length || !product) return;
-
-      // if (!product?.stock && !isUnlimitedMode) {
-      //   toast.error(`${product?.name} is out of stock.`);
-      // }
+    (cartItems: any[], product: any) => {
+      if (!cartItems?.length || !product) return;
 
       let caseQty = 0;
       let pieceQty = 0;
 
-      items.forEach((item) => {
+      cartItems.forEach((item) => {
         caseQty += item.caseQty || 0;
         pieceQty += item.pieceQty || 0;
       });
@@ -429,112 +304,392 @@ useFocusEffect(
           caseQty,
           pieceQty,
           stock: product.stock,
-          caseNetWeight: product?.caseNetWeight,
-          pieceNetWeight: product?.pieceNetWeight,
+          caseNetWeight: product.caseNetWeight,
+          pieceNetWeight: product.pieceNetWeight,
         },
       ]);
     },
     [addItems],
   );
 
+  /**
+   * Apply Filters
+   */
   const handleApplyFilters = useCallback(
-    (sections: FilterSection[]) => {
-      const newFilters: FilterState = { ...filters };
+    (sections: any[]) => {
+      const newFilters = { ...filters };
 
       sections.forEach((section) => {
-        switch (section.id) {
-          case 'categories':
-            newFilters.categories = categoriesList.filter((cat) =>
-              section.selectedIds?.includes(cat.categoryId),
-            );
-            break;
-          case 'brands':
-            newFilters.brands = section.selectedIds || [];
-            break;
+        if (section.id === 'brands') {
+          newFilters.brands = section.selectedIds || [];
         }
       });
 
       setFilters(newFilters);
       setShowFilters(false);
+      setSelectedCategory(null);
     },
-    [filters, categoriesList],
+    [filters],
   );
 
-  const handleCloseFilters = useCallback(() => {
-    setShowFilters(false);
-  }, []);
-
+  /**
+   * Clear Filters
+   */
   const clearAllFilters = useCallback(() => {
-    setFilters({
-      categories: [],
-      brands: [],
-    });
+    setFilters({ categories: [], brands: [] });
+    setSelectedCategory(null);
     setSearchQuery('');
+    setQuickFilter('all');
     setShowFilters(false);
     resetProductsFilterCount();
-  }, [resetProductsFilterCount]);
+    fetchProducts(1, false);
+  }, [resetProductsFilterCount, fetchProducts]);
 
+  /**
+   * Submit
+   */
   const handleSubmit = useCallback(() => {
     if (items.length === 0) {
-      Alert.alert(
-        'Cart Empty',
-        isUnlimitedMode
-          ? 'Add items to top-up before submitting'
-          : 'Add items to cart before processing sale',
-      );
+      Alert.alert('Cart Empty', 'Add items before proceeding');
       return;
     }
 
-    router.push({
-      pathname: '/checkin/sale',
-      params: {
-        mode,
-      },
-    });
-    // if (isUnlimitedMode && onSubmit) {
-    //   onSubmit(items);
-    // } else if (!isUnlimitedMode) {
-    // }
-  }, [items, isUnlimitedMode, onSubmit]);
+    if (mode === 'topup' && onSubmit) {
+      onSubmit(items);
+    } else {
+      router.push({ pathname: '/checkin/sale', params: { mode } });
+    }
+  }, [items, mode, onSubmit]);
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <Ionicons name="cube-outline" size={48} color={colors.textTertiary} />
-      <Text style={styles.emptyStateTitle}>No products found</Text>
-      <Text style={styles.emptyStateText}>
-        {searchQuery ? `No matches for "${searchQuery}"` : 'Try changing your filters'}
-      </Text>
-      {calculateActiveFilterCount() > 0 && (
-        <TouchableOpacity style={styles.clearFiltersButton} onPress={clearAllFilters}>
-          <Text style={[styles.clearFiltersText, { color: colors.primary }]}>Clear filters</Text>
+  /**
+   * Effects
+   */
+  useEffect(() => {
+    fetchProducts(1, false);
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
+    fetchProducts(1, false);
+  }, [searchQuery, filters, selectedCategory, quickFilter]);
+
+  useEffect(() => {
+    if (onCartUpdate) {
+      onCartUpdate(items, cartSummary);
+    }
+  }, [items, cartSummary, onCartUpdate]);
+
+  useEffect(() => {
+    setOpenProductFilterHandler(() => setShowFilters(true));
+    return () => setOpenProductFilterHandler(() => {});
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const filterCount = calculateActiveFilterCount();
+      setHeader({
+        onFilterPress: () => setShowFilters(true),
+        badgeCount: filterCount,
+        filterActive: !!filterCount,
+        filterCount,
+      });
+    }, [filters, searchQuery, quickFilter]),
+  );
+
+  useImperativeHandle(ref, () => ({
+    clearFilters: clearAllFilters,
+    getFilteredCount: () => products.length,
+    openFilters: () => setShowFilters(true),
+    getCartItems: () => items,
+    clearCart: () => clearCart(),
+    applyFilters: () => handleApplyFilters,
+  }));
+
+  /**
+   * Render Helpers
+   */
+
+  // Render quick filters
+  const renderQuickFilters = () => (
+    <View style={styles.quickFiltersContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.quickFiltersContent}
+      >
+        <TouchableOpacity
+          style={[
+            styles.quickFilterChip,
+            quickFilter === 'all' && styles.quickFilterChipActive,
+          ]}
+          onPress={() => handleQuickFilterChange('all')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="apps-outline"
+            size={16}
+            color={quickFilter === 'all' ? colors.primary : colors.textSecondary}
+          />
+          <AppText
+            style={[
+              styles.quickFilterText,
+              quickFilter === 'all' && styles.quickFilterTextActive,
+            ]}
+          >
+            All
+          </AppText>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.quickFilterChip,
+            quickFilter === 'focused' && styles.quickFilterChipActive,
+          ]}
+          onPress={() => handleQuickFilterChange('focused')}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="star-outline"
+            size={16}
+            color={quickFilter === 'focused' ? colors.primary : colors.textSecondary}
+          />
+          <AppText
+            style={[
+              styles.quickFilterText,
+              quickFilter === 'focused' && styles.quickFilterTextActive,
+            ]}
+          >
+            Focused Pack
+          </AppText>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
+  );
+
+  // Render vertical category list with initials
+  const renderCategoryList = () => (
+    <View style={[styles.categoryContainer, { width: CATEGORY_WIDTH }]}>
+      <ScrollView
+        style={styles.categoryList}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.categoryListContent}
+      >
+        {/* All Products Option */}
+        <TouchableOpacity
+          style={[
+            styles.categoryItem,
+            !selectedCategory && quickFilter === 'all' && styles.categoryItemActive,
+          ]}
+          onPress={() => {
+            setSelectedCategory(null);
+            setQuickFilter('all');
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={[
+            styles.categoryItemAvatar,
+            !selectedCategory && quickFilter === 'all' && styles.categoryItemAvatarActive
+          ]}>
+            <Ionicons 
+              name="grid-outline" 
+              size={16} 
+              color={!selectedCategory && quickFilter === 'all' ? colors.primary : colors.textSecondary} 
+            />
+          </View>
+          <View style={styles.categoryItemInfo}>
+            <AppText
+              style={[
+                styles.categoryItemName,
+                !selectedCategory && quickFilter === 'all' && styles.categoryItemNameActive,
+              ]}
+              numberOfLines={2}
+            >
+              All
+            </AppText>
+            <AppText style={styles.categoryItemCount}>
+              {totalCount}
+            </AppText>
+          </View>
+          {!selectedCategory && quickFilter === 'all' && (
+            <View style={[styles.categoryItemIndicator, { backgroundColor: colors.primary }]} />
+          )}
+        </TouchableOpacity>
+
+        {/* Category Items */}
+        {categoriesList.map((category) => {
+          const isActive = selectedCategory?.categoryId === category.categoryId;
+          const initials = getInitials(category.name);
+          
+          return (
+            <TouchableOpacity
+              key={category.categoryId}
+              style={[
+                styles.categoryItem,
+                isActive && styles.categoryItemActive,
+              ]}
+              onPress={() => handleCategorySelect(category)}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.categoryItemAvatar,
+                isActive && styles.categoryItemAvatarActive
+              ]}>
+                <AppText style={[
+                  styles.categoryItemInitials,
+                  isActive && styles.categoryItemInitialsActive
+                ]}>
+                  {initials}
+                </AppText>
+              </View>
+              <View style={styles.categoryItemInfo}>
+                <AppText
+                  style={[
+                    styles.categoryItemName,
+                    isActive && styles.categoryItemNameActive,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {category.name}
+                </AppText>
+              </View>
+              {isActive && (
+                <View style={[styles.categoryItemIndicator, { backgroundColor: colors.primary }]} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
+  // Render header stats
+  const renderHeaderStats = () => (
+    <View style={styles.statsContainer}>
+      <View style={styles.statItem}>
+        <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
+        <AppText style={styles.statText}>{products.length} Products</AppText>
+      </View>
+      {quickFilter === 'focused' && (
+        <View style={styles.statItem}>
+          <Ionicons name="star-outline" size={12} color={colors.textSecondary} />
+          <AppText style={styles.statText}>Focused Pack</AppText>
+        </View>
+      )}
+      {selectedCategory && (
+        <View style={styles.statItem}>
+          <Ionicons name="folder-outline" size={12} color={colors.textSecondary} />
+          <AppText style={styles.statText} numberOfLines={1}>
+            {selectedCategory.name}
+          </AppText>
+        </View>
+      )}
+      {searchQuery && (
+        <View style={styles.statItem}>
+          <Ionicons name="search-outline" size={12} color={colors.textSecondary} />
+          <AppText style={styles.statText} numberOfLines={1}>
+            "{searchQuery}"
+          </AppText>
+        </View>
       )}
     </View>
   );
 
-  const renderFooter = () => {
-    if (!loadingMore) return null;
+  // Full page skeleton loader
+  const renderFullSkeleton = () => (
+    <View style={styles.skeletonContainer}>
+      <View style={styles.searchWrapper}>
+        <Skeleton height={44} width="100%" borderRadius={12} />
+      </View>
+      <View style={styles.skeletonQuickFilters}>
+        <Skeleton height={36} width={80} borderRadius={18} />
+        <Skeleton height={36} width={100} borderRadius={18} />
+      </View>
+      <View style={styles.skeletonMainContent}>
+        <View style={[styles.skeletonCategoryList, { width: CATEGORY_WIDTH }]}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <View key={i} style={styles.skeletonCategoryItem}>
+              <Skeleton height={50} width="100%" borderRadius={8} />
+            </View>
+          ))}
+        </View>
+        <View style={[styles.skeletonProductsList, { width: PRODUCT_WIDTH }]}>
+          {[1, 2, 3, 4].map((i) => (
+            <View key={i} style={styles.skeletonProductItem}>
+              <Skeleton height={120} width="100%" borderRadius={12} />
+            </View>
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+
+  // Empty state
+  const renderEmptyState = () => {
+    const hasActiveFilters = calculateActiveFilterCount() > 0 || selectedCategory || quickFilter !== 'all';
+    
+    let title = 'No products found';
+    let description = 'Try adjusting your search or filters';
+    let icon: 'search-outline' | 'cube-outline' | 'folder-open-outline' = 'search-outline';
+    
+    if (!hasActiveFilters && !searchQuery) {
+      title = 'No products available';
+      description = 'Check back later for new products';
+      icon = 'cube-outline';
+    } else if (searchQuery && !hasActiveFilters) {
+      title = `No results for "${searchQuery}"`;
+      description = 'Try a different search term';
+      icon = 'search-outline';
+    } else if (selectedCategory) {
+      title = `No products in ${selectedCategory.name}`;
+      description = 'Try a different category';
+      icon = 'folder-open-outline';
+    } else if (quickFilter === 'focused') {
+      title = 'No focused packs available';
+      description = 'Check back later for focused packs';
+      // icon = 'star-outline';
+    }
+
     return (
-      <View style={styles.footerLoader}>
-        <ActivityIndicator color={colors.primary} size="small" />
+      <View style={styles.emptyStateWrapper}>
+        <EmptyState
+          title={title}
+          description={description}
+          icon={icon}
+          actionLabel={hasActiveFilters ? 'Clear filters' : undefined}
+          onAction={hasActiveFilters ? clearAllFilters : undefined}
+        />
       </View>
     );
   };
 
+  // Footer loader
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={colors.primary} />
+        <AppText style={styles.loadingMoreText}>Loading more products...</AppText>
+      </View>
+    );
+  };
 
+  // Render product item
+  const renderProductItem = ({ item, index }: { item: any; index: number }) => (
+    <ProductCard
+      index={index}
+      product={item}
+      onAddToCart={(cartItems) => handleAddToCart(cartItems, item)}
+      mode={mode}
+    />
+  );
 
+  // Action button
   const renderActionButton = () => {
     const isNoSale = mode === 'sales' && items.length === 0;
-
-    const buttonText = isNoSale
-      ? 'Add No Sale Reason'
-      : isUnlimitedMode
-        ? submitButtonText || `Submit Top-up (${cartSummary.totalItems} items)`
-        : `Proceed to Checkout (${cartSummary.totalItems} items)`;
-
+    
     const handlePress = () => {
       if (isNoSale) {
-        router.push('/checkin/nonsale'); // navigate to reason screen
+        router.push('/checkin/nonsale');
       } else {
         handleSubmit();
       }
@@ -546,81 +701,102 @@ useFocusEffect(
         onPress={handlePress}
         activeOpacity={0.9}
       >
-        <View style={styles.cartButtonContent}>
-          <View>
-            <Text style={[styles.cartButtonLabel, isNoSale ? { fontWeight: 'bold' } : null]}>
-              {' '}
-              {isNoSale
-                ? 'Add No Sale Reason'
-                : isUnlimitedMode
-                  ? 'Ready to submit'
-                  : 'Ready to checkout'}
-            </Text>
-
-            {!isNoSale && (
-              <Text style={styles.cartButtonTotal}>
-                {cartSummary.totalItems} Items • K{cartSummary.totalValue.toFixed(2)}
-                {isUnlimitedMode &&
-                  cartSummary.totalWeight > 0 &&
-                  ` • ${cartSummary.totalWeight.toFixed(2)} kg`}
-              </Text>
-            )}
+        <LinearGradient
+          colors={[colors.primary, colors.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.cartButtonGradient}
+        >
+          <View style={styles.cartButtonContent}>
+            <View>
+              <AppText style={styles.cartButtonLabel}>
+                {isNoSale
+                  ? 'Add No Sale Reason'
+                  : mode === 'topup'
+                    ? 'Ready to Submit'
+                    : 'Ready to Checkout'}
+              </AppText>
+              {!isNoSale && (
+                <AppText style={styles.cartButtonTotal}>
+                  {cartSummary.totalItems} Items • K{cartSummary.totalValue.toFixed(2)}
+                  {mode === 'topup' && cartSummary.totalWeight > 0 &&
+                    ` • ${cartSummary.totalWeight.toFixed(2)} kg`}
+                </AppText>
+              )}
+            </View>
+            <View style={styles.cartButtonIcon}>
+              <Ionicons name="arrow-forward-circle" size={28} color="white" />
+            </View>
           </View>
-
-          <Ionicons name="arrow-forward-circle" size={28} color="white" />
-        </View>
+        </LinearGradient>
       </TouchableOpacity>
     );
   };
 
+  // Show full skeleton on initial load
+  if (isLoading && products.length === 0) {
+    return renderFullSkeleton();
+  }
+
   return (
     <View style={styles.container}>
+      {/* Search Bar */}
       <View style={styles.searchWrapper}>
-        <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+        <SearchBar
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search products..."
+          debounceDelay={500}
+          clearable={true}
+          fullWidth={true}
+        />
       </View>
 
-      {products.length === 0 && !loading ? (
-        renderEmptyState()
-      ) : (
-        <FlatList
-          data={productsWithCart}
-          keyExtractor={(item) => item.productId}
-          renderItem={({ item, index }) => (
-            <ProductCard
-              product={item}
-              index={index}
-              onAddToCart={(items) => handleAddToCart(items, item)}
-              mode={mode} // Pass mode to ProductCard
+      {/* Quick Filters */}
+      {renderQuickFilters()}
+
+      {/* Header Stats */}
+      {renderHeaderStats()}
+
+      {/* Main Content with Category Sidebar */}
+      <View style={styles.mainContent}>
+        {/* Vertical Category List with Initials */}
+        {renderCategoryList()}
+
+        {/* Product List */}
+        <View style={[styles.productsSection, { width: PRODUCT_WIDTH }]}>
+          {products.length === 0 && !isLoading ? (
+            renderEmptyState()
+          ) : (
+            <FlatList
+              data={productsWithCart}
+              keyExtractor={(item) => item.productId}
+              renderItem={renderProductItem}
+              contentContainerStyle={styles.productsList}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={onRefresh}
+                  tintColor={colors.primary}
+                  colors={[colors.primary]}
+                />
+              }
+              onEndReached={loadMore}
+              onEndReachedThreshold={LOAD_MORE_THRESHOLD}
+              ListFooterComponent={renderFooter}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={true}
             />
           )}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
-            />
-          }
-          onEndReached={handleLoadMore}
-          onEndReachedThreshold={LOAD_MORE_THRESHOLD}
-          ListFooterComponent={renderFooter}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          removeClippedSubviews={true}
-        />
-      )}
-
-      {/* {loading && products.length === 0 && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      )} */}
+      </View>
 
+      {/* Filter Modal */}
       <FilterModal
         visible={showFilters}
-        onClose={handleCloseFilters}
+        onClose={() => setShowFilters(false)}
         sections={filterSections}
         onApply={handleApplyFilters}
         onReset={clearAllFilters}
@@ -631,11 +807,12 @@ useFocusEffect(
         maxHeight={600}
       />
 
+      {/* Action Button */}
       {renderActionButton()}
     </View>
   );
-});
+}
 
+export const ProductsScreen = forwardRef(ProductsScreenComponent);
 ProductsScreen.displayName = 'ProductsScreen';
-
 export default ProductsScreen;

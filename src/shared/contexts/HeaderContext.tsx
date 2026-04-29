@@ -92,6 +92,7 @@ export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
   const { colors } = useTheme();
 
   const routeKey = useMemo(() => getRouteKey(segments), [segments]);
+  console.log(routeKey, "routeKey")
 
   const [configs, setConfigs] = useState<Record<string, HeaderConfig>>({});
 

@@ -5,6 +5,4 @@ export { OutletTags } from './OutletTags';
 export { OutletStats } from './OutletStats';
 export { OutletVisitInfo } from './OutletVisitInfo';
 export { OutletQuickActions } from './OutletQuickActions';
-export { FilterChip } from './FilterChip';
 export { SearchBar } from './SearchBar';
-export { EmptyState } from './EmptyState';

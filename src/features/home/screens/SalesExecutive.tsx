@@ -944,7 +944,7 @@
 //   });
 
 // SalesExecutiveScreen.tsx (Updated with Unified Modal for Day Start)
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { View, ScrollView, RefreshControl, Alert, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -989,6 +989,8 @@ import { DayEndSummaryModal } from '../components/models/DayEndSummaryModal';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { DayEndConfirmationModal } from '@/shared/components/models/DayEndConfirmationModal';
+import { useFocusEffect } from 'expo-router';
+import { useAppEventsStore } from '@/core/store/appEvents.store';
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
@@ -997,7 +999,7 @@ export default function SalesExecutiveScreen() {
   const [dayStarted, setDayStarted] = useState(false);
   const [unifiedModalVisible, setUnifiedModalVisible] = useState(false);
   const [unifiedModalType, setUnifiedModalType] = useState<
-    'van-change' | 'route-selection' | 'activity-change' | 'other-work'
+    'van-change' | 'van-selection' | 'route-selection' | 'activity-change' | 'other-work'
   >('van-change');
   const [cameraVisible, setCameraVisible] = useState(false);
   const [loadSummaryVisible, setLoadSummaryVisible] = useState(false);
@@ -1017,6 +1019,11 @@ export default function SalesExecutiveScreen() {
   const [otherWorkStartTime, setOtherWorkStartTime] = useState<string | null>(null);
   const [todayActivities, setTodayActivities] = useState<TodayActivity[]>([]);
   const [vanChangeReason, setVanChangeReason] = useState('');
+  const [vanChangeNote, setVanChangeNote] = useState('');
+  const [availableVans, setAvailableVans] = useState<any[]>([]);
+  const [selectedVanForChange, setSelectedVanForChange] = useState<any | null>(null);
+  const [vanChangeRequestPending, setVanChangeRequestPending] = useState(false);
+  const [vanChangePendingBanner, setVanChangePendingBanner] = useState(false);
   const [currentActivity, setCurrentActivity] = useState<string | null>('');
   const [filteredActivityTypes, setFilteredActivityTypes] = useState(ACTIVITY_TYPES);
   const [tempSelectedActivity, setTempSelectedActivity] = useState<ActivityType | null>(null);
@@ -1040,6 +1047,18 @@ export default function SalesExecutiveScreen() {
   const { setVan } = useRouteStore();
 
   const { guard } = useVisitGuard();
+  const dashboardRefreshTick = useAppEventsStore((s) => s.dashboardRefreshTick);
+
+  const filteredQuickActions = useMemo(() => {
+    if (!currentActivity) return QUICK_ACTIONS;
+    return QUICK_ACTIONS.filter((a) => a.label !== currentActivity);
+  }, [currentActivity]);
+
+  const otherWorkOptionsForModal = useMemo(() => {
+    const base = isChangingActivity ? filteredOtherWorkOptions : OTHER_WORK_OPTIONS;
+    if (!currentActivity) return base;
+    return base.filter((o) => o.name !== currentActivity);
+  }, [currentActivity, filteredOtherWorkOptions, isChangingActivity]);
 
   const greeting = (() => {
     const hour = new Date().getHours();
@@ -1052,6 +1071,25 @@ export default function SalesExecutiveScreen() {
     getDayStatus();
     getVan();
   }, []);
+
+  // Refresh dashboard state when other parts of the app end the day (e.g. Van Settlement sidebar flow)
+  useEffect(() => {
+    // stop timer immediately
+    setDayStarted(false);
+    setCurrentActivity(null);
+    setStartTime(null);
+    setTodayActivities([]);
+    void getDayStatus();
+    void getVan();
+  }, [dashboardRefreshTick]);
+
+  // Ensure dashboard always refreshes when user comes back (e.g. after Day End from Van Settlement)
+  useFocusEffect(
+    React.useCallback(() => {
+      getDayStatus();
+      getVan();
+    }, []),
+  );
 
   useEffect(() => {
     if (!selectedRoute?.routeSessionId) return;
@@ -1078,7 +1116,7 @@ export default function SalesExecutiveScreen() {
       setFilteredActivityTypes(ACTIVITY_TYPES.filter((a) => a.name !== 'Retailing'));
     } else {
       setFilteredActivityTypes(ACTIVITY_TYPES);
-      setFilteredOtherWorkOptions(OTHER_WORK_OPTIONS.filter((o) => o.name != currentActivity));
+      setFilteredOtherWorkOptions(OTHER_WORK_OPTIONS.filter((o) => o.name !== currentActivity));
     }
     setUnifiedModalType('activity-change');
     setUnifiedModalVisible(true);
@@ -1089,16 +1127,17 @@ export default function SalesExecutiveScreen() {
 
   const handleActivitySelect = (activity: ActivityType) => {
     console.log('Selected Activity:', activity);
-
     if (activity.name === 'Other Work') {
       setShowOtherOptions(true);
       setShowChangeOtherOptions(true);
       setTempSelectedActivity(activity);
+      setUnifiedModalVisible(true);
+      setUnifiedModalType('other-work');
     } else if (activity.name === 'Retailing') {
       getRoutes();
 
       setSelectedActivity(activity.name);
-      setPendingActivity(activity); // ✅ FIX ADDED
+      setPendingActivity(activity);
 
       setUnifiedModalVisible(false);
       setUnifiedModalType('van-change');
@@ -1128,13 +1167,68 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
+    // Same van -> proceed to route selection
+    if (vanChangeReason === 'Yes, Same Van') {
+      setUnifiedModalVisible(false);
+      setUnifiedModalType('route-selection');
+      setUnifiedModalVisible(true);
+      return;
+    }
+
+    // Change van -> capture reason + select van
+    setVanChangeNote('');
+    setSelectedVanForChange(null);
+    fetchAvailableVans();
     setUnifiedModalVisible(false);
-    setUnifiedModalType('route-selection');
+    setUnifiedModalType('van-selection');
     setUnifiedModalVisible(true);
   };
 
+  const fetchAvailableVans = async () => {
+    try {
+      const response: any = await homeService.getVans({ limit: 50, page: 1 });
+
+      if (response?.statusCode === 200) {
+        const list = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.data?.data)
+            ? response.data.data
+            : Array.isArray(response?.data?.items)
+              ? response.data.items
+              : [];
+
+        setAvailableVans(list);
+      }
+    } catch (error) {
+      console.error('Error fetching vans:', error);
+      toast.error('Failed to fetch van list. Please try again.');
+    }
+  };
+
+  const handleVanSelectionSubmit = () => {
+    if (!selectedVanForChange || !vanChangeNote.trim()) {
+      Alert.alert('Error', 'Please enter reason and select a van');
+      return;
+    }
+
+    setMappedVan(selectedVanForChange);
+    setUnifiedModalVisible(false);
+
+    // For activity change: after van selection, proceed to route selection (no selfie)
+    if (isChangingActivity) {
+      setUnifiedModalType('route-selection');
+      setUnifiedModalVisible(true);
+      return;
+    }
+
+    // For day start: start day with van change pending approval
+    setVanChangeRequestPending(true);
+    setVanChangePendingBanner(true);
+    handleStartDay({ skipRouteValidation: true, forceVanChangePending: true });
+  };
+
   const handleRouteSelect = (route: any) => {
-    console.log('Selected Route FULL:', route); // 🔥 DEBUG
+    console.log('Selected Route FULL:', route);
 
     setSelectedRoute(route);
     setUnifiedModalVisible(false);
@@ -1149,6 +1243,9 @@ export default function SalesExecutiveScreen() {
       }
       setSelectedRoute(null);
       setShowChangeOtherOptions(true);
+      setUnifiedModalType('other-work');
+      setUnifiedModalVisible(true);
+      setIsChangingActivity(true);
     } else if (activity.name === 'Retailing') {
       getRoutes();
       setSelectedActivity(activity.name);
@@ -1158,26 +1255,30 @@ export default function SalesExecutiveScreen() {
       setVanChangeReason('');
       setIsChangingActivity(true);
     } else {
-      // For non-retailing activities
+      // For non-retailing activities (activity change should NOT require selfie / load summary)
+      setSelectedRoute(null);
       setSelectedActivity(activity.name);
       setPendingActivity(activity);
       setUnifiedModalVisible(false);
-      openCamera();
+      completeActivityChange();
     }
   };
 
   const handleChangeRouteSelect = (route: Route) => {
     setSelectedRoute(route);
     setUnifiedModalVisible(false);
-    openCamera();
+    // Activity change should not ask for selfie; go to load summary directly
+    setLoadSummaryVisible(true);
   };
 
   const handleChangeOtherWork = (option: OtherWorkOption) => {
+    // Activity change should NOT require selfie / load summary
+    setSelectedRoute(null);
     setSelectedActivity(option.name);
     setPendingActivity(option);
     setUnifiedModalVisible(false);
     setShowChangeOtherOptions(false);
-    openCamera();
+    completeActivityChange();
   };
 
   const openCamera = async () => {
@@ -1195,15 +1296,8 @@ export default function SalesExecutiveScreen() {
     if (photo && photo.uri) {
       setUserPhoto(photo.uri);
       setCameraVisible(false);
-      if (isChangingActivity) {
-        if (selectedRoute) {
-          setLoadSummaryVisible(true);
-        } else {
-          // handleStartDay();
-          completeActivityChange();
-        }
-        return;
-      }
+      // Selfie is only for day start, not for activity changes
+      if (isChangingActivity) return;
 
       //Revert me
 
@@ -1227,13 +1321,24 @@ export default function SalesExecutiveScreen() {
     handleStartDay();
   };
 
-  const handleStartDay = async () => {
+  const handleStartDay = async (options?: {
+    skipRouteValidation?: boolean;
+    forceVanChangePending?: boolean;
+  }) => {
     console.log('Selected Activity:', selectedActivity);
     console.log('Selected Route:', selectedRoute);
     console.log('Van:', van);
 
-    // ✅ VALIDATION FIX
-    if (selectedActivity === 'Retailing' && !selectedRoute) {
+    const isVanChangePending =
+      Boolean(options?.forceVanChangePending) || Boolean(vanChangeRequestPending);
+
+    // Skip route validation if van change request is pending
+    if (
+      selectedActivity === 'Retailing' &&
+      !selectedRoute &&
+      !isVanChangePending &&
+      !options?.skipRouteValidation
+    ) {
       toast.error('Please select route');
       return;
     }
@@ -1242,11 +1347,16 @@ export default function SalesExecutiveScreen() {
       activityName: selectedActivity,
       routeId: selectedRoute?.routeId,
       description: selectedRoute
-        ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${ASSIGNED_VAN.name}`
-        : `Started ${pendingActivity?.name}`,
+        ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${mappedVan?.name || ASSIGNED_VAN.name}`
+        : isVanChangePending
+          ? `Van change request pending. Requested Van: ${selectedVanForChange?.name || mappedVan?.name || ''}`
+          : `Started ${pendingActivity?.name}`,
       totalShops: selectedRoute?.totalShops,
       routeName: selectedRoute?.name,
-      vanId: van?.vanId,
+      vanId: mappedVan?.vanId || van?.vanId,
+      vanChangeReason: isVanChangePending ? 'No, Change Van' : undefined,
+      vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
+      requestedVanId: isVanChangePending ? selectedVanForChange?.vanId : undefined,
     };
 
     console.log('Day Start Payload:', payload);
@@ -1256,7 +1366,17 @@ export default function SalesExecutiveScreen() {
 
       if (response?.statusCode === 201) {
         getDayStatus();
-        toast.success('Your day successfully started.');
+        if (isVanChangePending) {
+          setVanChangeRequestPending(false);
+          toast.success('Day started. Van change request pending approval.');
+        } else {
+          toast.success('Your day successfully started.');
+        }
+
+        // If starting Retailing with selected route (same van flow), navigate to route outlets list
+        if (selectedActivity === 'Retailing' && selectedRoute && !isVanChangePending) {
+          router.replace('/route');
+        }
       }
     } catch (error) {
       console.error('Error starting day:', error);
@@ -1315,7 +1435,37 @@ export default function SalesExecutiveScreen() {
   };
 
   const handleQuickAction = (route: string) => {
-    router.push(route);
+    console.log('Clicked route:', route);
+
+    // Example navigation
+    // navigation.navigate(route);
+
+    // OR call different methods
+    switch (route) {
+      case '/retailing':
+        if (dayStarted) {
+          handleChangeActivity({ name: 'Retailing' } as any);
+        } else {
+          handleActivitySelect({ name: 'Retailing' } as any);
+        }
+        break;
+
+      case '/other-work':
+        if (dayStarted) {
+          handleChangeActivity({ name: 'Other Work' } as any);
+        } else {
+          handleActivitySelect({ name: 'Other Work' } as any);
+        }
+        break;
+
+      case '/leaves':
+        if (dayStarted) {
+          handleChangeActivity({ name: 'Leaves' } as any);
+        } else {
+          handleActivitySelect('Leaves' as any);
+        }
+        break;
+    }
   };
 
   const fetchDayEndSummary = async () => {
@@ -1336,9 +1486,12 @@ export default function SalesExecutiveScreen() {
         setCurrentActivity(null);
         setTodayActivities([]);
         setStartTime(null);
+        setVanChangePendingBanner(false);
+        setVanChangeRequestPending(false);
         setSelectedActivityColor('#4158D0');
         setSelectedActivityIcon('storefront');
         useRouteStore.getState().setSelectedRoute(null);
+        await getDayStatus();
       }
     } catch (error) {
       console.error('Error completing day:', error);
@@ -1374,6 +1527,12 @@ export default function SalesExecutiveScreen() {
         if (van) {
           routeStore.setVan(van);
         }
+
+        const activeDescription = response?.data?.activeActivity?.description || '';
+        setVanChangePendingBanner(
+          typeof activeDescription === 'string' &&
+            activeDescription.includes('Van change request pending'),
+        );
       }
     } catch (error) {
       console.error('Error fetching day status:', error);
@@ -1534,10 +1693,27 @@ export default function SalesExecutiveScreen() {
             </View>
           </View>
 
+          {vanChangePendingBanner && (
+            <View
+              style={[
+                styles.pendingBanner,
+                { backgroundColor: colors.warning + '12', borderColor: colors.warning + '40' },
+              ]}
+            >
+              <Ionicons name="time-outline" size={18} color={colors.warning} />
+              <View style={{ flex: 1 }}>
+                <AppText style={[styles.pendingBannerTitle, { color: colors.textPrimary }]}>
+                  Van change request pending
+                </AppText>
+                <AppText style={[styles.pendingBannerSubtitle, { color: colors.textSecondary }]}>
+                  You can continue your day; admin approval is required to switch vans.
+                </AppText>
+              </View>
+            </View>
+          )}
+
           <View style={styles.mainContent}>
-            {!dayStarted ? (
-              <StartDayButton onPress={handleStartDayPress} />
-            ) : (
+            {dayStarted && (
               <CurrentActivityCard
                 selectedActivity={currentActivity}
                 selectedActivityColor={selectedActivityColor}
@@ -1546,19 +1722,17 @@ export default function SalesExecutiveScreen() {
                 otherWorkStartTime={otherWorkStartTime}
                 selectedRoute={selectedRoute}
                 assignedVan={mappedVan}
-                onPressChange={handleChangeActivityPress}
-                onPressEnd={handleDayEndConfirmation}
               />
             )}
           </View>
 
-          <View style={styles.sectionStack}>
-            <View style={styles.sectionCard}>
-              <QuickActionsSection
-                actions={QUICK_ACTIONS}
-                onPressAction={(route: any) => handleQuickAction(route)}
-              />
-            </View>
+		          <View style={styles.sectionStack}>
+		            <View style={styles.sectionCard}>
+		              <QuickActionsSection
+		                actions={filteredQuickActions}
+		                onPressAction={(route: any) => handleQuickAction(route)}
+		              />
+		            </View>
 
             <View style={styles.sectionCard}>
               <StatsOverviewSection employeeId={user?.userId as any} />
@@ -1581,6 +1755,18 @@ export default function SalesExecutiveScreen() {
         vanChangeReason={vanChangeReason}
         onSelectVanChangeReason={setVanChangeReason}
         onVanChangeSubmit={handleVanChangeSubmit}
+        // Van Selection Props
+        vans={availableVans}
+        selectedVan={selectedVanForChange}
+        onSelectVan={setSelectedVanForChange}
+        vanChangeNote={vanChangeNote}
+        onChangeVanChangeNote={setVanChangeNote}
+        onVanSelectionSubmit={handleVanSelectionSubmit}
+        onVanSelectionBack={() => {
+          setUnifiedModalVisible(false);
+          setUnifiedModalType('van-change');
+          setUnifiedModalVisible(true);
+        }}
         // Route Selection Props
         routes={routes}
         assignedVan={mappedVan}
@@ -1589,7 +1775,7 @@ export default function SalesExecutiveScreen() {
         showChangeOtherOptions={showOtherOptions || showChangeOtherOptions} // Use both states
         selectedActivity={currentActivity || tempSelectedActivity?.name || undefined}
         activityTypes={ACTIVITY_TYPES}
-        otherWorkOptions={OTHER_WORK_OPTIONS}
+        otherWorkOptions={otherWorkOptionsForModal}
         onActivitySelect={isChangingActivity ? handleChangeActivity : handleActivitySelect}
         onOtherWorkSelect={isChangingActivity ? handleChangeOtherWork : handleOtherWorkSelect}
         onBackToOptions={() => {
@@ -1677,6 +1863,26 @@ const createStyles = (colors: any) =>
       justifyContent: 'space-between',
       gap: 12,
       marginBottom: 16,
+    },
+    pendingBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      marginBottom: 14,
+    },
+    pendingBannerTitle: {
+      fontSize: 13,
+      fontWeight: '800',
+      marginBottom: 2,
+    },
+    pendingBannerSubtitle: {
+      fontSize: 12,
+      lineHeight: 16,
+      opacity: 0.85,
     },
     heroTextBlock: {
       flex: 1,

@@ -1,5 +1,6 @@
 // app/customers/[id].tsx
-import React, { useCallback, useEffect, useState } from 'react';
+
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import {
   View,
   ScrollView,
@@ -16,14 +17,14 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   BackHandler,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText } from '@/core/components';
-import { useOutletDetailStyles } from '../styles/OutletDetail.styles';
-import { OutletAvatar, OutletStatusBadge } from '../components/outlet';
+
 import { outletService } from '../services/outlet.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { Outlet } from '../types/outlet.types';
@@ -32,6 +33,9 @@ import { useRouteStore } from '@/core/store/route.store';
 import moment from 'moment';
 import { saleService } from '@/shared/services/sale.service';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { OutletAvatar, OutletStatusBadge } from '../components/outlet';
+import { useOutletDetailStyles } from '../styles/OutletDetail.styles';
+import { getDistance, isInsideGeofence } from '@/shared/utils/geofence.utils';
 
 // Types
 interface SaleItem {
@@ -59,57 +63,32 @@ interface SaleItem {
   status: 'DRAFT' | 'CONFIRMED' | 'RETURNED' | 'CANCELLED';
 }
 
-interface PaymentTransaction {
-  paymentId: string;
-  customerId: string;
-  vanId: string;
-  employeeId: string;
-  amount: number;
-  paymentMode: 'CASH' | 'CHEQUE' | 'BANK_TRANSFER' | 'UPI';
-  status: 'SUCCESS' | 'FAILED' | 'PENDING';
-  date: string;
-  sales: {
-    saleId: string;
-    amount: number;
-  }[];
-  referenceNo?: string;
-  remark?: string;
+interface VisitHistory {
+  visitId: string;
+  outletId: string;
+  checkInTime: string;
+  checkOutTime?: string;
+  status: string;
+  note?: string;
 }
 
-interface Activity {
-  activityId: string;
-  workSessionId: string;
-  userId: string;
-  userName: string;
-  vanId: string;
-  vanName: string;
-  name: string;
-  description: string;
-  status: 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
-  category: string;
-  subCategory: string;
-  startTime: string;
-  endTime?: string;
-}
-
-type TabType = 'overview' | 'sales' | 'transactions' | 'contacts' | 'activity';
+type TabType = 'summary' | 'sales' | 'visits';
 
 const TABS: { key: TabType; label: string; icon: string }[] = [
-  { key: 'overview', label: 'Overview', icon: 'information-circle-outline' },
+  { key: 'summary', label: 'Summary', icon: 'stats-chart-outline' },
   { key: 'sales', label: 'Sales', icon: 'receipt-outline' },
-  { key: 'transactions', label: 'Transactions', icon: 'swap-horizontal-outline' },
-  { key: 'contacts', label: 'Contacts', icon: 'people-outline' },
-  { key: 'activity', label: 'Activity', icon: 'time-outline' },
+  { key: 'visits', label: 'Visits', icon: 'time-outline' },
 ];
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 10;
+const GEOFENCE_RADIUS = 100;
 
 export default function CustomerDetailScreen() {
   const { colors } = useTheme();
   const styles = useOutletDetailStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
 
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('summary');
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [customer, setCustomer] = useState<Outlet | null>(null);
@@ -117,23 +96,44 @@ export default function CustomerDetailScreen() {
   const [visitNote, setVisitNote] = useState('');
   const [isStartingVisit, setIsStartingVisit] = useState(false);
   const [isTabScrolled, setIsTabScrolled] = useState(false);
+  
+  // Geofencing states
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isInsideGeofence, setIsInsideGeofence] = useState(false);
+  const [distanceToOutlet, setDistanceToOutlet] = useState<number | null>(null);
+  const [autoStartAttempted, setAutoStartAttempted] = useState(false);
 
-  // Pagination states
-  const [orders, setOrders] = useState<SaleItem[]>([]);
-  const [ordersPage, setOrdersPage] = useState(1);
-  const [ordersHasMore, setOrdersHasMore] = useState(true);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-  const [ordersTotal, setOrdersTotal] = useState(0);
+  // Sales states
+  const [sales, setSales] = useState<SaleItem[]>([]);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [salesTotal, setSalesTotal] = useState(0);
+  
+  // Summary stats
+  const [summaryStats, setSummaryStats] = useState({
+    mySales: {
+      mtdOrderValue: 0,
+      mtdOrderQty: 0,
+      avgOrderValue: 0,
+      avgOrderQty: 0,
+      lpc: 0,
+    },
+    outletSales: {
+      mtdOrderValue: 0,
+      mtdOrderQty: 0,
+      avgOrderValue: 0,
+      avgOrderQty: 0,
+      lpc: 0,
+    },
+  });
 
-  const [payments, setPayments] = useState<PaymentTransaction[]>([]);
-  const [paymentsHasMore, setPaymentsHasMore] = useState(true);
-  const [transactionsLoading] = useState(false);
-  const [paymentsTotal] = useState(0);
+  // Visit history states
+  const [visitHistory, setVisitHistory] = useState<VisitHistory[]>([]);
+  const [visitsLoading, setVisitsLoading] = useState(false);
+  const [visitsTotal, setVisitsTotal] = useState(0);
 
-  const [activities] = useState<Activity[]>([]);
-  const [activitiesHasMore] = useState(true);
-  const [activitiesLoading] = useState(false);
-  const [activitiesTotal] = useState(0);
+  // Refs
+  const locationInterval = useRef<NodeJS.Timeout | null>(null);
+  const appStateListener = useRef<any>(null);
 
   const route = useRouteStore((s) => s.selectedRoute);
   const van = useRouteStore((s) => s.van);
@@ -142,25 +142,53 @@ export default function CustomerDetailScreen() {
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
   const { setSelectedOutlet } = useOutletStore();
 
+  // Load customer data
   useEffect(() => {
     loadCustomerData();
   }, [id]);
 
-  // useEffect(() => {
-  //   if (customer) {
-  //     loadOrders(1, true);
-  //     loadPayments(1, true);
-  //   }
-  // }, [customer]);
-
   useFocusEffect(
-  useCallback(() => {
-    if (customer) {
-      loadOrders(1, true);
-      loadPayments(1, true);
+    useCallback(() => {
+      if (customer) {
+        loadSalesHistory();
+        loadVisitHistory();
+        loadSummaryStats();
+      }
+    }, [customer]),
+  );
+
+  // Start/stop geofence tracking
+  useEffect(() => {
+    if (customer?.geoTag?.lat && customer?.geoTag?.lng) {
+      startLocationTracking();
+    } else {
+      stopLocationTracking();
     }
-  }, [customer])
-);
+
+    return () => {
+      stopLocationTracking();
+    };
+  }, [customer]);
+
+  // Auto-start visit when inside geofence
+  useEffect(() => {
+    if (isInsideGeofence && !activeVisit && !autoStartAttempted && customer) {
+      autoStartVisit();
+    }
+  }, [isInsideGeofence, activeVisit, autoStartAttempted, customer]);
+
+  // App state listener
+  useEffect(() => {
+    appStateListener.current = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && customer?.geoTag?.lat) {
+        getCurrentLocation();
+      }
+    });
+
+    return () => {
+      appStateListener.current?.remove();
+    };
+  }, [customer]);
 
   useEffect(() => {
     setIsTabScrolled(false);
@@ -168,17 +196,94 @@ export default function CustomerDetailScreen() {
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      handleBackNavigation();
+      router.replace(`/beats`);
       return true;
     });
 
     return () => backHandler.remove();
+  }, []);
+
+  // Location tracking functions
+  const getCurrentLocation = useCallback(() => {
+    if (Platform.OS === 'web' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          console.log(position, "got location from web geolocation");
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation({ latitude, longitude });
+          checkGeofenceStatus(latitude, longitude);
+        },
+        (error) => {
+          console.log('Error getting location:', error);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
+      );
+    }
+  }, []);
+
+  const checkGeofenceStatus = useCallback((lat: number, lng: number) => {
+    console.log(`Checking geofence status for location: ${lat}, ${lng}`);
+    if (!customer?.geoTag?.lat || !customer?.geoTag?.lng) return;
+
+    const distance = getDistance(lat, lng, customer.geoTag.lat, customer.geoTag.lng);
+    console.log(`Distance to outlet: ${distance} meters`);
+    setDistanceToOutlet(distance);
+    console.log(`Geofence status for location: ${lat}, ${lng}, ${customer}`);
+    const inside = distance <= GEOFENCE_RADIUS;
+    setIsInsideGeofence(inside);
   }, [customer]);
 
-  const handleBackNavigation = () => {
-    router.replace(`/beats`);
-    return true;
-  };
+  const startLocationTracking = useCallback(() => {
+    if (locationInterval.current) {
+      clearInterval(locationInterval.current);
+    }
+
+    getCurrentLocation();
+    locationInterval.current = setInterval(() => {
+      getCurrentLocation();
+    }, 5000);
+  }, [getCurrentLocation]);
+
+  const stopLocationTracking = useCallback(() => {
+    if (locationInterval.current) {
+      clearInterval(locationInterval.current);
+      locationInterval.current = null;
+    }
+  }, []);
+
+  // Auto-start visit
+  const autoStartVisit = useCallback(async () => {
+    if (!customer || activeVisit || autoStartAttempted) return;
+
+    setAutoStartAttempted(true);
+
+    try {
+      const payload: any = {
+        routeSessionId: route?.routeSessionId,
+        workSessionId: route?.workSessionId,
+        vanId: route?.vanId,
+        outletId: customer.customerId,
+        autoStarted: true,
+      };
+
+      const response = await outletService.startVisit(payload);
+      if (response.success) {
+        const visit = response?.data;
+        setActiveVisit({
+          visitId: visit.visitId,
+          outlet: customer as any,
+          checkInTime: new Date(visit.checkInTime),
+          checkOutTime: visit.checkOutTime ? new Date(visit.checkOutTime) : undefined,
+          status: visit.status,
+          routeSessionId: visit?.routeSessionId,
+          customerId: visit?.customerId,
+        });
+      }
+    } catch (error) {
+      console.error('Auto-start visit failed:', error);
+      setAutoStartAttempted(false);
+    }
+  }, [customer, activeVisit, autoStartAttempted, route, setActiveVisit]);
 
   const loadCustomerData = async () => {
     setIsLoading(true);
@@ -192,121 +297,77 @@ export default function CustomerDetailScreen() {
     setIsLoading(false);
   };
 
-  const loadOrders = async (page: number, reset: boolean = false) => {
-    if (ordersLoading || (!ordersHasMore && !reset)) return;
+  const loadSummaryStats = async () => {
+    if (!customer?.customerId) return;
+    
     try {
-      setOrdersLoading(true);
+      const params = {
+        customerId: customer.customerId,
+        vanId: van?.vanId,
+        employeeId: user?.userId,
+      };
+      
+      const response = await saleService.getCustomerSummaryStats(params);
+      if (response?.data) {
+        setSummaryStats(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to load summary stats:', error);
+    }
+  };
+
+  const loadSalesHistory = async () => {
+    if (!customer?.customerId) return;
+    
+    setSalesLoading(true);
+    try {
       const params: any = {
-        page: reset ? 1 : page,
-        limit: PAGE_SIZE,
-        customerId: customer?.customerId,
+        page: 1,
+        limit: 10,
+        customerId: customer.customerId,
         vanId: van?.vanId,
         employeeId: user?.userId,
       };
       const response: any = await saleService.fetchSales(params);
-
-      const newOrders = response?.data || [];
-      const total = response?.total || 0;
-
-      if (reset) {
-        setOrders(newOrders);
-        setOrdersPage(1);
-      } else {
-        setOrders((prev) => [...prev, ...newOrders]);
-      }
-
-      setOrdersTotal(total);
-      setOrdersHasMore(
-        newOrders.length === PAGE_SIZE &&
-          (reset ? newOrders.length : orders.length + newOrders.length) < total,
-      );
-      if (!reset) setOrdersPage(page);
+      
+      const salesData = response?.data || [];
+      setSales(salesData);
+      setSalesTotal(response?.total || 0);
     } catch (error) {
-      console.error('Failed to load orders:', error);
+      console.error('Failed to load sales:', error);
     } finally {
-      setOrdersLoading(false);
+      setSalesLoading(false);
     }
   };
 
-  const loadMorePayments = () => {
-    if (ordersHasMore && !ordersLoading) {
-      loadOrders(ordersPage + 1);
-    }
-  };
-
-  const loadPayments = async (page: number, reset: boolean = false) => {
-    if (ordersLoading || (!ordersHasMore && !reset)) return;
+  const loadVisitHistory = async () => {
+    if (!customer?.customerId) return;
+    
+    setVisitsLoading(true);
     try {
-      setOrdersLoading(true);
-      const params: any = {
-        page: reset ? 1 : page,
-        limit: PAGE_SIZE,
-        customerId: customer?.customerId,
-        vanId: van?.vanId,
-        employeeId: user?.userId,
-      };
-      const response: any = await saleService.fetchPayments(params);
-
-      const newPayments = response?.data || [];
-      const total = response?.total || 0;
-
-      if (reset) {
-        setPayments(newPayments);
-        // setOr(1);
-      } else {
-        setPayments((prev) => [...prev, ...newPayments]);
-      }
-
-      setOrdersTotal(total);
-      setOrdersHasMore(
-        newPayments.length === PAGE_SIZE &&
-          (reset ? newPayments.length : orders.length + newPayments.length) < total,
-      );
-      // if (!reset) setPayments(page);
+      const response = await outletService.getVisitHistory({
+        customerId: customer.customerId,
+        limit: 10,
+        page: 1,
+      });
+      
+      const visits = response?.data || [];
+      setVisitHistory(visits);
+      setVisitsTotal(response?.total || 0);
     } catch (error) {
-      console.error('Failed to load orders:', error);
+      console.error('Failed to load visit history:', error);
     } finally {
-      setOrdersLoading(false);
-    }
-  };
-
-  const loadMoreOrders = () => {
-    if (ordersHasMore && !ordersLoading) {
-      loadOrders(ordersPage + 1);
+      setVisitsLoading(false);
     }
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadCustomerData();
-    await loadOrders(1, true);
-    await loadPayments(1, true);
+    await loadSalesHistory();
+    await loadVisitHistory();
+    await loadSummaryStats();
     setRefreshing(false);
-  }, [id, customer]);
-
-  const handleShare = useCallback(async () => {
-    if (!customer) return;
-    const {
-      name,
-      ownerName,
-      address,
-      phoneNumber,
-      creditLimit,
-      outstanding,
-      segmentation,
-      status,
-    } = customer;
-
-    await Share.share({
-      message: `📋 *Customer Details*\n━━━━━━━━━━━━━━━━━━━━━\n🏢 *Name:* ${name}\n👤 *Owner:* ${ownerName}\n📍 *Address:* ${address?.line1 || 'N/A'}${address?.line2 ? ', ' + address.line2 : ''}\n📞 *Phone:* ${phoneNumber}\n🏷️ *Type:* ${segmentation || 'N/A'}\n💰 *Credit Limit:* ${creditLimit ? `K${creditLimit.toLocaleString()}` : 'N/A'}\n💵 *Outstanding:* ${outstanding ? `K${outstanding.toLocaleString()}` : 'N/A'}\n📊 *Status:* ${status}`,
-      title: name,
-    });
-  }, [customer]);
-
-  const handleEdit = useCallback(() => {
-    if (customer?.customerId) {
-      router.push(`/customers/edit/${customer.customerId}`);
-    }
   }, [customer]);
 
   const handleStartVisit = useCallback(async () => {
@@ -319,7 +380,6 @@ export default function CustomerDetailScreen() {
         workSessionId: route?.workSessionId,
         vanId: route?.vanId,
         outletId: customer.customerId,
-        // note: visitNote,
       };
 
       const response = await outletService.startVisit(payload);
@@ -343,15 +403,19 @@ export default function CustomerDetailScreen() {
     } finally {
       setIsStartingVisit(false);
     }
-  }, [customer, route, visitNote]);
+  }, [customer, route]);
 
-  const handleVisitAction = useCallback(() => {
-    if (activeVisit) {
+  const handleContinueVisit = useCallback(() => {
+    if (activeVisit && customer) {
       router.push(`/route/${customer?.customerId}/visit`);
-    } else {
-      handleStartVisit();
     }
   }, [activeVisit, customer]);
+
+  const handleContinueToSale = useCallback(() => {
+    if (customer) {
+      router.push(`/sales/create?customerId=${customer.customerId}`);
+    }
+  }, [customer]);
 
   const handleTabScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetY = event.nativeEvent.contentOffset.y;
@@ -362,8 +426,15 @@ export default function CustomerDetailScreen() {
     });
   }, []);
 
+  const formatCurrency = (amount: number): string => {
+    return `ZMW ${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+  };
+
   if (isLoading) return <LoadingState styles={styles} colors={colors} />;
   if (!customer) return <EmptyState styles={styles} colors={colors} />;
+
+  const lastOrderDate = sales.length > 0 ? sales[0]?.date : customer.lastOrderDate;
+  const lastVisitDate = customer.lastVisitedAt;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -371,49 +442,41 @@ export default function CustomerDetailScreen() {
         customer={customer}
         styles={styles}
         colors={colors}
-        onBack={() => router.back()}
-        onEdit={handleEdit}
-        onShare={handleShare}
         compact={isTabScrolled}
+        lastVisitDate={lastVisitDate}
+        lastOrderDate={lastOrderDate}
       />
 
-      {!isTabScrolled ? (
-        <VisitBanner
-          activeVisit={activeVisit}
-          customer={customer}
-          onStartVisit={handleVisitAction}
-          styles={styles}
-          colors={colors}
-        />
-      ) : null}
-
-      {/* {!isTabScrolled ? <StatsRow customer={customer} styles={styles} colors={colors} /> : null} */}
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} styles={styles} colors={colors} />
 
       <TabContent
         activeTab={activeTab}
         customer={customer}
-        orders={orders}
-        ordersLoading={ordersLoading}
-        ordersHasMore={ordersHasMore}
-        ordersTotal={ordersTotal}
-        onLoadMoreOrders={loadMoreOrders}
-        payments={payments}
-        transactionsLoading={transactionsLoading}
-        transactionsHasMore={paymentsHasMore}
-        transactionsTotal={paymentsTotal}
-        onLoadMoreTransactions={() => {}}
-        activities={activities}
-        activitiesLoading={activitiesLoading}
-        activitiesHasMore={activitiesHasMore}
-        activitiesTotal={activitiesTotal}
-        onLoadMoreActivities={() => {}}
+        summaryStats={summaryStats}
+        sales={sales}
+        salesLoading={salesLoading}
+        salesTotal={salesTotal}
+        visitHistory={visitHistory}
+        visitsLoading={visitsLoading}
+        visitsTotal={visitsTotal}
         styles={styles}
         colors={colors}
         refreshing={refreshing}
         onRefresh={onRefresh}
         onScroll={handleTabScroll}
+        formatCurrency={formatCurrency}
       />
+
+      {/* Footer Buttons */}
+      {activeVisit && activeVisit?.customerId === customer?.customerId &&<View style={styles.footerButtons}>
+        <TouchableOpacity
+          style={[styles.footerButton, { backgroundColor: colors.success }]}
+          onPress={handleContinueToSale}
+        >
+          <Ionicons name="cart-outline" size={20} color="#FFF" />
+          <AppText style={styles.footerButtonText}>Continue to Sale</AppText>
+        </TouchableOpacity>
+      </View>}
 
       {/* Visit Modal */}
       <Modal
@@ -504,14 +567,8 @@ const EmptyState = ({ styles, colors }: any) => (
   </View>
 );
 
-const CustomerHeader = ({ customer, styles, colors, onBack, onEdit, onShare, compact }: any) => (
+const CustomerHeader = ({ customer, styles, colors, compact, lastVisitDate, lastOrderDate }: any) => (
   <Animated.View entering={FadeInDown.duration(400)} style={styles.detailHeader}>
-    <View style={[styles.headerTopRow, compact && styles.headerTopRowCompact]}>
-      {/* <TouchableOpacity onPress={onBack} style={styles.backButton}>
-        <Ionicons name="arrow-back" size={22} color={colors.textPrimary} />
-      </TouchableOpacity> */}
-    </View>
-
     <View style={[styles.detailHeroCard, compact && styles.detailHeroCardCompact]}>
       <View style={styles.detailHeroTop}>
         <View style={styles.detailAvatarWrap}>
@@ -525,13 +582,31 @@ const CustomerHeader = ({ customer, styles, colors, onBack, onEdit, onShare, com
             <OutletStatusBadge status={customer.status} />
           </View>
           <AppText style={styles.detailOwner} numberOfLines={1}>
-            Managed by {customer.ownerName || 'Unknown'}
+            {customer.ownerName || 'Unknown'}
           </AppText>
+          
+          <View style={styles.detailDatesRow}>
+            <View style={styles.detailDateChip}>
+              <Ionicons name="calendar-outline" size={12} color={colors.textSecondary} />
+              <AppText style={styles.detailDateLabel}>Last Visited:</AppText>
+              <AppText style={styles.detailDateValue}>
+                {lastVisitDate ? moment(lastVisitDate).format('DD MMM YYYY') : 'Never'}
+              </AppText>
+            </View>
+            <View style={styles.detailDateChip}>
+              <Ionicons name="receipt-outline" size={12} color={colors.textSecondary} />
+              <AppText style={styles.detailDateLabel}>Last Ordered:</AppText>
+              <AppText style={styles.detailDateValue}>
+                {lastOrderDate ? moment(lastOrderDate).format('DD MMM YYYY') : 'Never'}
+              </AppText>
+            </View>
+          </View>
+
           <View style={styles.detailMetaRow}>
             <View style={styles.detailMetaChip}>
-              <Ionicons name="pricetag-outline" size={12} color={colors.primary} />
+              <Ionicons name="business-outline" size={12} color={colors.primary} />
               <AppText style={styles.detailMetaChipText}>
-                {customer.segmentation || customer.customerTypeId || 'General'}
+                {customer.customerTypeId || 'Van Sales'}
               </AppText>
             </View>
             <View style={styles.detailMetaChip}>
@@ -547,80 +622,12 @@ const CustomerHeader = ({ customer, styles, colors, onBack, onEdit, onShare, com
       <View style={styles.detailLocationCard}>
         <Ionicons name="location-outline" size={16} color={colors.primary} />
         <AppText style={styles.detailLocation} numberOfLines={2}>
-          {customer.address?.line1 || 'Address not available'}
+          {customer.address?.line1 || customer.address || 'Address not available'}
         </AppText>
       </View>
-      {/* <View style={styles.detailHeroActions}>
-        <TouchableOpacity
-          style={[styles.headerActionButtonOutline, { borderColor: colors.primary }]}
-          onPress={onEdit}
-        >
-          <Ionicons name="create-outline" size={16} color={colors.primary} />
-          <AppText style={[styles.headerActionButtonOutlineText, { color: colors.primary }]}>
-            Edit
-          </AppText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.headerActionButtonOutline, { borderColor: colors.error + '45' }]}
-          onPress={onShare}
-        >
-          <Ionicons name="share-social-outline" size={16} color={colors.error} />
-          <AppText style={[styles.headerActionButtonOutlineText, { color: colors.error }]}>
-            Share
-          </AppText>
-        </TouchableOpacity>
-      </View> */}
     </View>
   </Animated.View>
 );
-
-const VisitBanner = ({ activeVisit, customer, onStartVisit, styles, colors }: any) => {
-  if (activeVisit) {
-    return (
-      <Animated.View
-        entering={FadeInDown.duration(400).delay(200)}
-        style={[styles.visitBanner, styles.visitBannerActive]}
-      >
-        <View style={styles.visitBannerContent}>
-          <View style={styles.visitBannerIcon}>
-            <Ionicons name="time-outline" size={20} color={colors.warning} />
-          </View>
-          <View style={styles.visitBannerInfo}>
-            <AppText style={styles.visitBannerTitle}>Visit in Progress</AppText>
-            <AppText style={styles.visitBannerSubtitle}>
-              Started {moment(activeVisit.checkInTime).fromNow()}
-            </AppText>
-          </View>
-          <TouchableOpacity style={styles.visitBannerButton} onPress={onStartVisit}>
-            <AppText style={styles.visitBannerButtonText}>Continue</AppText>
-            <Ionicons name="arrow-forward" size={16} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
-    );
-  }
-
-  return (
-    <Animated.View entering={FadeInDown.duration(400).delay(200)} style={styles.visitBanner}>
-      <View style={styles.visitBannerContent}>
-        <View style={[styles.visitBannerIcon, { backgroundColor: colors.primary + '10' }]}>
-          <Ionicons name="navigate-outline" size={20} color={colors.primary} />
-        </View>
-        <View style={styles.visitBannerInfo}>
-          <AppText style={styles.visitBannerTitle}>Ready to visit?</AppText>
-          <AppText style={styles.visitBannerSubtitle}>Start your visit to {customer.name}</AppText>
-        </View>
-        <TouchableOpacity
-          style={[styles.visitBannerButton, { backgroundColor: colors.primary }]}
-          onPress={onStartVisit}
-        >
-          <AppText style={styles.visitBannerButtonText}>Start Visit</AppText>
-          <Ionicons name="arrow-forward" size={16} color="#FFF" />
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  );
-};
 
 const TabBar = ({ activeTab, setActiveTab, styles, colors }: any) => (
   <View style={styles.tabBar}>
@@ -649,20 +656,22 @@ const TabBar = ({ activeTab, setActiveTab, styles, colors }: any) => (
 const TabContent = ({
   activeTab,
   customer,
-  orders,
-  ordersLoading,
-  ordersHasMore,
-  ordersTotal,
-  onLoadMoreOrders,
+  summaryStats,
+  sales,
+  salesLoading,
+  salesTotal,
+  visitHistory,
+  visitsLoading,
+  visitsTotal,
   styles,
   colors,
   refreshing,
   onRefresh,
   onScroll,
-  payments,
+  formatCurrency,
 }: any) => (
   <>
-    {activeTab === 'overview' && (
+    {activeTab === 'summary' && (
       <ScrollView
         style={styles.tabContent}
         showsVerticalScrollIndicator={false}
@@ -670,16 +679,33 @@ const TabContent = ({
         onScroll={onScroll}
         scrollEventThrottle={16}
       >
-        <OverviewTab customer={customer} styles={styles} colors={colors} />
+        <SummaryTab 
+          customer={customer}
+          summaryStats={summaryStats}
+          styles={styles}
+          colors={colors}
+          formatCurrency={formatCurrency}
+        />
       </ScrollView>
     )}
     {activeTab === 'sales' && (
       <SalesTab
-        sales={orders}
-        loading={ordersLoading}
-        hasMore={ordersHasMore}
-        total={ordersTotal}
-        onLoadMore={onLoadMoreOrders}
+        sales={sales}
+        loading={salesLoading}
+        total={salesTotal}
+        styles={styles}
+        colors={colors}
+        onScroll={onScroll}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        formatCurrency={formatCurrency}
+      />
+    )}
+    {activeTab === 'visits' && (
+      <VisitsTab
+        visits={visitHistory}
+        loading={visitsLoading}
+        total={visitsTotal}
         styles={styles}
         colors={colors}
         onScroll={onScroll}
@@ -687,209 +713,123 @@ const TabContent = ({
         onRefresh={onRefresh}
       />
     )}
-    {activeTab === 'transactions' && (
-      <ScrollView
-        style={styles.tabContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-      >
-        <TransactionsTab
-          transactions={payments}
-          loading={false}
-          hasMore={false}
-          total={0}
-          onLoadMore={() => {}}
-          styles={styles}
-          colors={colors}
-        />
-      </ScrollView>
-    )}
-    {activeTab === 'contacts' && (
-      <ScrollView
-        style={styles.tabContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-      >
-        <ContactsTab contacts={customer.contacts || []} styles={styles} colors={colors} />
-      </ScrollView>
-    )}
-    {activeTab === 'activity' && (
-      <ScrollView
-        style={styles.tabContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-      >
-        <ActivityTab
-          activities={[]}
-          loading={false}
-          hasMore={false}
-          total={0}
-          onLoadMore={() => {}}
-          styles={styles}
-          colors={colors}
-        />
-      </ScrollView>
-    )}
   </>
 );
 
-// Orders Tab Component
-const formatDate = (dateString: string) => {
-  if (!dateString) return 'N/A';
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-const mapSaleStatus = (status: string): 'COMPLETED' | 'RETURNED' | 'CANCELLED' => {
-  switch (status) {
-    case 'CONFIRMED':
-      return 'COMPLETED';
-    case 'RETURNED':
-      return 'RETURNED';
-    case 'CANCELLED':
-      return 'CANCELLED';
-    default:
-      return 'COMPLETED';
-  }
-};
-
-const CURRENCY_CONFIG = {
-  code: 'K',
-  position: 'prefix' as 'prefix' | 'suffix',
-  decimalPlaces: 0,
-};
-
-const formatCurrency = (amount: number): string => {
-  const formattedAmount = amount.toLocaleString('en-IN', {
-    minimumFractionDigits: CURRENCY_CONFIG.decimalPlaces,
-    maximumFractionDigits: CURRENCY_CONFIG.decimalPlaces,
-  });
-  return CURRENCY_CONFIG.position === 'prefix'
-    ? `${CURRENCY_CONFIG.code}${formattedAmount}`
-    : `${formattedAmount}${CURRENCY_CONFIG.code}`;
-};
-
-const SalesTab = ({
-  sales,
-  loading,
-  hasMore,
-  total,
-  onLoadMore,
-  styles,
-  colors,
-  onSalePress,
-  onScroll,
-  refreshing,
-  onRefresh,
-}: any) => {
-  const getSaleStatusConfig = useCallback(
-    (status: string) => {
-      const statusMap: Record<string, { label: string; icon: string; color: string }> = {
-        COMPLETED: { label: 'Completed', icon: 'checkmark-circle-outline', color: colors.success },
-        RETURNED: { label: 'Returned', icon: 'refresh-circle-outline', color: colors.warning },
-        CANCELLED: { label: 'Cancelled', icon: 'close-circle-outline', color: colors.error },
-      };
-      return statusMap[mapSaleStatus(status)] || statusMap.COMPLETED;
-    },
-    [colors],
-  );
-
-  const getTypeConfig = useCallback(
-    (type: SaleItem['type']) =>
-      type === 'CREDIT'
-        ? { label: 'Credit', icon: 'card-outline', color: colors.warning }
-        : { label: 'Cash', icon: 'cash-outline', color: colors.success },
-    [colors],
-  );
-
-  const getPaymentStatusConfig = useCallback(
-    (paymentStatus: SaleItem['paymentStatus']) => {
-      const statusMap: Record<string, { label: string; icon: string; color: string }> = {
-        PAID: { label: 'Paid', icon: 'wallet-outline', color: colors.success },
-        UNPAID: { label: 'Unpaid', icon: 'alert-circle-outline', color: colors.error },
-        PARTIAL: { label: 'Partial', icon: 'time-outline', color: colors.warning },
-        OVERDUE: { label: 'Overdue', icon: 'warning-outline', color: colors.error },
-      };
-      return statusMap[paymentStatus] || statusMap.UNPAID;
-    },
-    [colors],
-  );
-
-  const renderSaleCard = ({ item }: { item: SaleItem }) => {
-    const saleStatusConfig = getSaleStatusConfig(item.status);
-    const typeConfig = getTypeConfig(item.type);
-    const paymentStatusConfig = getPaymentStatusConfig(item.paymentStatus);
-    const hasPendingAmount = item.type === 'CREDIT' && item.pendingAmount > 0;
-
-    return (
-      <TouchableOpacity style={styles.orderCard} onPress={() => onSalePress?.(item.saleId)}>
-        <View style={styles.orderCardHeader}>
-          <View>
-            <AppText style={styles.orderNumber}> #{item.saleId}</AppText>
-            <AppText style={styles.orderDate}>{formatDate(item.date)}</AppText>
-          </View>
-          <AppText style={styles.orderAmount}>{formatCurrency(item.totalValue)}</AppText>
+// Summary Tab
+const SummaryTab = ({ customer, summaryStats, styles, colors, formatCurrency }: any) => (
+  <View style={styles.summaryContainer}>
+    <View style={styles.salesSectionCard}>
+      <AppText style={styles.sectionTitle}>My Sales</AppText>
+      
+      <View style={styles.statsRow}>
+        <View style={styles.statBox}>
+          <AppText style={styles.statValue}>{formatCurrency(summaryStats.mySales.mtdOrderValue)}</AppText>
+          <AppText style={styles.statLabel}>MTD</AppText>
+          <AppText style={styles.statSubLabel}>TOTAL ORDER VALUE</AppText>
         </View>
-
-        <View style={styles.saleTagsRow}>
-          {[saleStatusConfig, typeConfig, paymentStatusConfig].map((tag, index) => (
-            <View
-              key={`${tag.label}-${index}`}
-              style={[
-                styles.saleTag,
-                { backgroundColor: tag.color + '12', borderColor: tag.color + '24' },
-              ]}
-            >
-              <Ionicons name={tag.icon as any} size={12} color={tag.color} />
-              <AppText style={[styles.saleTagText, { color: tag.color }]}>{tag.label}</AppText>
-            </View>
-          ))}
+        <View style={styles.statDivider} />
+        <View style={styles.statBox}>
+          <AppText style={styles.statValue}>{summaryStats.mySales.mtdOrderQty}</AppText>
+          <AppText style={styles.statLabel}>MTD</AppText>
+          <AppText style={styles.statSubLabel}>TOTAL ORDER QTY</AppText>
         </View>
+      </View>
 
-        <View style={styles.orderCardBody}>
-          <View style={styles.orderStat}>
-            <Ionicons name="cube-outline" size={14} color={colors.textSecondary} />
-            <AppText style={styles.orderStatText}>{item.totalQty} items</AppText>
-          </View>
-          <View style={styles.orderStat}>
-            <Ionicons name="albums-outline" size={14} color={colors.textSecondary} />
-            <AppText style={styles.orderStatText}>{item.totalCases || 0} cases</AppText>
-          </View>
+      <View style={styles.statsRowSmall}>
+        <View style={styles.statBoxSmall}>
+          <AppText style={styles.statValueSmall}>{formatCurrency(summaryStats.mySales.avgOrderValue)}</AppText>
+          <AppText style={styles.statLabelSmall}>LAST 5 ORDERS</AppText>
+          <AppText style={styles.statSubLabelSmall}>AVG. ORDER VALUE</AppText>
         </View>
-
-        {hasPendingAmount && (
-          <View style={styles.orderPendingBadge}>
-            <Ionicons name="alert-circle-outline" size={12} color={colors.warning} />
-            <AppText style={styles.orderPendingText}>
-              Pending: {formatCurrency(item.pendingAmount)}
-            </AppText>
-          </View>
-        )}
-
-        <View style={styles.orderCardFooter}>
-          <AppText style={styles.orderViewDetails}>View Sale</AppText>
-          <Ionicons name="chevron-forward" size={14} color={colors.primary} />
+        <View style={styles.statBoxSmall}>
+          <AppText style={styles.statValueSmall}>{summaryStats.mySales.avgOrderQty}</AppText>
+          <AppText style={styles.statLabelSmall}>LAST 5 ORDERS</AppText>
+          <AppText style={styles.statSubLabelSmall}>AVG. ORDER QTY</AppText>
         </View>
-      </TouchableOpacity>
-    );
+        <View style={styles.statBoxSmall}>
+          <AppText style={styles.statValueSmall}>{summaryStats.mySales.lpc}</AppText>
+          <AppText style={styles.statLabelSmall}>LAST 5 ORDERS</AppText>
+          <AppText style={styles.statSubLabelSmall}>LPC</AppText>
+        </View>
+      </View>
+    </View>
+
+    <View style={styles.salesSectionCard}>
+      <AppText style={styles.sectionTitle}>Outlet Sales</AppText>
+      
+      <View style={styles.statsRow}>
+        <View style={styles.statBox}>
+          <AppText style={styles.statValue}>{formatCurrency(summaryStats.outletSales.mtdOrderValue)}</AppText>
+          <AppText style={styles.statLabel}>MTD</AppText>
+          <AppText style={styles.statSubLabel}>TOTAL ORDER VALUE</AppText>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statBox}>
+          <AppText style={styles.statValue}>{summaryStats.outletSales.mtdOrderQty}</AppText>
+          <AppText style={styles.statLabel}>MTD</AppText>
+          <AppText style={styles.statSubLabel}>TOTAL ORDER QTY</AppText>
+        </View>
+      </View>
+
+      <View style={styles.statsRowSmall}>
+        <View style={styles.statBoxSmall}>
+          <AppText style={styles.statValueSmall}>{formatCurrency(summaryStats.outletSales.avgOrderValue)}</AppText>
+          <AppText style={styles.statLabelSmall}>LAST 5 ORDERS</AppText>
+          <AppText style={styles.statSubLabelSmall}>AVG. ORDER VALUE</AppText>
+        </View>
+        <View style={styles.statBoxSmall}>
+          <AppText style={styles.statValueSmall}>{summaryStats.outletSales.avgOrderQty}</AppText>
+          <AppText style={styles.statLabelSmall}>LAST 5 ORDERS</AppText>
+          <AppText style={styles.statSubLabelSmall}>AVG. ORDER QTY</AppText>
+        </View>
+        <View style={styles.statBoxSmall}>
+          <AppText style={styles.statValueSmall}>{summaryStats.outletSales.lpc}</AppText>
+          <AppText style={styles.statLabelSmall}>LAST 5 ORDERS</AppText>
+          <AppText style={styles.statSubLabelSmall}>LPC</AppText>
+        </View>
+      </View>
+    </View>
+  </View>
+);
+
+// Sales Tab
+const SalesTab = ({ sales, loading, total, styles, colors, onScroll, refreshing, onRefresh, formatCurrency }: any) => {
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return moment(dateString).format('DD MMM YYYY');
   };
 
-  if (sales.length === 0 && !loading) {
+  const renderSaleCard = ({ item }: { item: SaleItem }) => (
+    <View style={styles.saleCard}>
+      <View style={styles.saleCardHeader}>
+        <View>
+          <AppText style={styles.saleId}>#{item.saleId?.slice(-8)}</AppText>
+          <AppText style={styles.saleDate}>{formatDate(item.date)}</AppText>
+        </View>
+        <AppText style={[styles.saleAmount, { color: colors.primary }]}>
+          {formatCurrency(item.totalValue)}
+        </AppText>
+      </View>
+      
+      <View style={styles.saleCardBody}>
+        <View style={styles.saleStat}>
+          <Ionicons name="cube-outline" size={14} color={colors.textSecondary} />
+          <AppText style={styles.saleStatText}>{item.totalCases} Cases</AppText>
+        </View>
+        <View style={styles.saleStat}>
+          <Ionicons name="albums-outline" size={14} color={colors.textSecondary} />
+          <AppText style={styles.saleStatText}>{item.totalPieces || 0} PCS</AppText>
+        </View>
+      </View>
+    </View>
+  );
+
+  if (loading && sales.length === 0) {
     return (
-      <View style={styles.emptyTabContainer}>
-        <Ionicons name="receipt-outline" size={56} color={colors.textTertiary} />
-        <AppText style={styles.emptyTabTitle}>No Sales</AppText>
-        <AppText style={styles.emptyTabText}>No sales found for this customer</AppText>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <AppText style={styles.loadingText}>Loading sales...</AppText>
       </View>
     );
   }
@@ -901,15 +841,25 @@ const SalesTab = ({
       renderItem={renderSaleCard}
       contentContainerStyle={styles.tabContentContainer}
       style={styles.tabContent}
-      onEndReached={onLoadMore}
-      onEndReachedThreshold={0.3}
       onScroll={onScroll}
       scrollEventThrottle={16}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      ListFooterComponent={() =>
-        loading && (
-          <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color={colors.primary} />
+      ListHeaderComponent={
+        sales.length > 0 && (
+          <View style={styles.listHeader}>
+            <AppText style={styles.listHeaderTitle}>Last {Math.min(sales.length, 10)} Sales</AppText>
+            {total > 10 && (
+              <AppText style={styles.listHeaderSubtitle}>Showing last 10 of {total} total</AppText>
+            )}
+          </View>
+        )
+      }
+      ListEmptyComponent={
+        !loading && (
+          <View style={styles.emptyTabContainer}>
+            <Ionicons name="receipt-outline" size={56} color={colors.textTertiary} />
+            <AppText style={styles.emptyTabTitle}>No Sales</AppText>
+            <AppText style={styles.emptyTabText}>No sales found for this customer</AppText>
           </View>
         )
       }
@@ -918,642 +868,95 @@ const SalesTab = ({
   );
 };
 
-const TransactionsTab = ({
-  transactions,
-  loading,
-  hasMore,
-  total,
-  onLoadMore,
-  styles,
-  colors,
-}: any) => {
-  const formatCurrency = (amount: number) => {
-    return `K${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  };
-
+// Visits Tab
+const VisitsTab = ({ visits, loading, total, styles, colors, onScroll, refreshing, onRefresh }: any) => {
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} min ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-
-    return date.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    if (!dateString) return 'N/A';
+    return moment(dateString).format('DD MMM YYYY, hh:mm A');
   };
 
-  const getPaymentModeConfig = (mode: string) => {
-    const configs: Record<string, { label: string; icon: string; color: string; bgColor: string }> =
-      {
-        CASH: {
-          label: 'Cash',
-          icon: 'cash-outline',
-          color: '#10B981',
-          bgColor: '#10B98112',
-        },
-        CHEQUE: {
-          label: 'Cheque',
-          icon: 'document-text-outline',
-          color: '#3B82F6',
-          bgColor: '#3B82F612',
-        },
-        BANK_TRANSFER: {
-          label: 'Bank Transfer',
-          icon: 'business-outline',
-          color: '#8B5CF6',
-          bgColor: '#8B5CF612',
-        },
-        UPI: {
-          label: 'UPI',
-          icon: 'phone-portrait-outline',
-          color: '#EC4899',
-          bgColor: '#EC489912',
-        },
-      };
-    return configs[mode] || configs.CASH;
+  const getDuration = (checkIn: string, checkOut?: string) => {
+    if (!checkOut) return 'In progress';
+    const start = moment(checkIn);
+    const end = moment(checkOut);
+    const duration = moment.duration(end.diff(start));
+    const hours = Math.floor(duration.asHours());
+    const minutes = duration.minutes();
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    }
+    return `${minutes}m`;
   };
 
-  const getStatusConfig = (status: string) => {
-    const configs: Record<string, { label: string; icon: string; color: string; bgColor: string }> =
-      {
-        SUCCESS: {
-          label: 'Success',
-          icon: 'checkmark-circle',
-          color: '#10B981',
-          bgColor: '#10B98112',
-        },
-        FAILED: {
-          label: 'Failed',
-          icon: 'close-circle',
-          color: '#EF4444',
-          bgColor: '#EF444412',
-        },
-        PENDING: {
-          label: 'Pending',
-          icon: 'time-outline',
-          color: '#F59E0B',
-          bgColor: '#F59E0B12',
-        },
-      };
-    return configs[status] || configs.PENDING;
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'COMPLETED':
+        return colors.success;
+      case 'ACTIVE':
+        return colors.primary;
+      default:
+        return colors.warning;
+    }
   };
 
-  const renderTransactionCard = ({ item }: { item: any }) => {
-    const paymentModeConfig = getPaymentModeConfig(item.paymentMode);
-    const statusConfig = getStatusConfig(item.status);
-    const isSuccess = item.status === 'SUCCESS';
+  const renderVisitCard = ({ item }: { item: VisitHistory }) => (
+    <View style={styles.visitCard}>
+      <View style={styles.visitCardHeader}>
+        <View style={[styles.visitStatusDot, { backgroundColor: getStatusColor(item.status) }]} />
+        <AppText style={styles.visitDate}>{formatDate(item.checkInTime)}</AppText>
+        <View style={[styles.visitDurationBadge, { backgroundColor: colors.primary + '10' }]}>
+          <Ionicons name="time-outline" size={12} color={colors.primary} />
+          <AppText style={styles.visitDuration}>{getDuration(item.checkInTime, item.checkOutTime)}</AppText>
+        </View>
+      </View>
+      {item.note && (
+        <View style={styles.visitNote}>
+          <Ionicons name="chatbubble-outline" size={12} color={colors.textSecondary} />
+          <AppText style={styles.visitNoteText}>{item.note}</AppText>
+        </View>
+      )}
+    </View>
+  );
 
-    return (
-      <Animated.View entering={FadeInUp.duration(400).delay(0)}>
-        <TouchableOpacity
-          style={styles.transactionCard}
-          activeOpacity={0.7}
-          onPress={() => {
-            // Handle transaction details if needed
-            console.log('Transaction pressed:', item.paymentId);
-          }}
-        >
-          {/* Header with Icon and Amount */}
-          <View style={styles.transactionHeader}>
-            <View
-              style={[
-                styles.transactionIconContainer,
-                { backgroundColor: paymentModeConfig.bgColor },
-              ]}
-            >
-              <Ionicons
-                name={paymentModeConfig.icon as any}
-                size={22}
-                color={paymentModeConfig.color}
-              />
-            </View>
-            <View style={styles.transactionInfo}>
-              <View style={styles.transactionTitleRow}>
-                <AppText style={styles.transactionTitle}>{paymentModeConfig.label}</AppText>
-                <View
-                  style={[styles.transactionStatusBadge, { backgroundColor: statusConfig.bgColor }]}
-                >
-                  <Ionicons name={statusConfig.icon as any} size={12} color={statusConfig.color} />
-                  <AppText style={[styles.transactionStatusText, { color: statusConfig.color }]}>
-                    {statusConfig.label}
-                  </AppText>
-                </View>
-              </View>
-              <AppText style={styles.transactionId}>ID: {item.paymentId}</AppText>
-            </View>
-            <View style={styles.transactionAmountContainer}>
-              <AppText
-                style={[
-                  styles.transactionAmount,
-                  { color: isSuccess ? colors.success : colors.error },
-                ]}
-              >
-                {isSuccess ? '+' : '-'} {formatCurrency(item.amount)}
-              </AppText>
-              <AppText style={styles.transactionDate}>{formatDate(item.date)}</AppText>
-            </View>
-          </View>
-
-          {/* Sales Reference Section */}
-          {item.sales && item.sales.length > 0 && (
-            <View style={styles.transactionSalesSection}>
-              <View style={styles.transactionSalesHeader}>
-                <Ionicons name="receipt-outline" size={14} color={colors.textSecondary} />
-                <AppText style={styles.transactionSalesTitle}>Applied to Sales</AppText>
-              </View>
-              {item.sales.map((sale: any, index: number) => (
-                <View key={sale.saleId || index} style={styles.transactionSaleItem}>
-                  <AppText style={styles.transactionSaleId}>#{sale.saleId?.slice(-8)}</AppText>
-                  <AppText style={styles.transactionSaleAmount}>
-                    {formatCurrency(sale.amount)}
-                  </AppText>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Remark Section */}
-          {item.remark && (
-            <View style={styles.transactionRemarkSection}>
-              <Ionicons name="chatbubble-outline" size={14} color={colors.textTertiary} />
-              <AppText style={styles.transactionRemark} numberOfLines={2}>
-                {item.remark}
-              </AppText>
-            </View>
-          )}
-
-          {/* Footer with Metadata */}
-          <View style={styles.transactionFooter}>
-            <View style={styles.transactionMetaItem}>
-              <Ionicons name="calendar-outline" size={12} color={colors.textTertiary} />
-              <AppText style={styles.transactionMetaText}>
-                {new Date(item.createdAt).toLocaleString()}
-              </AppText>
-            </View>
-            {item.referenceNo && (
-              <View style={styles.transactionMetaItem}>
-                <Ionicons name="document-outline" size={12} color={colors.textTertiary} />
-                <AppText style={styles.transactionMetaText}>Ref: {item.referenceNo}</AppText>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
-  if (loading && transactions.length === 0) {
+  if (loading && visits.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <AppText style={styles.loadingText}>Loading transactions...</AppText>
-      </View>
-    );
-  }
-
-  if (transactions.length === 0 && !loading) {
-    return (
-      <View style={styles.emptyTabContainer}>
-        <View style={styles.emptyStateIconContainer}>
-          <Ionicons name="swap-horizontal-outline" size={56} color={colors.textTertiary} />
-        </View>
-        <AppText style={styles.emptyTabTitle}>No Transactions</AppText>
-        <AppText style={styles.emptyTabText}>No transactions found for this customer</AppText>
+        <AppText style={styles.loadingText}>Loading visits...</AppText>
       </View>
     );
   }
 
   return (
     <FlatList
-      data={transactions}
-      keyExtractor={(item) => item.paymentId || item._id}
-      renderItem={renderTransactionCard}
+      data={visits}
+      keyExtractor={(item) => item.visitId}
+      renderItem={renderVisitCard}
       contentContainerStyle={styles.tabContentContainer}
       style={styles.tabContent}
-      onEndReached={onLoadMore}
-      onEndReachedThreshold={0.3}
-      showsVerticalScrollIndicator={false}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       ListHeaderComponent={
-        total > 0 ? (
-          <View style={styles.transactionListHeader}>
-            <View>
-              <AppText style={styles.transactionListTitle}>Payment History</AppText>
-              <AppText style={styles.transactionListSubtitle}>
-                {total} transaction{total !== 1 ? 's' : ''} found
-              </AppText>
-            </View>
-            <View style={styles.transactionStatsBadge}>
-              <Ionicons name="stats-chart-outline" size={14} color={colors.primary} />
-              <AppText style={styles.transactionStatsText}>
-                Total:{' '}
-                {formatCurrency(transactions.reduce((sum: number, t: any) => sum + t.amount, 0))}
-              </AppText>
-            </View>
+        visits.length > 0 && (
+          <View style={styles.listHeader}>
+            <AppText style={styles.listHeaderTitle}>Last {Math.min(visits.length, 10)} Visits</AppText>
+            {total > 10 && (
+              <AppText style={styles.listHeaderSubtitle}>Showing last 10 of {total} total</AppText>
+            )}
           </View>
-        ) : null
+        )
       }
-      ListFooterComponent={() =>
-        loading && transactions.length > 0 ? (
-          <View style={styles.footerLoader}>
-            <ActivityIndicator size="small" color={colors.primary} />
-            <AppText style={styles.loadingMoreText}>Loading more transactions...</AppText>
+      ListEmptyComponent={
+        !loading && (
+          <View style={styles.emptyTabContainer}>
+            <Ionicons name="time-outline" size={56} color={colors.textTertiary} />
+            <AppText style={styles.emptyTabTitle}>No Visits</AppText>
+            <AppText style={styles.emptyTabText}>No visit history found for this customer</AppText>
           </View>
-        ) : hasMore ? (
-          <TouchableOpacity style={styles.loadMoreButton} onPress={onLoadMore}>
-            <AppText style={[styles.loadMoreButtonText, { color: colors.primary }]}>
-              Load More
-            </AppText>
-          </TouchableOpacity>
-        ) : transactions.length > 0 ? (
-          <View style={styles.endOfListContainer}>
-            <View style={styles.endOfListLine} />
-            <View style={styles.endOfListBadge}>
-              <Ionicons name="checkmark-circle-outline" size={14} color={colors.textTertiary} />
-              <AppText style={styles.endOfListText}>End of transactions</AppText>
-            </View>
-            <View style={styles.endOfListLine} />
-          </View>
-        ) : null
+        )
       }
+      showsVerticalScrollIndicator={false}
     />
   );
-};
-
-const ContactsTab = ({ contacts, styles, colors }: any) => {
-  if (!contacts || contacts.length === 0) {
-    return (
-      <View style={styles.emptyTabContainer}>
-        <Ionicons name="people-outline" size={56} color={colors.textTertiary} />
-        <AppText style={styles.emptyTabTitle}>No Contacts</AppText>
-        <AppText style={styles.emptyTabText}>No contacts found for this customer</AppText>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.tabContentContainer}>
-      {contacts.map((contact: any, index: number) => (
-        <View key={`${contact.phone}-${index}`} style={styles.contactCard}>
-          <View style={styles.contactAvatar}>
-            <AppText style={styles.contactInitials}>
-              {contact.name
-                ?.split(' ')
-                .map((part: string) => part[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase()}
-            </AppText>
-          </View>
-          <View style={styles.contactInfo}>
-            <View style={styles.contactNameRow}>
-              <AppText style={styles.contactName}>{contact.name}</AppText>
-              {contact.role ? (
-                <View style={styles.contactRoleBadge}>
-                  <AppText style={styles.contactRoleBadgeText}>{contact.role}</AppText>
-                </View>
-              ) : null}
-            </View>
-            <AppText style={styles.contactRole}>{contact.phone}</AppText>
-            <View style={styles.contactActions}>
-              <TouchableOpacity
-                style={styles.contactActionButton}
-                onPress={() => Linking.openURL(`tel:${contact.phone}`)}
-              >
-                <Ionicons name="call-outline" size={14} color={colors.primary} />
-                <AppText style={styles.contactActionText}>Call</AppText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.contactActionButton}
-                onPress={() =>
-                  Linking.openURL(`https://wa.me/${contact.phone?.replace(/[^0-9]/g, '')}`)
-                }
-              >
-                <Ionicons name="logo-whatsapp" size={14} color={colors.success} />
-                <AppText style={styles.contactActionText}>WhatsApp</AppText>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-};
-
-const ActivityTab = ({ activities, loading, hasMore, total, onLoadMore, styles, colors }: any) => {
-  if (activities.length === 0 && !loading) {
-    return (
-      <View style={styles.emptyTabContainer}>
-        <Ionicons name="time-outline" size={56} color={colors.textTertiary} />
-        <AppText style={styles.emptyTabTitle}>No Activity</AppText>
-        <AppText style={styles.emptyTabText}>No recent activity found</AppText>
-      </View>
-    );
-  }
-  return null;
-};
-
-const OverviewTab = ({ customer, styles, colors }: any) => (
-  <View style={styles.overviewContainer}>
-    {/* Stats Row - Credit Limit, Credit Days, Outstanding, Last Visit */}
-    {/* <StatsRow customer={customer} styles={styles} colors={colors} /> */}
-
-    {/* Financial Overview Section */}
-    <View style={styles.sectionCard}>
-      <View style={styles.sectionHeader}>
-        <View style={[styles.sectionHeaderIcon, { backgroundColor: colors.primary + '10' }]}>
-          <Ionicons name="wallet-outline" size={18} color={colors.primary} />
-        </View>
-        <View style={styles.sectionHeaderText}>
-          <AppText style={styles.sectionTitle}>Financial Overview</AppText>
-          <AppText style={styles.sectionSubtitle}>Credit and payment summary</AppText>
-        </View>
-      </View>
-
-      <View style={styles.financialGrid}>
-        <View style={styles.financialCard}>
-          <AppText style={styles.financialLabel}>Credit Limit</AppText>
-          <AppText style={[styles.financialValue, { color: colors.primary }]}>
-            {customer.creditLimit ? formatCurrency(customer.creditLimit) : 'K 0'}
-          </AppText>
-        </View>
-        <View style={styles.financialCard}>
-          <AppText style={styles.financialLabel}>Credit Days</AppText>
-          <AppText style={[styles.financialValue, { color: colors.info }]}>
-            {customer.creditDays ? `${customer.creditDays} days` : 'N/A'}
-          </AppText>
-        </View>
-        <View style={styles.financialCard}>
-          <AppText style={styles.financialLabel}>Outstanding</AppText>
-          <AppText style={[styles.financialValue, { color: colors.warning }]}>
-            {customer.outstanding ? formatCurrency(customer.outstanding) : 'K 0'}
-          </AppText>
-        </View>
-        <View style={styles.financialCard}>
-          <AppText style={styles.financialLabel}>Last Visit</AppText>
-          <AppText style={[styles.financialValue, { color: colors.success }]}>
-            {customer.lastVisitedAt
-              ? moment(customer.lastVisitedAt).format('DD MMM YYYY')
-              : 'Never'}
-          </AppText>
-        </View>
-      </View>
-
-      {/* {customer.outstanding && customer.creditLimit && (
-        <View style={styles.creditUtilization}>
-          <View style={styles.creditUtilizationHeader}>
-            <AppText style={styles.creditUtilizationLabel}>Credit Utilization</AppText>
-            <AppText style={styles.creditUtilizationPercent}>
-              {Math.round((customer.outstanding / customer.creditLimit) * 100)}%
-            </AppText>
-          </View>
-          <View style={styles.creditUtilizationBar}>
-            <View 
-              style={[
-                styles.creditUtilizationFill, 
-                { 
-                  width: `${Math.min((customer.outstanding / customer.creditLimit) * 100, 100)}%`,
-                  backgroundColor: (customer.outstanding / customer.creditLimit) > 0.8 ? colors.error : colors.success
-                }
-              ]} 
-            />
-          </View>
-        </View>
-      )} */}
-    </View>
-
-    {/* Business Details Section */}
-    <View style={styles.sectionCard}>
-      <View style={styles.sectionHeader}>
-        <View style={[styles.sectionHeaderIcon, { backgroundColor: colors.primary + '10' }]}>
-          <Ionicons name="business-outline" size={18} color={colors.primary} />
-        </View>
-        <View style={styles.sectionHeaderText}>
-          <AppText style={styles.sectionTitle}>Business Details</AppText>
-          <AppText style={styles.sectionSubtitle}>Classification and account settings</AppText>
-        </View>
-      </View>
-
-      <View style={styles.infoGrid}>
-        <View style={styles.infoRow}>
-          <AppText style={styles.infoLabel}>Business Type</AppText>
-          <AppText style={styles.infoValue}>{customer.customerTypeId || 'N/A'}</AppText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <AppText style={styles.infoLabel}>Category</AppText>
-          <AppText style={styles.infoValue}>{customer.customerCategoryId || 'N/A'}</AppText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <AppText style={styles.infoLabel}>Channel</AppText>
-          <AppText style={styles.infoValue}>{customer.channelId || 'N/A'}</AppText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <AppText style={styles.infoLabel}>Market</AppText>
-          <AppText style={styles.infoValue}>{customer.marketId || 'N/A'}</AppText>
-        </View>
-
-        <View style={styles.infoRow}>
-          <AppText style={styles.infoLabel}>Segmentation</AppText>
-          <View
-            style={[
-              styles.segmentationBadge,
-              { backgroundColor: getSegmentationColor(customer.segmentation) + '15' },
-            ]}
-          >
-            <AppText
-              style={[
-                styles.segmentationText,
-                { color: getSegmentationColor(customer.segmentation) },
-              ]}
-            >
-              {customer.segmentation || 'Standard'}
-            </AppText>
-          </View>
-        </View>
-      </View>
-    </View>
-
-    {/* Contact Information Section */}
-    <View style={styles.sectionCard}>
-      <View style={styles.sectionHeader}>
-        <View style={[styles.sectionHeaderIcon, { backgroundColor: colors.primary + '10' }]}>
-          <Ionicons name="call-outline" size={18} color={colors.primary} />
-        </View>
-        <View style={styles.sectionHeaderText}>
-          <AppText style={styles.sectionTitle}>Contact Information</AppText>
-          <AppText style={styles.sectionSubtitle}>Quick actions for calling and navigation</AppText>
-        </View>
-      </View>
-
-      {customer.phoneNumber && (
-        <TouchableOpacity
-          style={styles.contactRow}
-          onPress={() => Linking.openURL(`tel:${customer.phoneNumber}`)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.detailContactIcon}>
-            <Ionicons name="call-outline" size={18} color={colors.primary} />
-          </View>
-          <AppText style={styles.detailContactText}>{customer.phoneNumber}</AppText>
-          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-        </TouchableOpacity>
-      )}
-
-      {customer.phoneNumber && (
-        <TouchableOpacity
-          style={styles.contactRow}
-          onPress={() =>
-            Linking.openURL(`https://wa.me/${customer.phoneNumber.replace(/[^0-9]/g, '')}`)
-          }
-          activeOpacity={0.7}
-        >
-          <View style={[styles.detailContactIcon, { backgroundColor: colors.success + '10' }]}>
-            <Ionicons name="logo-whatsapp" size={18} color={colors.success} />
-          </View>
-          <AppText style={styles.detailContactText}>{customer.phoneNumber}</AppText>
-          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-        </TouchableOpacity>
-      )}
-
-      {customer.address?.line1 && (
-        <TouchableOpacity
-          style={styles.contactRow}
-          onPress={() => Linking.openURL(getMapUrl(customer.address))}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.detailContactIcon, { backgroundColor: colors.info + '10' }]}>
-            <Ionicons name="location-outline" size={18} color={colors.info} />
-          </View>
-          <AppText style={styles.detailContactText} numberOfLines={1}>
-            {customer.address.line1}
-            {customer.address.line2 ? `, ${customer.address.line2}` : ''}
-          </AppText>
-          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-        </TouchableOpacity>
-      )}
-
-      {customer.email && (
-        <TouchableOpacity
-          style={styles.contactRow}
-          onPress={() => Linking.openURL(`mailto:${customer.email}`)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.detailContactIcon, { backgroundColor: colors.warning + '10' }]}>
-            <Ionicons name="mail-outline" size={18} color={colors.warning} />
-          </View>
-          <AppText style={styles.detailContactText} numberOfLines={1}>
-            {customer.email}
-          </AppText>
-          <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
-        </TouchableOpacity>
-      )}
-    </View>
-  </View>
-);
-
-// StatsRow Component - Shows Credit Limit, Credit Days, Outstanding, Last Visit
-const StatsRow = ({ customer, styles, colors }: any) => (
-  <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.detailStatsRow}>
-    {[
-      {
-        icon: 'cash-outline',
-        value: customer.creditLimit ? formatCurrency(customer.creditLimit) : 'N/A',
-        label: 'Credit Limit',
-        color: colors.primary,
-      },
-      {
-        icon: 'calendar-outline',
-        value: customer.creditDays ? `${customer.creditDays}d` : 'N/A',
-        label: 'Credit Days',
-        color: colors.info,
-      },
-      {
-        icon: 'wallet-outline',
-        value: customer.outstanding ? formatCurrency(customer.outstanding) : 'K 0',
-        label: 'Outstanding',
-        color: colors.warning,
-      },
-      {
-        icon: 'time-outline',
-        value: customer.lastVisitedAt ? moment(customer.lastVisitedAt).format('DD MMM') : 'Never',
-        label: 'Last Visit',
-        color: colors.success,
-      },
-    ].map((stat, i) => (
-      <View key={i} style={styles.detailStatCard}>
-        <View style={[styles.detailStatIconWrap, { backgroundColor: stat.color + '10' }]}>
-          <Ionicons name={stat.icon as any} size={20} color={stat.color} />
-        </View>
-        <AppText style={styles.detailStatValue} numberOfLines={1}>
-          {stat.value}
-        </AppText>
-        <AppText style={styles.detailStatLabel}>{stat.label}</AppText>
-      </View>
-    ))}
-  </Animated.View>
-);
-
-// Helper function for segmentation colors
-const getSegmentationColor = (segmentation: string): string => {
-  const { colors } = useTheme();
-  switch (segmentation?.toLowerCase()) {
-    case 'platinum':
-    case 'premium':
-      return colors?.success || '#10B981';
-    case 'gold':
-    case 'high':
-      return colors?.warning || '#F59E0B';
-    case 'silver':
-    case 'medium':
-      return colors?.info || '#3B82F6';
-    case 'bronze':
-    case 'low':
-      return colors?.error || '#EF4444';
-    default:
-      return colors?.primary || '#8B5CF6';
-  }
-};
-
-const Section = ({ title, subtitle, icon, children, styles, colors }: any) => (
-  <View style={styles.sectionCard}>
-    <View style={styles.sectionHeader}>
-      <View style={styles.sectionHeaderIcon}>
-        <Ionicons name={icon} size={16} color={colors.primary} />
-      </View>
-      <View style={styles.sectionHeaderText}>
-        <AppText style={styles.sectionTitle}>{title}</AppText>
-        {subtitle ? <AppText style={styles.sectionSubtitle}>{subtitle}</AppText> : null}
-      </View>
-    </View>
-    {children}
-  </View>
-);
-
-const InfoRow = ({ label, value, styles }: any) => (
-  <View style={styles.infoRow}>
-    <AppText style={styles.infoLabel}>{label}</AppText>
-    <AppText style={styles.infoValue}>{value}</AppText>
-  </View>
-);
-
-const getMapUrl = (address: { line1: string; line2?: string } | undefined) => {
-  if (!address || !address.line1) return 'https://maps.google.com';
-  const addressString = `${address.line1}${address.line2 ? ', ' + address.line2 : ''}`;
-  const encoded = encodeURIComponent(addressString);
-  return Platform.select({
-    ios: `maps:0,0?q=${encoded}`,
-    android: `geo:0,0?q=${encoded}`,
-    default: `https://maps.google.com/?q=${encoded}`,
-  });
 };

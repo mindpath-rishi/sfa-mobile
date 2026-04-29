@@ -1,56 +1,53 @@
-// LoadSummaryModal.styles.ts
-import { StyleSheet, ViewStyle } from 'react-native';
+import { createStyles } from '@/shared/theme/styles';
 
-export const useLoadSummaryModalStyles = () => {
-  return StyleSheet.create({
+export const createLoadSummaryModalStyles = (colors: any) =>
+  createStyles((utils) => ({
+    // Container
     container: {
       flex: 1,
     },
 
     // Stats Bar
     statsBar: {
-      backgroundColor: '#FFFFFF',
-      paddingVertical: 12,
+      paddingVertical: utils.spacing[4],
+      paddingHorizontal: utils.spacing[4],
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
+      borderBottomColor: colors.divider,
     },
-    statsScrollContent: {
-      paddingHorizontal: 16,
-      gap: 16,
+    statsContainer: {
+      flexDirection: 'row',
+      gap: utils.spacing[3],
     },
-    statsBarItem: {
+    statCard: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: utils.spacing[3],
+      padding: utils.spacing[3],
+      borderRadius: utils.borderRadius.lg,
+      borderWidth: 1,
     },
-    statsIconWrapper: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
+    statIconWrapper: {
+      width: 44,
+      height: 44,
+      borderRadius: utils.borderRadius.md,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    statsValue: {
-      fontSize: 16,
+    statValue: {
+      fontSize: utils.fontSize.xl,
       fontWeight: '700',
-      color: '#1F2937',
     },
-    statsLabel: {
-      fontSize: 10,
-      color: '#6B7280',
-      marginTop: 2,
-    },
-    statsDivider: {
-      width: 1,
-      height: 30,
-      backgroundColor: '#E5E7EB',
+    statLabel: {
+      fontSize: utils.fontSize.xs,
+      marginTop: utils.spacing[0.5],
     },
 
     // Content Container
     contentContainer: {
       flex: 1,
-      paddingHorizontal: 16,
-      paddingTop: 16,
+      paddingHorizontal: utils.spacing[4],
+      paddingTop: utils.spacing[4],
     },
 
     // Section Header
@@ -58,35 +55,30 @@ export const useLoadSummaryModalStyles = () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
-      paddingBottom: 8,
+      marginBottom: utils.spacing[3],
+      paddingBottom: utils.spacing[2],
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
     },
     sectionTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-    },
-    sectionSubtitle: {
-      fontSize: 12,
-      marginTop: 2,
+      fontSize: utils.fontSize.base,
+      fontWeight: '600',
     },
     totalBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 20,
-      gap: 4,
+      paddingHorizontal: utils.spacing[2],
+      paddingVertical: utils.spacing[1],
+      borderRadius: utils.borderRadius.md,
+      gap: utils.spacing[1],
     },
     totalBadgeText: {
-      fontSize: 12,
-      fontWeight: '500',
+      fontSize: utils.fontSize.sm,
+      fontWeight: '600',
     },
 
     // List Container
     listContainer: {
-      paddingBottom: 80,
+      paddingBottom: utils.spacing[20],
     },
 
     // SKU Row
@@ -94,168 +86,120 @@ export const useLoadSummaryModalStyles = () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingVertical: 12,
+      paddingVertical: utils.spacing[3],
       borderBottomWidth: 1,
-      borderBottomColor: '#F3F4F6',
     },
     skuRowLeft: {
       flexDirection: 'row',
       alignItems: 'center',
       flex: 1,
-      marginRight: 12,
+      marginRight: utils.spacing[3],
     },
     skuIndex: {
       width: 28,
-      marginRight: 12,
+      marginRight: utils.spacing[2],
     },
     skuIndexText: {
-      fontSize: 13,
+      fontSize: utils.fontSize.xs,
       fontWeight: '500',
     },
     skuInfo: {
       flex: 1,
     },
     skuName: {
-      fontSize: 14,
+      fontSize: utils.fontSize.sm,
       fontWeight: '500',
-      marginBottom: 2,
+      marginBottom: utils.spacing[0.5],
     },
     skuCode: {
-      fontSize: 11,
+      fontSize: utils.fontSize.xs,
     },
     skuRowRight: {
       alignItems: 'flex-end',
-      gap: 4,
-      minWidth: 100,
     },
-
-    // Chips
-    itemCountChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-      backgroundColor: '#E0E7FF',
+    stockInfo: {
+      paddingHorizontal: utils.spacing[2],
+      paddingVertical: utils.spacing[1],
     },
-    itemCountText: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: '#4F46E5',
-    },
-    stockChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-      backgroundColor: '#F0FDF4',
-    },
-    stockChipText: {
-      fontSize: 11,
+    stockText: {
+      fontSize: utils.fontSize.sm,
       fontWeight: '500',
     },
     outOfStockChip: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-      backgroundColor: '#FEF2F2',
+      gap: utils.spacing[1],
+      paddingHorizontal: utils.spacing[2],
+      paddingVertical: utils.spacing[1],
+      borderRadius: utils.borderRadius.sm,
     },
     outOfStockChipText: {
-      fontSize: 11,
+      fontSize: utils.fontSize.xs,
       fontWeight: '500',
     },
 
-    // Value and Weight
-    skuValue: {
-      fontSize: 13,
-      fontWeight: '700',
-      marginTop: 2,
-    },
-    skuWeight: {
-      fontSize: 11,
-      fontWeight: '500',
-      marginTop: 1,
-    },
-
-    // Footer with Summary Preview
+    // Footer
     footer: {
-      backgroundColor: '#FFFFFF',
       borderTopWidth: 1,
-      borderTopColor: '#F0F0F0',
     },
     footerSummary: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: '#F9FAFB',
-      borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
-      gap: 16,
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[3],
+      gap: utils.spacing[4],
     },
     footerSummaryItem: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: utils.spacing[2],
     },
     footerSummaryIcon: {
       width: 36,
       height: 36,
-      borderRadius: 10,
+      borderRadius: utils.borderRadius.md,
       justifyContent: 'center',
       alignItems: 'center',
     },
     footerSummaryLabel: {
-      fontSize: 11,
-      marginBottom: 2,
+      fontSize: utils.fontSize.xs,
+      marginBottom: utils.spacing[0.5],
     },
     footerSummaryValue: {
-      fontSize: 15,
+      fontSize: utils.fontSize.sm,
       fontWeight: '700',
     },
     footerSummaryDivider: {
       width: 1,
-      height: 36,
-      backgroundColor: '#E5E7EB',
     },
     footerActions: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      paddingBottom: 20,
-      gap: 12,
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[3],
+      paddingBottom: utils.spacing[4],
+      gap: utils.spacing[3],
     },
     cancelButton: {
       flex: 1,
-      flexDirection: 'row',
-      paddingVertical: 12,
-      borderRadius: 10,
+      paddingVertical: utils.spacing[3],
+      borderRadius: utils.borderRadius.md,
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
     },
     cancelButtonText: {
-      fontSize: 14,
+      fontSize: utils.fontSize.sm,
       fontWeight: '600',
     },
     proceedButton: {
-      flex: 1.5,
-      flexDirection: 'row',
-      paddingVertical: 12,
-      borderRadius: 10,
+      flex: 1,
+      paddingVertical: utils.spacing[3],
+      borderRadius: utils.borderRadius.md,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
     },
     proceedButtonText: {
-      fontSize: 14,
+      fontSize: utils.fontSize.sm,
       fontWeight: '600',
       color: '#FFFFFF',
     },
@@ -265,35 +209,43 @@ export const useLoadSummaryModalStyles = () => {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: 60,
-      gap: 12,
+      paddingVertical: utils.spacing[20],
+      gap: utils.spacing[4],
     },
     loadingText: {
-      fontSize: 14,
+      fontSize: utils.fontSize.sm,
     },
     emptyState: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: 80,
-      gap: 12,
+      paddingVertical: utils.spacing[20],
+      gap: utils.spacing[3],
     },
     emptyStateText: {
-      fontSize: 16,
+      fontSize: utils.fontSize.base,
       fontWeight: '500',
-      marginTop: 8,
+      marginTop: utils.spacing[2],
     },
     emptyStateSubtext: {
-      fontSize: 13,
+      fontSize: utils.fontSize.sm,
       textAlign: 'center',
     },
+
+    // Modal
     modalContainer: {
       flex: 1,
-    } as ViewStyle,
-
+    },
     modalContent: {
       flex: 1,
       padding: 0,
-    } as ViewStyle,
-  });
-};
+    },
+
+    // Utility
+    disabled: {
+      opacity: 0.6,
+    },
+    pressed: {
+      opacity: 0.85,
+    },
+  }))(colors);

@@ -138,3 +138,28 @@ export interface UnitOption {
   price: number;
   stock: number;
 }
+
+export interface ProductsScreenProps {
+  mode: 'sales' | 'topup'
+  onProductsCountChange?: (count: number) => void;
+  onCartUpdate?: (
+    items: any[],
+    summary: { totalUnits: number; totalValue: number; totalWeight: number; totalItems: number },
+  ) => void;
+  onSubmit?: (items: any[]) => void;
+  warehouseId?: string;
+  vanId?: string;
+  submitButtonText?: string;
+  maxQuantityLimit?: number; // New prop for max quantity limit
+}
+
+export interface ProductsScreenRef {
+  clearFilters: () => void;
+  applyFilters: (filters: any) => void;
+  getFilteredCount: () => number;
+  openFilters: () => void;
+  getCartItems: () => any[];
+  clearCart: () => void;
+}
+
+export type ScreenMode = 'sales' | 'topup';

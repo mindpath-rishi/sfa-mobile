@@ -1,7 +1,5 @@
-// CheckInScreen.tsx
 import React, { useState, useRef, useCallback } from 'react';
-import { View, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View } from 'react-native';
 import { router, useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +7,7 @@ import ProductsScreen, { ProductsScreenRef } from '@/features/product/screens/Pr
 import { useFilterContext } from '@/shared/contexts/FilterContext';
 
 import { useCheckInScreenStyles } from '../styles/CheckInScreen.styles';
-import { CheckInScreenParams, Customer, NonSaleStep, TabType } from '../types/checkin.types';
+import { CheckInScreenParams, NonSaleStep, TabType } from '../types/checkin.types';
 import { TabBar } from '../components/checkin/TabBar';
 import { NonSaleCategoryScreen } from './NonSaleCategoryScreen';
 import { useOutletStore } from '@/core/store/outlet.store';
@@ -17,10 +15,8 @@ import PaymentsScreen from 'app/(drawer)/collection';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 
 export default function CheckInScreen() {
-  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useCheckInScreenStyles();
-  const params = useLocalSearchParams() as CheckInScreenParams;
   const navigation = useNavigation();
   const { productsFilterCount } = useFilterContext();
 
@@ -29,16 +25,7 @@ export default function CheckInScreen() {
   const outlet = useOutletStore((s) => s.selectedOutlet);
 
   const productsScreenRef = useRef<ProductsScreenRef>(null);
-  const [productsCount, setProductsCount] = useState(0);
-  const { setHeader } = useHeader();
 
-  useFocusEffect(
-    useCallback(() => {
-      // setHeader({
-      //   title: outlet?.name,
-      // });
-    }, []),
-  );
 
   useFocusEffect(
     useCallback(() => {
@@ -69,14 +56,6 @@ export default function CheckInScreen() {
       }
     }, [navigation, activeTab, productsFilterCount]),
   );
-
-  const handleBack = () => {
-    if (nonSaleStep === 'reason') {
-      setNonSaleStep('main');
-    } else {
-      router.back();
-    }
-  };
 
   const handleCategorySelect = (category: any) => {
     router.push({
@@ -111,7 +90,7 @@ export default function CheckInScreen() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'sale':
-        return <ProductsScreen ref={productsScreenRef} onProductsCountChange={setProductsCount} />;
+        return <ProductsScreen ref={productsScreenRef} />;
       case 'non-sale':
         return renderNonSaleContent();
       case 'collection':

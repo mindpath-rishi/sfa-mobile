@@ -5,6 +5,9 @@ export type DayStartPayload = {
   totalShops?: number;
   routeName?: string;
   vanId?: string;
+  vanChangeReason?: string;
+  vanChangeNote?: string;
+  requestedVanId?: string;
 };
 
 export type DayStartResponse = {

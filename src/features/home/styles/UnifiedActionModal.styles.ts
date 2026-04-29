@@ -245,6 +245,61 @@ export const useUnifiedActionModalStyles = () => {
       fontWeight: '500',
     },
 
+    // Van Selection
+    reasonContainer: {
+      marginBottom: 16,
+    },
+    reasonLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginBottom: 8,
+    },
+    reasonInput: {
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      minHeight: 46,
+      textAlignVertical: 'top',
+      fontSize: 14,
+    },
+    vanListContainer: {
+      paddingBottom: 8,
+    },
+    vanItem: {
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+      backgroundColor: '#FFFFFF',
+    },
+    vanItemLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+      paddingRight: 10,
+    },
+    vanAvatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    vanName: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    vanNumber: {
+      fontSize: 12,
+      marginTop: 2,
+      opacity: 0.8,
+    },
+
     // Route List Header
     routeListHeader: {
       flexDirection: 'row',

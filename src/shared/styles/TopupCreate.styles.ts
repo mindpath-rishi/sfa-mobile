@@ -4,7 +4,7 @@ import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 export const useCreateTopupStyles = () => {
-  const { colors, spacing, fontSize } = useTheme();
+  const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
     container: {

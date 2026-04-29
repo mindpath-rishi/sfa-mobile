@@ -7,13 +7,13 @@ export default function TopupLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: false, // ✅ disable ALL headers
+        headerShown: false,
         contentStyle: { backgroundColor: colors.background },
       }}
     >
-      {/* <Stack.Screen name="index" />
+      <Stack.Screen name="index" />
       <Stack.Screen name="detail" />
-      <Stack.Screen name="create" /> */}
+      <Stack.Screen name="create" />
     </Stack>
   );
 }

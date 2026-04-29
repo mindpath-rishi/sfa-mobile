@@ -16,7 +16,6 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
-
     filterBadge: {
       position: 'absolute',
       top: 0,
@@ -55,6 +54,7 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
     filterButtonActive: {
       backgroundColor: colors.success + '15' || '#10B98115', // Green tint
     } as ViewStyle,
+
     container: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -63,8 +63,8 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       borderBottomWidth: props.showBorder ? 1 : 0,
       borderBottomColor: colors.divider + '40',
       ...(props.elevated && {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 0 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
@@ -178,7 +178,6 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       fontWeight: '700',
       textAlign: 'center',
     } as TextStyle,
-
   }));
 
   return styleGenerator(colors);

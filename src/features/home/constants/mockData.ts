@@ -16,11 +16,9 @@ export const MOCK_DATA = {
 };
 
 export const QUICK_ACTIONS: QuickAction[] = [
-  // { icon: 'location', label: 'Active Visit', color: '#4158D0', route: '/checkin' },
-  // { icon: 'cart', label: 'New Order', color: '#C850C0', route: '/orders/new', badge: 3 },
-  { icon: 'cash', label: 'Collection', color: '#FF512F', route: '/collection' },
-  // { icon: 'people', label: 'Outlets', color: '#11998e', route: '/outlets' },
-  { icon: 'map', label: 'Route', color: '#F37335', route: '/route' },
+  { icon: 'cart', label: 'Retailing', color: '#4158D0', route: '/retailing' },
+  { icon: 'briefcase', label: 'Other Work', color: '#C850C0', route: '/other-work' },
+  { icon: 'calendar', label: 'Leaves', color: '#FF512F', route: '/leaves' },
 ];
 
 export const ACTIVITY_TYPES: ActivityType[] = [

@@ -17,7 +17,6 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { useGlobalErrorStore } from '@/core/store/error.store';
 
 import AppErrorScreen from '@/core/screens/error/Error';
-import LoaderOverlay from '@/core/screens/LoaderOverlay';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { HeaderProvider } from '@/shared/contexts/HeaderContext';
 
@@ -80,13 +79,6 @@ export default function RootLayout() {
 
     const currentToken = useAuthStore.getState().accessToken;
 
-    console.log('Auth State:', {
-      currentToken,
-      themeHydrated,
-      languageHydrated,
-      authHydrated,
-    });
-
     if (!currentToken) {
       router.replace('/(auth)');
     } else {
@@ -135,55 +127,25 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar
-        style={isDark ? 'light' : 'dark'}
-        translucent={false}
-        backgroundColor={colors.background}
-      />
-
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        {/* Gradient Background */}
-        <LinearGradient
-          colors={[colors.primary + '30', colors.primary + '10', 'transparent']}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-          }}
-          pointerEvents="none"
-        />
-
-        {/* App Content */}
-        <View style={{ flex: 1 }}>
-          <ThemeProvider>
-            <AppProviders>
-              <FilterProvider>
-                <HeaderProvider>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: {
-                        backgroundColor: 'transparent',
-                      },
-                    }}
-                  >
-                    <Stack.Screen name="(auth)" />
-                    <Stack.Screen name="(tabs)" />
-                    <Stack.Screen name="(drawer)" />
-                  </Stack>
-                </HeaderProvider>
-
-                {/* <LoaderOverlay /> */}
-                <Toast position="top" />
-              </FilterProvider>
-            </AppProviders>
-          </ThemeProvider>
-        </View>
-      </View>
+      {/* App Content */}
+      <ThemeProvider>
+        <AppProviders>
+          <FilterProvider>
+            <HeaderProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                }}
+              >
+                <Stack.Screen name="(auth)" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="(drawer)" />
+              </Stack>
+            </HeaderProvider>
+            <Toast position="top" />
+          </FilterProvider>
+        </AppProviders>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

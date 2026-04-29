@@ -1,13 +1,17 @@
-// UnifiedActionModal.tsx (Fixed for Other Work options)
 import React from 'react';
-import { View, TouchableOpacity, Modal, FlatList, ScrollView } from 'react-native';
+import { View, TouchableOpacity, Modal, FlatList, ScrollView, TextInput } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useUnifiedActionModalStyles } from '../../styles/UnifiedActionModal.styles';
 
-export type ModalType = 'van-change' | 'route-selection' | 'activity-change' | 'other-work';
+export type ModalType =
+  | 'van-change'
+  | 'van-selection'
+  | 'route-selection'
+  | 'activity-change'
+  | 'other-work';
 
 export interface UnifiedActionModalProps {
   visible: boolean;
@@ -17,6 +21,15 @@ export interface UnifiedActionModalProps {
   vanChangeReason?: string;
   onSelectVanChangeReason?: (reason: string) => void;
   onVanChangeSubmit?: () => void;
+
+  // Van Selection Modal Props
+  vans?: any[];
+  selectedVan?: any;
+  onSelectVan?: (van: any) => void;
+  vanChangeNote?: string;
+  onChangeVanChangeNote?: (note: string) => void;
+  onVanSelectionSubmit?: () => void;
+  onVanSelectionBack?: () => void;
   
   // Route Selection Modal Props
   routes?: any[];
@@ -45,6 +58,13 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
   vanChangeReason,
   onSelectVanChangeReason,
   onVanChangeSubmit,
+  vans,
+  selectedVan,
+  onSelectVan,
+  vanChangeNote,
+  onChangeVanChangeNote,
+  onVanSelectionSubmit,
+  onVanSelectionBack,
   routes,
   assignedVan,
   onSelectRoute,
@@ -60,6 +80,8 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
 }) => {
   const styles = useUnifiedActionModalStyles();
   const { colors } = useTheme();
+
+  const isVanSelectionValid = Boolean(selectedVan) && Boolean(vanChangeNote?.trim());
 
   const getModalTitle = () => {
     if (isDayStart) {
@@ -181,6 +203,117 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           disabled={!vanChangeReason}
         >
           <AppText style={styles.submitButtonText}>Continue</AppText>
+          <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  const renderVanSelectionModal = () => (
+    <>
+      <View style={styles.modalHeader}>
+        <View>
+          <AppText style={[styles.titleSmall, { color: colors.textPrimary }]}>Select Van</AppText>
+          <AppText style={[styles.routeHeaderSubtitle, { color: colors.textSecondary }]}>
+            Provide a reason and choose a different van
+          </AppText>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.routeCloseButton} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="close" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.reasonContainer}>
+        <AppText style={[styles.reasonLabel, { color: colors.textSecondary }]}>
+          Reason for van change
+        </AppText>
+        <TextInput
+          value={vanChangeNote || ''}
+          onChangeText={(t) => onChangeVanChangeNote?.(t)}
+          placeholder="Type reason..."
+          placeholderTextColor={colors.textTertiary}
+          style={[
+            styles.reasonInput,
+            { borderColor: colors.border, color: colors.textPrimary, backgroundColor: colors.surface },
+          ]}
+          multiline
+        />
+      </View>
+
+      <View style={styles.routeListHeader}>
+        <AppText style={[styles.routeListTitle, { color: colors.textPrimary }]}>Available Vans</AppText>
+        <AppText style={[styles.routeListCount, { color: colors.textTertiary }]}>
+          {vans?.length || 0} vans
+        </AppText>
+      </View>
+
+      <FlatList
+        data={vans}
+        keyExtractor={(item: any) => item.vanId || item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.vanListContainer}
+        renderItem={({ item }: { item: any }) => {
+          const isSelected = selectedVan?.vanId && item?.vanId && selectedVan.vanId === item.vanId;
+          return (
+            <TouchableOpacity
+              onPress={() => onSelectVan?.(item)}
+              style={[styles.vanItem, { borderColor: isSelected ? colors.primary : colors.border }]}
+              activeOpacity={0.7}
+            >
+              <View style={styles.vanItemLeft}>
+                <View style={[styles.vanAvatar, { backgroundColor: colors.primary + '10' }]}>
+                  <MaterialCommunityIcons name="truck" size={18} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <AppText style={[styles.vanName, { color: colors.textPrimary }]} numberOfLines={1}>
+                    {item?.name || item?.vanName || 'Van'}
+                  </AppText>
+                  <AppText style={[styles.vanNumber, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {item?.vanNumber || item?.registrationNumber || ''}
+                  </AppText>
+                </View>
+              </View>
+              {isSelected ? (
+                <MaterialCommunityIcons name="check-circle" size={20} color={colors.primary} />
+              ) : (
+                <MaterialCommunityIcons name="circle-outline" size={20} color={colors.textTertiary} />
+              )}
+            </TouchableOpacity>
+          );
+        }}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyRoutesContainer}>
+            <MaterialCommunityIcons name="truck-alert" size={48} color={colors.textTertiary} />
+            <AppText style={[styles.emptyRoutesText, { color: colors.textSecondary }]}>
+              No vans available
+            </AppText>
+            <AppText style={[styles.emptyRoutesSubtext, { color: colors.textTertiary }]}>
+              Please contact your administrator
+            </AppText>
+          </View>
+        )}
+      />
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          onPress={onVanSelectionBack || onClose}
+          style={[styles.cancelButton, { borderColor: colors.border }]}
+          activeOpacity={0.7}
+        >
+          <AppText style={[styles.cancelButtonText, { color: colors.textSecondary }]}>Back</AppText>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onVanSelectionSubmit}
+          style={[
+            styles.submitButton,
+            { backgroundColor: colors.primary },
+            !isVanSelectionValid && styles.submitButtonDisabled,
+          ]}
+          activeOpacity={0.85}
+          disabled={!isVanSelectionValid}
+        >
+          <AppText style={styles.submitButtonText}>Start Day</AppText>
           <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -473,7 +606,7 @@ const renderRouteSelectionModal = () => (
         renderOtherWorkOptionsList()
       )}
 
-      {showChangeOtherOptions && (
+      {showChangeOtherOptions && modalType == 'activity-change' && (
         <TouchableOpacity onPress={onBackToOptions} style={styles.backButton}>
           <Ionicons name="arrow-back" size={20} color={colors.primary} />
           <AppText style={[styles.backButtonText, { color: colors.primary }]}>
@@ -488,6 +621,8 @@ const renderRouteSelectionModal = () => (
     switch (modalType) {
       case 'van-change':
         return renderVanChangeModal();
+      case 'van-selection':
+        return renderVanSelectionModal();
       case 'route-selection':
         return renderRouteSelectionModal();
       case 'activity-change':

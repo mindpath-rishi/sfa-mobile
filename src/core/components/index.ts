@@ -7,3 +7,6 @@ export { default as AppCard } from './Card/Card';
 export { default as AppCamera } from './Camera/Camera';
 export { SectionHeader } from './SectionHeader/SectionHeader';
 export { ConfirmationModal } from './ConfirmationModal';
+export { SearchBar } from './Searchbar';
+export { Skeleton } from './Skeleton';
+export { Loader } from './Loader'

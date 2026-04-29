@@ -1,16 +1,14 @@
 // DayEndSummaryModal.tsx
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   Animated,
   SafeAreaView,
   ScrollView,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -120,13 +118,11 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
 
   const { opening, received, sold, closing } = data.summary;
 
-  // Stock Movement Stats
   const stockStats = [
     {
       label: 'Opening',
       cases: opening.cases,
       pieces: opening.pieces,
-      items: opening.items,
       value: opening.value,
       color: '#6B7280',
     },
@@ -134,7 +130,6 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       label: 'Topup',
       cases: received.cases,
       pieces: received.pieces,
-      items: received.items,
       value: received.value,
       color: '#3B82F6',
     },
@@ -142,7 +137,6 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       label: 'Sold',
       cases: sold.cases,
       pieces: sold.pieces,
-      items: sold.items,
       value: sold.value,
       color: '#F59E0B',
     },
@@ -150,13 +144,11 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       label: 'Closing',
       cases: closing.cases,
       pieces: closing.pieces,
-      items: closing.items,
       value: closing.value,
       color: '#10B981',
     },
   ];
 
-  // Stats Card Component - Same UI, Different Color
   const StatsCard = ({ title, icon, data: statsData, color }: any) => (
     <View
       style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
@@ -185,23 +177,18 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
     </View>
   );
 
-  // Sold Data
   const soldData = [
     { label: 'Sold Cases', value: sold.cases, icon: 'cube-outline' },
     { label: 'Sold Pieces', value: sold.pieces, icon: 'layers-outline' },
-    { label: 'Sold Items', value: sold.items, icon: 'package' },
     { label: 'Sale Value', value: formatCurrency(sold.value), icon: 'cash' },
     { label: 'Sold Weight', value: `${sold.weight.toFixed(2)} kg`, icon: 'weight-kilogram' },
   ];
 
-  // Closing Data
   const closingData = [
     { label: 'Closing Cases', value: closing.cases, icon: 'cube-outline' },
     { label: 'Closing Pieces', value: closing.pieces, icon: 'layers-outline' },
-    { label: 'Total Items', value: closing.items, icon: 'package' },
     { label: 'Stock Value', value: formatCurrency(closing.value), icon: 'currency-usd' },
     { label: 'Total Weight', value: `${closing.weight.toFixed(2)} kg`, icon: 'weight-kilogram' },
-    { label: 'Products', value: data.products?.length || 0, icon: 'format-list-bulleted' },
   ];
 
   return (
@@ -221,7 +208,6 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       style={styles.modalContainer}
     >
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Tab Bar */}
         <View style={[styles.tabBar, { borderBottomColor: colors.divider }]}>
           <TouchableOpacity
             style={[styles.tab, activeTab === 'overview' && styles.tabActive]}
@@ -267,7 +253,6 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
             contentContainerStyle={styles.scrollContent}
           >
             <Animated.View style={{ opacity: fadeAnim }}>
-              {/* Stock Movement Card */}
               <View
                 style={[
                   styles.card,
@@ -281,16 +266,12 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                   </AppText>
                 </View>
 
-                {/* Header Row */}
                 <View style={styles.financialHeader}>
                   <AppText style={[styles.financialHeaderLabel, { color: colors.textSecondary }]}>
                     Type
                   </AppText>
                   <AppText style={[styles.financialHeaderStock, { color: colors.textSecondary }]}>
                     Stock
-                  </AppText>
-                  <AppText style={[styles.financialHeaderItems, { color: colors.textSecondary }]}>
-                    Items
                   </AppText>
                   <AppText style={[styles.financialHeaderValue, { color: colors.textSecondary }]}>
                     Value
@@ -314,9 +295,6 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     <AppText style={[styles.financialStockText, { color: stat.color }]}>
                       {formatStock(stat.cases, stat.pieces)}
                     </AppText>
-                    <AppText style={[styles.financialItemsText, { color: stat.color }]}>
-                      {stat.items}
-                    </AppText>
                     <AppText style={[styles.financialValueText, { color: stat.color }]}>
                       {stat.value > 0 ? formatCurrency(stat.value) : '-'}
                     </AppText>
@@ -324,20 +302,11 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                 ))}
               </View>
 
-              {/* Sold Card - Orange Theme */}
               <StatsCard title="Sold Details" icon="trending-up" data={soldData} color="#F59E0B" />
-
-              {/* Closing Card - Green Theme */}
-              <StatsCard
-                title="Closing Stock"
-                icon="package-variant"
-                data={closingData}
-                color="#10B981"
-              />
+              <StatsCard title="Closing Stock" icon="package-variant" data={closingData} color="#10B981" />
             </Animated.View>
           </ScrollView>
         ) : (
-          /* Products Tab */
           <FlatList
             data={data.products}
             keyExtractor={(item) => item.productId}
@@ -403,9 +372,6 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     <AppText style={[styles.productStatValue, { color: '#F59E0B' }]}>
                       {formatStock(item.outCases, item.outPieces)}
                     </AppText>
-                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
-                      {item.soldItems} items
-                    </AppText>
                   </View>
                   <View style={styles.productStat}>
                     <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
@@ -457,7 +423,6 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
           />
         )}
 
-        {/* Footer Buttons */}
         <View style={[styles.footer, { borderTopColor: colors.divider }]}>
           <TouchableOpacity
             onPress={onClose}

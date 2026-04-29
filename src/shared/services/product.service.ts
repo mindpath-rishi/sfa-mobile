@@ -7,7 +7,7 @@ export interface FetchProductParams {
   limit: number;
   page: number;
   searchText?: string;
-  category?: string;
+  categoryIds?: string;
   brandId?: string;
 }
 

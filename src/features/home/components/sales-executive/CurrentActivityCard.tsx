@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CurrentActivityCardProps } from '../../types/activity.types';
 import { useCurrentActivityCardStyles } from '../../styles/CurrentActivityCard.styles';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppButton, AppText } from '@/core/components';
+import { AppText } from '@/core/components';
 
 // Helper function to format elapsed time
 const formatElapsedTime = (
@@ -43,8 +43,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
   otherWorkStartTime,
   selectedRoute,
   assignedVan,
-  onPressChange,
-  onPressEnd,
 }) => {
   const styles = useCurrentActivityCardStyles({ selectedActivity });
   const { colors } = useTheme();
@@ -201,30 +199,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
             </AppText>
           </View>
         )}
-      </View>
-      {/* Action Buttons - Compact Horizontal */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          gap: 12, // Better than margin between buttons
-        }}
-      >
-        <AppButton
-          size="small"
-          variant="outline" // Assuming your AppButton supports this
-          leftIcon={<Ionicons name="sync-outline" size={16} color={colors.primary} />}
-          title="Change"
-          onPress={onPressChange}
-          style={{ flex: 1 }} // Equal width distribution
-        />
-        <AppButton
-          size="small"
-          leftIcon={<Ionicons name="exit-outline" size={16} color="#fff" />}
-          title="End Day"
-          onPress={onPressEnd}
-          style={{ flex: 1 }}
-        />
       </View>
     </View>
   );
