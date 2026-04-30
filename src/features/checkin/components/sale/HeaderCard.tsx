@@ -195,7 +195,7 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
         <StatPill value={totals.totalSkus} label="SKU" highlight={totals.totalSkus > 0} />
         <StatPill value={totals.totalCases} label="CASES" highlight={totals.totalCases > 0} />
         <StatPill value={totals.totalPieces} label="PIECES" highlight={totals.totalPieces > 0} />
-        <StatPill value={totals.totalItems} label="ITEMS" highlight={totals.totalItems > 0} />
+        {/* <StatPill value={totals.totalItems} label="ITEMS" highlight={totals.totalItems > 0} /> */}
       </View>
     </View>
   );

@@ -18,7 +18,7 @@ export const MOCK_DATA = {
 export const QUICK_ACTIONS: QuickAction[] = [
   { icon: 'cart', label: 'Retailing', color: '#4158D0', route: '/retailing' },
   { icon: 'briefcase', label: 'Other Work', color: '#C850C0', route: '/other-work' },
-  { icon: 'calendar', label: 'Leaves', color: '#FF512F', route: '/leaves' },
+  // { icon: 'calendar', label: 'Leaves', color: '#FF512F', route: '/leaves' },
 ];
 
 export const ACTIVITY_TYPES: ActivityType[] = [

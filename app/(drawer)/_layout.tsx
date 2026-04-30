@@ -124,7 +124,10 @@ const CustomDrawerContent = (props: any) => {
         return;
       }
 
-      const res: any = await vanService.fetchTodayStockSummary({ vanId: vanIdToUse });
+      const res: any = await vanService.fetchTodayStockSummary({
+        vanId: vanIdToUse,
+        workSessionId: useRouteStore.getState().selectedRoute?.workSessionId,
+      });
       setDayEndSummary(res?.data);
       setShowDayEndSummary(true);
     } catch (error) {

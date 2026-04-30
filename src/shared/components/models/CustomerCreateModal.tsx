@@ -233,29 +233,29 @@ const FORM_SECTIONS: FormSection[] = [
       },
     ],
   },
-  {
-    title: 'Credit Terms',
-    description: 'Configure credit limit and payment terms',
-    icon: 'card',
-    fields: [
-      {
-        key: 'creditLimit',
-        label: 'Credit Limit (ZMW)',
-        type: 'number',
-        icon: 'card-outline',
-        placeholder: '0.00',
-        required: false,
-      },
-      {
-        key: 'creditDays',
-        label: 'Credit Days',
-        type: 'number',
-        icon: 'calendar-outline',
-        placeholder: '30',
-        required: false,
-      },
-    ],
-  },
+  // {
+  //   title: 'Credit Terms',
+  //   description: 'Configure credit limit and payment terms',
+  //   icon: 'card',
+  //   fields: [
+  //     {
+  //       key: 'creditLimit',
+  //       label: 'Credit Limit (ZMW)',
+  //       type: 'number',
+  //       icon: 'card-outline',
+  //       placeholder: '0.00',
+  //       required: false,
+  //     },
+  //     {
+  //       key: 'creditDays',
+  //       label: 'Credit Days',
+  //       type: 'number',
+  //       icon: 'calendar-outline',
+  //       placeholder: '30',
+  //       required: false,
+  //     },
+  //   ],
+  // },
 ];
 
 const dropdownOptions = {
@@ -265,8 +265,8 @@ const dropdownOptions = {
     { id: 'CAT003', name: 'Distributor' },
   ],
   channelId: [
-    { id: 'CH001', name: 'Direct' },
-    { id: 'CH002', name: 'Indirect' },
+    { id: 'CH001', name: 'Pre Sale' },
+    { id: 'CH002', name: 'Retail' },
   ],
   customerTypeId: [
     { id: 'TYPE001', name: 'Regular' },
@@ -326,10 +326,10 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     phoneNumber: '',
     address: { line1: '', line2: '' },
     customerCategoryId: '',
-    channelId: '',
+    channelId: 'CH002',
     customerTypeId: '',
     marketId: '',
-    provinceId: '',
+    provinceId: 'PROV001',
     segmentation: '',
     creditLimit: 0,
     creditDays: 0,
@@ -390,10 +390,10 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   };
 
   const handleSubmit = () => {
-    if (validateCurrentSection()) {
-      Keyboard.dismiss();
-      onSubmit(formData, capturedPhoto || undefined);
-    }
+    // if (validateCurrentSection()) {
+    Keyboard.dismiss();
+    onSubmit(formData, capturedPhoto || undefined);
+    // }
   };
 
   const updateField = (key: string, value: any) => {
@@ -465,10 +465,10 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       phoneNumber: '',
       address: { line1: '', line2: '' },
       customerCategoryId: '',
-      channelId: '',
+      channelId: 'CH002',
       customerTypeId: '',
       marketId: '',
-      provinceId: '',
+      provinceId: 'PROV001',
       segmentation: '',
       creditLimit: 0,
       creditDays: 0,

@@ -7,273 +7,583 @@ export const useOutletDetailStyles = () => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
-// Add/update these styles in your useOutletDetailStyles.ts
+    // Updated styles for Summary Tab - Add/replace these in your styles object
 
-// Consistent card styling for all tabs
-saleCard: {
-  backgroundColor: colors.surface,
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-  borderWidth: 1,
-  borderColor: colors.divider,
-  ...Platform.select({
-    ios: {
-      shadowColor: colors.shadow,
+    summaryContainer: {
+      padding: 16,
+      gap: 16,
+    },
+
+    salesSectionCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      padding: 16,
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.05,
-      shadowRadius: 4,
+      shadowRadius: 8,
+      elevation: 2,
+      borderWidth: 1,
+      borderColor: '#F0F0F0',
     },
-    android: {
-      elevation: 1,
+
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: '#F0F0F0',
     },
-  }),
-},
-visitCard: {
-  backgroundColor: colors.surface,
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-  borderWidth: 1,
-  borderColor: colors.divider,
-  ...Platform.select({
-    ios: {
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
+
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#1A1A1A',
+      flex: 1,
     },
-    android: {
-      elevation: 1,
+
+    statsGrid: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 16,
     },
-  }),
-},
-invoiceCard: {
-  backgroundColor: colors.surface,
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 12,
-  borderWidth: 1,
-  borderColor: colors.divider,
-  ...Platform.select({
-    ios: {
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 4,
+
+    statCard: {
+      flex: 1,
+      backgroundColor: '#F8F9FA',
+      borderRadius: 12,
+      padding: 12,
+      alignItems: 'center',
+      gap: 8,
     },
-    android: {
-      elevation: 1,
+
+    statValue: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: '#1A1A1A',
+      textAlign: 'center',
     },
-  }),
-},
-salesSectionCard: {
-  backgroundColor: colors.surface,
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 16,
-  borderWidth: 1,
-  borderColor: colors.divider,
-},
-actionButtonsContainer: {
-  flexDirection: 'row',
-  gap: 12,
-  paddingHorizontal: 16,
-  paddingVertical: 12,
-  backgroundColor: colors.background,
-},
-actionButton: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  paddingVertical: 12,
-  borderRadius: 12,
-  ...Platform.select({
-    ios: {
-      shadowColor: colors.shadow,
+
+    statLabel: {
+      fontSize: 12,
+      color: '#6C757D',
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+
+    statTrend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 4,
+    },
+
+    statTrendText: {
+      fontSize: 10,
+      fontWeight: '500',
+    },
+
+    statsDivider: {
+      height: 1,
+      backgroundColor: '#F0F0F0',
+      marginVertical: 16,
+    },
+
+    statsSubtitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#6C757D',
+      marginBottom: 12,
+      letterSpacing: 0.5,
+    },
+
+    statsGridSmall: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+
+    statCardSmall: {
+      flex: 1,
+      backgroundColor: '#F8F9FA',
+      borderRadius: 12,
+      padding: 12,
+      alignItems: 'center',
+      gap: 6,
+    },
+
+    statValueSmall: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: '#1A1A1A',
+      textAlign: 'center',
+    },
+
+    statLabelSmall: {
+      fontSize: 11,
+      color: '#6C757D',
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+
+    // Insights Card
+    insightsCard: {
+      backgroundColor: '#F8F9FA',
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: '#E9ECEF',
+    },
+
+    insightsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 12,
+    },
+
+    insightsTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: '#1A1A1A',
+    },
+
+    insightItem: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      marginBottom: 10,
+      paddingVertical: 4,
+    },
+
+    insightDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: '#4CAF50',
+      marginTop: 6,
+    },
+
+    insightText: {
+      flex: 1,
+      fontSize: 12,
+      color: '#495057',
+      lineHeight: 18,
+    },
+
+    // Update existing tabContent to have proper spacing
+    tabContent: {
+      flex: 1,
+    },
+
+    tabContentContainer: {
+      paddingBottom: 20,
+    },
+
+    // Loading text style
+    loadingText: {
+      marginTop: 12,
+      fontSize: 14,
+      color: '#6C757D',
+    },
+
+    // Empty state styles
+    emptyTabContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 48,
+      gap: 12,
+    },
+
+    emptyTabTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#1A1A1A',
+      marginTop: 8,
+    },
+
+    emptyTabText: {
+      fontSize: 14,
+      color: '#6C757D',
+      textAlign: 'center',
+    },
+
+    // Last Visit/Order Container
+    lastInfoContainer: {
+      paddingHorizontal: 16,
+      marginTop: -8,
+      marginBottom: 12,
+    },
+    lastInfoCard: {
+      flexDirection: 'row',
+      backgroundColor: '#F8F9FA',
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: '#E9ECEF',
+    },
+    lastInfoItem: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    lastInfoDivider: {
+      width: 1,
+      backgroundColor: '#E9ECEF',
+      marginHorizontal: 12,
+    },
+    lastInfoLabel: {
+      fontSize: 12,
+      color: '#6C757D',
+    },
+    lastInfoValue: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#212529',
+    },
+
+    // Full Width Button Styles
+    fullWidthButtonContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+      paddingTop: 8,
+    },
+    fullWidthButton: {
+      borderRadius: 12,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 4,
+      elevation: 3,
     },
-    android: {
-      elevation: 2,
+    fullWidthButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
-  }),
-},
-actionButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#FFF',
-},
-summaryContainer: {
-  padding: 16,
-  paddingBottom: 24,
-},
-salesSectionCard: {
-  backgroundColor: colors.surface,
-  borderRadius: 12,
-  padding: 16,
-  marginBottom: 16,
-  borderWidth: 1,
-  borderColor: colors.divider,
-},
-salesSectionTitle: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: colors.textPrimary,
-  marginBottom: 16,
-},
-statsRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 20,
-},
-statBox: {
-  flex: 1,
-  alignItems: 'center',
-},
-statValue: {
-  fontSize: 24,
-  fontWeight: 'bold',
-  color: colors.textPrimary,
-  marginBottom: 4,
-},
-statLabel: {
-  fontSize: 11,
-  fontWeight: '500',
-  color: colors.textSecondary,
-  letterSpacing: 0.5,
-},
-statSubLabel: {
-  fontSize: 9,
-  color: colors.textTertiary,
-  marginTop: 2,
-},
-statDivider: {
-  width: 1,
-  height: 50,
-  backgroundColor: colors.divider,
-},
-statsRowSmall: {
-  flexDirection: 'row',
-  gap: 12,
-},
-statBoxSmall: {
-  flex: 1,
-  alignItems: 'center',
-  backgroundColor: colors.background,
-  borderRadius: 8,
-  padding: 10,
-},
-statValueSmall: {
-  fontSize: 16,
-  fontWeight: 'bold',
-  color: colors.textPrimary,
-  marginBottom: 4,
-},
-statLabelSmall: {
-  fontSize: 9,
-  fontWeight: '500',
-  color: colors.textSecondary,
-  textAlign: 'center',
-  letterSpacing: 0.3,
-},
-statSubLabelSmall: {
-  fontSize: 8,
-  color: colors.textTertiary,
-  textAlign: 'center',
-  marginTop: 2,
-},
-vanSalesFooter: {
-  marginTop: 8,
-  paddingVertical: 16,
-  alignItems: 'center',
-  borderTopWidth: 1,
-  borderTopColor: colors.divider,
-},
-vanSalesText: {
-  fontSize: 12,
-  fontWeight: '600',
-  color: colors.textSecondary,
-  letterSpacing: 1,
-},
-welcomeCard: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  backgroundColor: colors.primary + '10',
-  borderRadius: 16,
-  padding: 16,
-  marginBottom: 16,
-},
-welcomeTitle: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  color: colors.textPrimary,
-},
-welcomeSubtitle: {
-  fontSize: 12,
-  color: colors.textSecondary,
-  marginTop: 4,
-},
-welcomeIcon: {
-  width: 48,
-  height: 48,
-  borderRadius: 24,
-  backgroundColor: colors.surface,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-sectionHeaderRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginBottom: 16,
-  gap: 8,
-},
-sectionIconBadge: {
-  width: 32,
-  height: 32,
-  borderRadius: 16,
-  backgroundColor: colors.primary + '15',
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-statPeriodSmall: {
-  fontSize: 9,
-  color: colors.textTertiary,
-  marginTop: 2,
-},
-quickStatsFooter: {
-  flexDirection: 'row',
-  backgroundColor: colors.surface,
-  borderRadius: 16,
-  padding: 16,
-  marginTop: 8,
-  marginBottom: 16,
-  borderWidth: 1,
-  borderColor: colors.divider,
-},
-quickStatItem: {
-  flex: 1,
-  alignItems: 'center',
-  gap: 4,
-},
-quickStatLabel: {
-  fontSize: 11,
-  color: colors.textSecondary,
-},
-quickStatValue: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  color: colors.textPrimary,
-},
-quickStatDivider: {
-  width: 1,
-  height: 40,
-  backgroundColor: colors.divider,
-},
+    fullWidthButtonTextContainer: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    fullWidthButtonTitle: {
+      color: '#FFF',
+      fontSize: 16,
+      fontWeight: 'bold',
+    },
+    fullWidthButtonSubtitle: {
+      color: '#FFF',
+      fontSize: 12,
+      opacity: 0.9,
+      marginTop: 2,
+    },
+    fullWidthAutoStartIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      borderRadius: 12,
+      gap: 12,
+    },
+    autoStartText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    proceedButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      marginBottom: 10,
+      backgroundColor: colors.primary,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.25,
+          shadowRadius: 12,
+        },
+        android: {
+          elevation: 6,
+        },
+      }),
+    },
+    proceedButtonContent: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    proceedButtonTitle: {
+      color: '#FFF',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    proceedButtonSubtitle: {
+      color: '#FFF',
+      fontSize: 11,
+      opacity: 0.9,
+      marginTop: 1,
+    },
+    autoStartIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      borderRadius: 12,
+      gap: 12,
+    },
+    autoStartText: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    saleCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.1,
+          shadowRadius: 6,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
+    },
+    visitCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.1,
+          shadowRadius: 6,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
+    },
+    invoiceCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.1,
+          shadowRadius: 6,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
+    },
+    salesSectionCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.divider,
+    },
+    summaryContainer: {
+      padding: 16,
+      paddingBottom: 24,
+    },
+    salesSectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginBottom: 16,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    statBox: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statValue: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    statLabel: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      letterSpacing: 0.5,
+    },
+    statSubLabel: {
+      fontSize: 9,
+      color: colors.textTertiary,
+      marginTop: 2,
+    },
+    statDivider: {
+      width: 1,
+      height: 50,
+      backgroundColor: colors.divider,
+    },
+    statsRowSmall: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    statBoxSmall: {
+      flex: 1,
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      padding: 10,
+    },
+    statValueSmall: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    statLabelSmall: {
+      fontSize: 9,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      textAlign: 'center',
+      letterSpacing: 0.3,
+    },
+    statSubLabelSmall: {
+      fontSize: 8,
+      color: colors.textTertiary,
+      textAlign: 'center',
+      marginTop: 2,
+    },
+    vanSalesFooter: {
+      marginTop: 8,
+      paddingVertical: 16,
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    },
+    vanSalesText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      letterSpacing: 1,
+    },
+    welcomeCard: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.primary + '12',
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1.5,
+      borderColor: colors.primary + '20',
+    },
+    welcomeTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+    },
+    welcomeSubtitle: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    welcomeIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sectionHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+      gap: 8,
+    },
+    sectionIconBadge: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.primary + '20',
+      borderWidth: 1,
+      borderColor: colors.primary + '30',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    statPeriodSmall: {
+      fontSize: 9,
+      color: colors.textTertiary,
+      marginTop: 2,
+    },
+    quickStatsFooter: {
+      flexDirection: 'row',
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginTop: 8,
+      marginBottom: 16,
+      borderWidth: 1.5,
+      borderColor: colors.primary + '15',
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
+    },
+    quickStatItem: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 4,
+    },
+    quickStatLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+    quickStatValue: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+    },
+    quickStatDivider: {
+      width: 1,
+      height: 40,
+      backgroundColor: colors.divider,
+    },
     detailDatesRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -314,14 +624,6 @@ quickStatDivider: {
       fontWeight: '500',
     },
     // Sales Tab Styles
-    saleCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: colors.divider,
-    },
     saleCardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -367,14 +669,6 @@ quickStatDivider: {
       fontWeight: '500',
     },
     // Visits Tab Styles
-    visitCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: colors.divider,
-    },
     visitCardHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -520,17 +814,17 @@ quickStatDivider: {
       backgroundColor: colors.surface,
       borderRadius: utils.borderRadius.xl,
       padding: utils.spacing[4],
-      borderWidth: 1,
-      borderColor: colors.primary + '14',
+      borderWidth: 1.5,
+      borderColor: colors.primary + '20',
       ...Platform.select({
         ios: {
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.08,
-          shadowRadius: 18,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: 0.1,
+          shadowRadius: 20,
         },
         android: {
-          elevation: 3,
+          elevation: 4,
         },
       }),
     } as ViewStyle,
@@ -1098,9 +1392,9 @@ quickStatDivider: {
     // ────────────────────────────────────────────────────────────────────────────
     actionButtonsContainer: {
       flexDirection: 'row',
-      gap: utils.spacing[2],
+      gap: utils.spacing[1.5],
       paddingHorizontal: utils.spacing[4],
-      marginBottom: utils.spacing[4],
+      marginBottom: utils.spacing[3],
     } as ViewStyle,
 
     actionButton: {
@@ -1108,9 +1402,9 @@ quickStatDivider: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: utils.spacing[2],
-      paddingVertical: utils.spacing[3],
-      borderRadius: utils.borderRadius.full,
+      gap: utils.spacing[1.5],
+      paddingVertical: utils.spacing[2.5],
+      borderRadius: utils.borderRadius.lg,
       ...Platform.select({
         ios: {
           shadowColor: colors.primary,
@@ -1134,9 +1428,9 @@ quickStatDivider: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: utils.spacing[2],
-      paddingVertical: utils.spacing[3],
-      borderRadius: utils.borderRadius.full,
+      gap: utils.spacing[1.5],
+      paddingVertical: utils.spacing[2.5],
+      borderRadius: utils.borderRadius.lg,
       borderWidth: 1,
       backgroundColor: colors.surface,
     } as ViewStyle,
@@ -1514,10 +1808,21 @@ quickStatDivider: {
       marginVertical: utils.spacing[2],
     } as TextStyle,
     emptyStateButton: {
-      paddingHorizontal: utils.spacing[6],
-      paddingVertical: utils.spacing[3],
+      paddingHorizontal: utils.spacing[5],
+      paddingVertical: utils.spacing[2.5],
       backgroundColor: colors.primary,
       borderRadius: utils.borderRadius.lg,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: 4,
+        },
+      }),
     } as ViewStyle,
     emptyStateButtonText: {
       color: 'white',
@@ -1558,9 +1863,9 @@ quickStatDivider: {
     } as TextStyle,
 
     emptyStateButtonNew: {
-      marginTop: utils.spacing[4],
-      paddingHorizontal: utils.spacing[5],
-      paddingVertical: utils.spacing[3],
+      marginTop: utils.spacing[3],
+      paddingHorizontal: utils.spacing[4],
+      paddingVertical: utils.spacing[2.5],
       backgroundColor: colors.primary + '10',
       borderRadius: utils.borderRadius.full,
     } as ViewStyle,
@@ -1601,6 +1906,17 @@ quickStatDivider: {
       marginBottom: utils.spacing[3],
       borderWidth: 1,
       borderColor: colors.divider,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
     } as ViewStyle,
     transactionHeader: {
       flexDirection: 'row',
@@ -1665,6 +1981,17 @@ quickStatDivider: {
       marginBottom: utils.spacing[3],
       borderWidth: 1,
       borderColor: colors.border + '24',
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.1,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
     } as ViewStyle,
     contactAvatar: {
       width: 48,
@@ -1830,10 +2157,6 @@ quickStatDivider: {
     // List Header
     // ────────────────────────────────────────────────────────────────────────────
 
-    // Add to your styles object
-    summaryContainer: {
-      padding: 16,
-    },
     curatedSection: {
       marginBottom: 20,
     },
@@ -1863,15 +2186,7 @@ quickStatDivider: {
       color: colors.primary,
       fontWeight: '500',
     },
-   
-    invoiceCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: colors.divider,
-    },
+
     invoiceCardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -2343,6 +2658,17 @@ quickStatDivider: {
       alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.divider,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 4,
+        },
+        android: {
+          elevation: 1,
+        },
+      }),
     } as ViewStyle,
 
     financialLabel: {
@@ -2415,49 +2741,43 @@ quickStatDivider: {
     } as ViewStyle,
     // Add to your styles in useOutletDetailStyles.ts
 
-// Footer Buttons
-footerButtons: {
-  flexDirection: 'row',
-  gap: 12,
-  paddingHorizontal: 16,
-  paddingVertical: 12,
-  backgroundColor: colors.background,
-  borderTopWidth: 1,
-  borderTopColor: colors.divider,
-} as ViewStyle,
-footerButton: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 8,
-  paddingVertical: 12,
-  borderRadius: 12,
-  ...Platform.select({
-    ios: {
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    },
-    android: {
-      elevation: 2,
-    },
-  }),
-} as ViewStyle,
-footerButtonText: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: '#FFF',
-} as TextStyle,
-
-// Consistent section title
-sectionTitle: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: colors.textPrimary,
-  marginBottom: 16,
-} as TextStyle,
+    // Footer Buttons
+    footerButtons: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      paddingBottom: 12,
+      backgroundColor: colors.background,
+      borderTopWidth: 1.5,
+      borderTopColor: colors.divider,
+    } as ViewStyle,
+    footerButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      borderRadius: 10,
+      backgroundColor: colors.primary,
+      ...Platform.select({
+        ios: {
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: 4,
+        },
+      }),
+    } as ViewStyle,
+    footerButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#FFF',
+    } as TextStyle,
   }));
 
   return styleGenerator(colors);

@@ -48,7 +48,7 @@ export default function InvoiceSharingScreen() {
     // Step 2: then push detail screen
     setTimeout(() => {
       // router.push(`/outlets/${customerId}/visit`);
-      router.push(`/route/${customerId}`);
+      router.push(`/route`);
     }, 0);
   };
 
@@ -550,10 +550,10 @@ export default function InvoiceSharingScreen() {
           <AppCard variant="elevated" padding="md" style={styles.submenuCard}>
             <Text style={styles.submenuTitle}>Share PDF via</Text>
 
-            <TouchableOpacity style={styles.submenuItem} onPress={sharePDF}>
+            {/* <TouchableOpacity style={styles.submenuItem} onPress={sharePDF}>
               <Ionicons name="share-social" size={24} color={colors.primary} />
               <Text style={styles.submenuText}>Any App</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             <TouchableOpacity style={styles.submenuItem} onPress={sharePDF}>
               <Ionicons name="logo-whatsapp" size={24} color="#25D366" />

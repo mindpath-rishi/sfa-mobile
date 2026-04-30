@@ -1184,26 +1184,22 @@ export default function SalesExecutiveScreen() {
     setUnifiedModalVisible(true);
   };
 
-  const fetchAvailableVans = async () => {
-    try {
-      const response: any = await homeService.getVans({ limit: 50, page: 1 });
+const fetchAvailableVans = async () => {
+  try {
+    const response: any = await homeService.getVans({ limit: 50, page: 1 });
 
-      if (response?.statusCode === 200) {
-        const list = Array.isArray(response?.data)
-          ? response.data
-          : Array.isArray(response?.data?.data)
-            ? response.data.data
-            : Array.isArray(response?.data?.items)
-              ? response.data.items
-              : [];
+    if (response?.statusCode === 200) {
+      const data = response?.data || [];
 
-        setAvailableVans(list);
-      }
-    } catch (error) {
-      console.error('Error fetching vans:', error);
-      toast.error('Failed to fetch van list. Please try again.');
+      const list = data.filter((v: any) => v.vanId !== van?.vanId);
+
+      setAvailableVans(list);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching vans:', error);
+    toast.error('Failed to fetch van list. Please try again.');
+  }
+};
 
   const handleVanSelectionSubmit = () => {
     if (!selectedVanForChange || !vanChangeNote.trim()) {
@@ -1237,10 +1233,10 @@ export default function SalesExecutiveScreen() {
 
   const handleChangeActivity = (activity: ActivityType) => {
     if (activity.name === 'Other Work') {
-      if (activeVisit) {
-        toast.error('To Change activity, Please complete active visit.');
-        return;
-      }
+      // if (activeVisit) {
+      //   toast.error('To Change activity, Please complete active visit.');
+      //   return;
+      // }
       setSelectedRoute(null);
       setShowChangeOtherOptions(true);
       setUnifiedModalType('other-work');
@@ -1353,11 +1349,15 @@ export default function SalesExecutiveScreen() {
           : `Started ${pendingActivity?.name}`,
       totalShops: selectedRoute?.totalShops,
       routeName: selectedRoute?.name,
-      vanId: mappedVan?.vanId || van?.vanId,
-      vanChangeReason: isVanChangePending ? 'No, Change Van' : undefined,
-      vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
+      vanId: van?.vanId,
+      // vanChangeReason: isVanChangePending ? 'No, Change Van' : undefined,
+      // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
       requestedVanId: isVanChangePending ? selectedVanForChange?.vanId : undefined,
     };
+
+    if(payload?.requestedVanId) return
+
+
 
     console.log('Day Start Payload:', payload);
 
@@ -1367,16 +1367,18 @@ export default function SalesExecutiveScreen() {
       if (response?.statusCode === 201) {
         getDayStatus();
         if (isVanChangePending) {
-          setVanChangeRequestPending(false);
+          setVanChangeRequestPending(true);
+          setUnifiedModalType('route-selection');
+          setUnifiedModalVisible(true)
           toast.success('Day started. Van change request pending approval.');
         } else {
           toast.success('Your day successfully started.');
         }
 
         // If starting Retailing with selected route (same van flow), navigate to route outlets list
-        if (selectedActivity === 'Retailing' && selectedRoute && !isVanChangePending) {
-          router.replace('/route');
-        }
+        // if (selectedActivity === 'Retailing' && selectedRoute && !isVanChangePending) {
+        //   router.replace('/route');
+        // }
       }
     } catch (error) {
       console.error('Error starting day:', error);
@@ -1469,8 +1471,8 @@ export default function SalesExecutiveScreen() {
   };
 
   const fetchDayEndSummary = async () => {
-    console.log('Selected Route at Day End:', van);
-    const res: any = await vanService.fetchTodayStockSummary({ vanId: van?.vanId });
+    console.log('Selected Route at Day End:', selectedRoute);
+    const res: any = await vanService.fetchTodayStockSummary({ vanId: van?.vanId, workSessionId: selectedRoute?.workSessionId });
     console.log('Stock Summary before day end:', res);
     setDayEndSummary(res?.data);
   };
@@ -1571,7 +1573,8 @@ export default function SalesExecutiveScreen() {
 
   const getVan = async () => {
     try {
-      const response: any = await homeService.getVan();
+      const userId = useAuthStore.getState().user?.userId
+      const response: any = await homeService.getVan(userId);
 
       if (response.statusCode === 200) {
         const van = response?.data?.[0] || null;

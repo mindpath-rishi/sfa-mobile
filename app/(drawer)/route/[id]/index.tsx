@@ -5,19 +5,18 @@ import { useOutletStore } from '@/core/store/outlet.store';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 export default function CustomerDetailRoute() {
-    const { setHeader } = useHeader();
-    const activeOutlet = useOutletStore.getState().selectedOutlet;
-    const { colors } = useTheme();
+  const { setHeader } = useHeader();
+  const activeOutlet = useOutletStore.getState().selectedOutlet;
+  const { colors } = useTheme();
 
-    useEffect(() => {
-      setHeader({
-        title: activeOutlet?.name,
-        showBack: true,
-        showMenu: false,
-        backgroundColor: colors.primary 
-      });
-    }, [setHeader]);
+  // useEffect(() => {
+  //   setHeader({
+  //     title: activeOutlet?.name,
+  //     showBack: true,
+  //     showMenu: false,
+  //     backgroundColor: colors.primary
+  //   });
+  // }, [setHeader]);
 
-    return <CustomerDetailScreen />;
-  }
-
+  return <CustomerDetailScreen />;
+}

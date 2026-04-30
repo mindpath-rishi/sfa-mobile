@@ -184,10 +184,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
 
         // Apply quick filter logic
         let extraParams: any = {};
-        if (quickFilter === 'focused') {
-          // Add focused pack logic here (e.g., specific category or tag)
-          // For example: extraParams.tags = ['focused'];
-        }
 
         const params = mapFiltersToParams(
           {
@@ -198,6 +194,10 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           page,
           PAGE_SIZE,
         );
+
+        if (quickFilter === 'focused') {
+          params['isFocusedPack'] = 'Y';
+        }
 
         const response = await productService.fetchProducts({ ...params, ...extraParams });
 
@@ -241,15 +241,18 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   /**
    * Handle category selection
    */
-  const handleCategorySelect = useCallback((category: any) => {
-    if (selectedCategory?.categoryId === category.categoryId) {
-      setSelectedCategory(null);
-      setFilters(prev => ({ ...prev, categories: [] }));
-    } else {
-      setSelectedCategory(category);
-      setFilters(prev => ({ ...prev, categories: [] }));
-    }
-  }, [selectedCategory]);
+  const handleCategorySelect = useCallback(
+    (category: any) => {
+      if (selectedCategory?.categoryId === category.categoryId) {
+        setSelectedCategory(null);
+        setFilters((prev) => ({ ...prev, categories: [] }));
+      } else {
+        setSelectedCategory(category);
+        setFilters((prev) => ({ ...prev, categories: [] }));
+      }
+    },
+    [selectedCategory],
+  );
 
   /**
    * Handle quick filter change
@@ -418,10 +421,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         contentContainerStyle={styles.quickFiltersContent}
       >
         <TouchableOpacity
-          style={[
-            styles.quickFilterChip,
-            quickFilter === 'all' && styles.quickFilterChipActive,
-          ]}
+          style={[styles.quickFilterChip, quickFilter === 'all' && styles.quickFilterChipActive]}
           onPress={() => handleQuickFilterChange('all')}
           activeOpacity={0.7}
         >
@@ -431,10 +431,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
             color={quickFilter === 'all' ? colors.primary : colors.textSecondary}
           />
           <AppText
-            style={[
-              styles.quickFilterText,
-              quickFilter === 'all' && styles.quickFilterTextActive,
-            ]}
+            style={[styles.quickFilterText, quickFilter === 'all' && styles.quickFilterTextActive]}
           >
             All
           </AppText>
@@ -486,14 +483,18 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           }}
           activeOpacity={0.7}
         >
-          <View style={[
-            styles.categoryItemAvatar,
-            !selectedCategory && quickFilter === 'all' && styles.categoryItemAvatarActive
-          ]}>
-            <Ionicons 
-              name="grid-outline" 
-              size={16} 
-              color={!selectedCategory && quickFilter === 'all' ? colors.primary : colors.textSecondary} 
+          <View
+            style={[
+              styles.categoryItemAvatar,
+              !selectedCategory && quickFilter === 'all' && styles.categoryItemAvatarActive,
+            ]}
+          >
+            <Ionicons
+              name="grid-outline"
+              size={16}
+              color={
+                !selectedCategory && quickFilter === 'all' ? colors.primary : colors.textSecondary
+              }
             />
           </View>
           <View style={styles.categoryItemInfo}>
@@ -506,9 +507,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
             >
               All
             </AppText>
-            <AppText style={styles.categoryItemCount}>
-              {totalCount}
-            </AppText>
+            <AppText style={styles.categoryItemCount}>{totalCount}</AppText>
           </View>
           {!selectedCategory && quickFilter === 'all' && (
             <View style={[styles.categoryItemIndicator, { backgroundColor: colors.primary }]} />
@@ -519,34 +518,29 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         {categoriesList.map((category) => {
           const isActive = selectedCategory?.categoryId === category.categoryId;
           const initials = getInitials(category.name);
-          
+
           return (
             <TouchableOpacity
               key={category.categoryId}
-              style={[
-                styles.categoryItem,
-                isActive && styles.categoryItemActive,
-              ]}
+              style={[styles.categoryItem, isActive && styles.categoryItemActive]}
               onPress={() => handleCategorySelect(category)}
               activeOpacity={0.7}
             >
-              <View style={[
-                styles.categoryItemAvatar,
-                isActive && styles.categoryItemAvatarActive
-              ]}>
-                <AppText style={[
-                  styles.categoryItemInitials,
-                  isActive && styles.categoryItemInitialsActive
-                ]}>
+              <View
+                style={[styles.categoryItemAvatar, isActive && styles.categoryItemAvatarActive]}
+              >
+                <AppText
+                  style={[
+                    styles.categoryItemInitials,
+                    isActive && styles.categoryItemInitialsActive,
+                  ]}
+                >
                   {initials}
                 </AppText>
               </View>
               <View style={styles.categoryItemInfo}>
                 <AppText
-                  style={[
-                    styles.categoryItemName,
-                    isActive && styles.categoryItemNameActive,
-                  ]}
+                  style={[styles.categoryItemName, isActive && styles.categoryItemNameActive]}
                   numberOfLines={2}
                 >
                   {category.name}
@@ -625,12 +619,13 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
 
   // Empty state
   const renderEmptyState = () => {
-    const hasActiveFilters = calculateActiveFilterCount() > 0 || selectedCategory || quickFilter !== 'all';
-    
+    const hasActiveFilters =
+      calculateActiveFilterCount() > 0 || selectedCategory || quickFilter !== 'all';
+
     let title = 'No products found';
     let description = 'Try adjusting your search or filters';
     let icon: 'search-outline' | 'cube-outline' | 'folder-open-outline' = 'search-outline';
-    
+
     if (!hasActiveFilters && !searchQuery) {
       title = 'No products available';
       description = 'Check back later for new products';
@@ -686,7 +681,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   // Action button
   const renderActionButton = () => {
     const isNoSale = mode === 'sales' && items.length === 0;
-    
+
     const handlePress = () => {
       if (isNoSale) {
         router.push('/checkin/nonsale');
@@ -719,7 +714,8 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
               {!isNoSale && (
                 <AppText style={styles.cartButtonTotal}>
                   {cartSummary.totalItems} Items • K{cartSummary.totalValue.toFixed(2)}
-                  {mode === 'topup' && cartSummary.totalWeight > 0 &&
+                  {mode === 'topup' &&
+                    cartSummary.totalWeight > 0 &&
                     ` • ${cartSummary.totalWeight.toFixed(2)} kg`}
                 </AppText>
               )}

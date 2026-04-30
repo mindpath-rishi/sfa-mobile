@@ -22,6 +22,7 @@ import { useOutletStore } from '@/core/store/outlet.store';
 import { useCartStore } from '@/core/store/cart.store';
 import { useRouteStore } from '@/core/store/route.store';
 import { saleService } from '@/shared/services/sale.service';
+import { outletService } from '@/features/outlet/services/outlet.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { AppModal, ConfirmationModal } from '@/core/components';
@@ -1056,7 +1057,7 @@ export default function PaymentCollectionScreen() {
       vanId: van?.vanId,
       vanName: van?.vanNumber || 'Van',
       customerId: outlet?.customerId,
-      customerName: outlet?.name,
+      customerName: outlet?.name || 'test',
       employeeId: user?.userId,
       employeeName: user?.name,
       date: new Date().toISOString(),
@@ -1160,6 +1161,18 @@ export default function PaymentCollectionScreen() {
     };
 
     clearCart();
+
+    // Auto-close the visit after successful sale
+    if (activeVisit?.visitId) {
+      try {
+        await outletService.completeVisit(activeVisit.visitId);
+        const setActiveVisit = useOutletStore.getState().setActiveVisit;
+        setActiveVisit(null);
+      } catch (error) {
+        console.error('Error completing visit:', error);
+      }
+    }
+
     router.push({
       pathname: '/checkin/shareinvoice',
       params: {
@@ -1248,7 +1261,7 @@ export default function PaymentCollectionScreen() {
         </Animated.View>
 
         {/* Credit Info */}
-        {creditInfo.creditLimit > 0 && showCreditInfo && (
+        {/* {creditInfo.creditLimit > 0 && showCreditInfo && (
           <Animated.View entering={FadeInDown.delay(30).springify()}>
             <AppCard variant="elevated" padding="md" style={styles.creditCard}>
               <View style={styles.creditHeader}>
@@ -1309,7 +1322,7 @@ export default function PaymentCollectionScreen() {
               )}
             </AppCard>
           </Animated.View>
-        )}
+        )} */}
 
         {/* Order Summary */}
         <Animated.View entering={FadeInDown.delay(60).springify()}>
@@ -1356,7 +1369,7 @@ export default function PaymentCollectionScreen() {
             <Text style={styles.sectionTitle}>Select Payment Method</Text>
 
             {/* Cash, Wallet, Card, Cheque */}
-            {['cash', 'wallet', 'card', 'cheque'].map((mode) => (
+            {['cash', 'wallet'].map((mode) => (
               <TouchableOpacity
                 key={mode}
                 style={[
@@ -1482,7 +1495,7 @@ export default function PaymentCollectionScreen() {
             )}
 
             {/* Split Payment Option */}
-            <TouchableOpacity
+            {/* <TouchableOpacity
               style={[
                 styles.paymentModeCard,
                 selectedMode === 'split' && styles.paymentModeSelected,
@@ -1503,7 +1516,7 @@ export default function PaymentCollectionScreen() {
                   <Ionicons name="checkmark-circle" size={20} color={colors.info} />
                 )}
               </View>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             {/* Split Payment Summary */}
             {isSplitPayment && selectedMode === 'split' && (

@@ -240,7 +240,7 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
         </View>
 
         {/* Incentives Card */}
-        <View style={styles.cardWrapper}>
+        {/* <View style={styles.cardWrapper}>
           <StatCard
             title="Incentives"
             value={formatCurrency(stats.incentives.earned)}
@@ -253,7 +253,7 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
             }
             compact={true}
           />
-        </View>
+        </View> */}
       </ScrollView>
     </View>
   );

@@ -486,12 +486,12 @@ export default function ProfileScreen() {
             value={userData.stats.customerSatisfaction.toString()}
             color="#FF512F"
           />
-          <StatCard
+          {/* <StatCard
             icon="gift"
             label="Incentives"
             value={userData.stats.incentivesEarned}
             color="#8E2DE2"
-          />
+          /> */}
         </View>
       </AppCard>
 

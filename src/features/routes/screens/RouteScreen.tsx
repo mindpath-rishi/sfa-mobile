@@ -76,114 +76,140 @@ if (Platform.OS !== 'web') {
 type QuickFilterType = 'all' | 'visited' | 'not_visited' | 'no_order';
 
 // ============= SEPARATE OUTLET CARD COMPONENT =============
-const OutletCardComponent = React.memo(({ 
-  outlet, 
-  index, 
-  onPress, 
-  onNavigate, 
-  onComplete,
-  colors,
-  styles 
-}: { 
-  outlet: any;
-  index: number;
-  onPress: (outlet: Outlet) => void;
-  onNavigate: (outlet: Outlet) => void;
-  onComplete: (outletId: string) => Promise<void>;
-  colors: any;
-  styles: any;
-}) => {
-  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
-  const visitStatus = outlet.visitStatus;
-  const isActive = visitStatus === 'ACTIVE';
-  const isCompleted = visitStatus === 'COMPLETED';
-  const isInside = outlet.isInsideGeofence;
+const OutletCardComponent = React.memo(
+  ({
+    outlet,
+    index,
+    onPress,
+    onNavigate,
+    onComplete,
+    colors,
+    styles,
+  }: {
+    outlet: any;
+    index: number;
+    onPress: (outlet: Outlet) => void;
+    onNavigate: (outlet: Outlet) => void;
+    onComplete: (outletId: string) => Promise<void>;
+    colors: any;
+    styles: any;
+  }) => {
+    const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+    const visitStatus = outlet.visitStatus;
+    const isActive = visitStatus === 'ACTIVE';
+    const isCompleted = visitStatus === 'COMPLETED';
+    const isInside = outlet.isInsideGeofence;
 
-  const statusColors = isCompleted
-    ? { bg: colors.success + '15', text: colors.success }
-    : isActive
-    ? { bg: colors.primary + '15', text: colors.primary }
-    : { bg: colors.warning + '15', text: colors.warning };
+    const statusColors = isCompleted
+      ? { bg: colors.success + '15', text: colors.success }
+      : isActive
+        ? { bg: colors.primary + '15', text: colors.primary }
+        : { bg: colors.warning + '15', text: colors.warning };
 
-  const handleComplete = useCallback(() => {
-    setShowCompleteConfirm(false);
-    onComplete(outlet._id);
-  }, [outlet._id, onComplete]);
+    const handleComplete = useCallback(() => {
+      setShowCompleteConfirm(false);
+      onComplete(outlet._id);
+    }, [outlet._id, onComplete]);
 
-  return (
-    <View
-      style={[
-        styles.expandableCard,
-        isActive && styles.expandableCardCurrent,
-        isCompleted && styles.expandableCardCompleted,
-        isInside && !isCompleted && !isActive && styles.expandableCardNearby,
-      ]}
-    >
-      <ConfirmationModal
-        visible={showCompleteConfirm}
-        title="Complete Visit"
-        message={`Mark "${outlet.name}" as completed?`}
-        onConfirm={handleComplete}
-        onCancel={() => setShowCompleteConfirm(false)}
-        confirmText="Yes, Complete"
-        cancelText="Cancel"
-        confirmVariant="success"
-      />
+    return (
+      <View
+        style={[
+          styles.expandableCard,
+          isActive && styles.expandableCardCurrent,
+          isCompleted && styles.expandableCardCompleted,
+          isInside && !isCompleted && !isActive && styles.expandableCardNearby,
+        ]}
+      >
+        <ConfirmationModal
+          visible={showCompleteConfirm}
+          title="Complete Visit"
+          message={`Mark "${outlet.name}" as completed?`}
+          onConfirm={handleComplete}
+          onCancel={() => setShowCompleteConfirm(false)}
+          confirmText="Yes, Complete"
+          cancelText="Cancel"
+          confirmVariant="success"
+        />
 
-      <TouchableOpacity style={styles.cardHeader} onPress={() => onPress(outlet)} activeOpacity={0.7}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.statusIndicator, { backgroundColor: statusColors.bg }]}>
-            {isCompleted ? (
-              <Ionicons name="checkmark-circle" size={24} color={statusColors.text} />
-            ) : (
-              <Text style={[styles.statusNumber, { color: statusColors.text }]}>{index + 1}</Text>
-            )}
-          </View>
-
-          <View style={styles.headerInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.outletName} numberOfLines={1}>{outlet.name}</Text>
-              {isInside && !isCompleted && !isActive && (
-                <View style={styles.nearbyBadge}>
-                  <Ionicons name="location" size={12} color={colors.success} />
-                  <Text style={styles.nearbyBadgeText}>Nearby</Text>
-                </View>
+        <TouchableOpacity
+          style={styles.cardHeader}
+          onPress={() => onPress(outlet)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.headerLeft}>
+            <View style={[styles.statusIndicator, { backgroundColor: statusColors.bg }]}>
+              {isCompleted ? (
+                <Ionicons name="checkmark-circle" size={24} color={statusColors.text} />
+              ) : (
+                <Text style={[styles.statusNumber, { color: statusColors.text }]}>{index + 1}</Text>
               )}
-              <View style={styles.headerIconsRow}>
-                <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); Alert.alert('Call', `Calling ${outlet.phoneNumber}`); }}
-                  style={styles.headerIconButton}
-                >
-                  <Ionicons name="call-outline" size={20} color={colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={(e) => { e.stopPropagation(); onNavigate(outlet); }}
-                  style={styles.headerIconButton}
-                >
-                  <Ionicons name="navigate-outline" size={20} color={colors.info} />
-                </TouchableOpacity>
-              </View>
             </View>
-            <View style={styles.detailsRow}>
-              <Text style={styles.stopAddress} numberOfLines={1}>{outlet.address?.line1}</Text>
-              <View style={styles.distanceBadge}>
-                <Feather name="map-pin" size={12} color={colors.textSecondary} />
-                <Text style={styles.distanceText}>{outlet.distance?.toFixed(1)} km</Text>
+
+            <View style={styles.headerInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.outletName} numberOfLines={1}>
+                  {outlet.name}
+                </Text>
+                {/* {outstanding && outstanding > 0 && (
+                  <View style={styles.outstandingBadge}>
+                    <Ionicons name="alert-circle" size={12} color={colors.error} />
+                    <Text style={styles.outstandingText}>K{outstanding?.toFixed(0)}</Text>
+                  </View>
+                )} */}
+                {isInside && !isCompleted && !isActive && (
+                  <View style={styles.nearbyBadge}>
+                    <Ionicons name="location" size={12} color={colors.success} />
+                    <Text style={styles.nearbyBadgeText}>Nearby</Text>
+                  </View>
+                )}
+                <View style={styles.headerIconsRow}>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      if (outlet.phoneNumber) {
+                        Linking.openURL(`tel:${outlet.phoneNumber}`);
+                      } else {
+                        Alert.alert('Error', 'Phone number not available');
+                      }
+                    }}
+                    style={styles.headerIconButton}
+                  >
+                    <Ionicons name="call-outline" size={20} color={colors.primary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      onNavigate(outlet);
+                    }}
+                    style={styles.headerIconButton}
+                  >
+                    <Ionicons name="navigate-outline" size={20} color={colors.info} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.detailsRow}>
+                <Text style={styles.stopAddress} numberOfLines={1}>
+                  {outlet.address?.line1}
+                </Text>
+                <View style={styles.distanceBadge}>
+                  <Feather name="map-pin" size={12} color={colors.textSecondary} />
+                  <Text style={styles.distanceText}>{outlet.distance?.toFixed(1)} km</Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-        <View style={styles.headerRight}>
-          <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
-            <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-              {isCompleted ? 'Done' : isActive ? 'Active' : 'Pending'}
-            </Text>
+          <View style={styles.headerRight}>
+            <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+              <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                {isCompleted ? 'Done' : isActive ? 'Active' : 'Pending'}
+              </Text>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    </View>
-  );
-});
+        </TouchableOpacity>
+      </View>
+    );
+  },
+);
 
 // ============= MAIN COMPONENT =============
 export default function RouteScreen() {
@@ -212,7 +238,14 @@ export default function RouteScreen() {
     priority: [] as string[],
   });
   const [showFilters, setShowFilters] = useState(false);
-  
+  const [routeSummary, setRouteSummary] = useState({
+    totalOrderValue: 0,
+    totalCases: 0,
+    totalVisitedShop: 0,
+    totalProductiveCall: 0,
+    LPSC: 0,
+  });
+
   // Refs to prevent infinite loops
   const lastOsrmKeyRef = useRef<string>('');
   const osrmDisabledUntilRef = useRef<number>(0);
@@ -238,15 +271,21 @@ export default function RouteScreen() {
   // ========== SUMMARY STATS ==========
   const summaryStats = useMemo(() => {
     const visitedCount = outlets.filter((o) => o.visitStatus === 'COMPLETED').length;
-    const notVisitedCount = outlets.filter((o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus).length;
-    const noOrderCount = outlets.filter((o) => !o.orderValue || o.orderValue === 0).length;
-    const productiveCalls = outlets.reduce((sum, outlet) => sum + (outlet.productiveCall || 0), 0);
-    const lpsc = outlets.reduce((sum, outlet) => sum + (outlet.lpsc || 0), 0);
-    const totalOrderValue = outlets.reduce((sum, outlet) => sum + (outlet.orderValue || 0), 0);
-    const totalQuantity = outlets.reduce((sum, outlet) => sum + (outlet.quantity || 0), 0);
-    
+    const activeCount = outlets.filter((o) => o.visitStatus === 'ACTIVE').length;
+    const notVisitedCount = outlets.filter(
+      (o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus,
+    ).length;
+    const noOrderCount = outlets.filter((o) => !o.hasSale && o.visitStatus === 'COMPLETED').length;
+
+    // Use API summary data for totals
+    const totalOrderValue = routeSummary.totalOrderValue;
+    const totalQuantity = routeSummary.totalCases;
+    const productiveCalls = routeSummary.totalProductiveCall;
+    const lpsc = routeSummary.LPSC;
+
     return {
       visitedCount,
+      activeCount,
       notVisitedCount,
       noOrderCount,
       productiveCalls,
@@ -256,7 +295,7 @@ export default function RouteScreen() {
       totalOutlets: outlets.length,
       completionRate: outlets.length > 0 ? (visitedCount / outlets.length) * 100 : 0,
     };
-  }, [outlets]);
+  }, [outlets, routeSummary]);
 
   // ========== QUICK FILTER APPLY ==========
   const applyQuickFilter = useCallback((filter: QuickFilterType) => {
@@ -268,20 +307,52 @@ export default function RouteScreen() {
   const filterSections = useMemo((): FilterSection[] => {
     const statusOptions = [
       { id: 'ACTIVE', label: 'Active', count: outlets.filter((o) => o.status === 'ACTIVE').length },
-      { id: 'INACTIVE', label: 'Inactive', count: outlets.filter((o) => o.status === 'INACTIVE').length },
-      { id: 'PENDING', label: 'Pending', count: outlets.filter((o) => o.status === 'PENDING').length },
+      {
+        id: 'INACTIVE',
+        label: 'Inactive',
+        count: outlets.filter((o) => o.status === 'INACTIVE').length,
+      },
+      {
+        id: 'PENDING',
+        label: 'Pending',
+        count: outlets.filter((o) => o.status === 'PENDING').length,
+      },
     ].filter((opt) => opt.count > 0);
 
     const visitStatusOptions = [
-      { id: 'COMPLETED', label: 'Completed', count: outlets.filter((o) => o.visitStatus === 'COMPLETED').length },
-      { id: 'ACTIVE', label: 'Active Visit', count: outlets.filter((o) => o.visitStatus === 'ACTIVE').length },
-      { id: 'NOT_VISITED', label: 'Not Visited', count: outlets.filter((o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus).length },
+      {
+        id: 'COMPLETED',
+        label: 'Completed',
+        count: outlets.filter((o) => o.visitStatus === 'COMPLETED').length,
+      },
+      {
+        id: 'ACTIVE',
+        label: 'Active Visit',
+        count: outlets.filter((o) => o.visitStatus === 'ACTIVE').length,
+      },
+      {
+        id: 'NOT_VISITED',
+        label: 'Not Visited',
+        count: outlets.filter((o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus).length,
+      },
     ].filter((opt) => opt.count > 0);
 
     const priorityOptions = [
-      { id: 'high', label: 'High Priority', count: outlets.filter((o) => o.priority === 'high').length },
-      { id: 'medium', label: 'Medium Priority', count: outlets.filter((o) => o.priority === 'medium').length },
-      { id: 'low', label: 'Low Priority', count: outlets.filter((o) => o.priority === 'low').length },
+      {
+        id: 'high',
+        label: 'High Priority',
+        count: outlets.filter((o) => o.priority === 'high').length,
+      },
+      {
+        id: 'medium',
+        label: 'Medium Priority',
+        count: outlets.filter((o) => o.priority === 'medium').length,
+      },
+      {
+        id: 'low',
+        label: 'Low Priority',
+        count: outlets.filter((o) => o.priority === 'low').length,
+      },
     ].filter((opt) => opt.count > 0);
 
     const sections: FilterSection[] = [];
@@ -371,7 +442,7 @@ export default function RouteScreen() {
           filtered = filtered.filter((o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus);
           break;
         case 'no_order':
-          filtered = filtered.filter((o) => !o.orderValue || o.orderValue === 0);
+          filtered = filtered.filter((o) => !o.hasSale && o.visitStatus === 'COMPLETED');
           break;
       }
     }
@@ -386,7 +457,6 @@ export default function RouteScreen() {
         return filters.visitStatus.includes(visitStatus);
       });
     }
-
     if (filters.priority.length > 0) {
       filtered = filtered.filter((outlet) => filters.priority.includes(outlet.priority || 'low'));
     }
@@ -410,15 +480,15 @@ export default function RouteScreen() {
         const distance = getDistance(currentLat, currentLng, outlet.geoTag.lat, outlet.geoTag.lng);
         const isInside = distance <= 100;
 
-        if (isInside && !geofenceStatus[outlet._id]) {
-          setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: true }));
-          toast.info(`Auto-starting ${outlet.name}`);
-          router.push(`/route/${outlet.customerId}`);
-          setTimeout(() => {
-            setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: false }));
-          }, 8000);
-          break;
-        }
+        // if (isInside && !geofenceStatus[outlet._id]) {
+        //   setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: true }));
+        //   toast.info(`Auto-starting ${outlet.name}`);
+        //   router.push(`/route/${outlet.customerId}`);
+        //   setTimeout(() => {
+        //     setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: false }));
+        //   }, 8000);
+        //   break;
+        // }
       }
     },
     [outlets, activeVisist, autoStartInProgress, geofenceStatus],
@@ -482,12 +552,15 @@ export default function RouteScreen() {
       .sort((a, b) => a.sequence - b.sequence)
       .map((outlet) => ({
         ...outlet,
-        distance: getDistance(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          outlet.geoTag?.lat || currentLocation.latitude,
-          outlet.geoTag?.lng || currentLocation.longitude,
-        ),
+        distance:
+          outlet.geoTag?.lat && outlet.geoTag?.lng
+            ? getDistance(
+                currentLocation.latitude,
+                currentLocation.longitude,
+                outlet.geoTag.lat,
+                outlet.geoTag.lng,
+              )
+            : 0,
         isInsideGeofence:
           outlet.geoTag?.lat && outlet.geoTag?.lng
             ? isInsideGeofence(currentLocation.latitude, currentLocation.longitude, {
@@ -497,6 +570,7 @@ export default function RouteScreen() {
                 radius: 100,
               })
             : false,
+        // outstanding: outlet.outstanding || 0,
       }));
   }, [filteredOutlets, currentLocation]);
 
@@ -518,10 +592,10 @@ export default function RouteScreen() {
     });
   }, [setHeader, activeRoute?.routeName, handleRightPress, handleRightPress2, handleFilterPress]);
 
-  // ========== DATA LOADING - FIXED INFINITE LOOP ==========
+  // ========== DATA LOADING - UPDATED FOR NEW RESPONSE ==========
   const getRouteOutlets = useCallback(async () => {
     const currentRouteId = activeRoute?.routeId;
-    
+
     // Prevent API call if no route ID or already loaded this route
     if (!currentRouteId) return;
     if (routeIdRef.current === currentRouteId && isDataLoadedRef.current) return;
@@ -529,7 +603,7 @@ export default function RouteScreen() {
     routeIdRef.current = currentRouteId;
     isDataLoadedRef.current = false;
 
-    const payload = {
+    const payload: any = {
       routeId: currentRouteId,
       page: 1,
       limit: ROUTE_OUTLETS_LIMIT,
@@ -543,13 +617,45 @@ export default function RouteScreen() {
       if (!isMountedRef.current) return;
 
       if (response.statusCode === 200) {
-        const outletsData = response.data || [];
+        const outletsData = response.data?.data || [];
+        const summary = response.data?.summary || {};
+
+        // Update route summary from API response
+        setRouteSummary({
+          totalOrderValue: summary.totalOrderValue || 0,
+          totalCases: summary.totalCases || 0,
+          totalVisitedShop: summary.totalVisitedShop || 0,
+          totalProductiveCall: summary.totalProductiveCall || 0,
+          LPSC: summary.LPSC || 0,
+        });
+
         const transformedOutlets: Outlet[] = outletsData.map((outlet: any, index: number) => ({
           ...outlet,
-          priority: outlet.priority || (index % 3 === 0 ? 'high' : index % 2 === 0 ? 'medium' : 'low'),
+          _id: outlet._id,
+          customerId: outlet.customerId,
+          name: outlet.name,
+          ownerName: outlet.ownerName,
+          phoneNumber: outlet.phoneNumber,
+          address: outlet.address,
+          geoTag: outlet.geoTag,
+          status: outlet.status,
+          sequence: outlet.sequence || index + 1,
           visitStatus: outlet.visitStatus || 'NOT_VISITED',
+          isVisited: outlet.isVisited || false,
+          hasSale: outlet.hasSale || false,
+          hasNonSale: outlet.hasNonSale || false,
+          isNonSale: outlet.isNonSale || false,
+          sale: outlet.sale,
+          saleItems: outlet.saleItems || [],
+          outstanding: outlet.outstanding || 0,
+          creditLimit: outlet.creditLimit || 0,
+          creditDays: outlet.creditDays || 0,
+          lastVisitedAt: outlet.lastVisitedAt,
+          priority:
+            outlet.priority || (index % 3 === 0 ? 'high' : index % 2 === 0 ? 'medium' : 'low'),
           geofenceRadius: 100,
         }));
+
         setOutlets(transformedOutlets);
         setFilteredOutlets(transformedOutlets);
         isDataLoadedRef.current = true;
@@ -571,11 +677,11 @@ export default function RouteScreen() {
         routeIdRef.current = undefined;
         getRouteOutlets();
       }
-      
+
       return () => {
         // No cleanup needed
       };
-    }, [activeRoute?.routeId, getRouteOutlets])
+    }, [activeRoute?.routeId, getRouteOutlets]),
   );
 
   // ========== ACTIONS ==========
@@ -583,18 +689,21 @@ export default function RouteScreen() {
     router.push(`/route/${outlet.customerId}`);
   }, []);
 
-  const handleCreateCustomer = useCallback(async (formValue: any) => {
-    formValue.routeId = activeRoute?.routeId;
-    const response = await outletService?.createCustomer(formValue);
-    if (response?.success) {
-      toast.success(response.message as any);
-      setShowCustomerCreateModal(false);
-      // Reset data loaded flag to allow reload
-      isDataLoadedRef.current = false;
-      routeIdRef.current = undefined;
-      getRouteOutlets();
-    }
-  }, [activeRoute?.routeId, getRouteOutlets]);
+  const handleCreateCustomer = useCallback(
+    async (formValue: any) => {
+      formValue.routeId = activeRoute?.routeId;
+      const response = await outletService?.createCustomer(formValue);
+      if (response?.success) {
+        toast.success(response.message as any);
+        setShowCustomerCreateModal(false);
+        // Reset data loaded flag to allow reload
+        isDataLoadedRef.current = false;
+        routeIdRef.current = undefined;
+        getRouteOutlets();
+      }
+    },
+    [activeRoute?.routeId, getRouteOutlets],
+  );
 
   const handleNavigation = useCallback((outlet: Outlet) => {
     if (!outlet.geoTag?.lat || !outlet.geoTag?.lng) {
@@ -621,25 +730,43 @@ export default function RouteScreen() {
     );
   }, [summaryStats.visitedCount, outlets.length, summaryStats.totalOrderValue]);
 
-  const markComplete = useCallback(async (currentOutletId: string) => {
-    const response = await outletService.completeVisit(activeVisist?.visitId);
-    if (response?.success) {
-      toast.success('Visit successfully completed.');
-      setActiveVisit(null);
-      // Reset data loaded flag to allow reload
-      isDataLoadedRef.current = false;
-      routeIdRef.current = undefined;
-      getRouteOutlets();
-    }
-  }, [activeVisist, setActiveVisit, getRouteOutlets]);
+  const markComplete = useCallback(
+    async (currentOutletId: string) => {
+      const response = await outletService.completeVisit(activeVisist?.visitId);
+      if (response?.success) {
+        toast.success('Visit successfully completed.');
+        setActiveVisit(null);
+        // Reset data loaded flag to allow reload
+        isDataLoadedRef.current = false;
+        routeIdRef.current = undefined;
+        getRouteOutlets();
+      }
+    },
+    [activeVisist, setActiveVisit, getRouteOutlets],
+  );
 
   // ========== QUICK FILTER TABS ==========
   const QuickFilterTabs = useMemo(() => {
     const tabItems = [
       { key: 'all', label: 'All', count: summaryStats.totalOutlets, icon: 'apps' },
-      { key: 'visited', label: 'Visited', count: summaryStats.visitedCount, icon: 'checkmark-circle' },
-      { key: 'not_visited', label: 'Not Visited', count: summaryStats.notVisitedCount, icon: 'time' },
-      { key: 'no_order', label: 'No Order', count: summaryStats.noOrderCount, icon: 'cash-outline' },
+      {
+        key: 'visited',
+        label: 'Visited',
+        count: summaryStats.visitedCount,
+        icon: 'checkmark-circle',
+      },
+      {
+        key: 'not_visited',
+        label: 'Not Visited',
+        count: summaryStats.notVisitedCount,
+        icon: 'time',
+      },
+      {
+        key: 'no_order',
+        label: 'No Order',
+        count: summaryStats.noOrderCount,
+        icon: 'cash-outline',
+      },
     ];
 
     return (
@@ -651,16 +778,38 @@ export default function RouteScreen() {
               style={[
                 styles.quickFilterTab,
                 quickFilter === item.key && styles.quickFilterTabActive,
-                { backgroundColor: quickFilter === item.key ? colors.primary : colors.surface }
+                { backgroundColor: quickFilter === item.key ? colors.primary : colors.surface },
               ]}
               onPress={() => applyQuickFilter(item.key as QuickFilterType)}
             >
-              <Ionicons name={item.icon as any} size={16} color={quickFilter === item.key ? colors.surface : colors.textSecondary} />
-              <Text style={[styles.quickFilterLabel, { color: quickFilter === item.key ? colors.surface : colors.textSecondary }]}>
+              <Ionicons
+                name={item.icon as any}
+                size={16}
+                color={quickFilter === item.key ? colors.surface : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.quickFilterLabel,
+                  { color: quickFilter === item.key ? colors.surface : colors.textSecondary },
+                ]}
+              >
                 {item.label}
               </Text>
-              <View style={[styles.quickFilterBadge, { backgroundColor: quickFilter === item.key ? colors.surface + '20' : colors.divider }]}>
-                <Text style={[styles.quickFilterCount, { color: quickFilter === item.key ? colors.surface : colors.textPrimary }]}>
+              <View
+                style={[
+                  styles.quickFilterBadge,
+                  {
+                    backgroundColor:
+                      quickFilter === item.key ? colors.surface + '20' : colors.divider,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.quickFilterCount,
+                    { color: quickFilter === item.key ? colors.surface : colors.textPrimary },
+                  ]}
+                >
                   {item.count}
                 </Text>
               </View>
@@ -669,14 +818,26 @@ export default function RouteScreen() {
         </ScrollView>
       </View>
     );
-  }, [summaryStats.totalOutlets, summaryStats.visitedCount, summaryStats.notVisitedCount, summaryStats.noOrderCount, quickFilter, colors, styles, applyQuickFilter]);
+  }, [
+    summaryStats.totalOutlets,
+    summaryStats.visitedCount,
+    summaryStats.notVisitedCount,
+    summaryStats.noOrderCount,
+    quickFilter,
+    colors,
+    styles,
+    applyQuickFilter,
+  ]);
 
   // ========== RENDER ==========
   return (
     <SafeAreaView style={styles.container}>
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: new Animated.Value(0) } } }], { useNativeDriver: false })}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: new Animated.Value(0) } } }],
+          { useNativeDriver: false },
+        )}
         scrollEventThrottle={16}
       >
         {/* Header */}
@@ -704,19 +865,21 @@ export default function RouteScreen() {
             <View style={styles.headerMetricDivider} />
             <View style={styles.headerMetricItem}>
               <MaterialIcons name="attach-money" size={16} color={colors.surface} />
-              <Text style={styles.headerMetricValue}>{formatCurrency(summaryStats.totalOrderValue)}</Text>
+              <Text style={styles.headerMetricValue}>
+                {formatCurrency(summaryStats.totalOrderValue)}
+              </Text>
               <Text style={styles.headerMetricLabel}>Pipeline</Text>
             </View>
             <View style={styles.headerMetricDivider} />
             <View style={styles.headerMetricItem}>
               <Feather name="package" size={16} color={colors.surface} />
-              <Text style={styles.headerMetricValue}>{summaryStats.totalQuantity}</Text>
-              <Text style={styles.headerMetricLabel}>Qty</Text>
+              <Text style={styles.headerMetricValue}>{summaryStats.totalQuantity.toFixed(1)}</Text>
+              <Text style={styles.headerMetricLabel}>Cases</Text>
             </View>
             <View style={styles.headerMetricDivider} />
             <View style={styles.headerMetricItem}>
               <MaterialIcons name="inventory" size={16} color={colors.surface} />
-              <Text style={styles.headerMetricValue}>{summaryStats.lpsc}</Text>
+              <Text style={styles.headerMetricValue}>{summaryStats.lpsc.toFixed(1)}</Text>
               <Text style={styles.headerMetricLabel}>LPSC</Text>
             </View>
           </View>
@@ -740,9 +903,14 @@ export default function RouteScreen() {
             )}
           </View>
           <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
-            <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.filterGradient}>
+            <LinearGradient
+              colors={[colors.primary, colors.primaryDark]}
+              style={styles.filterGradient}
+            >
               <Ionicons name="filter-outline" size={18} color={colors.surface} />
-              {(filters.status.length > 0 || filters.visitStatus.length > 0 || filters.priority.length > 0) && (
+              {(filters.status.length > 0 ||
+                filters.visitStatus.length > 0 ||
+                filters.priority.length > 0) && (
                 <View style={styles.filterBadge}>
                   <Text style={styles.filterBadgeText}>
                     {filters.status.length + filters.visitStatus.length + filters.priority.length}
@@ -764,7 +932,9 @@ export default function RouteScreen() {
               <Text style={styles.emptyStateTitle}>No outlets found</Text>
               <Text style={styles.emptyStateText}>Try adjusting your search or filters</Text>
               <TouchableOpacity onPress={clearAllFilters}>
-                <Text style={[styles.clearFiltersText, { color: colors.primary }]}>Clear all filters</Text>
+                <Text style={[styles.clearFiltersText, { color: colors.primary }]}>
+                  Clear all filters
+                </Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -798,7 +968,10 @@ export default function RouteScreen() {
                 {'\n'}Total pipeline value: {formatCurrency(summaryStats.totalOrderValue)}
               </Text>
               <View style={styles.confirmButtons}>
-                <TouchableOpacity style={styles.confirmCancel} onPress={() => setShowEndRouteConfirm(false)}>
+                <TouchableOpacity
+                  style={styles.confirmCancel}
+                  onPress={() => setShowEndRouteConfirm(false)}
+                >
                   <Text style={styles.confirmCancelText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.confirmEnd} onPress={endRoute}>
@@ -810,8 +983,12 @@ export default function RouteScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <CustomerCreateModal visible={showCustomerCreteModal} onClose={() => setShowCustomerCreateModal(false)} onSubmit={handleCreateCustomer} />
-      
+      <CustomerCreateModal
+        visible={showCustomerCreteModal}
+        onClose={() => setShowCustomerCreateModal(false)}
+        onSubmit={handleCreateCustomer}
+      />
+
       <FilterModal
         visible={showFilters}
         onClose={() => setShowFilters(false)}

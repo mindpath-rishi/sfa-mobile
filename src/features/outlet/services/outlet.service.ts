@@ -48,6 +48,7 @@ export interface OutletService {
   visitStatus(payload: StartVisitPayload): Promise<ApiResponse<any>>;
   completeVisit(visitId: string | undefined): Promise<ApiResponse<any>>;
   createCustomer(payload: any): Promise<ApiResponse<any>>;
+  getVisitHistory(payload: any): Promise<ApiResponse<any>>;
 }
 
 /**
@@ -121,5 +122,9 @@ export const outletService: OutletService = {
 
   createCustomer: async (payload: any) => {
     return api.post<any>(`customer`, payload) as Promise<ApiResponse<any>>;
+  },
+
+  getVisitHistory: async (payload: any) => {
+    return api.get<any>(`shop-visit`, { params: payload }) as Promise<ApiResponse<any>>;
   },
 };
