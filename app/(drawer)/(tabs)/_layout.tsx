@@ -1,12 +1,24 @@
 // app/(drawer)/(tabs)/_layout.tsx
 
-import React from 'react';
-import { Tabs } from 'expo-router';
+import React, { useCallback } from 'react';
+import { Tabs, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 
 export default function TabsLayout() {
   const { colors } = useTheme();
+  const { setHeader } = useHeader();
+  useFocusEffect(
+    useCallback(() => {
+      setHeader({
+        showFilter: false,
+        showBack: false,
+        showMenu: true,
+        title: '',
+      });
+    }, [setHeader]),
+  );
 
   return (
     <Tabs

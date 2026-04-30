@@ -334,7 +334,7 @@ export const Modal: React.FC<ModalProps> & {
         headerStyle={headerStyle}
         closeIcon={closeIcon}
         closeButtonPosition={closeButtonPosition}
-        showDragHandle={position === 'bottom'}
+        showDragHandle={false}
       />
     );
   };

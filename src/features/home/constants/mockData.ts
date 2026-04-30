@@ -28,7 +28,7 @@ export const ACTIVITY_TYPES: ActivityType[] = [
 
 export const OTHER_WORK_OPTIONS: OtherWorkOption[] = [
   { id: 'office', name: 'Office Work', icon: 'business', color: '#11998e' },
-  { id: 'collection', name: 'Collection', icon: 'cash', color: '#FF512F' },
+  // { id: 'collection', name: 'Collection', icon: 'cash', color: '#FF512F' },
   { id: 'meeting', name: 'Meetings', icon: 'people', color: '#F37335' },
 ];
 

@@ -1249,7 +1249,13 @@ export default function CustomerDetailScreen() {
   const { setSelectedOutlet } = useOutletStore();
   const { setHeader } = useHeader();
   const selectedRoute = useRouteStore((s) => s.selectedRoute);
+  const hasTriggeredRef = useRef(false);
 
+  useEffect(() => {
+    if (activeVisit?.customerId === customer?.customerId) {
+      hasTriggeredRef.current = true;
+    }
+  }, [activeVisit, customer]);
   // Load customer data
   useEffect(() => {
     loadCustomerData();
@@ -1297,15 +1303,19 @@ export default function CustomerDetailScreen() {
     };
   }, [customer]);
 
+  useEffect(() => {
+    hasTriggeredRef.current = false;
+  }, [customer?.customerId]);
+
   // Auto-start visit when inside geofence
   useEffect(() => {
     const shouldAutoStart =
-      isInsideGeofenceArea && !activeVisit && customer && !autoStartAttempted && !isAutoStarting;
+      isInsideGeofenceArea && !activeVisit && customer && !hasTriggeredRef.current;
 
     if (shouldAutoStart) {
       autoStartVisit();
     }
-  }, [isInsideGeofenceArea, activeVisit, autoStartAttempted, customer, isAutoStarting]);
+  }, [isInsideGeofenceArea, activeVisit, customer]);
 
   // App state listener
   useEffect(() => {
@@ -1407,7 +1417,7 @@ export default function CustomerDetailScreen() {
         const payload: any = {
           routeSessionId: route?.routeSessionId,
           workSessionId: route?.workSessionId,
-          vanId: route?.vanId,
+          vanId: van?.vanId,
           outletId: customer.customerId,
         };
 
@@ -1548,7 +1558,7 @@ export default function CustomerDetailScreen() {
     try {
       const query: any = {
         workSessionId: selectedRoute?.workSessionId,
-        vanId: selectedRoute?.vanId,
+        vanId: van?.vanId,
         routeSessionId: selectedRoute?.routeSessionId,
         outletId: customer?.customerId,
       };

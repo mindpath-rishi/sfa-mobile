@@ -176,15 +176,27 @@ const CustomDrawerContent = (props: any) => {
     }
   }, []);
 
+  // Filter out hidden screens from the drawer list (collection hidden)
+  const filteredProps = {
+    ...props,
+    state: {
+      ...props.state,
+      routes: props.state.routes.filter((route: any) => {
+        // Hide 'collection' from drawer
+        return route.name !== 'collection';
+      }),
+    },
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ModernDrawerHeader colors={colors} />
 
       <DrawerContentScrollView
-        {...props}
+        {...filteredProps}
         contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 8 }}
       >
-        <DrawerItemList {...props} />
+        <DrawerItemList {...filteredProps} />
       </DrawerContentScrollView>
 
       {/* Logout Section with Divider */}
@@ -401,14 +413,15 @@ export default function DrawerLayout() {
       showBack: true,
       backgroundColor: colors.primary,
     },
-    // topup: {
-    //   title: 'Topup',
-    //   showMenu: false,
-    //   showFilter: true,
-    //   showBack: true,
-    //   backgroundColor: colors.primary,
-    //   rightIcon: 'plus'
-    // },
+
+    'my-target': {
+      title: 'My Target',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
     collection: {
       title: 'Collection',
       showMenu: false,
@@ -424,6 +437,7 @@ export default function DrawerLayout() {
       showBack: true,
       backgroundColor: colors.primary,
     },
+
     route: {
       title: 'My Route',
       showMenu: false,
@@ -442,18 +456,9 @@ export default function DrawerLayout() {
    * ============================ */
 
   useEffect(() => {
-    // if (isProfile) {
-    //   setHeader({ hidden: true });
-    //   return;
-    // }
-
-    // ONLY apply header for ROOT screens
     if (isProfile) {
       const routeName = getRouteName(segments);
-      console.log(isProfile, '============profile============', routeName);
       const config = HEADER_MAP[routeName];
-
-      console.log('===============config=========', config);
 
       if (config) {
         setHeader(config);
@@ -507,6 +512,11 @@ export default function DrawerLayout() {
           component: MaterialCommunityIcons,
           focusedIcon: 'cash-multiple',
           unfocusedIcon: 'cash-multiple',
+        },
+        'my-target': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'target',
+          unfocusedIcon: 'target',
         },
         'stock-count': {
           component: MaterialCommunityIcons,
@@ -569,6 +579,7 @@ export default function DrawerLayout() {
           drawerLabel: 'Dashboard',
         }}
       />
+
       <Drawer.Screen
         name="stock"
         options={{
@@ -585,13 +596,25 @@ export default function DrawerLayout() {
         }}
       />
 
+      {/* My Target Screen - Added */}
+      <Drawer.Screen
+        name="my-target"
+        options={{
+          title: 'My Target',
+          drawerLabel: 'My Target',
+        }}
+      />
+
+      {/* Collection Screen - Hidden from drawer */}
       <Drawer.Screen
         name="collection"
         options={{
           title: 'Cash Collection',
-          drawerLabel: 'Collection',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
         }}
       />
+
       <Drawer.Screen
         name="topup"
         options={{
@@ -599,6 +622,7 @@ export default function DrawerLayout() {
           drawerLabel: 'Topup',
         }}
       />
+
       <Drawer.Screen
         name="stock-count"
         options={{

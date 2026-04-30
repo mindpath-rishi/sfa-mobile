@@ -944,7 +944,7 @@
 //   });
 
 // SalesExecutiveScreen.tsx (Updated with Unified Modal for Day Start)
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { View, ScrollView, RefreshControl, Alert, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -991,6 +991,7 @@ import { toast } from '@/core/utils';
 import { DayEndConfirmationModal } from '@/shared/components/models/DayEndConfirmationModal';
 import { useFocusEffect } from 'expo-router';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
@@ -1045,6 +1046,7 @@ export default function SalesExecutiveScreen() {
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
   const [finalConfirmation, setFinalConfirmation] = useState(false);
   const { setVan } = useRouteStore();
+  const { setHeader } = useHeader();
 
   const { guard } = useVisitGuard();
   const dashboardRefreshTick = useAppEventsStore((s) => s.dashboardRefreshTick);
@@ -1184,22 +1186,22 @@ export default function SalesExecutiveScreen() {
     setUnifiedModalVisible(true);
   };
 
-const fetchAvailableVans = async () => {
-  try {
-    const response: any = await homeService.getVans({ limit: 50, page: 1 });
+  const fetchAvailableVans = async () => {
+    try {
+      const response: any = await homeService.getVans({ limit: 50, page: 1 });
 
-    if (response?.statusCode === 200) {
-      const data = response?.data || [];
+      if (response?.statusCode === 200) {
+        const data = response?.data || [];
 
-      const list = data.filter((v: any) => v.vanId !== van?.vanId);
+        const list = data.filter((v: any) => v.vanId !== van?.vanId);
 
-      setAvailableVans(list);
+        setAvailableVans(list);
+      }
+    } catch (error) {
+      console.error('Error fetching vans:', error);
+      toast.error('Failed to fetch van list. Please try again.');
     }
-  } catch (error) {
-    console.error('Error fetching vans:', error);
-    toast.error('Failed to fetch van list. Please try again.');
-  }
-};
+  };
 
   const handleVanSelectionSubmit = () => {
     if (!selectedVanForChange || !vanChangeNote.trim()) {
@@ -1355,9 +1357,7 @@ const fetchAvailableVans = async () => {
       requestedVanId: isVanChangePending ? selectedVanForChange?.vanId : undefined,
     };
 
-    if(payload?.requestedVanId) return
-
-
+    if (payload?.requestedVanId) return;
 
     console.log('Day Start Payload:', payload);
 
@@ -1369,7 +1369,7 @@ const fetchAvailableVans = async () => {
         if (isVanChangePending) {
           setVanChangeRequestPending(true);
           setUnifiedModalType('route-selection');
-          setUnifiedModalVisible(true)
+          setUnifiedModalVisible(true);
           toast.success('Day started. Van change request pending approval.');
         } else {
           toast.success('Your day successfully started.');
@@ -1472,7 +1472,7 @@ const fetchAvailableVans = async () => {
 
   const fetchDayEndSummary = async () => {
     console.log('Selected Route at Day End:', selectedRoute);
-    const res: any = await vanService.fetchTodayStockSummary({ vanId: van?.vanId, workSessionId: selectedRoute?.workSessionId });
+    const res: any = await vanService.fetchTodayStockSummary({ vanId: van?.vanId, workSessionId });
     console.log('Stock Summary before day end:', res);
     setDayEndSummary(res?.data);
   };
@@ -1573,7 +1573,7 @@ const fetchAvailableVans = async () => {
 
   const getVan = async () => {
     try {
-      const userId = useAuthStore.getState().user?.userId
+      const userId = useAuthStore.getState().user?.userId;
       const response: any = await homeService.getVan(userId);
 
       if (response.statusCode === 200) {
@@ -1729,13 +1729,13 @@ const fetchAvailableVans = async () => {
             )}
           </View>
 
-		          <View style={styles.sectionStack}>
-		            <View style={styles.sectionCard}>
-		              <QuickActionsSection
-		                actions={filteredQuickActions}
-		                onPressAction={(route: any) => handleQuickAction(route)}
-		              />
-		            </View>
+          <View style={styles.sectionStack}>
+            <View style={styles.sectionCard}>
+              <QuickActionsSection
+                actions={filteredQuickActions}
+                onPressAction={(route: any) => handleQuickAction(route)}
+              />
+            </View>
 
             <View style={styles.sectionCard}>
               <StatsOverviewSection employeeId={user?.userId as any} />

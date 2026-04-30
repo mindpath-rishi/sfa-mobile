@@ -465,34 +465,34 @@ export default function RouteScreen() {
   }, [outlets, searchText, filters.status, filters.visitStatus, filters.priority, quickFilter]);
 
   // ========== GEOFENCE FUNCTIONS ==========
-  const autoStartVisitIfNeeded = useCallback(
-    async (currentLat: number, currentLng: number) => {
-      if (activeVisist) return;
+  // const autoStartVisitIfNeeded = useCallback(
+  //   async (currentLat: number, currentLng: number) => {
+  //     if (activeVisist) return;
 
-      const pendingOutlets = outlets.filter(
-        (o) => o.visitStatus !== 'COMPLETED' && o.visitStatus !== 'ACTIVE',
-      );
+  //     const pendingOutlets = outlets.filter(
+  //       (o) => o.visitStatus !== 'COMPLETED' && o.visitStatus !== 'ACTIVE',
+  //     );
 
-      for (const outlet of pendingOutlets) {
-        if (autoStartInProgress[outlet._id]) continue;
-        if (!outlet.geoTag?.lat || !outlet.geoTag?.lng) continue;
+  //     for (const outlet of pendingOutlets) {
+  //       if (autoStartInProgress[outlet._id]) continue;
+  //       if (!outlet.geoTag?.lat || !outlet.geoTag?.lng) continue;
 
-        const distance = getDistance(currentLat, currentLng, outlet.geoTag.lat, outlet.geoTag.lng);
-        const isInside = distance <= 100;
+  //       const distance = getDistance(currentLat, currentLng, outlet.geoTag.lat, outlet.geoTag.lng);
+  //       const isInside = distance <= 100;
 
-        // if (isInside && !geofenceStatus[outlet._id]) {
-        //   setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: true }));
-        //   toast.info(`Auto-starting ${outlet.name}`);
-        //   router.push(`/route/${outlet.customerId}`);
-        //   setTimeout(() => {
-        //     setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: false }));
-        //   }, 8000);
-        //   break;
-        // }
-      }
-    },
-    [outlets, activeVisist, autoStartInProgress, geofenceStatus],
-  );
+  //       // if (isInside && !geofenceStatus[outlet._id]) {
+  //       //   setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: true }));
+  //       //   toast.info(`Auto-starting ${outlet.name}`);
+  //       //   router.push(`/route/${outlet.customerId}`);
+  //       //   setTimeout(() => {
+  //       //     setAutoStartInProgress((prev) => ({ ...prev, [outlet._id]: false }));
+  //       //   }, 8000);
+  //       //   break;
+  //       // }
+  //     }
+  //   },
+  //   [outlets, activeVisist, autoStartInProgress, geofenceStatus],
+  // );
 
   const checkAllGeofences = useCallback(
     (lat: number, lng: number) => {
@@ -519,9 +519,9 @@ export default function RouteScreen() {
       });
 
       setGeofenceStatus(newStatus);
-      autoStartVisitIfNeeded(lat, lng);
+      // autoStartVisitIfNeeded(lat, lng);
     },
-    [outlets, geofenceStatus, autoStartVisitIfNeeded],
+    [outlets, geofenceStatus],
   );
 
   const getUserLocation = useCallback(() => {
