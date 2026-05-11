@@ -26,13 +26,18 @@ export default ({ config }: any) => {
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
 
-    jsEngine: 'jsc', // ✅ FIX: prevents Hermes web transform issues
+    jsEngine: 'hermes', // ✅ FIX: prevents Hermes web transform issues
     // web: {
     //   bundler: "metro",
     // },
 
     android: {
       softwareKeyboardLayoutMode: 'resize',
+      package: 'com.anonymous.expojwttabstemplateultimate',
+    },
+
+    ios: {
+      bundleIdentifier: 'com.anonymous.expojwttabstemplateultimate',
     },
 
     extra: {

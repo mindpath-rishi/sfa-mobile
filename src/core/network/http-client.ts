@@ -39,7 +39,7 @@ type AppExtraConfig = {
 
 const extra = Constants.expoConfig?.extra as AppExtraConfig | undefined;
 
-const BASE_URL = extra?.api?.baseURL ?? 'http://localhost:3000';
+const BASE_URL = extra?.api?.baseURL ?? 'https://order.tradekings.app:4001/api/v1';
 const TIMEOUT_MS = extra?.api?.timeoutMs ?? 15000;
 const AUTH_HEADER_KEY = extra?.api?.authHeaderKey ?? 'Authorization';
 const TOKEN_PREFIX = extra?.api?.tokenPrefix ?? 'Bearer';

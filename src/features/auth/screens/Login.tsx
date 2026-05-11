@@ -241,6 +241,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
 
   const onSubmit = useCallback(
     async (data: LoginFormData) => {
+      console.log('Submitting Login Form with data:', process.env.EXPO_PUBLIC_API_URL);
       Keyboard.dismiss();
 
       try {
