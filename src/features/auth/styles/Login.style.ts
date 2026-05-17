@@ -1,196 +1,388 @@
+// import { StyleSheet, Dimensions, Platform } from 'react-native';
+// import { createStyles } from '@/shared/theme/styles';
+
+// const { width, height } = Dimensions.get('window');
+
+// export const useLoginStyles = createStyles((utils, colors) => ({
+//   container: {
+//     flex: 1,
+//     backgroundColor: colors.background,
+//     zIndex: 1,
+//   },
+
+//   gradientBackground: {
+//     position: 'absolute',
+//     top: 0,
+//     left: 0,
+//     right: 0,
+//     height: Dimensions.get('window').height * 0.5,
+//     zIndex: 0,
+//   },
+
+//   topSection: {
+//     height: height * 0.5,
+//     borderBottomLeftRadius: 30,
+//     borderBottomRightRadius: 30,
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//     paddingTop: Platform.OS === 'ios' ? 20 : 30,
+//     paddingBottom: 20,
+//     overflow: 'hidden',
+//     flexShrink: 0,
+//     zIndex: 2,
+//     backgroundColor: 'transparent',
+//   },
+
+//   logoContainer: {
+//     width: 70,
+//     height: 70,
+//     borderRadius: 18,
+//     backgroundColor: '#fff',
+//     alignItems: 'center',
+//     justifyContent: 'center',
+//     marginBottom: 10,
+//     ...Platform.select({
+//       ios: {
+//         shadowColor: '#000',
+//         shadowOffset: { width: 0, height: 4 },
+//         shadowOpacity: 0.1,
+//         shadowRadius: 8,
+//       },
+//       android: {
+//         elevation: 5,
+//       },
+//       web: {
+//         boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
+//       },
+//     }),
+//   },
+
+//   logoImage: {
+//     width: 45,
+//     height: 45,
+//   },
+
+//   appTitle: {
+//     fontSize: 24,
+//     fontWeight: '700',
+//     color: '#fff',
+//     marginBottom: 4,
+//     textAlign: 'center',
+//   },
+
+//   appSubtitle: {
+//     fontSize: 12,
+//     color: 'rgba(255,255,255,0.9)',
+//     textAlign: 'center',
+//     paddingHorizontal: 30,
+//   },
+
+//   bottomSection: {
+//     backgroundColor: colors.background,
+//     borderTopLeftRadius: 25,
+//     borderTopRightRadius: 25,
+//     marginTop: -50,
+//     paddingHorizontal: 0,
+//     paddingTop: 0,
+//     paddingBottom: 0,
+//     minHeight: height * 0.5 + 50,
+//     flex: 0,
+//     zIndex: 15,
+//   },
+
+//   formContainer: {
+//     paddingHorizontal: 24,
+//     paddingTop: 25,
+//     paddingBottom: Platform.OS === 'ios' ? 30 : 25,
+//     flex: 1,
+//     justifyContent: 'space-between',
+//   },
+
+//   welcomeContainer: {
+//     marginBottom: 20,
+//   },
+
+//   welcomeTitle: {
+//     fontSize: 24,
+//     fontWeight: '700',
+//     color: colors.textPrimary,
+//     marginBottom: 4,
+//   },
+
+//   welcomeSubtitle: {
+//     fontSize: 13,
+//     color: colors.textSecondary,
+//   },
+
+//   inputContainer: {
+//     marginBottom: 16,
+//   },
+
+//   loginButton: {
+//     height: 52,
+//     borderRadius: 26,
+//     marginTop: 12,
+//     marginBottom: 16,
+//     overflow: 'hidden',
+//   },
+
+//   loginButtonGradient: {
+//     flex: 1,
+//     justifyContent: 'center',
+//     alignItems: 'center',
+//   },
+
+//   loginButtonText: {
+//     fontSize: 16,
+//     fontWeight: '600',
+//     letterSpacing: 0.5,
+//     color: '#fff',
+//   },
+
+//   footerText: {
+//     fontSize: 11,
+//     color: colors.textTertiary,
+//     textAlign: 'center',
+//     marginTop: 6,
+//     marginBottom: 8,
+//   },
+
+//   disabledButton: {
+//     opacity: 0.6,
+//   },
+// }));
+
 import { StyleSheet, Dimensions, Platform } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export const useLoginStyles = createStyles((utils, colors) => ({
   container: {
     flex: 1,
-    backgroundColor: 'transparent', // Make sure this is transparent
+    backgroundColor: colors.background,
+    zIndex: 1,
   },
 
-  scrollView: {
-    flex: 1,
-    backgroundColor: 'transparent',
+  gradientBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: Dimensions.get('window').height * 0.5,
+    zIndex: 0,
   },
 
-  scrollContent: {
-    flexGrow: 1,
-    backgroundColor: 'transparent',
-    paddingVertical: 20,
-  },
-
-  scrollContentInner: {
-    flex: 1,
-    paddingHorizontal: 20,
-    justifyContent: 'space-between',
-    backgroundColor: 'transparent',
-  },
-
-  webContainer: {
-    flex: 1,
-    alignItems: 'center',
+  topSection: {
+    height: height * 0.5,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
     justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 20 : 30,
+    paddingBottom: 20,
+    overflow: 'hidden',
+    flexShrink: 0,
+    zIndex: 2,
     backgroundColor: 'transparent',
   },
 
-  header: {
-    alignItems: 'center',
-    marginTop: utils.spacing[8],
-    marginBottom: utils.spacing[8],
-  },
-
-  logoBox: {
+  logoContainer: {
     width: 80,
     height: 80,
-    borderRadius: 24,
+    borderRadius: 20,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: utils.spacing[4],
-    // ...(Platform.OS === 'ios' ? utils.shadows.medium : {}),
-    ...(Platform.OS === 'web' ? { boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } : {}),
+    marginBottom: 16,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: `0px 8px 16px rgba(0,0,0,0.15)`,
+      },
+    }),
+  },
+
+  logoImage: {
+    width: 50,
+    height: 50,
   },
 
   appTitle: {
-    fontSize: Platform.select({
-      web: 36,
-      default: 32,
-    }),
-    fontWeight: utils.getFontWeight('bold'),
-    color: colors.textPrimary,
-    marginBottom: utils.spacing[2],
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 6,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
 
   appSubtitle: {
-    fontSize: utils.fontSize.base,
-    color: colors.textSecondary,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
     textAlign: 'center',
-    maxWidth: width * 0.8,
+    paddingHorizontal: 30,
+    lineHeight: 18,
+    fontWeight: '400',
   },
 
-  decorativeLine: {
-    width: 60,
-    height: 3,
-    backgroundColor: colors.primary,
-    borderRadius: utils.borderRadius.full,
-    marginTop: utils.spacing[4],
-  },
-
-  formSection: {
-    width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center',
-  },
-
-  formTitle: {
-    fontSize: Platform.select({
-      web: 28,
-      default: 24,
+  bottomSection: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    marginTop: -50,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    minHeight: height * 0.5 + 50,
+    flex: 0,
+    zIndex: 15,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 12,
+      },
     }),
-    fontWeight: utils.getFontWeight('bold'),
+  },
+
+  formContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 32,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+
+  welcomeContainer: {
+    marginBottom: 28,
+  },
+
+  welcomeTitle: {
+    fontSize: 26,
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: utils.spacing[6],
+    marginBottom: 6,
+    letterSpacing: -0.3,
   },
 
-  inputWrapper: {
-    marginBottom: utils.spacing[4],
+  welcomeSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontWeight: '400',
+    lineHeight: 20,
   },
 
-  forgotLink: {
-    color: colors.primary,
-    fontWeight: utils.getFontWeight('medium'),
-    fontSize: utils.fontSize.sm,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
-    marginVertical: utils.spacing[4],
-    textAlign: 'right',
+  inputContainer: {
+    marginBottom: 20,
   },
 
-  buttonContainer: {
-    marginBottom: utils.spacing[4],
+  errorHelperText: {
+    fontSize: 12,
+    color: colors.error,
+    marginTop: 6,
+    marginLeft: 4,
+    fontWeight: '500',
+    flexDirection: 'row',
   },
 
-  signupContainer: {
+  capsLockWarning: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    // marginTop: utils.spacing[6],
+    backgroundColor: `${colors.warning}15`,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginTop: 8,
+    borderRadius: 6,
   },
 
-  signupText: {
-    color: colors.textSecondary,
+  capsLockText: {
+    fontSize: 12,
+    color: colors.warning,
+    marginLeft: 6,
+    fontWeight: '500',
   },
 
-  signupLink: {
-    color: colors.primary,
-    fontWeight: utils.getFontWeight('bold'),
-    ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+  passwordRequirements: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: `${colors.primary}08`,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
   },
 
-  versionText: {
-    textAlign: 'center',
-    color: colors.textTertiary,
-    fontSize: utils.fontSize.xs,
-    marginTop: utils.spacing[8],
+  loginButton: {
+    height: 56,
+    borderRadius: 28,
+    marginTop: 16,
+    marginBottom: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
 
-  // Add these to your styles object:
-
-  fixedContainer: {
+  loginButtonGradient: {
     flex: 1,
     justifyContent: 'center',
-  },
-
-  headerCompact: {
-    marginTop: utils.spacing[2],
-    marginBottom: utils.spacing[2],
-  },
-
-  appTitleCompact: {
-    fontSize: Platform.select({
-      ios: 24,
-      android: 22,
-      default: 20,
-    }),
-    marginBottom: utils.spacing[1],
-  },
-
-  appSubtitleCompact: {
-    fontSize: utils.fontSize.xs,
-  },
-
-  decorativeLineCompact: {
-    width: 40,
-    marginTop: utils.spacing[2],
-  },
-
-  footer: {
-    marginTop: 'auto',
     alignItems: 'center',
-    paddingBottom: utils.spacing[6],
   },
 
-  // Add/update these styles:
-
-  logoBoxCompact: {
-    width: 50,
-    height: 50,
-    borderRadius: 16,
-    marginBottom: utils.spacing[2],
+  loginButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    color: '#fff',
   },
 
-  formTitleCompact: {
-    fontSize: Platform.select({
-      ios: 20,
-      android: 18,
-      default: 18,
-    }),
-    marginBottom: utils.spacing[3],
+  forgotPasswordContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
 
-  // Add these to your existing styles:
+  forgotPasswordText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: '600',
+    textAlign: 'center',
+    textDecorationLine: 'none',
+  },
 
-  keyboardDismiss: {
-    flex: 1,
+  footerText: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 0,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+
+  disabledButton: {
+    opacity: 0.5,
   },
 }));

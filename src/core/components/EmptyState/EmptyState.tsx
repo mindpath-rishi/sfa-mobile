@@ -157,17 +157,17 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     }
   }, [variant, iconColor, colors]);
 
-  // Get default icon size if not provided
+  // Get default icon size if not provided (reduced for consistency)
   const defaultIconSize = useMemo(() => {
     if (iconSize) return iconSize;
 
     switch (size) {
       case 'small':
-        return 48;
+        return 40; // Reduced from 48
       case 'large':
-        return 96;
+        return 72; // Reduced from 96
       default:
-        return 64;
+        return 56; // Reduced from 64
     }
   }, [size, iconSize]);
 
@@ -238,7 +238,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
         }}
       >
         <AppText
-          variant={size === 'small' ? 'title' : size === 'large' ? 'heading' : 'body'}
+          variant={size === 'small' ? 'body' : size === 'large' ? 'title' : 'body'}
           weight="semibold"
           align="center"
           style={[styles.title, titleStyle]}
@@ -260,7 +260,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           transform: [{ translateY: translateYAnim }],
         }}
       >
-        <AppText variant="body" align="center" style={[styles.description, descriptionStyle]}>
+        <AppText variant="caption" align="center" style={[styles.description, descriptionStyle]}>
           {description}
         </AppText>
       </Animated.View>

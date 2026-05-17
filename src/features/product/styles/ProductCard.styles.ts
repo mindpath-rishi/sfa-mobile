@@ -7,21 +7,21 @@ export const useProductCardStyles = () => {
 
   const styleGenerator = createStyles((utils) => ({
     container: {
-      marginBottom: utils.spacing[1],
+      marginBottom: utils.spacing[1.5],
     } as ViewStyle,
 
     card: {
-      borderRadius: utils.borderRadius.lg,
+      borderRadius: utils.borderRadius.md,
     } as ViewStyle,
 
     contentRow: {
       flexDirection: 'row',
-      gap: utils.spacing[3],
+      gap: utils.spacing[2],
     } as ViewStyle,
 
     detailsContainer: {
       flex: 1,
-      gap: utils.spacing[1.5],
+      gap: utils.spacing[1],
     } as ViewStyle,
 
     // Header Section
@@ -29,7 +29,7 @@ export const useProductCardStyles = () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      gap: utils.spacing[2],
+      gap: utils.spacing[1.5],
     } as ViewStyle,
 
     titleContainer: {
@@ -37,14 +37,23 @@ export const useProductCardStyles = () => {
     } as ViewStyle,
 
     productName: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('600'),
+      fontSize: 13, // Small, consistent size
+      fontWeight: '500',
       color: colors.textPrimary,
       marginBottom: 2,
+      lineHeight: 18,
+    } as TextStyle,
+
+    productBrand: {
+      fontSize: 11, // Even smaller for secondary info
+      fontWeight: '400',
+      color: colors.textSecondary,
+      lineHeight: 15,
     } as TextStyle,
 
     productMeta: {
-      fontSize: utils.fontSize.sm,
+      fontSize: 11,
+      fontWeight: '400',
       color: colors.textSecondary,
     } as TextStyle,
 
@@ -55,12 +64,12 @@ export const useProductCardStyles = () => {
     } as ViewStyle,
 
     skuText: {
-      fontSize: utils.fontSize.xs,
+      fontSize: 10,
       color: colors.textTertiary,
     } as TextStyle,
 
     unitText: {
-      fontSize: utils.fontSize.xs,
+      fontSize: 10,
       color: colors.textTertiary,
     } as TextStyle,
 
@@ -73,19 +82,19 @@ export const useProductCardStyles = () => {
     } as ViewStyle,
 
     stockText: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('500'),
+      fontSize: 11,
+      fontWeight: '500',
       color: colors.textSecondary,
     } as TextStyle,
 
     // Scheme
     schemeContainer: {
-      marginTop: 2,
+      marginTop: 0,
     } as ViewStyle,
 
     schemeText: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('500'),
+      fontSize: 11,
+      fontWeight: '500',
     } as TextStyle,
   }));
 

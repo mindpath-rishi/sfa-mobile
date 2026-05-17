@@ -11,32 +11,32 @@ export const useEmptyStateStyles = (
 ) => {
   const { colors } = useTheme();
 
-  // Size-based spacing
+  // Size-based spacing (reduced for consistency)
   const getSpacing = () => {
     switch (size) {
       case 'small':
         return {
-          containerPadding: styleUtils.spacing[4] || 16,
-          gap: styleUtils.spacing[2] || 8,
-          iconMarginBottom: styleUtils.spacing[2] || 8,
+          containerPadding: styleUtils.spacing[3] || 12,
+          gap: styleUtils.spacing[1.5] || 6,
+          iconMarginBottom: styleUtils.spacing[1.5] || 6,
           textMarginBottom: styleUtils.spacing[1] || 4,
-          actionsMarginTop: styleUtils.spacing[2] || 8,
+          actionsMarginTop: styleUtils.spacing[1.5] || 6,
         };
       case 'large':
-        return {
-          containerPadding: styleUtils.spacing[12] || 48,
-          gap: styleUtils.spacing[6] || 24,
-          iconMarginBottom: styleUtils.spacing[6] || 24,
-          textMarginBottom: styleUtils.spacing[4] || 16,
-          actionsMarginTop: styleUtils.spacing[6] || 24,
-        };
-      default:
         return {
           containerPadding: styleUtils.spacing[8] || 32,
           gap: styleUtils.spacing[4] || 16,
           iconMarginBottom: styleUtils.spacing[4] || 16,
           textMarginBottom: styleUtils.spacing[2] || 8,
           actionsMarginTop: styleUtils.spacing[4] || 16,
+        };
+      default:
+        return {
+          containerPadding: styleUtils.spacing[6] || 24,
+          gap: styleUtils.spacing[3] || 12,
+          iconMarginBottom: styleUtils.spacing[2] || 8,
+          textMarginBottom: styleUtils.spacing[1.5] || 6,
+          actionsMarginTop: styleUtils.spacing[3] || 12,
         };
     }
   };
@@ -72,8 +72,8 @@ export const useEmptyStateStyles = (
         };
       default:
         return {
-          titleColor: colors.textPrimary,
-          descriptionColor: colors.textSecondary,
+          titleColor: colors.textSecondary,
+          descriptionColor: colors.textTertiary,
           background: 'transparent',
         };
     }
@@ -124,18 +124,20 @@ export const useEmptyStateStyles = (
     } as ViewStyle,
 
     title: {
-      fontSize: size === 'small' ? 18 : size === 'large' ? 28 : 22,
+      fontSize: size === 'small' ? 15 : size === 'large' ? 20 : 17, // Reduced from 18/28/22
       fontWeight: '600',
       color: variantColors.titleColor,
       textAlign: 'center',
       marginBottom: spacing.textMarginBottom,
+      lineHeight: size === 'large' ? 26 : 22,
     } as TextStyle,
 
     description: {
-      fontSize: size === 'small' ? 13 : size === 'large' ? 16 : 14,
+      fontSize: size === 'small' ? 12 : size === 'large' ? 14 : 13, // Reduced from 13/16/14
+      fontWeight: '400',
       color: variantColors.descriptionColor,
       textAlign: 'center',
-      lineHeight: size === 'large' ? 24 : 20,
+      lineHeight: size === 'large' ? 20 : 18,
     } as TextStyle,
 
     actionsContainer: {
@@ -147,11 +149,11 @@ export const useEmptyStateStyles = (
     } as ViewStyle,
 
     actionButton: {
-      minWidth: size === 'small' ? 100 : size === 'large' ? 160 : 120,
+      minWidth: size === 'small' ? 90 : size === 'large' ? 140 : 110, // Reduced min widths
     } as ViewStyle,
 
     secondaryButton: {
-      minWidth: size === 'small' ? 100 : size === 'large' ? 160 : 120,
+      minWidth: size === 'small' ? 90 : size === 'large' ? 140 : 110,
     } as ViewStyle,
   };
 };

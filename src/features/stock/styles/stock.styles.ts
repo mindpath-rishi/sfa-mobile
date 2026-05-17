@@ -1,6 +1,4 @@
-// stock.styles.ts
-
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -11,129 +9,112 @@ export const createStockStyles = (colors: any) =>
       backgroundColor: colors.background,
     },
 
-    // Header Styles
     headerContainer: {
       backgroundColor: colors.background,
+      paddingTop: Platform.OS === 'ios' ? 4 : 8,
     },
 
-    heroSection: {
-      paddingBottom: 24,
-      paddingHorizontal: 20,
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
-      height: 35,
-      marginBottom: 40,
-      backgroundColor: colors.primary
-    },
-
-    heroContent: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-
-    heroTitle: {
-      fontSize: 24,
-      fontWeight: 'bold',
-      color: '#FFFFFF',
-      marginBottom: 4,
-    },
-
-    heroSubtitle: {
-      fontSize: 14,
-      color: '#FFFFFF',
-      opacity: 0.9,
-    },
-
-    loadNumberChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 20,
-      gap: 6,
-    },
-
-    loadNumberChipText: {
-      fontSize: 12,
-      color: '#FFFFFF',
-      fontWeight: '500',
-    },
-
-    // Search Section (inside header)
-    searchSection: {
-      marginTop: 16,
-      paddingHorizontal: 0,
-    },
-
-    searchResultText: {
-      marginTop: 8,
-      fontSize: 12,
-      marginLeft: 4,
-      color: '#FFFFFF',
-      opacity: 0.9,
-    },
-
-    // Metrics Section
+    // Metrics Section - Horizontal Scroll (All devices)
     metricsWrapper: {
-      marginTop: 16,
-      marginBottom: 8,
+      marginVertical: 8,
     },
 
     metricsScrollContainer: {
-      paddingHorizontal: 16,
-      gap: 16,
+      paddingHorizontal: 12,
+      gap: 8,
+      alignItems: 'center',
+      flexDirection: 'row',
     },
 
-    metricItem: {
+    metricCard: {
+      flexDirection: 'row',
       alignItems: 'center',
-      minWidth: width * 0.22,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 12,
+      paddingVertical: Platform.OS === 'ios' ? 8 : 10,
+      borderRadius: 10,
+      borderWidth: 0.5,
+      borderColor: colors.divider,
+      width: width * 0.42, // Fixed width for consistency
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.05,
+          shadowRadius: 2,
+        },
+        android: {
+          elevation: 1,
+        },
+      }),
+    },
+
+    metricIconContainer: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 10,
+    },
+
+    metricContent: {
+      flex: 1,
     },
 
     metricLabel: {
       fontSize: 11,
-      marginBottom: 4,
+      fontWeight: '500',
+      marginBottom: 2,
       color: colors.textSecondary,
     },
 
     metricValue: {
-      fontSize: 18,
+      fontSize: 14,
       fontWeight: '600',
-    },
-
-    metricDivider: {
-      width: 1,
-      height: 30,
-      backgroundColor: colors.divider,
     },
 
     // Product List Styles
     listContainer: {
-      paddingBottom: 24,
+      paddingHorizontal: 12,
+      gap: 8,
+      paddingBottom: Platform.OS === 'ios' ? 20 : 16,
     },
 
     productRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.divider,
+      backgroundColor: colors.surface,
+      borderRadius: 10,
+      paddingVertical: Platform.OS === 'ios' ? 10 : 12,
+      paddingHorizontal: 12,
+      borderWidth: 0.5,
+      borderColor: colors.divider,
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.03,
+          shadowRadius: 2,
+        },
+        android: {
+          elevation: 0.5,
+        },
+      }),
     },
 
     productLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      marginRight: 12,
+      gap: 10,
+      marginRight: 10,
     },
 
     productIndex: {
-      fontSize: 14,
-      fontWeight: '500',
-      width: 30,
-      color: colors.textTertiary,
+      fontSize: 13,
+      fontWeight: '600',
+      width: 24,
+      color: colors.primary,
     },
 
     statusDot: {
@@ -149,8 +130,14 @@ export const createStockStyles = (colors: any) =>
     productName: {
       fontSize: 14,
       fontWeight: '500',
-      marginBottom: 2,
+      marginBottom: 4,
       color: colors.textPrimary,
+    },
+
+    productMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
     },
 
     productCode: {
@@ -160,12 +147,25 @@ export const createStockStyles = (colors: any) =>
 
     productRight: {
       alignItems: 'flex-end',
+      gap: 4,
+    },
+
+    stockBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+
+    priceBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
     },
 
     productStock: {
       fontSize: 14,
       fontWeight: '600',
-      marginBottom: 2,
+      color: colors.textPrimary,
     },
 
     productPrice: {
@@ -173,34 +173,25 @@ export const createStockStyles = (colors: any) =>
       color: colors.textTertiary,
     },
 
+    outOfStockBadge: {
+      backgroundColor: colors.error + '10',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+
     outOfStockText: {
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: '600',
+      color: colors.error,
     },
 
     // Loading States
-    loadingOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'rgba(0,0,0,0.5)',
-    },
-
-    loadingText: {
-      marginTop: 12,
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-
     loadingFooter: {
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: 20,
+      paddingVertical: 16,
       gap: 8,
     },
 
@@ -209,50 +200,15 @@ export const createStockStyles = (colors: any) =>
       color: colors.textSecondary,
     },
 
-    // Empty State
-    emptyStateContainer: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 60,
-      gap: 12,
-    },
-
-    emptyStateText: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-
-    clearSearchButton: {
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-    },
-
-    clearSearchText: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: colors.primary,
-    },
-
     // Skeleton Styles
     skeletonContainer: {
       flex: 1,
       backgroundColor: colors.background,
     },
 
-    skeletonHeader: {
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
-    },
-
-    skeletonSearchBar: {
-      paddingHorizontal: 16,
-      paddingTop: 16,
-    },
-
     skeletonMetrics: {
-      marginTop: 16,
-      marginBottom: 8,
-      paddingHorizontal: 16,
+      marginVertical: 8,
+      paddingHorizontal: 12,
     },
 
     skeletonMetricsRow: {
@@ -262,12 +218,12 @@ export const createStockStyles = (colors: any) =>
     },
 
     skeletonList: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       gap: 8,
-      marginTop: 16,
+      marginTop: 8,
     },
 
     skeletonItem: {
-      marginBottom: 8,
+      marginBottom: 6,
     },
   });

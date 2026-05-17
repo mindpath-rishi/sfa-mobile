@@ -1,25 +1,27 @@
-// VanInventoryTopupDetail.tsx
-
 import React, { useEffect, useState, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert, View, ScrollView } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-
-import { Loader } from '@/core/components';
-import { useTheme } from '@/shared/hooks/useTheme';
-import { vanService } from '@/shared/services/van.service';
-import { createTopupDetailStyles } from '../styles/topupDetail.styles';
-import { ActiveTab, TopupDetail } from '../types/topupDetail.types';
-import { TopupDetailHeader } from '../components/TopupDetailHeader';
-import { TopupDetailOverview } from '../components/TopupDetailOverview';
-import { TopupDetailProducts } from '../components/TopupDetailProducts';
-import { EmptyState } from '@/core/components/EmptyState';
-import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Loader, AppText } from '@/core/components';
+import { EmptyState } from '@/core/components/EmptyState';
+import { useTheme } from '@/shared/hooks/useTheme';
+import { useHeader } from '@/shared/contexts/HeaderContext';
+import { vanService } from '@/shared/services/van.service';
+import { formatCurrency } from '@/shared/utils/currenty.utils';
+import { formatWeight } from '@/shared/utils/weight.utils';
+
+import { TopupDetailHeader } from '../components/TopupDetailHeader';
+import { TopupDetailProducts } from '../components/TopupDetailProducts';
+import { createTopupDetailStyles } from '../styles/topupDetail.styles';
+import { ActiveTab, TopupDetail } from '../types/topupDetail.types';
+import { TopupItem } from '../types/topup.types';
+import { TopupDetailOverview } from '../components/TopupDetailOverview';
+
 export const VanInventoryTopupDetail: React.FC = () => {
-  const styles = createTopupDetailStyles(useTheme().colors);
   const { colors } = useTheme();
+  const styles = createTopupDetailStyles(colors);
   const route = useRoute();
   const navigation = useNavigation();
   const { id } = route?.params as { id: string };
@@ -84,7 +86,7 @@ export const VanInventoryTopupDetail: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <TopupDetailHeader
         detail={detail}
         colors={colors}

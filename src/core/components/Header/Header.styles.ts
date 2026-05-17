@@ -1,5 +1,3 @@
-// src/core/components/Header/Header.styles.ts
-
 import { ViewStyle, TextStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -10,6 +8,7 @@ interface HeaderStylesProps {
   transparent: boolean;
   size: 'sm' | 'md' | 'lg';
   showBorder: boolean;
+  showSearchBar?: boolean;
 }
 
 export const useHeaderStyles = (props: HeaderStylesProps) => {
@@ -18,16 +17,17 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
   const styleGenerator = createStyles((utils) => ({
     filterBadge: {
       position: 'absolute',
-      top: 0,
+      top: -2,
       right: 2,
       minWidth: 18,
       height: 18,
       borderRadius: 9,
-      backgroundColor: colors.surface || 'white', // Green instead of error red
+      backgroundColor: colors.success || '#10B981',
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 4,
       borderWidth: 2,
+      // borderColor: colors.background,
       zIndex: 10,
     } as ViewStyle,
 
@@ -38,7 +38,6 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       textAlign: 'center',
     } as TextStyle,
 
-    // Filter dot for active state without count
     filterDot: {
       position: 'absolute',
       top: 10,
@@ -46,25 +45,27 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       width: 8,
       height: 8,
       borderRadius: 4,
-      backgroundColor: colors.success || '#10B981', // Green instead of error red
+      backgroundColor: colors.success || '#10B981',
       zIndex: 10,
     } as ViewStyle,
 
-    // Active filter button style
     filterButtonActive: {
-      backgroundColor: colors.success + '15' || '#10B98115', // Green tint
+      backgroundColor: colors.success + '15' || '#10B98115',
     } as ViewStyle,
 
     container: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      height: props.size === 'sm' ? 56 : props.size === 'lg' ? 80 : 50,
+      // minHeight: props.size === 'sm' ? 56 : props.size === 'lg' ? 80 : 50,
+      minHeight: 48,
+      paddingVertical: 8,
+      paddingHorizontal: 8,
       borderBottomWidth: props.showBorder ? 1 : 0,
       borderBottomColor: colors.divider + '40',
       ...(props.elevated && {
         shadowColor: colors.primary,
-        shadowOffset: { width: 0, height: 0 },
+        shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 4,
         elevation: 2,
@@ -74,6 +75,7 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
     leftSection: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'flex-start',
       minWidth: 44,
     } as ViewStyle,
 
@@ -81,6 +83,15 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       flex: 1,
       alignItems: props.centeredTitle ? 'center' : 'flex-start',
       justifyContent: 'center',
+      paddingHorizontal: 8,
+    } as ViewStyle,
+
+    centerSectionWithSearch: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 8,
     } as ViewStyle,
 
     rightSection: {
@@ -88,19 +99,17 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       alignItems: 'center',
       justifyContent: 'flex-end',
       minWidth: 44,
-      gap: utils.spacing[2],
+      gap: utils.spacing[1],
     } as ViewStyle,
 
-    // Button base styles
     buttonBase: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       justifyContent: 'center',
       alignItems: 'center',
     } as ViewStyle,
 
-    // Title styles
     title: {
       fontSize: props.size === 'sm' ? 18 : props.size === 'lg' ? 28 : 22,
       fontWeight: props.size === 'lg' ? '700' : '600',
@@ -111,11 +120,10 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
     subtitle: {
       fontSize: 13,
       color: colors.textSecondary,
-      marginTop: 4,
+      marginTop: 2,
       letterSpacing: -0.2,
     } as TextStyle,
 
-    // Avatar styles (if needed)
     avatar: {
       width: 36,
       height: 36,
@@ -131,32 +139,72 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       color: '#FFFFFF',
     } as TextStyle,
 
-    // Search styles
+    // Inline search styles (within header)
+    searchContainerInline: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      height: 40,
+      borderWidth: 1,
+      borderColor: colors.border || 'rgba(0,0,0,0.1)',
+    } as ViewStyle,
+
+    searchInputInline: {
+      flex: 1,
+      marginLeft: 8,
+      fontSize: 15,
+      color: colors.textPrimary,
+      padding: 0,
+      height: 40,
+    } as ViewStyle,
+
+    clearButtonInline: {
+      padding: 4,
+      marginLeft: 4,
+    } as ViewStyle,
+
+    // Legacy search styles (for when search is below header)
+    searchBarWrapper: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 16,
+    } as ViewStyle,
+
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surface,
-      borderRadius: 16,
-      paddingHorizontal: 16,
-      height: 50,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      height: 44,
       borderWidth: 1,
-      borderColor: colors.border || 'transparent',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 4,
+      borderColor: colors.border || 'rgba(0,0,0,0.1)',
+      ...(props.elevated && {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+      }),
     } as ViewStyle,
 
     searchInput: {
       flex: 1,
-      marginLeft: 10,
+      marginLeft: 8,
       fontSize: 15,
       color: colors.textPrimary,
       padding: 0,
+      height: 44,
     } as ViewStyle,
 
-    // Badge styles
+    clearButton: {
+      padding: 4,
+      marginLeft: 4,
+    } as ViewStyle,
+
     badge: {
       position: 'absolute',
       top: -4,

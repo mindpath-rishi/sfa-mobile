@@ -104,6 +104,7 @@ const CustomDrawerContent = (props: any) => {
   const { colors } = useTheme();
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
+  const { workSessionId, setWorkSessionId } = useAuthStore();
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
@@ -126,7 +127,7 @@ const CustomDrawerContent = (props: any) => {
 
       const res: any = await vanService.fetchTodayStockSummary({
         vanId: vanIdToUse,
-        workSessionId: useRouteStore.getState().selectedRoute?.workSessionId,
+        workSessionId,
       });
       setDayEndSummary(res?.data);
       setShowDayEndSummary(true);
@@ -147,6 +148,7 @@ const CustomDrawerContent = (props: any) => {
         setShowSettlementOptions(false);
         setShowDayEndSummary(false);
         bumpDashboardRefresh();
+        setWorkSessionId(null);
         router.replace('/(drawer)/(tabs)/home');
         return;
       }
@@ -218,7 +220,7 @@ const CustomDrawerContent = (props: any) => {
           }}
         />
 
-        <DrawerItem
+        {/* <DrawerItem
           label="Logout"
           labelStyle={{ fontWeight: '500' }}
           icon={({ color, size }) => (
@@ -233,7 +235,7 @@ const CustomDrawerContent = (props: any) => {
             marginHorizontal: 8,
             marginTop: 8,
           }}
-        />
+        /> */}
       </View>
 
       <ConfirmationModal
@@ -422,6 +424,14 @@ export default function DrawerLayout() {
       backgroundColor: colors.primary,
     },
 
+    'swith-route': {
+      title: 'Change Route',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
     collection: {
       title: 'Collection',
       showMenu: false,
@@ -518,6 +528,11 @@ export default function DrawerLayout() {
           focusedIcon: 'target',
           unfocusedIcon: 'target',
         },
+        'switch-route': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'target',
+          unfocusedIcon: 'target',
+        },
         'stock-count': {
           component: MaterialCommunityIcons,
           focusedIcon: 'package-variant',
@@ -602,6 +617,14 @@ export default function DrawerLayout() {
         options={{
           title: 'My Target',
           drawerLabel: 'My Target',
+        }}
+      />
+
+      <Drawer.Screen
+        name="switch-route"
+        options={{
+          title: 'Change Route',
+          drawerLabel: 'Change Route',
         }}
       />
 

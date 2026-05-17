@@ -44,12 +44,6 @@ export default function InvoiceSharingScreen() {
   const handleBackNavigation = () => {
     // Step 1: go to outlets root
     router.replace('/route');
-
-    // Step 2: then push detail screen
-    setTimeout(() => {
-      // router.push(`/outlets/${customerId}/visit`);
-      router.push(`/route`);
-    }, 0);
   };
 
   // Handle hardware back button (Android)

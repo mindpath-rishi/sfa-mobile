@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -231,7 +231,7 @@ export default function RouteScreen() {
   const [geofenceStatus, setGeofenceStatus] = useState<Record<string, boolean>>({});
   const [autoStartInProgress, setAutoStartInProgress] = useState<Record<string, boolean>>({});
   const [showCustomerCreteModal, setShowCustomerCreateModal] = useState(false);
-  const [quickFilter, setQuickFilter] = useState<QuickFilterType>('all');
+  const [quickFilter, setQuickFilter] = useState<QuickFilterType>('not_visited');
   const [filters, setFilters] = useState({
     status: [] as string[],
     visitStatus: [] as string[],
@@ -270,7 +270,7 @@ export default function RouteScreen() {
 
   // ========== SUMMARY STATS ==========
   const summaryStats = useMemo(() => {
-    const visitedCount = outlets.filter((o) => o.visitStatus === 'COMPLETED').length;
+    const visitedCount = outlets.filter((o) => o.isVisited).length;
     const activeCount = outlets.filter((o) => o.visitStatus === 'ACTIVE').length;
     const notVisitedCount = outlets.filter(
       (o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus,
@@ -323,7 +323,7 @@ export default function RouteScreen() {
       {
         id: 'COMPLETED',
         label: 'Completed',
-        count: outlets.filter((o) => o.visitStatus === 'COMPLETED').length,
+        count: outlets.filter((o) => o.isVisited).length,
       },
       {
         id: 'ACTIVE',
@@ -436,7 +436,7 @@ export default function RouteScreen() {
     } else if (quickFilter !== 'all') {
       switch (quickFilter) {
         case 'visited':
-          filtered = filtered.filter((o) => o.visitStatus === 'COMPLETED');
+          filtered = filtered.filter((o) => o.isVisited);
           break;
         case 'not_visited':
           filtered = filtered.filter((o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus);
@@ -513,9 +513,9 @@ export default function RouteScreen() {
       const events = detectGeofenceEvents(geofenceStatus, newStatus);
       events.forEach((event) => {
         const outlet = outlets.find((o) => o._id === event.id);
-        if (outlet && event.type === 'ENTER') {
-          toast.info(`Entering ${outlet.name} area`, { duration: 2000 });
-        }
+        // if (outlet && event.type === 'ENTER') {
+        //   toast.info(`Entering ${outlet.name} area`, { duration: 2000 });
+        // }
       });
 
       setGeofenceStatus(newStatus);
@@ -579,18 +579,23 @@ export default function RouteScreen() {
   const handleRightPress2 = useCallback(() => setShowCustomerCreateModal(true), []);
   const handleFilterPress = useCallback(() => setShowFilters(true), []);
 
-  useEffect(() => {
-    setHeader({
-      onRightPress: handleRightPress2,
-      onRightPress2: handleRightPress,
-      onFilterPress: handleFilterPress,
-      showBack: true,
-      showFilter: true,
-      rightIcon: 'plus',
-      rightIcon2: 'map',
-      title: activeRoute?.routeName || 'Active Route',
-    });
-  }, [setHeader, activeRoute?.routeName, handleRightPress, handleRightPress2, handleFilterPress]);
+  useFocusEffect(
+    React.useCallback(() => {
+      setHeader({
+        onRightPress: handleRightPress2,
+        onRightPress2: handleRightPress,
+        onFilterPress: handleFilterPress,
+
+        showBack: true,
+        showFilter: true,
+
+        rightIcon: 'plus',
+        rightIcon2: 'map',
+
+        title: activeRoute?.routeName || 'Active Route',
+      });
+    }, [handleRightPress2, handleRightPress, handleFilterPress, activeRoute?.routeName]),
+  );
 
   // ========== DATA LOADING - UPDATED FOR NEW RESPONSE ==========
   const getRouteOutlets = useCallback(async () => {
@@ -640,7 +645,7 @@ export default function RouteScreen() {
           geoTag: outlet.geoTag,
           status: outlet.status,
           sequence: outlet.sequence || index + 1,
-          visitStatus: outlet.visitStatus || 'NOT_VISITED',
+          visitStatus: outlet.isVisited ? 'COMPLETED' : 'NOT_VISITED',
           isVisited: outlet.isVisited || false,
           hasSale: outlet.hasSale || false,
           hasNonSale: outlet.hasNonSale || false,
@@ -748,13 +753,6 @@ export default function RouteScreen() {
   // ========== QUICK FILTER TABS ==========
   const QuickFilterTabs = useMemo(() => {
     const tabItems = [
-      { key: 'all', label: 'All', count: summaryStats.totalOutlets, icon: 'apps' },
-      {
-        key: 'visited',
-        label: 'Visited',
-        count: summaryStats.visitedCount,
-        icon: 'checkmark-circle',
-      },
       {
         key: 'not_visited',
         label: 'Not Visited',
@@ -762,11 +760,18 @@ export default function RouteScreen() {
         icon: 'time',
       },
       {
+        key: 'visited',
+        label: 'Visited',
+        count: summaryStats.visitedCount,
+        icon: 'checkmark-circle',
+      },
+      {
         key: 'no_order',
         label: 'No Order',
         count: summaryStats.noOrderCount,
         icon: 'cash-outline',
       },
+      { key: 'all', label: 'All', count: summaryStats.totalOutlets, icon: 'apps' },
     ];
 
     return (

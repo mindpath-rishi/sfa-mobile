@@ -1,9 +1,11 @@
+// ProductUnitSelector.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { CartItemWithDetails } from '../../types/product.types';
 import { AppText } from '@/core/components';
+import { useProductUnitSelectorStyles } from '../../styles/ProductUnitSelector.styles';
 
 interface Props {
   product: CartItemWithDetails;
@@ -19,12 +21,14 @@ export const ProductUnitSelector: React.FC<Props> = ({
   showName = true,
 }) => {
   const { colors } = useTheme();
+  const styles = useProductUnitSelectorStyles();
 
   const UNITS_PER_CASE = product.unitQtyInCase || 1;
   const casePrice = product.casePrice || 0;
   const piecePrice = product.piecePrice || (UNITS_PER_CASE > 0 ? casePrice / UNITS_PER_CASE : 0);
   const availableStock = product.stock || 0;
 
+  // For topup mode, we don't have stock limits
   const isUnlimitedMode = mode === 'topup';
 
   const [caseQuantity, setCaseQuantity] = useState(product.caseQty || 0);
@@ -33,17 +37,21 @@ export const ProductUnitSelector: React.FC<Props> = ({
   const totalUnits = caseQuantity * UNITS_PER_CASE + unitQuantity;
   const totalValue = caseQuantity * casePrice + unitQuantity * piecePrice;
 
+  // Stock limits only apply to sales mode
   const isMaxStock = !isUnlimitedMode && totalUnits >= availableStock;
   const maxCases = isUnlimitedMode
-    ? 999
+    ? 10 // No limit for topup
     : Math.floor((availableStock - unitQuantity) / UNITS_PER_CASE);
-  const maxUnits = isUnlimitedMode ? 999 : availableStock - caseQuantity * UNITS_PER_CASE;
+  const maxUnits = isUnlimitedMode
+    ? 10 // No limit for topup
+    : availableStock - caseQuantity * UNITS_PER_CASE;
 
   useEffect(() => {
     setCaseQuantity(product.caseQty || 0);
     setUnitQuantity(product.pieceQty || 0);
   }, [product.caseQty, product.pieceQty]);
 
+  // Only apply stock validation for sales mode
   useEffect(() => {
     if (!isUnlimitedMode && totalUnits > availableStock && availableStock > 0) {
       const maxUnitsVal = availableStock - caseQuantity * UNITS_PER_CASE;
@@ -51,8 +59,10 @@ export const ProductUnitSelector: React.FC<Props> = ({
     }
   }, [caseQuantity, unitQuantity, availableStock, totalUnits, isUnlimitedMode]);
 
+  // Update cart whenever quantities change
   useEffect(() => {
     if (!onAddToCart) return;
+
     onAddToCart([
       {
         productId: product.productId,
@@ -91,280 +101,174 @@ export const ProductUnitSelector: React.FC<Props> = ({
   const remainingPieces = availableStock % UNITS_PER_CASE;
 
   return (
-    <View
-      style={{
-        backgroundColor: colors.surface,
-        marginBottom: 6,
-        padding: 8,
-        borderRadius: 8,
-        borderWidth: 0.5,
-        borderColor: colors.border + '30',
-      }}
-    >
-      {/* Header - Product Name & Actions */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 6,
-        }}
-      >
-        {showName && (
-          <AppText
-            style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '500', flex: 1 }}
-            numberOfLines={1}
-          >
-            {product.productName}
-          </AppText>
-        )}
-
-        {/* <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <View style={styles.container}>
+      {/* Header with Actions */}
+      <View style={styles.headerRow}>
+        <View style={styles.headerLeft}>
+          {showName && (
+            <AppText style={[styles.productName, { color: colors.textPrimary }]} numberOfLines={1}>
+              {product.productName}
+            </AppText>
+          )}
           {!isUnlimitedMode && availableStock < 10 && availableStock > 0 && (
-            <View
-              style={{
-                backgroundColor: colors.warning + '20',
-                paddingHorizontal: 4,
-                paddingVertical: 1,
-                borderRadius: 3,
-              }}
-            >
-              <AppText style={{ color: colors.warning, fontSize: 9, fontWeight: '600' }}>
-                Low Stock
-              </AppText>
+            <View style={[styles.lowStockBadge, { backgroundColor: colors.warning + '20' }]}>
+              <AppText style={[styles.lowStockText, { color: colors.warning }]}>Low Stock</AppText>
             </View>
           )}
+        </View>
 
+        <View style={styles.actionIcons}>
           {isUnlimitedMode && (
-            <TouchableOpacity
-              onPress={setMaxQuantity}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
-            >
-              <Ionicons name="flash-outline" size={14} color={colors.primary} />
-              <AppText style={{ color: colors.primary, fontSize: 10, fontWeight: '500' }}>
-                Max
-              </AppText>
+            <TouchableOpacity onPress={setMaxQuantity} style={styles.actionButton}>
+              <Ionicons name="flash-outline" size={16} color={colors.primary} />
+              <AppText style={[styles.actionText, { color: colors.primary }]}>Max</AppText>
             </TouchableOpacity>
           )}
-
           {(caseQuantity > 0 || unitQuantity > 0) && (
-            <TouchableOpacity onPress={clearQuantities}>
+            <TouchableOpacity onPress={clearQuantities} style={styles.actionButton}>
               <Ionicons name="trash-outline" size={14} color={colors.error} />
+              <AppText style={[styles.actionText, { color: colors.error }]}>Clear</AppText>
             </TouchableOpacity>
           )}
-        </View> */}
+        </View>
       </View>
 
-      {/* Cases & Pieces Row */}
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 6 }}>
+      {/* Cases and Pieces Row */}
+      <View style={styles.quantityRow}>
         {/* Cases */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: colors.background + '50',
-            borderRadius: 6,
-            padding: 6,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 4,
-            }}
-          >
-            <AppText style={{ color: colors.textPrimary, fontSize: 11, fontWeight: '600' }}>
-              Case
-            </AppText>
-            <AppText style={{ color: colors.primary, fontSize: 11, fontWeight: '600' }}>
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <View style={styles.sectionHeader}>
+            <AppText style={[styles.sectionTitle, { color: colors.textPrimary }]}>Cases</AppText>
+            <AppText style={[styles.sectionPrice, { color: colors.primary }]}>
               {formatCurrency(casePrice)}
             </AppText>
           </View>
-
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-          >
+          <View style={styles.quantityControls}>
             <TouchableOpacity
               onPress={decrementCase}
               disabled={caseQuantity === 0}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: caseQuantity === 0 ? 0.4 : 1,
-              }}
+              style={[
+                styles.quantityButton,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                  opacity: caseQuantity === 0 ? 0.4 : 1,
+                },
+              ]}
             >
-              <Ionicons name="remove" size={14} color={colors.primary} />
+              <Ionicons name="remove" size={16} color={colors.primary} />
             </TouchableOpacity>
-
             <TextInput
-              style={{
-                width: 45,
-                textAlign: 'center',
-                fontSize: 14,
-                fontWeight: '600',
-                color: colors.textPrimary,
-                paddingVertical: 4,
-                backgroundColor: colors.surface,
-                borderRadius: 6,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-              }}
+              style={[
+                styles.quantityInput,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
               value={caseQuantity.toString()}
               onChangeText={updateCaseQuantity}
               keyboardType="numeric"
             />
-
             <TouchableOpacity
               onPress={incrementCase}
               disabled={!isUnlimitedMode && (isMaxStock || caseQuantity >= maxCases)}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: !isUnlimitedMode && (isMaxStock || caseQuantity >= maxCases) ? 0.4 : 1,
-              }}
+              style={[
+                styles.quantityButton,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                  opacity: !isUnlimitedMode && (isMaxStock || caseQuantity >= maxCases) ? 0.4 : 1,
+                },
+              ]}
             >
-              <Ionicons name="add" size={14} color={colors.primary} />
+              <Ionicons name="add" size={16} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Pieces */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: colors.background + '50',
-            borderRadius: 6,
-            padding: 6,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 4,
-            }}
-          >
-            <AppText style={{ color: colors.textPrimary, fontSize: 11, fontWeight: '600' }}>
-              Piece
-            </AppText>
-            <AppText style={{ color: colors.warning, fontSize: 11, fontWeight: '600' }}>
+        <View style={[styles.section, { backgroundColor: colors.background }]}>
+          <View style={styles.sectionHeader}>
+            <AppText style={[styles.sectionTitle, { color: colors.textPrimary }]}>Pieces</AppText>
+            <AppText style={[styles.sectionPrice, { color: colors.warning }]}>
               {formatCurrency(piecePrice)}
             </AppText>
           </View>
-
-          <View
-            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-          >
+          <View style={styles.quantityControls}>
             <TouchableOpacity
               onPress={decrementUnit}
               disabled={unitQuantity === 0}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: unitQuantity === 0 ? 0.4 : 1,
-              }}
+              style={[
+                styles.quantityButton,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                  opacity: unitQuantity === 0 ? 0.4 : 1,
+                },
+              ]}
             >
-              <Ionicons name="remove" size={14} color={colors.warning} />
+              <Ionicons name="remove" size={16} color={colors.warning} />
             </TouchableOpacity>
-
             <TextInput
-              style={{
-                width: 45,
-                textAlign: 'center',
-                fontSize: 14,
-                fontWeight: '600',
-                color: colors.textPrimary,
-                paddingVertical: 4,
-                backgroundColor: colors.surface,
-                borderRadius: 6,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-              }}
+              style={[
+                styles.quantityInput,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
               value={unitQuantity.toString()}
               onChangeText={updateUnitQuantity}
               keyboardType="numeric"
             />
-
             <TouchableOpacity
               onPress={incrementUnit}
               disabled={!isUnlimitedMode && (isMaxStock || unitQuantity >= maxUnits)}
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                backgroundColor: colors.surface,
-                borderWidth: 0.5,
-                borderColor: colors.border,
-                justifyContent: 'center',
-                alignItems: 'center',
-                opacity: !isUnlimitedMode && (isMaxStock || unitQuantity >= maxUnits) ? 0.4 : 1,
-              }}
+              style={[
+                styles.quantityButton,
+                {
+                  borderColor: colors.border,
+                  backgroundColor: colors.surface,
+                  opacity: !isUnlimitedMode && (isMaxStock || unitQuantity >= maxUnits) ? 0.4 : 1,
+                },
+              ]}
             >
-              <Ionicons name="add" size={14} color={colors.warning} />
+              <Ionicons name="add" size={16} color={colors.warning} />
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
-      {/* Footer - Stock Info & Total */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingTop: 4,
-          borderTopWidth: 0.5,
-          borderTopColor: colors.divider,
-        }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-            <Ionicons name="cube-outline" size={10} color={colors.textSecondary} />
-            <AppText style={{ color: colors.textSecondary, fontSize: 9 }}>
+      {/* Compact Stock Info */}
+      <View style={[styles.stockInfoRow, { borderTopColor: colors.divider }]}>
+        <View style={styles.stockInfoLeft}>
+          <View style={styles.stockInfoItem}>
+            <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
+            <AppText style={[styles.stockInfoText, { color: colors.textSecondary }]}>
               {availableStock} pcs
             </AppText>
-          </View> */}
-
+          </View>
           {availableCases > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              {/* <Ionicons name="options-outline" size={9} color={colors.textSecondary} /> */}
-              <AppText style={{ color: colors.textSecondary, fontSize: 9 }}>
+            <View style={styles.stockInfoItem}>
+              <Ionicons name="options-outline" size={10} color={colors.textSecondary} />
+              <AppText style={[styles.stockInfoDetail, { color: colors.textSecondary }]}>
                 {availableCases}c {remainingPieces > 0 && `+${remainingPieces}p`}
               </AppText>
             </View>
           )}
-
           {!isUnlimitedMode && totalUnits === availableStock && totalUnits > 0 && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-              <Ionicons name="checkmark-circle" size={9} color={colors.success} />
-              <AppText style={{ color: colors.success, fontSize: 9 }}>Max</AppText>
+            <View style={styles.stockInfoItem}>
+              <Ionicons name="checkmark-circle" size={10} color={colors.success} />
+              <AppText style={[styles.allStockText, { color: colors.success }]}>Max</AppText>
             </View>
           )}
         </View>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <AppText style={{ color: colors.textSecondary, fontSize: 10 }}>Total:</AppText>
-          <AppText style={{ color: colors.primary, fontWeight: '700', fontSize: 12 }}>
+        <View style={styles.totalValueContainer}>
+          <AppText style={[styles.totalLabel, { color: colors.textSecondary }]}>Total:</AppText>
+          <AppText style={[styles.totalValue, { color: colors.primary }]}>
             {formatCurrency(totalValue)}
           </AppText>
         </View>

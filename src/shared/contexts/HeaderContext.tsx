@@ -1,16 +1,8 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useCallback,
-  useMemo,
-} from 'react';
-import { useSegments } from 'expo-router';
-import { useTheme } from '@/shared/hooks/useTheme';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
-/* ============================
- * TYPES
- * ============================ */
+import { useSegments } from 'expo-router';
+
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export type HeaderConfig = {
   title?: string;
@@ -18,11 +10,13 @@ export type HeaderConfig = {
 
   showBack?: boolean;
   showMenu?: boolean;
+
   showSearch?: boolean;
   showFilter?: boolean;
 
   searchValue?: string;
   searchPlaceholder?: string;
+
   onSearchChange?: (text: string) => void;
   onSearchClear?: () => void;
   onSearchPress?: () => void;
@@ -37,140 +31,111 @@ export type HeaderConfig = {
   onRightPress?: () => void;
   onRightPress2?: () => void;
 
-  secondRightIcon?: string;
-  onSecondRightPress?: () => void;
-
-  badgeCount?: number;
-
-  centeredTitle?: boolean;
-  elevated?: boolean;
-  showBorder?: boolean;
-  useGradient?: boolean;
-  gradientColors?: string[];
-  transparent?: boolean;
-
   hidden?: boolean;
-  backgroundColor?: string;
-  size?: 'small' | 'medium' | 'large';
 
-  __ts?: number; // 🔥 force re-render key
+  backgroundColor?: string;
+
+  size?: 'small' | 'medium' | 'large';
 };
 
 type HeaderContextType = {
   config: HeaderConfig;
   setHeader: (config: Partial<HeaderConfig>) => void;
+  resetHeader: () => void;
 };
-
-/* ============================
- * CONTEXT
- * ============================ */
 
 const HeaderContext = createContext<HeaderContextType | undefined>(undefined);
 
-/* ============================
- * ROUTE KEY
- * ============================ */
-
-const getRouteKey = (segments: string[]) => {
-  if (!segments || segments.length === 0) return 'root';
-
-  return segments
-    .map((seg) => {
-      if (/^\d+$/.test(seg)) return '[id]';
-      if (seg.length > 20) return '[param]';
-      return seg;
-    })
-    .join('/');
-};
-
-/* ============================
- * PROVIDER
- * ============================ */
-
 export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
   const segments = useSegments();
+
   const { colors } = useTheme();
 
-  const routeKey = useMemo(() => getRouteKey(segments), [segments]);
-  console.log(routeKey, "routeKey")
+  const isHome = segments.includes('home');
 
-  const [configs, setConfigs] = useState<Record<string, HeaderConfig>>({});
-
-  /* ============================
-   * BASE CONFIG
-   * ============================ */
-
-  const baseConfig: HeaderConfig = useMemo(() => {
-    const isRoot = segments.length <= 1;
-    const isHome = segments.includes('home');
-
-    console.log(isRoot, "==================root=====================", isHome )
-
-    return {
+  const baseConfig = useMemo<HeaderConfig>(
+    () => ({
       title: '',
+
+      subtitle: '',
+
       showBack: !isHome,
+
       showMenu: isHome,
+
       showSearch: false,
+
       showFilter: false,
+
       searchValue: '',
+
       searchPlaceholder: 'Search...',
+
       filterActive: false,
+
       filterCount: 0,
-      badgeCount: 0,
+
       centeredTitle: true,
+
       elevated: true,
+
       showBorder: false,
-      useGradient: false,
-      transparent: false,
+
       hidden: false,
+
       backgroundColor: colors.primary,
+
       size: 'medium',
-    };
-  }, [segments, colors.primary]);
 
-  /* ============================
-   * SET HEADER (FIXED)
-   * ============================ */
+      rightIcon: undefined,
+      rightIcon2: undefined,
 
-const setHeader = useCallback(
-  (newConfig: Partial<HeaderConfig>) => {
-    setConfigs((prev) => ({
-      ...prev,
-      [routeKey]: {
-        ...newConfig, // ✅ no merge with old config
-        __ts: Date.now(),
-      },
-    }));
-  },
-  [routeKey],
-);
+      onRightPress: undefined,
+      onRightPress2: undefined,
 
-  /* ============================
-   * FINAL CONFIG (MEMOIZED)
-   * ============================ */
+      onSearchChange: undefined,
+      onSearchClear: undefined,
+      onSearchPress: undefined,
 
-  const config = useMemo(() => {
-    return {
-      ...baseConfig,
-      ...(configs[routeKey] || {}),
-    };
-  }, [baseConfig, configs, routeKey]);
-
-  return (
-    <HeaderContext.Provider value={{ config, setHeader }}>
-      {children}
-    </HeaderContext.Provider>
+      onFilterPress: undefined,
+    }),
+    [isHome, colors.primary],
   );
-};
 
-/* ============================
- * HOOK
- * ============================ */
+  const [config, setConfig] = useState<HeaderConfig>(baseConfig);
+
+  const setHeader = useCallback(
+    (newConfig: Partial<HeaderConfig>) => {
+      setConfig({
+        ...baseConfig,
+        ...newConfig,
+      });
+    },
+    [baseConfig],
+  );
+
+  const resetHeader = useCallback(() => {
+    setConfig(baseConfig);
+  }, [baseConfig]);
+
+  const value = useMemo(
+    () => ({
+      config,
+      setHeader,
+      resetHeader,
+    }),
+    [config, setHeader, resetHeader],
+  );
+
+  return <HeaderContext.Provider value={value}>{children}</HeaderContext.Provider>;
+};
 
 export const useHeader = () => {
   const context = useContext(HeaderContext);
+
   if (!context) {
     throw new Error('useHeader must be used within HeaderProvider');
   }
+
   return context;
 };

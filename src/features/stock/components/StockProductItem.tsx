@@ -1,8 +1,8 @@
 // StockProductItem.tsx
 
 import React from 'react';
-import { Animated, View } from 'react-native';
-
+import { Animated, View, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
 import { StockProductItemProps } from '../types/stock.types';
 
@@ -15,6 +15,7 @@ export const StockProductItem: React.FC<StockProductItemProps> = ({
   opacityAnim,
   colors,
   styles,
+  onPress,
 }) => {
   const outOfStock = isOutOfStock(item);
   const animatedStyle = {
@@ -24,50 +25,70 @@ export const StockProductItem: React.FC<StockProductItemProps> = ({
     ],
   };
 
+  const handlePress = () => {
+    if (onPress) {
+      onPress(item);
+    }
+  };
+
   return (
-    <Animated.View style={[styles.productRow, animatedStyle]}>
-      <View style={styles.productLeft}>
-        <AppText style={[styles.productIndex, { color: colors.textTertiary }]}>
-          {index + 1}
-        </AppText>
-        <View
-          style={[
-            styles.statusDot,
-            { backgroundColor: outOfStock ? colors.error : colors.success },
-          ]}
-        />
-      </View>
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.7} disabled={!onPress}>
+      <Animated.View style={[styles.productRow, animatedStyle]}>
+        {/* Left Section: Index & Status */}
+        <View style={styles.productLeft}>
+          <AppText style={styles.productIndex}>{index + 1}</AppText>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: outOfStock ? colors.error : colors.success },
+            ]}
+          />
+        </View>
 
-      <View style={styles.productCenter}>
-        <AppText
-          style={[styles.productName, outOfStock && { color: colors.textSecondary }]}
-          numberOfLines={2}
-        >
-          {item.name}
-        </AppText>
-        {item.productId && (
-          <AppText style={[styles.productCode, { color: colors.textTertiary }]}>
-            {item.productId}
+        {/* Center Section: Product Info */}
+        <View style={styles.productCenter}>
+          <AppText
+            style={[styles.productName, outOfStock && { color: colors.textSecondary }]}
+            numberOfLines={2}
+          >
+            {item.name}
           </AppText>
-        )}
-      </View>
-
-      <View style={styles.productRight}>
-        {outOfStock ? (
-          <AppText style={[styles.outOfStockText, { color: colors.error }]}>Out</AppText>
-        ) : (
-          <>
-            <AppText style={[styles.productStock, { color: colors.primary }]}>
-              {formatStock(item.cases, item.pieces)}
-            </AppText>
-            {item.price && (
-              <AppText style={[styles.productPrice, { color: colors.textTertiary }]}>
-                {formatCurrency(item.price)}
+          {item.productId && (
+            <View style={styles.productMetaRow}>
+              <Ionicons name="barcode-outline" size={10} color={colors.textTertiary} />
+              <AppText style={[styles.productCode, { color: colors.textTertiary }]}>
+                {item.productId}
               </AppText>
-            )}
-          </>
-        )}
-      </View>
-    </Animated.View>
+            </View>
+          )}
+        </View>
+
+        {/* Right Section: Stock & Price */}
+        <View style={styles.productRight}>
+          {outOfStock ? (
+            <View style={styles.outOfStockBadge}>
+              <AppText style={styles.outOfStockText}>Out of Stock</AppText>
+            </View>
+          ) : (
+            <>
+              <View style={styles.stockBadge}>
+                <Ionicons name="cube-outline" size={10} color={colors.primary} />
+                <AppText style={[styles.productStock, { color: colors.primary }]}>
+                  {formatStock(item.cases, item.pieces)}
+                </AppText>
+              </View>
+              {item.price && (
+                <View style={styles.priceBadge}>
+                  <Ionicons name="cash-outline" size={10} color={colors.textTertiary} />
+                  <AppText style={[styles.productPrice, { color: colors.textTertiary }]}>
+                    {formatCurrency(item.price)}
+                  </AppText>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
   );
 };

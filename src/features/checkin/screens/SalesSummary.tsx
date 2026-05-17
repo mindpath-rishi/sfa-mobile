@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { View, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { TotalsCard } from '../components/sale/TotalCard';
 import { ProductsSection } from '../components/sale/ProductsSection';
@@ -13,6 +13,7 @@ import { ConfirmationModal } from '@/core/components';
 import { vanService } from '@/shared/services/van.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 
 type ScreenMode = 'sales' | 'topup';
 
@@ -21,6 +22,7 @@ export default function OrderSummary() {
   const { mode } = useLocalSearchParams<{ mode: ScreenMode }>();
   const currentMode = mode || 'sales';
   const user = useAuthStore.getState().user;
+  const { setHeader } = useHeader();
 
   // Zustand stores
   const { items, summary, clearCart } = useCartStore();
@@ -33,6 +35,18 @@ export default function OrderSummary() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const hasItems = summary.totalSkus > 0;
+
+  const selectedOutlet = useOutletStore((s) => s.selectedOutlet);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setHeader({
+        title: selectedOutlet?.name,
+        showBack: true,
+        showMenu: false,
+      });
+    }, []),
+  );
 
   // Calculate total weight for top-up mode
   const totalWeight = useMemo(() => {
@@ -120,20 +134,16 @@ export default function OrderSummary() {
       productId: item.productId,
       productName: item.productName,
 
-      // ✅ CASES & PIECES
       requestedCaseQty: item.caseQty || 0,
       requestedPieceQty: item.pieceQty || 0,
 
-      // ✅ DERIVED QTY
       requestedQty: (item.caseQty || 0) * item.unitQtyInCase + (item.pieceQty || 0),
 
       unitQtyInCase: item.unitQtyInCase,
 
-      // ✅ PRICING
       piecePrice: item.piecePrice,
       casePrice: item.casePrice,
 
-      // ✅ WEIGHT
       pieceNetWeight: item.pieceNetWeight || 0,
       caseNetWeight: item.caseNetWeight || 0,
 
@@ -141,7 +151,6 @@ export default function OrderSummary() {
         (item.caseQty || 0) * (item.caseNetWeight || 0) +
         (item.pieceQty || 0) * (item.pieceNetWeight || 0),
 
-      // ✅ VALUE
       requestedValue: (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice,
     }));
 
@@ -152,10 +161,8 @@ export default function OrderSummary() {
       warehouseId: 'WH-001',
       date: new Date().toISOString(),
 
-      // ✅ NEW TOTALS
       totalRequestedCases,
       totalRequestedPieces,
-
       totalRequestedQty,
       totalRequestedWeight,
       totalRequestedValue,
@@ -187,7 +194,7 @@ export default function OrderSummary() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [buildTopupPayload, currentConfig, clearCart]);
+  }, [buildTopupPayload]);
 
   /* ================= HANDLE SUBMIT ================= */
   const handleSubmit = useCallback(() => {
@@ -197,7 +204,6 @@ export default function OrderSummary() {
     }
 
     if (currentMode === 'sales') {
-      // Sales mode - navigate to payment
       const orderItems = items.map((item) => ({
         id: item.productId,
         name: item.productName,
@@ -222,7 +228,6 @@ export default function OrderSummary() {
         },
       });
     } else {
-      // Top-up mode - show confirmation modal
       setShowConfirmation(true);
     }
   }, [hasItems, currentMode, currentConfig, items, summary, outlet]);
@@ -249,23 +254,17 @@ export default function OrderSummary() {
 
   // Totals props based on mode
   const getTotalsProps = () => {
-    const baseProps = {
-      subtotal: summary.totalValue,
-      total: summary.totalValue,
-      hasItems,
-    };
-
     if (currentMode === 'sales') {
-      const tax = summary.totalValue * 0;
       return {
-        ...baseProps,
-        tax,
-        total: summary.totalValue + tax,
+        total: summary.totalValue,
+        hasItems,
+        mode: currentMode,
       };
     } else {
       return {
-        ...baseProps,
-        tax: undefined,
+        total: summary.totalValue,
+        hasItems,
+        mode: currentMode,
         showWeight: true,
         totalWeight,
       };
@@ -280,7 +279,7 @@ export default function OrderSummary() {
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 12, paddingBottom: 96, gap: 10 }}
+        contentContainerStyle={{ padding: 12, paddingBottom: 80, gap: 6 }}
         keyboardShouldPersistTaps="handled"
       >
         <HeaderCard
@@ -296,7 +295,7 @@ export default function OrderSummary() {
           mode={currentMode}
         />
 
-        <TotalsCard {...getTotalsProps()} mode={currentMode} />
+        <TotalsCard {...getTotalsProps()} />
 
         <ProductsSection products={items} hasItems={hasItems} mode={currentMode} />
       </ScrollView>
@@ -304,12 +303,11 @@ export default function OrderSummary() {
       <BottomCTA
         hasItems={hasItems}
         isProcessing={isSubmitting}
-        total={currentMode === 'sales' ? summary.totalValue : summary.totalValue}
+        total={summary.totalValue}
         units={summary.totalItems}
         onPress={handleSubmit}
         buttonText={currentConfig.submitButtonText}
         mode={currentMode}
-        weight={currentMode === 'topup' ? totalWeight : undefined}
       />
 
       {/* Confirmation Modal for Top-up */}
@@ -319,10 +317,8 @@ export default function OrderSummary() {
         message={
           `Submit top-up request with ${summary.totalSkus} skus(s)?\n\n` +
           `Total Value: K ${summary.totalValue.toLocaleString()}\n` +
-          `Total Weight: ${totalWeight.toFixed(2)} kg\n` +
           `Total Cases: ${summary.totalCases}\n` +
-          `Total Pieces: ${summary.totalPieces}\n` +
-          `Total Items: ${summary.totalItems}\n`
+          `Total Pieces: ${summary.totalPieces}`
         }
         confirmText="Submit Request"
         cancelText="Cancel"

@@ -63,7 +63,6 @@ export type AppColors = {
   gradientError: readonly [string, string];
 };
 
-
 export const lightColors: AppColors = {
   // Primary (more premium blue)
   primary: '#2563EB',
@@ -130,7 +129,6 @@ export const lightColors: AppColors = {
   gradientSuccess: ['#22C55E', '#15803D'] as const,
   gradientError: ['#EF4444', '#B91C1C'] as const,
 };
-
 
 export const darkColors: AppColors = {
   // Primary

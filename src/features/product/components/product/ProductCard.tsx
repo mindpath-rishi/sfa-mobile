@@ -54,11 +54,8 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart, mode
       style={[animatedStyle, styles.container]}
     >
       <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
-        <AppCard variant="elevated" padding="md">
+        <AppCard variant="elevated" padding="sm">
           <View style={styles.contentRow}>
-            {/* Product Image - Uncomment if needed */}
-            {/* <ProductImage image={product.image} size="medium" discount={product.discount} /> */}
-
             {/* Product Details */}
             <View style={styles.detailsContainer}>
               {/* Header Row with Name and Status */}
@@ -68,22 +65,13 @@ export const ProductCard: React.FC<Props> = ({ product, index, onAddToCart, mode
                     {product.name}
                   </AppText>
                   {product.brand && (
-                    <AppText style={styles.productMeta} numberOfLines={1}>
-                      {product.brand} • {product.category || 'Category'}
+                    <AppText style={styles.productBrand} numberOfLines={1}>
+                      {product.brand}
                     </AppText>
                   )}
                 </View>
                 <ProductStatusBadge status={product.stock ? 'in_stock' : 'out_of_stock'} />
               </View>
-
-              {/* SKU and Unit Info - Uncomment if needed */}
-              {/* <View style={styles.infoRow}>
-                <Text style={styles.skuText}>SKU: {product.sku}</Text>
-                <Text style={styles.unitText}>Unit: {product.unitType}</Text>
-              </View> */}
-
-              {/* Tags - Uncomment if needed */}
-              {/* <ProductTags tags={product.tags} limit={2} /> */}
 
               {/* Scheme/Badge */}
               {product.discount && product.discount > 0 && (

@@ -19,6 +19,7 @@ import { AppCard } from '@/core/components/Card';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { useAuthStore } from '@/core/store/auth.store';
 
 // Mock salesman data
 const SALESMAN_DATA = {
@@ -34,11 +35,11 @@ const SALESMAN_DATA = {
   employeeId: 'SFA-2022-001',
   aadhar: 'XXXX-XXXX-1234',
   pan: 'ABCDE1234F',
-  bankDetails: {
-    account: 'XXXXXX1234',
-    ifsc: 'SBIN0001234',
-    bank: 'State Bank of India',
-  },
+  // bankDetails: {
+  //   account: 'XXXXXX1234',
+  //   ifsc: 'SBIN0001234',
+  //   bank: 'State Bank of India',
+  // },
   stats: {
     totalVisits: 1245,
     totalOrders: 892,
@@ -55,12 +56,12 @@ const SALESMAN_DATA = {
     { id: 3, title: '100% Collection Target', date: 'Jan 2024', icon: 'cash' },
     { id: 4, title: 'Employee of the Month', date: 'Dec 2023', icon: 'medal' },
   ],
-  documents: [
-    { id: 1, name: 'Employment Contract', type: 'pdf', size: '2.5 MB', verified: true },
-    { id: 2, name: 'Aadhar Card', type: 'pdf', size: '1.2 MB', verified: true },
-    { id: 3, name: 'PAN Card', type: 'pdf', size: '0.8 MB', verified: true },
-    { id: 4, name: 'Bank Proof', type: 'pdf', size: '1.5 MB', verified: false },
-  ],
+  // documents: [
+  //   { id: 1, name: 'Employment Contract', type: 'pdf', size: '2.5 MB', verified: true },
+  //   { id: 2, name: 'Aadhar Card', type: 'pdf', size: '1.2 MB', verified: true },
+  //   { id: 3, name: 'PAN Card', type: 'pdf', size: '0.8 MB', verified: true },
+  //   { id: 4, name: 'Bank Proof', type: 'pdf', size: '1.5 MB', verified: false },
+  // ],
   settings: {
     notifications: true,
     darkMode: false,
@@ -82,6 +83,7 @@ const SALESMAN_DATA = {
 // Profile Header Component
 const ProfileHeader = ({ user, onEditPress }: any) => {
   const { colors } = useTheme();
+  const logout = useAuthStore((s) => s.logout);
 
   return (
     <LinearGradient
@@ -335,6 +337,7 @@ export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
   const [userData, setUserData] = useState(SALESMAN_DATA);
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'stats', 'settings', 'docs'
+  const logout = useAuthStore((s) => s.logout);
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
@@ -362,15 +365,9 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        onPress: () => router.replace('/(auth)'),
-        style: 'destructive',
-      },
-    ]);
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/(auth)');
   };
 
   const handleUploadDocument = async () => {
@@ -415,7 +412,7 @@ export default function ProfileScreen() {
       </AppCard>
 
       {/* Bank Details */}
-      <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 16 }}>
+      {/* <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 16 }}>
         <Text
           style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
         >
@@ -424,10 +421,10 @@ export default function ProfileScreen() {
         <InfoRow icon="card" label="Account Number" value={userData.bankDetails.account} />
         <InfoRow icon="code" label="IFSC Code" value={userData.bankDetails.ifsc} />
         <InfoRow icon="business" label="Bank Name" value={userData.bankDetails.bank} />
-      </AppCard>
+      </AppCard> */}
 
       {/* KYC Details */}
-      <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 30 }}>
+      {/* <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 30 }}>
         <Text
           style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
         >
@@ -435,7 +432,7 @@ export default function ProfileScreen() {
         </Text>
         <InfoRow icon="id-card" label="Aadhar Number" value={userData.aadhar} />
         <InfoRow icon="document" label="PAN Number" value={userData.pan} />
-      </AppCard>
+      </AppCard> */}
     </>
   );
 
@@ -725,10 +722,10 @@ export default function ProfileScreen() {
             </View>
           </TouchableOpacity>
         </View>
-
+        {/* 
         {userData.documents.map((doc) => (
           <DocumentItem key={doc.id} doc={doc} />
-        ))}
+        ))} */}
       </AppCard>
 
       {/* Recent Activity */}
@@ -803,7 +800,7 @@ export default function ProfileScreen() {
             { key: 'profile', label: 'Profile', icon: 'person' },
             { key: 'stats', label: 'Stats', icon: 'stats-chart' },
             { key: 'settings', label: 'Settings', icon: 'settings' },
-            { key: 'docs', label: 'Documents', icon: 'document' },
+            // { key: 'docs', label: 'Documents', icon: 'document' },
           ].map((tab) => (
             <TouchableOpacity
               key={tab.key}
@@ -833,7 +830,7 @@ export default function ProfileScreen() {
         {activeTab === 'profile' && renderProfileTab()}
         {activeTab === 'stats' && renderStatsTab()}
         {activeTab === 'settings' && renderSettingsTab()}
-        {activeTab === 'docs' && renderDocumentsTab()}
+        {/* {activeTab === 'docs' && renderDocumentsTab()} */}
       </ScrollView>
     </View>
   );

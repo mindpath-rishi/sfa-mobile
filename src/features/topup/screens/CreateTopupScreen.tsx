@@ -19,14 +19,14 @@ export default function CreateTopupScreen() {
   const { setHeader } = useHeader();
 
   /* -------------------- Header -------------------- */
-  useFocusEffect(
-    useCallback(() => {
-      setHeader({
-        showFilter: false,
-        title: van?.name,
-      });
-    }, [setHeader]),
-  );
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     setHeader({
+  //       showFilter: false,
+  //       title: van?.name,
+  //     });
+  //   }, [setHeader]),
+  // );
 
   const handleCartUpdate = useCallback((items: CartItem[], summary: any) => {
     setCartItems(items);

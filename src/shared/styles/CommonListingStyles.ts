@@ -12,35 +12,35 @@ export const useCommonListingStyles = () => {
       backgroundColor: colors.background,
     } as ViewStyle,
 
+    /* -------------------- Fixed Search Container -------------------- */
     fixedSearchContainer: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      zIndex: 100000,
-      backgroundColor: colors.primary,
-      padding: 10,
-      elevation: 3,
-      height: 35,
-      borderBottomLeftRadius: 24,
-      borderBottomRightRadius: 24,
-    },
-
-    listContent: {
-      paddingHorizontal: utils.spacing[2],
+      backgroundColor: colors.background,
+      paddingHorizontal: utils.spacing[3],
+      paddingTop: utils.spacing[2],
+      paddingBottom: utils.spacing[2],
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.divider,
+      zIndex: 10,
     } as ViewStyle,
 
+    /* -------------------- List Content -------------------- */
+    listContent: {
+      paddingHorizontal: utils.spacing[2],
+      paddingBottom: utils.spacing[4],
+    } as ViewStyle,
+
+    /* -------------------- Empty State Container -------------------- */
     emptyContainer: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: utils.spacing[4],
-      paddingVertical: utils.spacing[6],
+      paddingVertical: utils.spacing[8],
     } as ViewStyle,
 
-    /* -------------------- Search -------------------- */
+    /* -------------------- Search Container (Deprecated - use fixedSearchContainer) -------------------- */
     searchContainer: {
-      paddingHorizontal: utils.spacing[4],
+      paddingHorizontal: utils.spacing[3],
       marginBottom: utils.spacing[2],
     } as ViewStyle,
 
@@ -55,82 +55,70 @@ export const useCommonListingStyles = () => {
     filterContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      paddingHorizontal: utils.spacing[4],
+      paddingHorizontal: utils.spacing[3],
       paddingVertical: utils.spacing[2],
       gap: utils.spacing[2],
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.divider,
+      backgroundColor: colors.background,
     } as ViewStyle,
 
     chip: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.primary + '15',
-      borderRadius: utils.borderRadius.full,
-      paddingHorizontal: utils.spacing[3],
-      paddingVertical: utils.spacing[1],
-      gap: utils.spacing[1],
+      backgroundColor: colors.primary + '10',
+      borderRadius: 14,
+      paddingHorizontal: utils.spacing[2.5],
+      paddingVertical: utils.spacing[1.25],
+      gap: utils.spacing[1.5],
     } as ViewStyle,
 
     chipText: {
       fontSize: utils.fontSize.xs,
       color: colors.primary,
-      fontWeight: utils.getFontWeight('medium'),
+      fontWeight: '500',
     } as TextStyle,
 
     chipClear: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.error + '15',
-      borderRadius: utils.borderRadius.full,
-      paddingHorizontal: utils.spacing[3],
-      paddingVertical: utils.spacing[1],
-      gap: utils.spacing[1],
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      paddingHorizontal: utils.spacing[2.5],
+      paddingVertical: utils.spacing[1.25],
+      gap: utils.spacing[1.5],
+      borderWidth: 0.5,
+      borderColor: colors.border,
     } as ViewStyle,
 
     chipClearText: {
       fontSize: utils.fontSize.xs,
-      color: colors.error,
-      fontWeight: utils.getFontWeight('semibold'),
-    } as TextStyle,
-
-    /* -------------------- Empty State -------------------- */
-    emptyTitle: {
-      fontSize: utils.fontSize.md,
-      fontWeight: utils.getFontWeight('bold'),
-      color: colors.textPrimary,
-      marginBottom: utils.spacing[2],
-      textAlign: 'center',
-    } as TextStyle,
-
-    emptyText: {
-      fontSize: utils.fontSize.sm,
       color: colors.textSecondary,
-      textAlign: 'center',
+      fontWeight: '500',
     } as TextStyle,
+
+    /* -------------------- Header Container -------------------- */
+    headerContainer: {
+      marginBottom: utils.spacing[1],
+    } as ViewStyle,
+
+    /* -------------------- Footer Container -------------------- */
+    footerContainer: {
+      paddingVertical: utils.spacing[3],
+      alignItems: 'center',
+    } as ViewStyle,
 
     /* -------------------- Loading Skeleton -------------------- */
     skeletonContainer: {
       gap: utils.spacing[3],
-      paddingHorizontal: utils.spacing[4],
+      paddingHorizontal: utils.spacing[3],
+      paddingVertical: utils.spacing[2],
     } as ViewStyle,
 
     skeletonItem: {
       height: 100,
       borderRadius: utils.borderRadius.lg,
       backgroundColor: colors.surface,
-      opacity: 0.7,
-    } as ViewStyle,
-
-    /* -------------------- Header -------------------- */
-    headerContainer: {
-      marginBottom: utils.spacing[2],
-    } as ViewStyle,
-
-    /* -------------------- Footer -------------------- */
-    footerContainer: {
-      paddingVertical: utils.spacing[4],
-      alignItems: 'center',
     } as ViewStyle,
   }));
 

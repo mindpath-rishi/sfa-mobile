@@ -1,16 +1,23 @@
 // StockPage.tsx
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, FlatList, ActivityIndicator, Animated, RefreshControl } from 'react-native';
+import {
+  View,
+  FlatList,
+  ActivityIndicator,
+  Animated,
+  RefreshControl,
+  Platform,
+} from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { vanService } from '@/shared/services/van.service';
 import { useRouteStore } from '@/core/store/route.store';
 import { AppText, Skeleton } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { createStockStyles } from '../styles/stock.styles';
-import { StockHeader } from '../components/StockHeader';
 import { StockProductItem } from '../components/StockProductItem';
 import { StockMetrics } from '../components/StockMetrix';
 import { StockPageProps, StockSummary, StockItem } from '../types/stock.types';
@@ -25,12 +32,13 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   const { colors } = useTheme();
   const route = useRoute();
   const van = useRouteStore.getState().van;
+  const insets = useSafeAreaInsets();
 
   const loadNumber = propLoadNumber || (route.params as any)?.loadNumber;
 
   // State
   const [stock, setStock] = useState<StockItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -50,19 +58,34 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   const flatListRef = useRef<FlatList>(null);
   const { setHeader } = useHeader();
 
+  // Update header with search bar
+  useFocusEffect(
+    useCallback(() => {
+      setHeader({
+        title: 'Available Stock',
+        showBack: true,
+        showSearchBar: true,
+        searchPlaceholder: 'Search products...',
+        searchValue: searchQuery,
+        onSearchChange: handleSearch,
+        onSearchClear: clearSearch,
+        onSearchPress: () => {
+          if (searchQuery.trim()) {
+            fetchStock(false, 1, searchQuery, true);
+          }
+        },
+        autoFocusSearch: false,
+        showFilter: false,
+        elevated: true,
+        centeredTitle: false,
+        size: 'sm',
+        showBorder: false,
+      });
+    }, [searchQuery]),
+  );
 
-    useFocusEffect(
-      useCallback(() => {
-        setHeader({
-          showFilter: false,
-          title: 'Available Stock',
-        });
-      }, [setHeader])
-    );
-
-  // Fetch stock with search
   const fetchStock = useCallback(
-    async (isRefresh = false, page = 1, search = searchQuery) => {
+    async (isRefresh = false, page = 1, search = searchQuery, isSearchAction = false) => {
       if (!van?.vanId) {
         setStock([]);
         setTotalItems(0);
@@ -70,9 +93,14 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
       }
 
       try {
-        if (isRefresh) setRefreshing(true);
-        else if (page === 1) setIsLoading(true);
-        else setIsLoadingMore(true);
+        if (isRefresh) {
+          setRefreshing(true);
+        } else if (isSearchAction || page === 1) {
+          setIsLoading(true);
+          setStock([]);
+        } else {
+          setIsLoadingMore(true);
+        }
 
         const response = await vanService.fetchVanStocks(van.vanId, {
           searchText: search || undefined,
@@ -83,7 +111,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         const data = response?.data;
         const products = data?.products || [];
 
-        if (page === 1) {
+        if (page === 1 || isSearchAction) {
           setStock(products);
           setTotalItems(data?.total || 0);
           setSummary({
@@ -114,25 +142,42 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
           setTotalItems(0);
         }
       } finally {
-        if (isRefresh) setRefreshing(false);
-        else if (page === 1) setIsLoading(false);
-        else setIsLoadingMore(false);
+        if (isRefresh) {
+          setRefreshing(false);
+        } else if (isSearchAction || page === 1) {
+          setIsLoading(false);
+        } else {
+          setIsLoadingMore(false);
+        }
       }
     },
-    [van, searchQuery, opacityAnim],
+    [van, opacityAnim],
   );
 
   const handleSearch = useCallback(
     (text: string) => {
       setSearchQuery(text);
-      fetchStock(false, 1, text);
+      if (text === '') {
+        fetchStock(false, 1, '', true);
+      }
     },
     [fetchStock],
   );
 
+  // Debounced search effect
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery !== undefined && searchQuery !== '') {
+        fetchStock(false, 1, searchQuery, true);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const clearSearch = useCallback(() => {
     setSearchQuery('');
-    fetchStock(false, 1, '');
+    fetchStock(false, 1, '', true);
   }, [fetchStock]);
 
   const onRefresh = useCallback(() => {
@@ -153,19 +198,28 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
 
   const renderSkeleton = () => (
     <View style={styles.skeletonContainer}>
-      <Skeleton height={250} width="100%" style={styles.skeletonHeader} />
       <View style={styles.skeletonMetrics}>
         <View style={styles.skeletonMetricsRow}>
-          <Skeleton height={60} width="18%" borderRadius={8} />
-          <Skeleton height={60} width="18%" borderRadius={8} />
-          <Skeleton height={60} width="18%" borderRadius={8} />
-          <Skeleton height={60} width="18%" borderRadius={8} />
+          <Skeleton height={48} width="23%" borderRadius={10} />
+          <Skeleton height={48} width="23%" borderRadius={10} />
+          <Skeleton height={48} width="23%" borderRadius={10} />
+          <Skeleton height={48} width="23%" borderRadius={10} />
         </View>
       </View>
       <View style={styles.skeletonList}>
-        {[1, 2, 3, 4, 5].map((i) => (
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <View key={i} style={styles.skeletonItem}>
-            <Skeleton height={60} width="100%" borderRadius={8} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Skeleton height={52} width={52} borderRadius={10} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <Skeleton height={14} width="80%" borderRadius={4} />
+                <Skeleton height={10} width="50%" borderRadius={4} />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Skeleton height={12} width="35%" borderRadius={4} />
+                  <Skeleton height={12} width="35%" borderRadius={4} />
+                </View>
+              </View>
+            </View>
           </View>
         ))}
       </View>
@@ -174,16 +228,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      <StockHeader
-        loadNumber={loadNumber}
-        colors={colors}
-        styles={styles}
-        searchQuery={searchQuery}
-        onSearch={handleSearch}
-        totalItems={totalItems}
-      />
-
-      {/* Metrics Section - Below Header */}
+      {/* Metrics Section */}
       <StockMetrics
         summary={summary}
         formatCurrency={formatCurrency}
@@ -193,7 +238,6 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
     </View>
   );
 
-  // Render footer
   const renderFooter = () => {
     if (!isLoadingMore) return null;
     return (
@@ -206,7 +250,6 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
     );
   };
 
-  // Render product item
   const renderProductItem = ({ item, index }: { item: StockItem; index: number }) => (
     <StockProductItem
       item={item}
@@ -220,19 +263,21 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
     />
   );
 
-  // Show skeleton while loading
-  if (isLoading && !refreshing && stock.length === 0) {
+  if (isLoading && stock.length === 0) {
     return renderSkeleton();
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['bottom']}>
       <FlatList
         ref={flatListRef}
         data={stock}
         renderItem={renderProductItem}
         keyExtractor={(item, index) => `${item.productId || item.id}-${index}`}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+          styles.listContainer,
+          { paddingBottom: Platform.OS === 'ios' ? 20 : 16 },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -240,6 +285,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
             onRefresh={onRefresh}
             colors={[colors.primary]}
             tintColor={colors.primary}
+            progressViewOffset={Platform.OS === 'ios' ? 0 : 8}
           />
         }
         ListHeaderComponent={renderHeader()}
@@ -257,6 +303,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
               icon={searchQuery ? 'search-outline' : 'cube-outline'}
               actionLabel={searchQuery ? 'Clear search' : undefined}
               onAction={searchQuery ? clearSearch : undefined}
+              size="small"
             />
           )
         }
@@ -265,6 +312,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         initialNumToRender={PAGINATION.LIMIT}
         maxToRenderPerBatch={PAGINATION.LIMIT}
         windowSize={10}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     </SafeAreaView>
   );

@@ -9,6 +9,7 @@ export const useTopupStyles = () => {
     container: {
       flex: 1,
       backgroundColor: colors.background,
+      paddingTop: utils.spacing[2],
     } as ViewStyle,
 
     fab: {

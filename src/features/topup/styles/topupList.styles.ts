@@ -2,159 +2,216 @@ import { ViewStyle, TextStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 
-/**
- * TopupList Styles Hook
- *
- * Organized with semantic groupings:
- * 1. Card Content Sections (title, subtitle, amount)
- * 2. Cases & Pieces Display (Requested and Approved columns)
- * 3. Icon Configurations
- *
- * Maintains consistency with PaymentsList styling patterns
- */
 export const useTopupListStyles = () => {
   const { colors } = useTheme();
 
-  const styles = createStyles((utils) => {
-    // ─────────────────────────────────────────────
-    // CARD HEADER SECTION
-    // ─────────────────────────────────────────────
-    const cardTitle: TextStyle = {
+  const styles = createStyles((utils) => ({
+    listContent: {
+      padding: utils.spacing[3],
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    filterChipsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: utils.spacing[3],
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    filterChip: {
+      backgroundColor: colors.primary + '10',
+      paddingHorizontal: utils.spacing[2.5],
+      paddingVertical: utils.spacing[1.25],
+      borderRadius: 20,
+    } as ViewStyle,
+
+    filterChipText: {
+      fontSize: utils.fontSize.xs,
+      color: colors.primary,
+      fontWeight: '500',
+    } as TextStyle,
+
+    clearAllChip: {
+      backgroundColor: colors.surface,
+      paddingHorizontal: utils.spacing[2.5],
+      paddingVertical: utils.spacing[1.25],
+      borderRadius: 20,
+      borderWidth: 0.5,
+      borderColor: colors.border,
+    } as ViewStyle,
+
+    clearAllText: {
+      fontSize: utils.fontSize.xs,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    } as TextStyle,
+
+    itemContainer: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: utils.spacing[3],
+      marginBottom: utils.spacing[2],
+      borderWidth: 0.5,
+      borderColor: colors.divider,
+    } as ViewStyle,
+
+    itemHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: utils.spacing[2],
+    } as ViewStyle,
+
+    title: {
       fontSize: utils.fontSize.sm,
       fontWeight: '600',
       color: colors.textPrimary,
-      letterSpacing: -0.3, // Subtle tightening for readability
-    };
+      marginBottom: 2,
+    } as TextStyle,
 
-    const cardSubtitle: TextStyle = {
-      fontSize: utils.fontSize.xs,
-      color: colors.textSecondary,
-      marginTop: utils.spacing[1], // 4px gap below title
-    };
+    reference: {
+      fontSize: utils.fontSize.xs - 1,
+      color: colors.textTertiary,
+    } as TextStyle,
 
-    const cardAmount: TextStyle = {
-      fontSize: utils.fontSize.lg,
-      fontWeight: '700',
-      color: colors.primary,
-      letterSpacing: -0.5, // Tighter numeric display
-    };
-
-    // ─────────────────────────────────────────────
-    // CASES & PIECES SECTION
-    // ─────────────────────────────────────────────
-    const casesContainer: ViewStyle = {
-      flexDirection: utils.rowDirection(),
+    statusBadge: {
+      flexDirection: 'row',
       alignItems: 'center',
-      gap: utils.spacing[4], // 16px between Requested and Approved
-      marginTop: utils.spacing[2], // 8px
-      paddingBottom: utils.spacing[2], // 8px
-      borderBottomWidth: 1,
-      borderBottomColor: colors.divider,
-    };
+      paddingHorizontal: utils.spacing[2],
+      paddingVertical: utils.spacing[0.75],
+      borderRadius: 20,
+      gap: utils.spacing[0.75],
+    } as ViewStyle,
 
-    const casesColumn: ViewStyle = {
-      flex: 1,
-      flexDirection: 'column',
-    };
+    statusDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    } as ViewStyle,
 
-    const casesLabel: TextStyle = {
-      fontSize: utils.fontSize.xs - 1, // 11px
-      fontWeight: '600',
-      color: colors.textSecondary,
-      marginBottom: utils.spacing[1], // 4px
-    };
-
-    const casesPiecesRow: ViewStyle = {
-      flexDirection: utils.rowDirection(),
-      alignItems: 'center',
-      gap: utils.spacing[2], // 8px between Cases and Pieces
-    };
-
-    const casesValue: TextStyle = {
-      fontSize: utils.fontSize.xs,
+    statusText: {
+      fontSize: utils.fontSize.xs - 1,
       fontWeight: '500',
-      color: colors.textPrimary,
-    };
+    } as TextStyle,
 
-    const piecesValue: TextStyle = {
-      fontSize: utils.fontSize.xs,
-      fontWeight: '500',
-      color: colors.textPrimary,
-    };
-
-    // ─────────────────────────────────────────────
-    // FOOTER SECTION (Date & Approval Info)
-    // ─────────────────────────────────────────────
-    const footerDivider: ViewStyle = {
-      flexDirection: utils.rowDirection(),
+    metaRow: {
+      flexDirection: 'row',
       alignItems: 'center',
-      gap: utils.spacing[3], // 12px
-      marginTop: utils.spacing[2], // 8px
-      paddingTop: utils.spacing[2], // 8px
+      gap: utils.spacing[1],
+      marginBottom: utils.spacing[2],
+    } as ViewStyle,
+
+    metaText: {
+      fontSize: utils.fontSize.xs - 1,
+      color: colors.textTertiary,
+    } as TextStyle,
+
+    amountSection: {
+      flexDirection: 'row',
       justifyContent: 'space-between',
-    };
+      gap: utils.spacing[2],
+      marginBottom: utils.spacing[2],
+      paddingTop: utils.spacing[2],
+      // borderTopWidth: 0.5,
+      borderTopColor: colors.divider,
+    } as ViewStyle,
 
-    const dateContainer: ViewStyle = {
-      flexDirection: utils.rowDirection(),
-      alignItems: 'center',
-      gap: utils.spacing[1], // 4px
-    };
+    amountBlock: { flex: 1 } as ViewStyle,
 
-    const dateText: TextStyle = {
-      fontSize: utils.fontSize.xs - 1, // 11px
-      color: colors.textTertiary,
+    amountLabel: {
+      fontSize: utils.fontSize.xs - 1,
       fontWeight: '500',
-    };
+      color: colors.textTertiary,
+      marginBottom: 4,
+    } as TextStyle,
 
-    const approvedByContainer: ViewStyle = {
-      flexDirection: utils.rowDirection(),
-      alignItems: 'center',
-      gap: utils.spacing[1], // 4px
-    };
+    amountValue: {
+      fontSize: utils.fontSize.md,
+      fontWeight: '700',
+      marginBottom: 4,
+    } as TextStyle,
 
-    const approvedByText: TextStyle = {
-      fontSize: utils.fontSize.xs - 1, // 11px
+    quantityText: {
+      fontSize: utils.fontSize.xs - 1,
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    infoRow: {
+      paddingVertical: utils.spacing[1],
+      paddingHorizontal: utils.spacing[2],
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      marginTop: utils.spacing[1],
+    } as ViewStyle,
+
+    infoText: {
+      fontSize: utils.fontSize.xs - 1,
       color: colors.success,
+    } as TextStyle,
+
+    errorRow: { backgroundColor: colors.error + '08' } as ViewStyle,
+
+    errorText: {
+      fontSize: utils.fontSize.xs - 1,
+      color: colors.error,
+    } as TextStyle,
+
+    pendingRow: { backgroundColor: colors.warning + '08' } as ViewStyle,
+
+    pendingInfoText: {
+      fontSize: utils.fontSize.xs - 1,
+      color: colors.warning,
+    } as TextStyle,
+
+    skeletonContainer: { gap: utils.spacing[2] } as ViewStyle,
+
+    skeletonItem: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: utils.spacing[3],
+      gap: utils.spacing[2],
+      borderWidth: 0.5,
+      borderColor: colors.divider,
+    } as ViewStyle,
+
+    skeletonHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    } as ViewStyle,
+
+    skeletonRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: utils.spacing[2],
+    } as ViewStyle,
+
+    emptyContainer: {
+      alignItems: 'center',
+      padding: utils.spacing[4],
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    emptyTitle: {
+      fontSize: utils.fontSize.md,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    } as TextStyle,
+
+    emptyDescription: {
+      fontSize: utils.fontSize.sm,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    } as TextStyle,
+
+    emptyAction: {
+      fontSize: utils.fontSize.sm,
+      color: colors.primary,
       fontWeight: '500',
-    };
-
-    // ─────────────────────────────────────────────
-    // ICON CONFIGURATION
-    // ─────────────────────────────────────────────
-    const iconConfig = {
-      size: 11,
-      color: colors.textTertiary,
-      successColor: colors.success,
-    } as const;
-
-    // ─────────────────────────────────────────────
-    // RETURNED STYLES OBJECT
-    // ─────────────────────────────────────────────
-    return {
-      // Card sections
-      title: cardTitle,
-      subtitle: cardSubtitle,
-      amount: cardAmount,
-
-      // Cases & pieces
-      casesContainer,
-      casesColumn,
-      casesLabel,
-      casesPiecesRow,
-      casesValue,
-      piecesValue,
-
-      // Footer
-      footerDivider,
-      dateContainer,
-      dateText,
-      approvedByContainer,
-      approvedByText,
-
-      // Icon configuration
-      iconConfig,
-    };
-  });
+      marginTop: utils.spacing[2],
+    } as TextStyle,
+  }));
 
   return styles(colors);
 };

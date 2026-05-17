@@ -1,3 +1,4 @@
+// ProductUnitSelector.styles.ts
 import { ViewStyle, TextStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -7,116 +8,156 @@ export const useProductUnitSelectorStyles = () => {
 
   const styleGenerator = createStyles((utils) => ({
     container: {
-      borderWidth: 1,
-      borderRadius: utils.borderRadius.md,
-      // padding: utils.spacing[2],
-      // backgroundColor: colors.surface,
+      marginBottom: utils.spacing[1.5],
     } as ViewStyle,
 
-    row: {
+    headerRow: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: utils.spacing[2],
+      alignItems: 'center',
+      marginBottom: utils.spacing[1.5],
     } as ViewStyle,
 
-    labelContainer: {
+    headerLeft: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: utils.spacing[1.5],
     } as ViewStyle,
 
-    label: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('medium'),
-      minWidth: 45,
-    } as TextStyle,
-
-    price: {
+    productName: {
       fontSize: utils.fontSize.sm,
       fontWeight: utils.getFontWeight('semibold'),
+      flex: 1,
     } as TextStyle,
 
-    discountBadge: {
+    lowStockBadge: {
       paddingHorizontal: utils.spacing[1],
-      paddingVertical: 2,
+      paddingVertical: utils.spacing[0.25],
       borderRadius: utils.borderRadius.xs,
     } as ViewStyle,
 
-    discountText: {
-      color: 'white',
-      fontSize: 8,
+    lowStockText: {
+      fontSize: utils.fontSize.xs,
       fontWeight: utils.getFontWeight('bold'),
     } as TextStyle,
 
-    quantityControl: {
+    actionIcons: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: utils.spacing[1],
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    actionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: utils.spacing[0.5],
+    } as ViewStyle,
+
+    actionText: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: utils.getFontWeight('medium'),
+    } as TextStyle,
+
+    quantityRow: {
+      flexDirection: 'row',
+      gap: utils.spacing[2],
+      marginBottom: utils.spacing[1.5],
+    } as ViewStyle,
+
+    section: {
+      flex: 1,
+      borderRadius: utils.borderRadius.sm,
+      padding: utils.spacing[1.5],
+    } as ViewStyle,
+
+    sectionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: utils.spacing[1.5],
+    } as ViewStyle,
+
+    sectionTitle: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: utils.getFontWeight('semibold'),
+    } as TextStyle,
+
+    sectionPrice: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: utils.getFontWeight('bold'),
+    } as TextStyle,
+
+    quantityControls: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     } as ViewStyle,
 
     quantityButton: {
-      width: 28,
-      height: 28,
-      borderWidth: 1,
+      width: utils.spacing[6],
+      height: utils.spacing[6],
       borderRadius: utils.borderRadius.sm,
+      borderWidth: 1,
       justifyContent: 'center',
       alignItems: 'center',
     } as ViewStyle,
 
     quantityInput: {
       width: 45,
-      height: 28,
-      borderWidth: 1,
-      borderRadius: utils.borderRadius.sm,
       textAlign: 'center',
       fontSize: utils.fontSize.sm,
-      padding: 0,
+      fontWeight: utils.getFontWeight('bold'),
+      paddingVertical: utils.spacing[1],
+      borderRadius: utils.borderRadius.sm,
+      borderWidth: 1,
     } as ViewStyle,
 
-    footer: {
-      // marginTop: utils.spacing[1.5],
-      // paddingTop: utils.spacing[1.5],
-      borderTopWidth: 1,
-      borderTopColor: colors.border + '40',
-    } as ViewStyle,
-
-    stockInfo: {
-      fontSize: utils.fontSize.xs,
-      marginBottom: utils.spacing[1],
-    } as TextStyle,
-
-    totalRow: {
+    stockInfoRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: utils.spacing[2],
+      paddingTop: utils.spacing[1.5],
+      borderTopWidth: 1,
+    } as ViewStyle,
+
+    stockInfoLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: utils.spacing[2],
+    } as ViewStyle,
+
+    stockInfoItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: utils.spacing[0.5],
+    } as ViewStyle,
+
+    stockInfoText: {
+      fontSize: utils.fontSize.xs,
+    } as TextStyle,
+
+    stockInfoDetail: {
+      fontSize: utils.fontSize.xs,
+    } as TextStyle,
+
+    allStockText: {
+      fontSize: utils.fontSize.xs,
+    } as TextStyle,
+
+    totalValueContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: utils.spacing[1],
     } as ViewStyle,
 
     totalLabel: {
-      fontSize: utils.fontSize.sm,
+      fontSize: utils.fontSize.xs,
     } as TextStyle,
 
     totalValue: {
-      fontSize: utils.fontSize.md,
       fontWeight: utils.getFontWeight('bold'),
-    } as TextStyle,
-
-    addButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: utils.spacing[2],
-      paddingHorizontal: utils.spacing[3],
-      borderRadius: utils.borderRadius.md,
-      gap: utils.spacing[1.5],
-    } as ViewStyle,
-
-    addButtonText: {
-      color: 'white',
       fontSize: utils.fontSize.sm,
-      fontWeight: utils.getFontWeight('semibold'),
     } as TextStyle,
   }));
 

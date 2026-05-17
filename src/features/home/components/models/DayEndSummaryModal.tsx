@@ -1,13 +1,6 @@
 // DayEndSummaryModal.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  FlatList,
-  Animated,
-  SafeAreaView,
-  ScrollView,
-} from 'react-native';
+import { View, TouchableOpacity, FlatList, Animated, SafeAreaView, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { AppModal, AppText } from '@/core/components';
@@ -303,7 +296,12 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
               </View>
 
               <StatsCard title="Sold Details" icon="trending-up" data={soldData} color="#F59E0B" />
-              <StatsCard title="Closing Stock" icon="package-variant" data={closingData} color="#10B981" />
+              <StatsCard
+                title="Closing Stock"
+                icon="package-variant"
+                data={closingData}
+                color="#10B981"
+              />
             </Animated.View>
           </ScrollView>
         ) : (
@@ -350,9 +348,9 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     <AppText style={[styles.productStatValue, { color: '#6B7280' }]}>
                       {formatStock(item.openingCases, item.openingPieces)}
                     </AppText>
-                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
+                    {/* <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
                       {item.openingItems} items
-                    </AppText>
+                    </AppText> */}
                   </View>
                   <View style={styles.productStat}>
                     <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
@@ -361,9 +359,9 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     <AppText style={[styles.productStatValue, { color: '#3B82F6' }]}>
                       {formatStock(item.inCases, item.inPieces)}
                     </AppText>
-                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
+                    {/* <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
                       {item.receivedItems} items
-                    </AppText>
+                    </AppText> */}
                   </View>
                   <View style={styles.productStat}>
                     <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
@@ -380,9 +378,9 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     <AppText style={[styles.productStatValue, { color: '#10B981' }]}>
                       {formatStock(item.closingCases, item.closingPieces)}
                     </AppText>
-                    <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
+                    {/* <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
                       {item.closingItems} items
-                    </AppText>
+                    </AppText> */}
                   </View>
                 </View>
 

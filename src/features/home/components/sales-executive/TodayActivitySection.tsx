@@ -3,34 +3,30 @@ import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   TouchableOpacity,
-  ScrollView,
   Platform,
   UIManager,
   LayoutAnimation,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityItemComponent } from './ActivityItem';
 import { TodayActivitiesSectionProps } from '../../types/activity.types';
-import { AppText, SectionHeader } from '@/core/components';
+import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useTodayActivitiesSectionStyles } from '../../styles/TodayActivitiesSection.styles';
 
-// Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// Helper to safely calculate total duration
 const calculateTotalDuration = (activities: any[]): string => {
-  if (!activities || !Array.isArray(activities) || activities.length === 0) {
-    return '0 min';
-  }
+  if (!activities?.length) return '0 min';
 
   let totalMinutes = 0;
 
   activities.forEach((activity) => {
     try {
-      if (activity && activity.startTime) {
+      if (activity?.startTime) {
         const start = new Date(activity.startTime);
         if (isNaN(start.getTime())) return;
 
@@ -64,9 +60,8 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAll, setShowAll] = useState(false);
 
-  // Memoized statistics
   const stats = useMemo(() => {
-    if (!activities || activities.length === 0) {
+    if (!activities?.length) {
       return {
         ongoing: 0,
         completed: 0,
@@ -96,20 +91,17 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
     };
   }, [activities]);
 
-  // Sort and limit activities
   const displayedActivities = useMemo(() => {
-    if (!activities || activities.length === 0) return [];
+    if (!activities?.length) return [];
 
     const sorted = [...activities]
-      .filter((a) => a && a._id)
+      .filter((a) => a?._id)
       .sort((a, b) => {
-        // Ongoing first
         const aOngoing = a?.status === 'ongoing' || (!a?.endTime && a?.startTime);
         const bOngoing = b?.status === 'ongoing' || (!b?.endTime && b?.startTime);
         if (aOngoing && !bOngoing) return -1;
         if (!aOngoing && bOngoing) return 1;
 
-        // Then by start time (most recent first)
         if (!a?.startTime) return 1;
         if (!b?.startTime) return -1;
 
@@ -124,7 +116,7 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
   }, [activities, showAll]);
 
   const hasMore = activities.length > 5;
-  const hasActivities = activities && activities.length > 0;
+  const hasActivities = activities.length > 0;
 
   const toggleExpand = useCallback(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -132,25 +124,25 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
   }, []);
 
   const toggleShowAll = useCallback(() => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setShowAll((prev) => !prev);
   }, []);
 
-  // Helper to get status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ongoing':
-        return colors.primary;
-      case 'completed':
-        return colors.success;
-      default:
-        return colors.textSecondary;
-    }
-  };
+  const renderActivityItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => (
+      <ActivityItemComponent
+        key={item._id}
+        item={item}
+        index={index}
+        totalItems={displayedActivities.length}
+      />
+    ),
+    [displayedActivities.length],
+  );
+
+  const keyExtractor = useCallback((item: any) => item._id, []);
 
   return (
     <View style={styles.container}>
-      {/* Header - Always Visible */}
       <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7} style={styles.headerContainer}>
         <View style={styles.headerLeft}>
           <AppText style={[styles.headerTitle, { color: colors.textSecondary }]}>
@@ -169,13 +161,10 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
         />
       </TouchableOpacity>
 
-      {/* Expandable Content */}
       {isExpanded && (
         <View>
-          {/* Stats Summary - Only show if there are activities */}
           {hasActivities && (
             <View style={styles.statsContainer}>
-              {/* Total Duration Card */}
               <View
                 style={[
                   styles.statCard,
@@ -194,7 +183,6 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
                 </AppText>
               </View>
 
-              {/* Ongoing Card */}
               {stats.ongoing > 0 && (
                 <View
                   style={[
@@ -213,7 +201,6 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
                 </View>
               )}
 
-              {/* Completion Card */}
               {stats.completed > 0 && (
                 <View
                   style={[
@@ -234,37 +221,31 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
             </View>
           )}
 
-          {/* Activities List */}
-          <ScrollView
-            style={styles.activitiesScrollView}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.activitiesContent}
-          >
-            {hasActivities ? (
-              displayedActivities.map((item, index) => (
-                <ActivityItemComponent
-                  key={item._id}
-                  item={item}
-                  index={index}
-                  totalItems={displayedActivities.length}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <View style={[styles.emptyStateIconContainer, { backgroundColor: colors.surface }]}>
-                  <Ionicons name="time-outline" size={28} color={colors.textSecondary} />
-                </View>
-                <AppText style={[styles.emptyStateTitle, { color: colors.textSecondary }]}>
-                  No activities yet
-                </AppText>
-                <AppText style={[styles.emptyStateSubtitle, { color: colors.textSecondary }]}>
-                  Start your first activity to begin tracking
-                </AppText>
+          {hasActivities ? (
+            <FlatList
+              data={displayedActivities}
+              renderItem={renderActivityItem}
+              keyExtractor={keyExtractor}
+              scrollEnabled={false} // Important: Disable internal scrolling
+              removeClippedSubviews={Platform.OS === 'android'}
+              initialNumToRender={5}
+              maxToRenderPerBatch={5}
+              windowSize={5}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <View style={[styles.emptyStateIconContainer, { backgroundColor: colors.surface }]}>
+                <Ionicons name="time-outline" size={28} color={colors.textSecondary} />
               </View>
-            )}
-          </ScrollView>
+              <AppText style={[styles.emptyStateTitle, { color: colors.textSecondary }]}>
+                No activities yet
+              </AppText>
+              <AppText style={[styles.emptyStateSubtitle, { color: colors.textSecondary }]}>
+                Start your first activity to begin tracking
+              </AppText>
+            </View>
+          )}
 
-          {/* Show More / Less Button */}
           {hasMore && hasActivities && (
             <TouchableOpacity
               onPress={toggleShowAll}

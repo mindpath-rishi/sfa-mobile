@@ -1,5 +1,3 @@
-// src/core/components/Header/Header.tsx
-
 import React from 'react';
 import { View, Text, Pressable, TextInput, Platform, StatusBar } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -37,6 +35,7 @@ const Header: React.FC = () => {
     showMenu: config?.showMenu ?? false,
     showSearch: config?.showSearch ?? false,
     showFilter: config?.showFilter ?? false,
+    showSearchBar: config?.showSearchBar ?? false,
 
     rightIcon: config?.rightIcon,
     rightIcon2: config?.rightIcon2,
@@ -57,6 +56,7 @@ const Header: React.FC = () => {
     onSearchChange: config?.onSearchChange,
     onSearchClear: config?.onSearchClear,
     onSearchPress: config?.onSearchPress,
+    autoFocusSearch: config?.autoFocusSearch ?? false,
   };
 
   /* ============================
@@ -73,6 +73,7 @@ const Header: React.FC = () => {
     transparent: config.transparent ?? false,
     size: config.size ?? 'sm',
     showBorder: config.showBorder ?? true,
+    showSearchBar: safeConfig.showSearchBar,
   });
 
   const useGradient = safeConfig.useGradient;
@@ -149,7 +150,7 @@ const Header: React.FC = () => {
    * ============================ */
   const renderHeaderContent = () => (
     <>
-      {/* LEFT */}
+      {/* LEFT SECTION - Back/Menu Button */}
       <View style={styles.leftSection}>
         {safeConfig.showBack ? (
           <AnimatedPressable
@@ -169,27 +170,52 @@ const Header: React.FC = () => {
           >
             <Feather name="menu" size={22} color={useGradient ? '#fff' : colors.surface} />
           </AnimatedPressable>
-        ) : (
+        ) : safeConfig.showSearchBar ? null : (
           <View style={{ width: 44 }} />
         )}
       </View>
 
-      {/* CENTER */}
-      <View style={styles.centerSection}>
-        <Text style={styles.title}>{safeConfig.title}</Text>
-        {safeConfig.subtitle && <Text style={styles.subtitle}>{safeConfig.subtitle}</Text>}
-      </View>
+      {/* CENTER SECTION - Search Bar (when enabled) or Title */}
+      {safeConfig.showSearchBar ? (
+        <View style={styles.centerSectionWithSearch}>
+          <View style={styles.searchContainerInline}>
+            <Ionicons name="search" size={20} color={colors.textTertiary} />
+            <TextInput
+              style={styles.searchInputInline}
+              placeholder={safeConfig.searchPlaceholder || 'Search...'}
+              placeholderTextColor={colors.textTertiary}
+              value={safeConfig.searchValue}
+              onChangeText={safeConfig.onSearchChange}
+              autoFocus={safeConfig.autoFocusSearch}
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                safeConfig.onSearchPress?.();
+              }}
+            />
+            {safeConfig.searchValue && safeConfig.onSearchClear && (
+              <Pressable onPress={safeConfig.onSearchClear} style={styles.clearButtonInline}>
+                <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+              </Pressable>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.centerSection}>
+          <Text style={styles.title}>{safeConfig.title}</Text>
+          {safeConfig.subtitle && <Text style={styles.subtitle}>{safeConfig.subtitle}</Text>}
+        </View>
+      )}
 
-      {/* RIGHT */}
-      <View style={[styles.rightSection, { flexDirection: 'row', alignItems: 'center' }]}>
-        {safeConfig.showSearch && (
+      {/* RIGHT SECTION - Filter and Other Icons */}
+      <View style={styles.rightSection}>
+        {safeConfig.showSearch && !safeConfig.showSearchBar && (
           <AnimatedPressable
             onPress={handleSearchPress}
             onPressIn={() => handlePressIn(searchScale)}
             onPressOut={() => handlePressOut(searchScale)}
             style={[searchStyle, styles.buttonBase]}
           >
-            <Feather name="search" size={20} color={colors.textPrimary} />
+            <Feather name="search" size={20} color={useGradient ? '#fff' : colors.surface} />
           </AnimatedPressable>
         )}
 
@@ -200,7 +226,7 @@ const Header: React.FC = () => {
             onPressOut={() => handlePressOut(filterButtonScale)}
             style={[filterStyle, styles.buttonBase]}
           >
-            <Feather name="sliders" size={20} color={colors.surface} />
+            <Feather name="sliders" size={20} color={useGradient ? '#fff' : colors.surface} />
             {renderFilterBadge()}
           </AnimatedPressable>
         )}
@@ -234,26 +260,6 @@ const Header: React.FC = () => {
           </LinearGradient>
         ) : (
           <View style={styles.container}>{renderHeaderContent()}</View>
-        )}
-
-        {/* SEARCH BAR */}
-        {safeConfig.showSearch && config.showSearchBar && (
-          <View style={{ padding: 16 }}>
-            <View style={styles.searchContainer}>
-              <Ionicons name="search" size={20} color={colors.textTertiary} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder={safeConfig.searchPlaceholder || 'Search...'}
-                value={safeConfig.searchValue}
-                onChangeText={safeConfig.onSearchChange}
-              />
-              {safeConfig.searchValue && safeConfig.onSearchClear && (
-                <Pressable onPress={safeConfig.onSearchClear}>
-                  <Ionicons name="close-circle" size={18} />
-                </Pressable>
-              )}
-            </View>
-          </View>
         )}
       </View>
     </>

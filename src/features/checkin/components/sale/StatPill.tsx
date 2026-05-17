@@ -1,10 +1,9 @@
-// components/SalesSummary/components/StatPill.tsx
 import React from 'react';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 interface StatPillProps {
-  value: string | number;
+  value: number;
   label: string;
   highlight?: boolean;
 }
@@ -18,17 +17,17 @@ export const StatPill: React.FC<StatPillProps> = ({ value, label, highlight = fa
         flex: 1,
         alignItems: 'center',
         paddingVertical: 8,
-        paddingHorizontal: 6,
-        backgroundColor: highlight ? colors.primary + '12' : colors.background,
-        borderRadius: 10,
+        paddingHorizontal: 4,
+        borderRadius: 8,
+        backgroundColor: highlight ? colors.primary + '10' : colors.background,
         borderWidth: 0.5,
-        borderColor: highlight ? colors.primary + '40' : colors.border + '40',
+        borderColor: colors.border + '30',
       }}
     >
       <Text
         style={{
-          fontSize: 16,
-          fontWeight: '700',
+          fontSize: 15,
+          fontWeight: '600',
           color: highlight ? colors.primary : colors.textPrimary,
         }}
       >
@@ -36,10 +35,9 @@ export const StatPill: React.FC<StatPillProps> = ({ value, label, highlight = fa
       </Text>
       <Text
         style={{
-          fontSize: 10,
+          fontSize: 11,
           color: colors.textTertiary,
           marginTop: 2,
-          letterSpacing: 0.4,
         }}
       >
         {label}

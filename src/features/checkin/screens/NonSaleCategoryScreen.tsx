@@ -1,11 +1,14 @@
 // components/non-sale/NonSaleCategoryScreen.tsx
 import React, { useState } from 'react';
 import { View, FlatList, Text } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { Customer } from '../types/checkin.types';
 import { AppCard, SectionHeader } from '@/core/components';
+import { useHeader } from '@/shared/contexts/HeaderContext';
+import { useAuthStore } from '@/core/store/auth.store';
+import { useOutletStore } from '@/core/store/outlet.store';
 
 export const REASON_CATEGORIES = [
   {
@@ -56,6 +59,18 @@ export const NonSaleCategoryScreen: React.FC<NonSaleCategoryScreenProps> = ({
 }) => {
   const { colors } = useTheme();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const { setHeader } = useHeader();
+  const selectedOutlet = useOutletStore((s) => s.selectedOutlet);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setHeader({
+        title: selectedOutlet?.name,
+        showBack: true,
+        showMenu: false,
+      });
+    }, []),
+  );
 
   const handleCategorySelect = (category: (typeof REASON_CATEGORIES)[0]) => {
     setSelectedCategoryId(category.id);

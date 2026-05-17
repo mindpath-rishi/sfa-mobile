@@ -1,4 +1,4 @@
-// StatsOverviewSection.tsx
+// StatsOverviewSection.tsx - Updated
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -6,11 +6,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStatsOverviewSectionStyles } from '../../styles/StatusOverviewSection.styles';
 import { StatCard } from './StatCard';
-import { SectionHeader, AppText } from '@/core/components';
+import { AppText } from '@/core/components';
 import { homeService } from '@/features/home/services/home.service';
 
 type Props = {
@@ -44,6 +45,7 @@ interface StatsData {
 
 export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh }) => {
   const styles = useStatsOverviewSectionStyles();
+  const { width: screenWidth } = useWindowDimensions();
 
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -72,6 +74,12 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
     },
   });
 
+  const getCardWidth = useCallback(() => {
+    if (screenWidth < 360) return 260;
+    if (screenWidth < 768) return 280;
+    return 300;
+  }, [screenWidth]);
+
   const fetchStats = useCallback(
     async (isRefresh = false) => {
       if (!employeeId) return;
@@ -87,7 +95,6 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
         const res = await homeService.getEmployeeStats(employeeId);
         const data = res?.data || {};
 
-        // Calculate percentages
         const visitsPercentage =
           data?.totalVisits > 0 ? (data?.visits / data?.totalVisits) * 100 : 0;
 
@@ -153,7 +160,9 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <SectionHeader title="TODAY'S OVERVIEW" variant="small" />
+        <View style={styles.headerContainer}>
+          <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#4158D0" />
           <AppText style={styles.loadingText}>Loading stats...</AppText>
@@ -165,7 +174,9 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
   if (error) {
     return (
       <View style={styles.container}>
-        <SectionHeader title="TODAY'S OVERVIEW" variant="small" />
+        <View style={styles.headerContainer}>
+          <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
+        </View>
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle" size={48} color="#EF4444" />
           <AppText style={styles.errorText}>{error}</AppText>
@@ -180,9 +191,14 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
-        <SectionHeader title="TODAY'S OVERVIEW" variant="small" />
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <MaterialCommunityIcons name="refresh" size={20} color="#6B7280" />
+        <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
+        <TouchableOpacity
+          onPress={handleRefresh}
+          style={styles.refreshButton}
+          activeOpacity={0.7}
+          disabled={refreshing}
+        >
+          <MaterialCommunityIcons name="refresh" size={18} color="#4158D0" />
         </TouchableOpacity>
       </View>
 
@@ -198,9 +214,10 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
             tintColor="#4158D0"
           />
         }
+        decelerationRate="fast"
+        showsHorizontalScrollIndicator={false}
       >
-        {/* Visits Card */}
-        <View style={styles.cardWrapper}>
+        <View style={[styles.cardWrapper]}>
           <StatCard
             title="Visits"
             value={`${stats.visits.completed}/${stats.visits.total}`}
@@ -213,8 +230,7 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
           />
         </View>
 
-        {/* Orders Card */}
-        <View style={styles.cardWrapper}>
+        <View style={[styles.cardWrapper]}>
           <StatCard
             title="Orders"
             value={stats.orders.count.toString()}
@@ -227,8 +243,7 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
           />
         </View>
 
-        {/* Collections Card */}
-        <View style={styles.cardWrapper}>
+        <View style={[styles.cardWrapper]}>
           <StatCard
             title="Collections"
             value={formatCurrency(stats.collections.value)}
@@ -238,22 +253,6 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
             trend={stats.collections.percentage > 50 ? 15 : -3}
           />
         </View>
-
-        {/* Incentives Card */}
-        {/* <View style={styles.cardWrapper}>
-          <StatCard
-            title="Incentives"
-            value={formatCurrency(stats.incentives.earned)}
-            subtitle={`Next: ${formatCurrency(stats.incentives.nextMilestone)}`}
-            icon="trophy-award"
-            color="#F37335"
-            trend={stats.incentives.earned > 0 ? 20 : 0}
-            progress={
-              stats.incentives.target > 0 ? stats.incentives.earned / stats.incentives.target : 0
-            }
-            compact={true}
-          />
-        </View> */}
       </ScrollView>
     </View>
   );

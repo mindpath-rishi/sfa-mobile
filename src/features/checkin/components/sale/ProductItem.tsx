@@ -1,9 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { CartItemWithDetails, Product, ProductUnitSelector } from '@/features/product';
+import { CartItemWithDetails } from '@/features/product';
+import { ProductUnitSelector } from '@/features/product';
 import { useCartStore } from '@/core/store/cart.store';
 
 interface ProductItemProps {
@@ -22,12 +23,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
 
-  // Zustand store
   const { addItems, removeItem } = useCartStore();
-
-  const isUnlimitedMode = mode === 'topup';
-
-  /* ================= ADD/UPDATE TO CART ================= */
 
   const handleAddToCart = useCallback(
     (items: any[]) => {
@@ -41,7 +37,6 @@ export const ProductItem: React.FC<ProductItemProps> = ({
         pieceQty += item.pieceQty || 0;
       });
 
-      // If both are zero, remove the item
       if (caseQty === 0 && pieceQty === 0) {
         removeItem(product.productId);
         if (onUpdate) {
@@ -50,7 +45,6 @@ export const ProductItem: React.FC<ProductItemProps> = ({
         return;
       }
 
-      // Send to store
       addItems([
         {
           productId: product.productId,
@@ -69,17 +63,10 @@ export const ProductItem: React.FC<ProductItemProps> = ({
       if (onUpdate) {
         onUpdate(product.productId, caseQty, pieceQty);
       }
-
-      const totalItems = caseQty + pieceQty;
-      const totalValue = caseQty * product.casePrice + pieceQty * product.piecePrice;
-      const totalWeight =
-        caseQty * (product.caseNetWeight || 0) + pieceQty * (product.pieceNetWeight || 0);
     },
-    [product, addItems, removeItem, mode, onUpdate],
+    [product, addItems, removeItem, onUpdate],
   );
 
-  // Calculate current totals
-  const totalUnits = (product.caseQty || 0) * product.unitQtyInCase + (product.pieceQty || 0);
   const totalValue =
     (product.caseQty || 0) * product.casePrice + (product.pieceQty || 0) * product.piecePrice;
   const totalWeight =
@@ -94,7 +81,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
       entering={FadeInDown.delay(index * 50).springify()}
       style={{
         backgroundColor: colors.surface,
-        borderRadius: 12,
+        borderRadius: 10,
         marginBottom: 8,
         borderWidth: 0.5,
         borderColor: colors.border + '30',
@@ -107,7 +94,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          padding: 14,
+          padding: 12,
           gap: 12,
         }}
       >
@@ -127,7 +114,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
           <Text
             style={{
               fontSize: 13,
-              fontWeight: '700',
+              fontWeight: '600',
               color: colors.primary,
             }}
           >
@@ -140,40 +127,37 @@ export const ProductItem: React.FC<ProductItemProps> = ({
           <Text
             style={{
               fontSize: 14,
-              fontWeight: '600',
+              fontWeight: '500',
               color: colors.textPrimary,
-              marginBottom: 3,
+              marginBottom: 4,
             }}
             numberOfLines={2}
           >
             {product.productName}
           </Text>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-            <Text style={{ fontSize: 11, color: colors.textTertiary }}>
-              SKU: {product.productId}
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <Text style={{ fontSize: 12, color: colors.textTertiary }}>
               Case: {formatCurrency(product.casePrice)}
             </Text>
-            <Text style={{ fontSize: 11, color: colors.textTertiary }}>
+            <Text style={{ fontSize: 12, color: colors.textTertiary }}>
               Piece: {formatCurrency(product.piecePrice)}
             </Text>
           </View>
 
           {/* Show selected quantities */}
           {(product.caseQty > 0 || product.pieceQty > 0) && (
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
               {product.caseQty > 0 && (
-                <Text style={{ fontSize: 10, color: colors.success }}>{product.caseQty} cases</Text>
+                <Text style={{ fontSize: 11, color: colors.success }}>{product.caseQty} cases</Text>
               )}
               {product.pieceQty > 0 && (
-                <Text style={{ fontSize: 10, color: colors.success }}>
+                <Text style={{ fontSize: 11, color: colors.success }}>
                   {product.pieceQty} pieces
                 </Text>
               )}
               {mode === 'topup' && totalWeight > 0 && (
-                <Text style={{ fontSize: 10, color: colors.warning }}>
+                <Text style={{ fontSize: 11, color: colors.warning }}>
                   {totalWeight.toFixed(2)} kg
                 </Text>
               )}
@@ -184,7 +168,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
         {/* Right Section - Total & Expand Icon */}
         <View style={{ alignItems: 'flex-end', gap: 4 }}>
           {(product.caseQty > 0 || product.pieceQty > 0) && (
-            <Text style={{ fontSize: 14, fontWeight: '700', color: colors.primary }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>
               {formatCurrency(totalValue)}
             </Text>
           )}
@@ -210,7 +194,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
               product={product}
               onAddToCart={handleAddToCart}
               mode={mode}
-              showName={true}
+              showName={false}
             />
           </View>
         </Animated.View>

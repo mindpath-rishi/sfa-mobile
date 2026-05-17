@@ -112,9 +112,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
                   marginRight: 4,
                 }}
               />
-              <AppText style={[styles.textXSmallBold, { color: '#4CAF50' }]}>
-                ACTIVE
-              </AppText>
+              <AppText style={[styles.textXSmallBold, { color: '#4CAF50' }]}>ACTIVE</AppText>
             </View>
           </View>
 
@@ -157,7 +155,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
         )}
 
         {/* Van Info */}
-        {assignedVan && (
+        {/* {assignedVan && (
           <View
             style={{
               flex: selectedActivity === 'Retailing' ? 1 : 1,
@@ -179,7 +177,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
               {assignedVan.vanNumber || assignedVan.name} • {assignedVan.capacity || 'Std'} Tonnages
             </AppText>
           </View>
-        )}
+        )} */}
 
         {/* Other Work Badge - Compact */}
         {otherWorkStartTime && selectedActivity !== 'Retailing' && (
@@ -192,9 +190,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
             }}
           >
             <Ionicons name="briefcase-outline" size={16} color={colors.warning} />
-            <AppText
-              style={[styles.textXSmall, { color: colors.warning, marginTop: 2 }]}
-            >
+            <AppText style={[styles.textXSmall, { color: colors.warning, marginTop: 2 }]}>
               {otherWorkDuration}
             </AppText>
           </View>

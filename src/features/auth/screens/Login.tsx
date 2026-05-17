@@ -1,63 +1,464 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+// import React, { useState, useRef, useEffect, useCallback } from 'react';
+
+// import {
+//   View,
+//   Platform,
+//   Keyboard,
+//   KeyboardAvoidingView,
+//   Pressable,
+//   Image,
+//   ScrollView,
+//   SafeAreaView,
+//   ActivityIndicator,
+//   TouchableWithoutFeedback,
+// } from 'react-native';
+
+// import { router } from 'expo-router';
+// import { Ionicons } from '@expo/vector-icons';
+// import { useForm, Controller } from 'react-hook-form';
+// import * as Haptics from 'expo-haptics';
+// import { LinearGradient } from 'expo-linear-gradient';
+// import { StatusBar } from 'expo-status-bar';
+
+// import { toast } from '@/shared/utils/toast';
+// import { useTheme } from '@/shared/hooks/useTheme';
+// import { AppText, AppFormField } from '@/core/components';
+// import { t } from '@/shared/locales/engine/t';
+// import { authService } from '../services/auth.service';
+// import { LoginFormData, LoginScreenProps } from '../types/login.types';
+// import { useAuthStore } from '@/core/store/auth.store';
+// import { useLoginStyles } from '../styles/Login.style';
+
+// const isWeb = Platform.OS === 'web';
+
+// const LoginScreen: React.FC<LoginScreenProps> = () => {
+//   const { colors } = useTheme();
+//   const styles = useLoginStyles(colors);
+
+//   // Refs
+//   const userIdRef = useRef<any>(null);
+//   const passwordRef = useRef<any>(null);
+//   const scrollViewRef = useRef<ScrollView>(null);
+
+//   // State
+//   const [loading, setLoading] = useState(false);
+//   const [secureTextEntry, setSecureTextEntry] = useState(true);
+//   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+//   const [logoError, setLogoError] = useState(false);
+//   const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+//   // Form
+//   const {
+//     control,
+//     handleSubmit,
+//     formState: { errors, isValid, isDirty, touchedFields },
+//     setValue,
+//     setFocus,
+//     trigger,
+//   } = useForm<LoginFormData>({
+//     defaultValues: {
+//       userId: '',
+//       password: '',
+//     },
+//     mode: 'onChange',
+//   });
+
+//   // Keyboard handling
+//   useEffect(() => {
+//     if (isWeb) return;
+
+//     const showSubscription = Keyboard.addListener(
+//       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+//       () => {
+//         setKeyboardVisible(true);
+//         if (focusedInput === 'password' && scrollViewRef.current) {
+//           setTimeout(() => {
+//             scrollViewRef.current?.scrollTo({
+//               y: 120,
+//               animated: true,
+//             });
+//           }, 250);
+//         }
+//       },
+//     );
+
+//     const hideSubscription = Keyboard.addListener(
+//       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+//       () => {
+//         setKeyboardVisible(false);
+//       },
+//     );
+
+//     return () => {
+//       showSubscription.remove();
+//       hideSubscription.remove();
+//     };
+//   }, [focusedInput]);
+
+//   // Toggle password
+//   const toggleSecureEntry = () => {
+//     if (!isWeb) {
+//       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+//     }
+//     setSecureTextEntry((prev) => !prev);
+//   };
+
+//   // Focus password
+//   const focusPassword = () => {
+//     setFocus('password');
+//     setTimeout(() => {
+//       passwordRef.current?.focus();
+//       scrollViewRef.current?.scrollTo({
+//         y: 120,
+//         animated: true,
+//       });
+//     }, 100);
+//   };
+
+//   // Focus handler
+//   const handleFocus = useCallback((field: string) => {
+//     setFocusedInput(field);
+//     if (field === 'password') {
+//       setTimeout(() => {
+//         scrollViewRef.current?.scrollTo({
+//           y: 120,
+//           animated: true,
+//         });
+//       }, 100);
+//     }
+//     if (!isWeb) {
+//       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+//     }
+//   }, []);
+
+//   // Blur handler
+//   const handleBlur = useCallback(
+//     (field: keyof LoginFormData) => {
+//       setFocusedInput(null);
+//       trigger(field);
+//     },
+//     [trigger],
+//   );
+
+//   // Error message
+//   const getErrorMessage = useCallback(
+//     (field: keyof LoginFormData): string => {
+//       const error = errors[field];
+//       if (error?.message && touchedFields[field]) {
+//         return t(error.message);
+//       }
+//       return '';
+//     },
+//     [errors, touchedFields],
+//   );
+
+//   // Device info
+//   const getDeviceInfo = async () => ({
+//     deviceId: isWeb ? 'web-device' : 'mobile-device',
+//     deviceType: Platform.OS,
+//     os: Platform.OS,
+//     osVersion: String(Platform.Version),
+//     browser: isWeb ? 'Modern Browser' : 'N/A',
+//     appVersion: '1.3.0',
+//     fcmToken: 'temp-token',
+//   });
+
+//   // Submit
+//   const onSubmit = async (data: LoginFormData) => {
+//     if (!isWeb) {
+//       Keyboard.dismiss();
+//     }
+//     setLoading(true);
+//     try {
+//       const payload = {
+//         loginId: data.userId.trim(),
+//         password: data.password,
+//         deviceInfo: await getDeviceInfo(),
+//       };
+//       const response = await authService.login(payload);
+//       const resData: any = response.data;
+//       const user = {
+//         userId: resData.user.profileId,
+//         name: resData.user.profile?.name,
+//         role: resData.user.profile?.role,
+//         vanId: resData.user.profile?.associatedVans?.[0] ?? null,
+//       };
+//       await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
+//       toast.success(t('auth.login.welcomeBack'));
+//       router.replace('/(tabs)/home');
+//     } catch (error: any) {
+//       toast.error(t('auth.login.loginFailed'), error?.message);
+//       setValue('password', '', {
+//         shouldValidate: true,
+//       });
+//       setFocus('password');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const isFormValid = isValid && isDirty;
+
+//   return (
+//     <SafeAreaView style={styles.container}>
+//       <StatusBar style="light" />
+
+//       {/* Background */}
+//       <LinearGradient
+//         colors={[colors.primary, colors.secondary || colors.primary]}
+//         start={{ x: 0, y: 0 }}
+//         end={{ x: 1, y: 1 }}
+//         style={styles.gradientBackground}
+//       />
+
+//       {/* Main */}
+//       <KeyboardAvoidingView
+//         style={{ flex: 1 }}
+//         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+//         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+//       >
+//         <TouchableWithoutFeedback
+//           onPress={() => {
+//             if (!isWeb) {
+//               Keyboard.dismiss();
+//             }
+//           }}
+//         >
+//           <ScrollView
+//             ref={scrollViewRef}
+//             style={{ flex: 1 }}
+//             showsVerticalScrollIndicator={false}
+//             keyboardShouldPersistTaps="handled"
+//             keyboardDismissMode={isWeb ? 'none' : 'interactive'}
+//             scrollEnabled={true}
+//             bounces={false}
+//             overScrollMode="never"
+//             nestedScrollEnabled={false}
+//           >
+//             <View>
+//               {/* HERO SECTION */}
+//               <View style={styles.topSection}>
+//                 <View style={{ alignItems: 'center' }}>
+//                   {/* Logo */}
+//                   <View style={styles.logoContainer}>
+//                     {!logoError ? (
+//                       <Image
+//                         source={require('@/assets/images/logo.png')}
+//                         style={styles.logoImage}
+//                         resizeMode="contain"
+//                         onError={() => setLogoError(true)}
+//                       />
+//                     ) : (
+//                       <Ionicons name="rocket-outline" size={40} color={colors.primary} />
+//                     )}
+//                   </View>
+
+//                   {/* Title */}
+//                   <AppText style={styles.appTitle}>{t('common.appTitle')}</AppText>
+
+//                   {/* Subtitle */}
+//                   <AppText style={styles.appSubtitle}>
+//                     Experience the future of digital access
+//                   </AppText>
+//                 </View>
+//               </View>
+
+//               {/* FORM SECTION */}
+//               <View style={styles.bottomSection}>
+//                 <View style={styles.formContainer}>
+//                   {/* Welcome */}
+//                   <View style={styles.welcomeContainer}>
+//                     <AppText style={styles.welcomeTitle}>Welcome Back!</AppText>
+//                     <AppText style={styles.welcomeSubtitle}>
+//                       Please enter your credentials to continue
+//                     </AppText>
+//                   </View>
+
+//                   {/* USER ID - Using AppFormField */}
+//                   <Controller
+//                     control={control}
+//                     name="userId"
+//                     rules={{
+//                       required: 'auth.login.userIdRequired',
+//                       validate: (value) => (value?.trim() ? true : 'auth.login.userIdRequired'),
+//                     }}
+//                     render={({ field: { onChange, onBlur, value } }) => (
+//                       <AppFormField
+//                         ref={userIdRef}
+//                         value={value}
+//                         placeholder="Enter your loginId"
+//                         onChangeText={(text: string) => {
+//                           onChange(text);
+//                         }}
+//                         onBlur={() => {
+//                           onBlur();
+//                           handleBlur('userId');
+//                         }}
+//                         onFocus={() => handleFocus('userId')}
+//                         errorText={getErrorMessage('userId')}
+//                         returnKeyType="next"
+//                         onSubmitEditing={focusPassword}
+//                         icon="person-outline"
+//                         editable={!loading}
+//                         touched={touchedFields.userId}
+//                         containerStyle={styles.inputContainer}
+//                       />
+//                     )}
+//                   />
+
+//                   {/* PASSWORD - Using AppFormField */}
+//                   <Controller
+//                     control={control}
+//                     name="password"
+//                     rules={{
+//                       required: 'auth.login.passwordRequired',
+//                       minLength: {
+//                         value: 6,
+//                         message: 'auth.login.passwordMinLength',
+//                       },
+//                     }}
+//                     render={({ field: { onChange, onBlur, value } }) => (
+//                       <AppFormField
+//                         ref={passwordRef}
+//                         value={value}
+//                         placeholder="Enter your password"
+//                         onChangeText={(text: string) => {
+//                           onChange(text);
+//                         }}
+//                         onBlur={() => {
+//                           onBlur();
+//                           handleBlur('password');
+//                         }}
+//                         onFocus={() => handleFocus('password')}
+//                         errorText={getErrorMessage('password')}
+//                         secureTextEntry={secureTextEntry}
+//                         returnKeyType="done"
+//                         onSubmitEditing={handleSubmit(onSubmit)}
+//                         icon="lock-closed-outline"
+//                         rightIcon={secureTextEntry ? 'eye-off-outline' : 'eye-outline'}
+//                         onRightIconPress={toggleSecureEntry}
+//                         editable={!loading}
+//                         touched={touchedFields.password}
+//                         containerStyle={styles.inputContainer}
+//                       />
+//                     )}
+//                   />
+
+//                   {/* LOGIN BUTTON */}
+//                   <Pressable
+//                     onPress={handleSubmit(onSubmit)}
+//                     disabled={!isFormValid || loading}
+//                     style={({ pressed }) => [
+//                       styles.loginButton,
+//                       (!isFormValid || loading) && styles.disabledButton,
+//                       pressed && {
+//                         opacity: 0.85,
+//                         transform: [{ scale: 0.99 }],
+//                       },
+//                     ]}
+//                   >
+//                     <LinearGradient
+//                       colors={[colors.primary, colors.secondary || colors.primary]}
+//                       start={{ x: 0, y: 0 }}
+//                       end={{ x: 1, y: 0 }}
+//                       style={styles.loginButtonGradient}
+//                     >
+//                       {loading ? (
+//                         <ActivityIndicator size="small" color="#fff" />
+//                       ) : (
+//                         <View
+//                           style={{
+//                             flexDirection: 'row',
+//                             alignItems: 'center',
+//                             justifyContent: 'center',
+//                           }}
+//                         >
+//                           <Ionicons name="log-in-outline" size={18} color="#fff" />
+//                           <AppText style={[styles.loginButtonText, { marginLeft: 8 }]}>
+//                             Sign In
+//                           </AppText>
+//                         </View>
+//                       )}
+//                     </LinearGradient>
+//                   </Pressable>
+
+//                   {/* Footer */}
+//                   {!loading && !keyboardVisible && (
+//                     <AppText style={styles.footerText}>⚡ Secure & Encrypted Connection</AppText>
+//                   )}
+//                 </View>
+//               </View>
+//             </View>
+//           </ScrollView>
+//         </TouchableWithoutFeedback>
+//       </KeyboardAvoidingView>
+//     </SafeAreaView>
+//   );
+// };
+
+// export default React.memo(LoginScreen);
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+
 import {
   View,
   Platform,
-  Alert,
-  Pressable,
   Keyboard,
-  TextInput,
   KeyboardAvoidingView,
-  Dimensions,
+  Pressable,
+  Image,
   ScrollView,
+  SafeAreaView,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Animated,
+  Easing,
+  Dimensions,
 } from 'react-native';
+
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Animated from 'react-native-reanimated';
 import { useForm, Controller } from 'react-hook-form';
+import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
 
 import { toast } from '@/shared/utils/toast';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppFormField, AppButton, AppText } from '@/core/components';
+import { AppText, AppFormField } from '@/core/components';
 import { t } from '@/shared/locales/engine/t';
 import { authService } from '../services/auth.service';
-import { LoginFormData, LoginRequest, LoginScreenProps } from '../types/login.types';
-import { useLoginStyles } from '../styles/Login.style';
-import { useLoginAnimation } from '../hooks/useLoginAnimation';
-// import messaging from '@react-native-firebase/messaging';
-import Device from 'expo-device';
-import * as Notifications from 'expo-notifications';
-import { setTokens } from '@/shared/services/tokenStorage';
+import { LoginFormData, LoginScreenProps } from '../types/login.types';
 import { useAuthStore } from '@/core/store/auth.store';
+import { useLoginStyles } from '../styles/Login.style';
 
-const { height } = Dimensions.get('window');
-const SMALL_SCREEN_HEIGHT = 700;
+const isWeb = Platform.OS === 'web';
+const { height: screenHeight } = Dimensions.get('window');
 
-/**
- * Login Screen Component
- * Handles user authentication with form validation and animations
- */
 const LoginScreen: React.FC<LoginScreenProps> = () => {
   const { colors } = useTheme();
   const styles = useLoginStyles(colors);
 
-  // ============================================================================
+  // Animation refs
+  const logoAnimValue = useRef(new Animated.Value(0)).current;
+  const formAnimValue = useRef(new Animated.Value(0)).current;
+  const inputScaleRef = useRef(new Animated.Value(1)).current;
+
   // Refs
-  // ============================================================================
-  const userIdRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
+  const userIdRef = useRef<any>(null);
+  const passwordRef = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // ============================================================================
   // State
-  // ============================================================================
   const [loading, setLoading] = useState(false);
   const [secureTextEntry, setSecureTextEntry] = useState(true);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
 
-  // ============================================================================
-  // Form Handling with React Hook Form
-  // ============================================================================
+  // Form
   const {
     control,
     handleSubmit,
@@ -65,48 +466,51 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
     setValue,
     setFocus,
     trigger,
+    watch,
   } = useForm<LoginFormData>({
     defaultValues: {
       userId: '',
       password: '',
     },
-    mode: 'onChange', // Real-time validation
+    mode: 'onChange',
   });
 
-  // ============================================================================
-  // Custom Hooks
-  // ============================================================================
-  const { animatedLogo, animatedForm, animatedButton } = useLoginAnimation();
+  const passwordValue = watch('password');
 
-  // ============================================================================
-  // Constants & Memoized Values
-  // ============================================================================
-  const isSmallScreen = height < SMALL_SCREEN_HEIGHT;
-  const isFormValid = isValid && isDirty;
-  const shouldHideFooter = keyboardVisible && isSmallScreen && focusedInput === 'password';
-
-  // ============================================================================
-  // Effects
-  // ============================================================================
-
-  /**
-   * Keyboard event listeners for native platforms
-   * Handles keyboard show/hide and scrolling behavior
-   */
+  // Animation on mount
   useEffect(() => {
-    if (Platform.OS === 'web') return;
+    Animated.sequence([
+      Animated.timing(logoAnimValue, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(formAnimValue, {
+        toValue: 1,
+        duration: 500,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [logoAnimValue, formAnimValue]);
+
+  // Keyboard handling
+  useEffect(() => {
+    if (isWeb) return;
 
     const showSubscription = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
+      () => {
         setKeyboardVisible(true);
-
-        // Scroll to password field when keyboard opens
-        setTimeout(() => {
-          if (focusedInput === 'password' && scrollViewRef.current) {
-            scrollViewRef.current.scrollTo({ y: 200, animated: true });
-          }
-        }, 100);
+        if (focusedInput === 'password' && scrollViewRef.current) {
+          setTimeout(() => {
+            scrollViewRef.current?.scrollTo({
+              y: 120,
+              animated: true,
+            });
+          }, 250);
+        }
       },
     );
 
@@ -114,7 +518,6 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
       () => {
         setKeyboardVisible(false);
-        setFocusedInput(null);
       },
     );
 
@@ -124,208 +527,72 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
     };
   }, [focusedInput]);
 
-  // ============================================================================
-  // Event Handlers
-  // ============================================================================
-
-  /**
-   * Toggle password visibility
-   */
-  const toggleSecureEntry = useCallback(() => {
-    setSecureTextEntry((prev) => !prev);
-  }, []);
-
-  /**
-   * Handle forgot password press
-   */
-  const handleForgotPassword = useCallback(() => {
-    Alert.alert(t('auth.login.forgotTitle'), t('auth.login.forgotMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.continue'),
-        onPress: () => router.push('/forgot-password'),
-      },
-    ]);
-  }, []);
-
-  /**
-   * Focus password field (used for next button)
-   */
-  const focusPassword = useCallback(() => {
-    setFocus('password');
-    passwordRef.current?.focus();
-  }, [setFocus]);
-
-  /**
-   * Handle input focus
-   */
-  const handleFocus = useCallback(
-    (field: string) => {
-      setFocusedInput(field);
-
-      // Auto-scroll for smaller screens
-      if (isSmallScreen && scrollViewRef.current) {
-        setTimeout(() => {
-          scrollViewRef.current?.scrollTo({
-            y: field === 'password' ? 200 : 100,
-            animated: true,
-          });
-        }, 300);
+  // Caps lock detection (for web)
+  const handlePasswordKeyPress = (e: any) => {
+    if (isWeb && e.nativeEvent) {
+      const { shiftKey, code } = e.nativeEvent;
+      if (code?.startsWith('Key')) {
+        setCapsLockOn(shiftKey);
       }
-    },
-    [isSmallScreen],
-  );
+    }
+  };
 
-  /**
-   * Handle input blur
-   */
+  // Toggle password
+  const toggleSecureEntry = () => {
+    if (!isWeb) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    setSecureTextEntry((prev) => !prev);
+  };
+
+  // Focus password
+  const focusPassword = () => {
+    setFocus('password');
+    setTimeout(() => {
+      passwordRef.current?.focus();
+      scrollViewRef.current?.scrollTo({
+        y: 120,
+        animated: true,
+      });
+    }, 100);
+  };
+
+  // Focus handler
+  const handleFocus = useCallback((field: string) => {
+    setFocusedInput(field);
+    Animated.spring(inputScaleRef, {
+      toValue: 1.02,
+      useNativeDriver: true,
+      speed: 15,
+    }).start();
+    if (field === 'password') {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: 120,
+          animated: true,
+        });
+      }, 100);
+    }
+    if (!isWeb) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, []);
+
+  // Blur handler
   const handleBlur = useCallback(
     (field: keyof LoginFormData) => {
       setFocusedInput(null);
-      trigger(field); // Validate on blur
+      Animated.spring(inputScaleRef, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 15,
+      }).start();
+      trigger(field);
     },
-    [trigger],
+    [trigger, inputScaleRef],
   );
 
-  // const getFcmToken = async (): Promise<string | null> => {
-  //   try {
-  //     // Request permission (important for iOS + Android 13+)
-  //     const authStatus = await messaging().requestPermission();
-
-  //     const enabled =
-  //       authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-  //       authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-  //     if (!enabled) return null;
-
-  //     return await messaging().getToken();
-  //   } catch (error) {
-  //     console.log('FCM Token Error:', error);
-  //     return null;
-  //   }
-  // };
-
-  const getDeviceInfo = async () => {
-    // const fcmToken = await getPushToken();
-
-    return {
-      deviceId: 'dsfjklfkjdskfjl',
-      // deviceId: Device.osInternalBuildId || Device.modelId || 'unknown-device',
-      deviceType: Platform.OS,
-      os: Platform.OS,
-      osVersion: String(Platform.Version),
-      browser: Platform.OS === 'web' ? 'Chrome' : 'N/A',
-      appVersion: '1.3.0',
-      fcmToken: 'dklfjfj',
-      // agent: 'BACK_OFFICE',
-    };
-  };
-
-  const getPushToken = async (): Promise<string | null> => {
-    try {
-      if (!Device.isDevice) return null;
-
-      // Request permission
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') return null;
-
-      // Get Expo push token
-      const tokenData = await Notifications.getExpoPushTokenAsync();
-
-      return tokenData.data;
-    } catch (error) {
-      console.log('Push Token Error:', error);
-      return null;
-    }
-  };
-
-  const onSubmit = useCallback(
-    async (data: LoginFormData) => {
-      console.log('Submitting Login Form with data:', process.env.EXPO_PUBLIC_API_URL);
-      Keyboard.dismiss();
-
-      try {
-        setLoading(true);
-
-        const payload = {
-          loginId: data.userId.trim(),
-          password: data.password,
-          deviceInfo: await getDeviceInfo(),
-        };
-
-        const response = await authService.login(payload);
-
-        console.log('Login Response:', response);
-
-        const resData: any = response.data;
-
-        /**
-         * ✅ Extract user from API response
-         */
-        const user = {
-          userId: resData.user.profileId,
-          name: resData.user.profile?.name,
-          role: resData.user.profile?.role,
-          vanId: resData.user.profile?.associatedVans?.[0] ?? null,
-        };
-
-        console.log('Authenticated User:', user);
-
-        /**
-         * ✅ Store auth (token + user)
-         * ❌ No need to call setTokens again
-         */
-        await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
-
-        toast.success(t('auth.login.welcomeBack'), t('auth.login.loginSuccess'));
-
-        router.replace('/(tabs)/home');
-      } catch (error: any) {
-        toast.error(
-          t('auth.login.loginFailed'),
-          error?.message || t('auth.login.invalidCredentials'),
-        );
-
-        setValue('password', '', { shouldValidate: true });
-        setFocus('password');
-      } finally {
-        setLoading(false);
-      }
-    },
-    [setValue, setFocus],
-  );
-
-  /**
-   * Navigate to sign up
-   */
-  const handleSignUp = useCallback(() => {
-    router.push('/register');
-  }, []);
-
-  /**
-   * Dismiss keyboard on tap outside
-   */
-  const handleDismissKeyboard = useCallback(() => {
-    if (Platform.OS !== 'web') {
-      Keyboard.dismiss();
-    }
-  }, []);
-
-  // ============================================================================
-  // Helper Functions
-  // ============================================================================
-
-  /**
-   * Get dynamic icon size based on screen size and keyboard state
-   */
-  const getIconSize = useCallback(
-    () => (keyboardVisible && isSmallScreen ? 28 : 36),
-    [keyboardVisible, isSmallScreen],
-  );
-
-  /**
-   * Get localized error message for a field
-   */
+  // Error message
   const getErrorMessage = useCallback(
     (field: keyof LoginFormData): string => {
       const error = errors[field];
@@ -337,193 +604,445 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
     [errors, touchedFields],
   );
 
-  // ============================================================================
-  // Render Methods
-  // ============================================================================
+  // Device info
+  const getDeviceInfo = async () => ({
+    deviceId: isWeb ? 'web-device' : 'mobile-device',
+    deviceType: Platform.OS,
+    os: Platform.OS,
+    osVersion: String(Platform.Version),
+    browser: isWeb ? 'Modern Browser' : 'N/A',
+    appVersion: '1.3.0',
+    fcmToken: 'temp-token',
+  });
 
-  /**
-   * Render header with logo and app title
-   */
-  const renderHeader = () => (
-    <Animated.View
-      style={[
-        styles.header,
-        animatedLogo,
-        keyboardVisible && isSmallScreen && styles.headerCompact,
-      ]}
-    >
-      <View
-        style={[
-          styles.logoBox,
-          { backgroundColor: colors.primary },
-          keyboardVisible && isSmallScreen && styles.logoBoxCompact,
-        ]}
-      >
-        <Ionicons name="shield-checkmark" size={getIconSize()} color={colors.textInverse} />
-      </View>
+  // Submit
+  const onSubmit = async (data: LoginFormData) => {
+    if (!isWeb) {
+      Keyboard.dismiss();
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        loginId: data.userId.trim(),
+        password: data.password,
+        deviceInfo: await getDeviceInfo(),
+      };
+      const response = await authService.login(payload);
+      const resData: any = response.data;
+      const user = {
+        userId: resData.user.profileId,
+        name: resData.user.profile?.name,
+        role: resData.user.profile?.role,
+        vanId: resData.user.profile?.associatedVans?.[0] ?? null,
+      };
+      await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
+      toast.success(t('auth.login.welcomeBack'));
+      router.replace('/(tabs)/home');
+    } catch (error: any) {
+      if (!isWeb) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      toast.error(t('auth.login.loginFailed'), error?.message);
+      setValue('password', '', {
+        shouldValidate: true,
+      });
+      setFocus('password');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      <AppText
-        style={[styles.appTitle, keyboardVisible && isSmallScreen && styles.appTitleCompact]}
-      >
-        {t('common.appTitle')}
-      </AppText>
+  const isFormValid = isValid && isDirty;
+  const userIdError = getErrorMessage('userId');
+  const passwordError = getErrorMessage('password');
 
-      {!keyboardVisible && (
-        <AppText style={styles.appSubtitle}>{t('auth.login.appSubtitle')}</AppText>
-      )}
-    </Animated.View>
-  );
+  const logoOpacity = logoAnimValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
-  /**
-   * Render login form with validation
-   */
-  const renderForm = () => (
-    <Animated.View style={[styles.formSection, animatedForm]}>
-      {/* User ID Field */}
-      <Controller
-        control={control}
-        name="userId"
-        rules={{
-          required: 'auth.login.userIdRequired',
-          validate: (value) => (value?.trim() ? true : 'auth.login.userIdRequired'),
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <AppFormField
-            ref={userIdRef}
-            label={!keyboardVisible ? t('auth.login.userIdLabel') : ''}
-            value={value}
-            placeholder={t('auth.login.userIdPlaceholder')}
-            onChangeText={onChange}
-            onBlur={() => {
-              onBlur();
-              handleBlur('userId');
-            }}
-            onFocus={() => handleFocus('userId')}
-            errorText={getErrorMessage('userId')}
-            returnKeyType="next"
-            onSubmitEditing={focusPassword}
-            icon="person-outline"
-            editable={!loading}
-            touched={touchedFields.userId}
-          />
-        )}
-      />
+  const logoScale = logoAnimValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.8, 1],
+  });
 
-      {/* Password Field */}
-      <Controller
-        control={control}
-        name="password"
-        rules={{
-          required: 'auth.login.passwordRequired',
-          minLength: {
-            value: 6,
-            message: 'auth.login.passwordMinLength',
-          },
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <AppFormField
-            ref={passwordRef}
-            label={!keyboardVisible ? t('auth.login.passwordLabel') : ''}
-            value={value}
-            placeholder={t('auth.login.passwordPlaceholder')}
-            onChangeText={onChange}
-            onBlur={() => {
-              onBlur();
-              handleBlur('password');
-            }}
-            onFocus={() => handleFocus('password')}
-            errorText={getErrorMessage('password')}
-            secureTextEntry={secureTextEntry}
-            returnKeyType="done"
-            onSubmitEditing={handleSubmit(onSubmit)}
-            icon="lock-closed-outline"
-            rightIcon={secureTextEntry ? 'eye-off-outline' : 'eye-outline'}
-            onRightIconPress={toggleSecureEntry}
-            editable={!loading}
-            touched={touchedFields.password}
-          />
-        )}
-      />
+  const formOpacity = formAnimValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
-      {/* Forgot Password Link */}
-      {/* {!keyboardVisible && (
-        <
-          onPress={handleForgotPassword}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <AppText style={styles.forgotLink}>{t('auth.login.forgotPassword')}</AppText>
-        </Pressable>
-      )} */}
+  const formTranslateY = formAnimValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [20, 0],
+  });
 
-      {/* Submit Button */}
-      <Animated.View style={[styles.buttonContainer, animatedButton]}>
-        <AppButton
-          title={t('auth.login.title')}
-          loading={loading}
-          disabled={!isFormValid || loading}
-          onPress={handleSubmit(onSubmit)}
-          fullWidth
-        />
-      </Animated.View>
-    </Animated.View>
-  );
-
-  /**
-   * Render footer with sign up link
-   */
-  const renderFooter = () => (
-    <View style={styles.footer}>
-      <View style={styles.signupContainer}>
-        <AppText style={styles.signupText}>{t('auth.login.noAccount')} </AppText>
-        <Pressable
-          onPress={handleSignUp}
-          hitSlop={{ top: 10, bottom: 10, left: 5, right: 5 }}
-          disabled={loading}
-        >
-          <AppText style={styles.signupLink}>{t('auth.login.signUp')}</AppText>
-        </Pressable>
-      </View>
-    </View>
-  );
-
-  /**
-   * Render main content
-   */
-  const renderContent = () => (
-    <View style={[styles.scrollContentInner, { backgroundColor: 'transparent' }]}>
-      {renderHeader()}
-      {renderForm()}
-      {/* {!shouldHideFooter && renderFooter()} */}
-      {keyboardVisible && <View style={{ height: 20 }} />}
-    </View>
-  );
-
-  // ============================================================================
-  // Main Render
-  // ============================================================================
   return (
-    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
+
+      {/* Background */}
+      <LinearGradient
+        colors={[colors.primary, colors.secondary || colors.primary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.gradientBackground}
+      />
+
+      {/* Main */}
       <KeyboardAvoidingView
-        style={{ flex: 1, backgroundColor: 'transparent' }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        <ScrollView
-          ref={scrollViewRef}
-          style={[styles.scrollView, { backgroundColor: 'transparent' }]}
-          contentContainerStyle={[styles.scrollContent, { backgroundColor: 'transparent' }]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          bounces={false}
+        <TouchableWithoutFeedback
+          onPress={() => {
+            if (!isWeb) {
+              Keyboard.dismiss();
+            }
+          }}
         >
-          <Pressable
-            onPress={handleDismissKeyboard}
-            accessible={false}
-            style={{ backgroundColor: 'transparent' }}
+          <ScrollView
+            ref={scrollViewRef}
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={isWeb ? 'none' : 'interactive'}
+            scrollEnabled={true}
+            bounces={false}
+            overScrollMode="never"
+            nestedScrollEnabled={false}
           >
-            {renderContent()}
-          </Pressable>
-        </ScrollView>
+            <View>
+              {/* HERO SECTION */}
+              <View style={styles.topSection}>
+                <View style={{ alignItems: 'center' }}>
+                  {/* Logo */}
+                  <Animated.View
+                    style={[
+                      styles.logoContainer,
+                      {
+                        opacity: logoOpacity,
+                        transform: [
+                          { scale: logoScale },
+                          {
+                            translateY: logoAnimValue.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [-20, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    {!logoError ? (
+                      <Image
+                        source={require('@/assets/images/logo.png')}
+                        style={styles.logoImage}
+                        resizeMode="contain"
+                        onError={() => setLogoError(true)}
+                      />
+                    ) : (
+                      <Ionicons name="rocket-outline" size={40} color={colors.primary} />
+                    )}
+                  </Animated.View>
+
+                  {/* Title */}
+                  <Animated.View
+                    style={{
+                      opacity: logoOpacity,
+                      transform: [
+                        {
+                          translateY: logoAnimValue.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-15, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <AppText style={styles.appTitle}>{t('common.appTitle')}</AppText>
+                  </Animated.View>
+
+                  {/* Subtitle */}
+                  <Animated.View
+                    style={{
+                      opacity: logoOpacity,
+                      transform: [
+                        {
+                          translateY: logoAnimValue.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-10, 0],
+                          }),
+                        },
+                      ],
+                    }}
+                  >
+                    <AppText style={styles.appSubtitle}>
+                      Experience the future of digital access
+                    </AppText>
+                  </Animated.View>
+                </View>
+              </View>
+
+              {/* FORM SECTION */}
+              <Animated.View
+                style={[
+                  styles.bottomSection,
+                  {
+                    opacity: formOpacity,
+                    transform: [{ translateY: formTranslateY }],
+                  },
+                ]}
+              >
+                <View style={styles.formContainer}>
+                  {/* Welcome */}
+                  <View style={styles.welcomeContainer}>
+                    <AppText style={styles.welcomeTitle}>Welcome Back!</AppText>
+                    <AppText style={styles.welcomeSubtitle}>
+                      Please enter your credentials to continue
+                    </AppText>
+                  </View>
+
+                  {/* USER ID - Using AppFormField */}
+                  <Controller
+                    control={control}
+                    name="userId"
+                    rules={{
+                      required: 'auth.login.userIdRequired',
+                      validate: (value) => (value?.trim() ? true : 'auth.login.userIdRequired'),
+                    }}
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <View>
+                        <AppFormField
+                          ref={userIdRef}
+                          value={value}
+                          placeholder="Enter your loginId"
+                          onChangeText={(text: string) => {
+                            onChange(text);
+                          }}
+                          onBlur={() => {
+                            onBlur();
+                            handleBlur('userId');
+                          }}
+                          onFocus={() => handleFocus('userId')}
+                          errorText={userIdError}
+                          returnKeyType="next"
+                          onSubmitEditing={focusPassword}
+                          icon="person-outline"
+                          editable={!loading}
+                          touched={touchedFields.userId}
+                          containerStyle={styles.inputContainer}
+                          accessibilityLabel="User ID or Login ID input field"
+                          accessibilityHint="Enter your unique user ID or login ID"
+                        />
+                        {userIdError && (
+                          <Animated.View
+                            style={{
+                              opacity: formAnimValue,
+                              transform: [
+                                {
+                                  translateX: formAnimValue.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [-10, 0],
+                                  }),
+                                },
+                              ],
+                            }}
+                          >
+                            <AppText style={styles.errorHelperText}>
+                              <Ionicons
+                                name="alert-circle-outline"
+                                size={12}
+                                color={colors.error}
+                              />{' '}
+                              {userIdError}
+                            </AppText>
+                          </Animated.View>
+                        )}
+                      </View>
+                    )}
+                  />
+
+                  {/* PASSWORD - Using AppFormField */}
+                  <Controller
+                    control={control}
+                    name="password"
+                    rules={{
+                      required: 'auth.login.passwordRequired',
+                      minLength: {
+                        value: 6,
+                        message: 'auth.login.passwordMinLength',
+                      },
+                    }}
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <View>
+                        <AppFormField
+                          ref={passwordRef}
+                          value={value}
+                          placeholder="Enter your password"
+                          onChangeText={(text: string) => {
+                            onChange(text);
+                          }}
+                          onBlur={() => {
+                            onBlur();
+                            handleBlur('password');
+                          }}
+                          onFocus={() => handleFocus('password')}
+                          onKeyPress={handlePasswordKeyPress}
+                          errorText={passwordError}
+                          secureTextEntry={secureTextEntry}
+                          returnKeyType="done"
+                          onSubmitEditing={handleSubmit(onSubmit)}
+                          icon="lock-closed-outline"
+                          rightIcon={secureTextEntry ? 'eye-off-outline' : 'eye-outline'}
+                          onRightIconPress={toggleSecureEntry}
+                          editable={!loading}
+                          touched={touchedFields.password}
+                          containerStyle={styles.inputContainer}
+                          accessibilityLabel="Password input field"
+                          accessibilityHint="Enter your password. Use the eye icon to toggle visibility"
+                        />
+                        {passwordError && (
+                          <Animated.View
+                            style={{
+                              opacity: formAnimValue,
+                              transform: [
+                                {
+                                  translateX: formAnimValue.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [-10, 0],
+                                  }),
+                                },
+                              ],
+                            }}
+                          >
+                            <AppText style={styles.errorHelperText}>
+                              <Ionicons
+                                name="alert-circle-outline"
+                                size={12}
+                                color={colors.error}
+                              />{' '}
+                              {passwordError}
+                            </AppText>
+                          </Animated.View>
+                        )}
+                        {/* Caps Lock Warning */}
+                        {capsLockOn && (
+                          <View style={styles.capsLockWarning}>
+                            <Ionicons name="alert-circle" size={14} color={colors.warning} />
+                            <AppText style={styles.capsLockText}>Caps Lock is on</AppText>
+                          </View>
+                        )}
+                        {/* Password Requirements */}
+                        {/* {passwordValue && (
+                          <View style={styles.passwordRequirements}>
+                            <PasswordRequirement
+                              met={passwordValue.length >= 6}
+                              text="At least 6 characters"
+                            />
+                            <PasswordRequirement
+                              met={/[A-Z]/.test(passwordValue)}
+                              text="One uppercase letter"
+                            />
+                            <PasswordRequirement
+                              met={/[a-z]/.test(passwordValue)}
+                              text="One lowercase letter"
+                            />
+                            <PasswordRequirement
+                              met={/[0-9]/.test(passwordValue)}
+                              text="One number"
+                            />
+                          </View>
+                        )} */}
+                      </View>
+                    )}
+                  />
+
+                  {/* LOGIN BUTTON */}
+                  <Pressable
+                    onPress={handleSubmit(onSubmit)}
+                    disabled={!isFormValid || loading}
+                    style={({ pressed }) => [
+                      styles.loginButton,
+                      (!isFormValid || loading) && styles.disabledButton,
+                      pressed && {
+                        opacity: 0.85,
+                        transform: [{ scale: 0.99 }],
+                      },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Sign in button"
+                    accessibilityHint={
+                      !isFormValid ? 'Please fill in all required fields' : 'Double tap to sign in'
+                    }
+                    accessibilityState={{ disabled: !isFormValid || loading }}
+                  >
+                    <LinearGradient
+                      colors={[colors.primary, colors.secondary || colors.primary]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.loginButtonGradient}
+                    >
+                      {loading ? (
+                        <ActivityIndicator size="small" color="#fff" accessibilityLabel="Loading" />
+                      ) : (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Ionicons name="log-in-outline" size={18} color="#fff" />
+                          <AppText style={[styles.loginButtonText, { marginLeft: 8 }]}>
+                            Sign In
+                          </AppText>
+                        </View>
+                      )}
+                    </LinearGradient>
+                  </Pressable>
+
+                  {/* Forgot Password Link */}
+                  {!loading && !keyboardVisible && (
+                    <Pressable
+                      onPress={() => router.push('/forgot-password')}
+                      style={styles.forgotPasswordContainer}
+                      accessibilityRole="link"
+                      accessibilityLabel="Forgot password"
+                    >
+                      <AppText style={styles.forgotPasswordText}>Forgot password?</AppText>
+                    </Pressable>
+                  )}
+
+                  {/* Footer */}
+                  {!loading && !keyboardVisible && (
+                    <AppText style={styles.footerText}>🔒 Secure & Encrypted Connection</AppText>
+                  )}
+                </View>
+              </Animated.View>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+};
+
+// Password Requirement Component
+const PasswordRequirement: React.FC<{ met: boolean; text: string }> = ({ met, text }) => {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 3 }}>
+      <Ionicons
+        name={met ? 'checkmark-circle' : 'ellipse-outline'}
+        size={14}
+        color={met ? colors.success : colors.textTertiary}
+      />
+      <AppText
+        style={{ marginLeft: 8, fontSize: 12, color: met ? colors.success : colors.textTertiary }}
+      >
+        {text}
+      </AppText>
     </View>
   );
 };

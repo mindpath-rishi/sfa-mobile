@@ -49,6 +49,7 @@ export interface OutletService {
   completeVisit(visitId: string | undefined): Promise<ApiResponse<any>>;
   createCustomer(payload: any): Promise<ApiResponse<any>>;
   getVisitHistory(payload: any): Promise<ApiResponse<any>>;
+  changeRoute(payload: any): Promise<ApiResponse<any>>;
 }
 
 /**
@@ -117,6 +118,7 @@ export const outletService: OutletService = {
   completeVisit: async (visitId: string) => {
     return api.patch<any>(`shop-visit/${visitId}`, {
       status: 'COMPLETED',
+      checkOutTime: new Date().toISOString(),
     }) as Promise<ApiResponse<any>>;
   },
 
@@ -126,5 +128,9 @@ export const outletService: OutletService = {
 
   getVisitHistory: async (payload: any) => {
     return api.get<any>(`shop-visit`, { params: payload }) as Promise<ApiResponse<any>>;
+  },
+
+  changeRoute: async (payload: any) => {
+    return api.post<any>(`route-session`, payload) as Promise<ApiResponse<any>>;
   },
 };

@@ -25,7 +25,6 @@ import { useTopupStyles } from '../styles/topupScreen.styles';
 import { Topup } from '../types/topup.types';
 import { TopupList } from '../components/TopupList';
 
-
 interface TopupScreenProps {
   vanId?: string;
   hideFAB?: boolean;
@@ -43,11 +42,8 @@ export default function TopupScreen({
   const styles = useTopupStyles();
 
   const { setHeader } = useHeader();
-  const {
-    updateTopupFilterCount,
-    resetTopupFilterCount,
-    setOpenTopupFilterHandler,
-  } = useFilterContext();
+  const { updateTopupFilterCount, resetTopupFilterCount, setOpenTopupFilterHandler } =
+    useFilterContext();
 
   const [topups, setTopups] = useState<Topup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,30 +54,22 @@ export default function TopupScreen({
   const [hasMore, setHasMore] = useState(true);
 
   const [showFilters, setShowFilters] = useState(false);
-
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
-
-  /* -------------------- Header -------------------- */
-  useFocusEffect(
-    useCallback(() => {
-      setHeader({
-        showFilter: true,
-        onFilterPress: () => setShowFilters(true),
-        rightIcon: HEADER.RIGHT_ICON,
-        onRightPress: () => handleCreateTopup(),
-        title: HEADER.TITLE,
-      });
-    }, [setHeader])
-  );
 
   /* -------------------- API -------------------- */
   const getTopups = async (
     pageNumber = PAGINATION.DEFAULT_PAGE,
-    isRefresh = false
+    isRefresh = false,
+    isSearch = false,
   ) => {
     try {
-      if (isRefresh) setRefreshing(true);
-      else if (pageNumber === PAGINATION.DEFAULT_PAGE) setLoading(true);
+      // Set loading based on action type
+      if (isRefresh) {
+        setRefreshing(true);
+      } else if (isSearch || pageNumber === PAGINATION.DEFAULT_PAGE) {
+        setLoading(true);
+        setTopups([]); // Clear existing data to show skeleton
+      }
 
       const payload: any = {
         page: pageNumber,
@@ -100,8 +88,11 @@ export default function TopupScreen({
       const res = await vanService.fetchInventoryTopupRequests(payload);
       const newData = res?.data?.data || res?.data || [];
 
-      if (pageNumber === PAGINATION.DEFAULT_PAGE) setTopups(newData);
-      else setTopups((prev) => [...prev, ...newData]);
+      if (pageNumber === PAGINATION.DEFAULT_PAGE || isSearch) {
+        setTopups(newData);
+      } else {
+        setTopups((prev) => [...prev, ...newData]);
+      }
 
       setHasMore(newData.length === PAGINATION.LIMIT);
       setPage(pageNumber);
@@ -122,8 +113,10 @@ export default function TopupScreen({
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(PAGINATION.DEFAULT_PAGE);
+      // Set loading true and clear data to show skeleton
+      setLoading(true);
       setTopups([]);
-      getTopups(PAGINATION.DEFAULT_PAGE, true);
+      getTopups(PAGINATION.DEFAULT_PAGE, false, true);
     }, DEBOUNCE_DELAY);
 
     return () => clearTimeout(timer);
@@ -175,8 +168,7 @@ export default function TopupScreen({
     const newFilters: any = { ...DEFAULT_FILTERS };
 
     sections.forEach((s) => {
-      if (s.id === FILTER_SECTIONS.STATUS.id)
-        newFilters.status = s.selectedIds || [];
+      if (s.id === FILTER_SECTIONS.STATUS.id) newFilters.status = s.selectedIds || [];
       if (s.id === FILTER_SECTIONS.DATE_RANGE.id && s.rangeValue) {
         newFilters.dateRange = {
           start: s.rangeValue.min || '',
@@ -197,7 +189,9 @@ export default function TopupScreen({
     setFilters(DEFAULT_FILTERS);
     setSearchQuery('');
     resetTopupFilterCount();
-    getTopups(PAGINATION.DEFAULT_PAGE, true);
+    setLoading(true);
+    setTopups([]);
+    getTopups(PAGINATION.DEFAULT_PAGE, false, true);
   };
 
   /* -------------------- Filter Chips -------------------- */
@@ -214,16 +208,14 @@ export default function TopupScreen({
             ...prev,
             status: prev.status.filter((s) => s !== status),
           })),
-      }))
+      })),
     );
 
     // Date range chip
     if (filters.dateRange.start || filters.dateRange.end) {
       chips.push({
         id: 'dateRange',
-        label: `Date: ${filters.dateRange.start || 'any'} - ${
-          filters.dateRange.end || 'any'
-        }`,
+        label: `Date: ${filters.dateRange.start || 'any'} - ${filters.dateRange.end || 'any'}`,
         onRemove: () =>
           setFilters((prev) => ({
             ...prev,
@@ -236,9 +228,7 @@ export default function TopupScreen({
     if (filters.minValue || filters.maxValue) {
       chips.push({
         id: 'valueRange',
-        label: `Value: ${filters.minValue || '0'} - ${
-          filters.maxValue || '∞'
-        } ZMW`,
+        label: `Value: ${filters.minValue || '0'} - ${filters.maxValue || '∞'} ZMW`,
         onRemove: () =>
           setFilters((prev) => ({
             ...prev,
@@ -256,15 +246,30 @@ export default function TopupScreen({
     router.push('/topup/create');
   };
 
+  /* -------------------- Search Handlers -------------------- */
+  const handleSearchClear = useCallback(() => {
+    setSearchQuery('');
+    setLoading(true);
+    setTopups([]);
+    getTopups(PAGINATION.DEFAULT_PAGE, false, true);
+  }, []);
+
+  const handleSearchSubmit = useCallback(() => {
+    if (searchQuery.trim()) {
+      setLoading(true);
+      setTopups([]);
+      getTopups(PAGINATION.DEFAULT_PAGE, false, true);
+    }
+  }, [searchQuery]);
+
   /* -------------------- Filter Count -------------------- */
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (filters.status.length) count += filters.status.length;
     if (filters.dateRange.start || filters.dateRange.end) count++;
     if (filters.minValue || filters.maxValue) count++;
-    if (searchQuery) count++;
     return count;
-  }, [filters, searchQuery]);
+  }, [filters]);
 
   // Update filter count in context
   useEffect(() => {
@@ -283,6 +288,33 @@ export default function TopupScreen({
     };
   }, [hideFilters, setOpenTopupFilterHandler]);
 
+  // Update header configuration with search bar (no scroll toggle)
+  useFocusEffect(
+    useCallback(() => {
+      setHeader({
+        title: 'Top-up Requests',
+        showBack: true,
+        showSearchBar: true,
+        searchPlaceholder: 'Search by reference, van...',
+        searchValue: searchQuery,
+        onSearchChange: setSearchQuery,
+        onSearchClear: handleSearchClear,
+        onSearchPress: handleSearchSubmit,
+        autoFocusSearch: false,
+        showFilter: false,
+        filterCount: activeFilterCount,
+        filterActive: activeFilterCount > 0,
+        onFilterPress: () => setShowFilters(true),
+        rightIcon: HEADER.RIGHT_ICON,
+        onRightPress: handleCreateTopup,
+        elevated: true,
+        centeredTitle: false,
+        size: 'sm',
+        showBorder: false,
+      });
+    }, [searchQuery, activeFilterCount]),
+  );
+
   return (
     <View style={styles.container}>
       <TopupList
@@ -291,11 +323,11 @@ export default function TopupScreen({
         refreshing={refreshing}
         onRefresh={onRefresh}
         onEndReached={handleLoadMore}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
         filterChips={filterChips}
         clearAllFilters={clearAllFilters}
         activeFilterCount={activeFilterCount}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
       />
 
       <FilterModal

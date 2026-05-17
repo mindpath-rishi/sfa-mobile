@@ -10,6 +10,7 @@ export const useTodayActivitiesSectionStyles = () => {
     container: {
       paddingHorizontal: utils.spacing[4],
       marginBottom: utils.spacing[5],
+      width: '100%',
     } as ViewStyle,
 
     headerContainer: {
@@ -48,10 +49,12 @@ export const useTodayActivitiesSectionStyles = () => {
       flexDirection: 'row',
       gap: utils.spacing[2],
       marginBottom: utils.spacing[4],
+      flexWrap: 'wrap', // Allow wrapping on smaller screens
     } as ViewStyle,
 
     statCard: {
       flex: 1,
+      minWidth: 100, // Minimum width for better layout
       borderRadius: 10,
       padding: utils.spacing[2.5],
       borderWidth: 1,
@@ -68,18 +71,11 @@ export const useTodayActivitiesSectionStyles = () => {
       marginTop: utils.spacing[0.5],
     } as TextStyle,
 
-    activitiesScrollView: {
-      maxHeight: 400,
-    } as ViewStyle,
-
-    activitiesContent: {
-      paddingVertical: utils.spacing[1],
-    } as ViewStyle,
-
+    // Remove ScrollView styles - no longer needed
     emptyState: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: utils.spacing[12],
+      paddingVertical: utils.spacing[8],
     } as ViewStyle,
 
     emptyStateIconContainer: {
@@ -107,7 +103,7 @@ export const useTodayActivitiesSectionStyles = () => {
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: utils.spacing[2.5],
-      marginTop: utils.spacing[2],
+      marginTop: utils.spacing[3],
       borderRadius: 8,
       borderWidth: 1,
     } as ViewStyle,

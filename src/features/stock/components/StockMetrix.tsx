@@ -1,10 +1,12 @@
 // StockMetrix.tsx
 
 import React from 'react';
-import { ScrollView, View } from 'react-native';
-
+import { ScrollView, View, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
 import { StockMetricsProps } from '../types/stock.types';
+
+const { width } = Dimensions.get('window');
 
 export const StockMetrics: React.FC<StockMetricsProps> = ({
   summary,
@@ -12,64 +14,70 @@ export const StockMetrics: React.FC<StockMetricsProps> = ({
   colors,
   styles,
 }) => {
+  const metrics = [
+    {
+      id: 'cases',
+      label: 'Cases',
+      value: summary.totalCases,
+      icon: 'cube-outline',
+      iconColor: colors.primary,
+      bgColor: colors.primary + '10',
+      format: (val: number) => val.toString(),
+    },
+    {
+      id: 'pieces',
+      label: 'Pieces',
+      value: summary.totalPiece,
+      icon: 'layers-outline',
+      iconColor: colors.success,
+      bgColor: colors.success + '10',
+      format: (val: number) => val.toString(),
+    },
+    {
+      id: 'weight',
+      label: 'Weight',
+      value: summary.totalNetWeight,
+      icon: 'scale-outline',
+      iconColor: colors.info,
+      bgColor: colors.info + '10',
+      format: (val: number) => `${val.toFixed(1)}kg`,
+    },
+    {
+      id: 'value',
+      label: 'Value',
+      value: summary.totalValue,
+      icon: 'cash-outline',
+      iconColor: colors.warning,
+      bgColor: colors.warning + '10',
+      format: (val: number) => formatCurrency(val),
+    },
+  ];
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.metricsScrollContainer}
       style={styles.metricsWrapper}
+      decelerationRate="fast"
+      snapToInterval={width * 0.35}
+      snapToAlignment="start"
     >
-      {/* Total Items */}
-      {/* <View style={styles.metricItem}>
-        <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
-          Total Items
-        </AppText>
-        <AppText style={[styles.metricValue, { color: colors.primary }]}>
-          {summary.totalItems}
-        </AppText>
-      </View> */}
-
-      <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
-
-      {/* Total Cases */}
-      <View style={styles.metricItem}>
-        <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>Total Cases</AppText>
-        <AppText style={[styles.metricValue, { color: colors.primary }]}>
-          {summary.totalCases}
-        </AppText>
-      </View>
-
-      <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
-
-      {/* Total Pieces */}
-      <View style={styles.metricItem}>
-        <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
-          Total Pieces
-        </AppText>
-        <AppText style={[styles.metricValue, { color: colors.success }]}>
-          {summary.totalPiece}
-        </AppText>
-      </View>
-
-      <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
-
-      {/* Net Weight */}
-      <View style={styles.metricItem}>
-        <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>Net Weight</AppText>
-        <AppText style={[styles.metricValue, { color: colors.info }]}>
-          {summary.totalNetWeight.toFixed(2)} kg
-        </AppText>
-      </View>
-
-      <View style={[styles.metricDivider, { backgroundColor: colors.divider }]} />
-
-      {/* Net Weight */}
-      <View style={styles.metricItem}>
-        <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>Total Value</AppText>
-        <AppText style={[styles.metricValue, { color: colors.info }]}>
-          {formatCurrency(summary.totalValue)}
-        </AppText>
-      </View>
+      {metrics.map((metric, index) => (
+        <View key={metric.id} style={styles.metricCard}>
+          <View style={[styles.metricIconContainer, { backgroundColor: metric.bgColor }]}>
+            <Ionicons name={metric.icon as any} size={16} color={metric.iconColor} />
+          </View>
+          <View style={styles.metricContent}>
+            <AppText style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              {metric.label}
+            </AppText>
+            <AppText style={[styles.metricValue, { color: metric.iconColor }]}>
+              {metric.format(metric.value)}
+            </AppText>
+          </View>
+        </View>
+      ))}
     </ScrollView>
   );
 };

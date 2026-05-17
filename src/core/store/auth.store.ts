@@ -24,6 +24,8 @@ type JwtPayload = {
   vanId?: string;
 };
 
+type workSessionId = string | null;
+
 /* ======================================================
  * HELPERS
  * ====================================================== */
@@ -67,11 +69,16 @@ export const useAuthStore = create<{
   setAuth: (accessToken: string, refreshToken?: string, userFromApi?: AuthUser) => Promise<void>;
 
   logout: () => Promise<void>;
+  workSessionId: workSessionId;
+  setWorkSessionId: (id: workSessionId) => void;
 }>((set) => ({
   isHydrated: false,
   accessToken: null,
   user: null,
-
+  workSessionId: null,
+  setWorkSessionId: (id) => {
+    set({ workSessionId: id });
+  },
   /**
    * 🔄 Hydrate from storage
    */
@@ -125,19 +132,16 @@ export const useAuthStore = create<{
 
   logout: async () => {
     try {
-      // 🔐 clear auth tokens
       await clearTokens();
 
-      // 🧹 reset all zustand stores (cart, outlet, route, etc.)
       resetAllStores();
 
-      // 🗑️ clear persisted storage (VERY IMPORTANT)
       await storage.clear();
 
-      // 🔄 reset auth state
       set({
         accessToken: null,
         user: null,
+        workSessionId: null,
       });
     } catch (error) {
       console.log('Logout error:', error);

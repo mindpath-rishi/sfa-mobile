@@ -57,6 +57,7 @@ export interface SaleService {
   fetchSales: (params: FetchSaleQuery) => Promise<ApiResponse<any>>;
   fetchPayments: (params: FetchSaleQuery) => Promise<ApiResponse<any>>;
   createPayment: (payload: any) => Promise<ApiResponse<any>>;
+  getCategoryWiseSales: (params: any) => Promise<ApiResponse<any>>;
 }
 
 /**
@@ -74,4 +75,7 @@ export const saleService: SaleService = {
 
   createPayment: (payload: any = {}) =>
     api.post<any>('/payment', payload) as Promise<ApiResponse<any>>,
+
+  getCategoryWiseSales: (params: any) =>
+    api.get<any>('/sales/category-wise', { params }) as Promise<ApiResponse<any>>,
 };

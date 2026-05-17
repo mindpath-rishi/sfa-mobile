@@ -1,40 +1,22 @@
 import React from 'react';
-import { View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, TouchableOpacity, FlatList } from 'react-native';
 import { router } from 'expo-router';
 
-import { CommonListing } from '@/shared/components/CommonListing';
-import { AppText } from '@/core/components';
-import { IconTile } from '@/shared/components/IconTile';
-import { StatusChip } from '@/shared/components/StatusChip';
+import { AppText, Skeleton } from '@/core/components';
 import { formatCurrency, formatDateSafe } from '@/shared/utils/currenty.utils';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 import { Topup, TopupListProps } from '../types/topup.types';
-import { EMPTY_STATE, SEARCH } from '../constants/topup.constants';
+import { EMPTY_STATE } from '../constants/topup.constants';
 import { useTopupListStyles } from '../styles/topupList.styles';
-import { getStatusConfig, getStatusIcon } from '../utils/topup.utils';
+import { getStatusConfig } from '../utils/topup.utils';
 
-
-
-/**
- * TopupList Component
- *
- * Displays a searchable, filterable list of topup requests with:
- * - Status icons and badges with color coding
- * - Requested vs Approved cases/pieces breakdown
- * - Approval metadata (approver name, approval date)
- * - Pull-to-refresh and infinite scroll
- * - Navigation to detail view on selection
- */
 export const TopupList: React.FC<TopupListProps> = ({
   data,
   loading,
   refreshing,
   onRefresh,
   onEndReached,
-  searchQuery,
-  setSearchQuery,
   filterChips,
   clearAllFilters,
   activeFilterCount,
@@ -42,10 +24,7 @@ export const TopupList: React.FC<TopupListProps> = ({
   const { colors } = useTheme();
   const styles = useTopupListStyles();
 
-  /**
-   * Determine empty state based on search/filters
-   */
-  const hasActiveFilters = searchQuery || activeFilterCount > 0;
+  const hasActiveFilters = activeFilterCount > 0;
   const emptyStateConfig = {
     title: hasActiveFilters ? EMPTY_STATE.SEARCH_TITLE : EMPTY_STATE.TITLE,
     description: hasActiveFilters ? EMPTY_STATE.SEARCH_DESCRIPTION : EMPTY_STATE.DESCRIPTION,
@@ -54,125 +33,148 @@ export const TopupList: React.FC<TopupListProps> = ({
     onAction: hasActiveFilters ? clearAllFilters : undefined,
   };
 
-  /**
-   * Navigate to topup detail page
-   */
   const handleItemPress = (item: Topup) => {
     router.push(`/topup/detail?id=${item.vanInventoryTopupId}`);
   };
 
-  /**
-   * Render topup item card
-   */
-  const renderTopupCard = (item: Topup) => {
-    const statusConfig = getStatusConfig(item.status);
-    const showApprovalInfo = item.status === 'APPROVED' && item.approvedByName;
+  const renderFilterChips = () => {
+    if (filterChips.length === 0) return null;
 
-    return {
-      title: <AppText style={styles.title}>{item.vanName || item.vanId}</AppText>,
-
-      leading: <IconTile icon={getStatusIcon(item.status) as any} color={statusConfig.color} />,
-
-      headerRight: (
-        <StatusChip
-          label={statusConfig.label}
-          color={statusConfig.color}
-          backgroundColor={statusConfig.bg}
-        />
-      ),
-
-      subtitle: <AppText style={styles.subtitle}>{item.employeeName || item.employeeId}</AppText>,
-
-      subtitleRight: (
-        <AppText style={styles.amount}>{formatCurrency(item.totalRequestedValue)}</AppText>
-      ),
-
-      children: (
-        <View>
-          {/* Cases and Pieces Section */}
-          <View style={styles.casesContainer}>
-            {/* Requested Column */}
-            <View style={styles.casesColumn}>
-              <AppText style={styles.casesLabel}>Requested</AppText>
-              <View style={styles.casesPiecesRow}>
-                <AppText style={styles.casesValue}>{item.totalRequestedCases || 0} Cases</AppText>
-                <AppText style={styles.piecesValue}>
-                  {item.totalRequestedPieces || 0} Pieces
-                </AppText>
-              </View>
-            </View>
-
-            {/* Approved Column */}
-            <View style={styles.casesColumn}>
-              <AppText style={styles.casesLabel}>Approved</AppText>
-              <View style={styles.casesPiecesRow}>
-                <AppText style={styles.casesValue}>{item.totalApprovedCases || 0} Cases</AppText>
-                <AppText style={styles.piecesValue}>{item.totalApprovedPieces || 0} Pieces</AppText>
-              </View>
-            </View>
-          </View>
-
-          {/* Footer Section with Date and Approval Info */}
-          <View style={styles.footerDivider}>
-            {/* Date */}
-            <View style={styles.dateContainer}>
-              <Ionicons
-                name="calendar-outline"
-                size={styles.iconConfig.size}
-                color={styles.iconConfig.color}
-              />
-              <AppText style={styles.dateText}>{formatDateSafe(item.date)}</AppText>
-            </View>
-
-            {/* Approval Info (conditional) */}
-            {showApprovalInfo && (
-              <View style={styles.approvedByContainer}>
-                <Ionicons
-                  name="shield-checkmark"
-                  size={styles.iconConfig.size}
-                  color={styles.iconConfig.successColor}
-                />
-                <AppText style={styles.approvedByText}>Approved by {item.approvedByName}</AppText>
-              </View>
-            )}
-          </View>
-        </View>
-      ),
-
-      showChevron: true,
-    };
+    return (
+      <View style={styles.filterChipsContainer}>
+        {filterChips.map((chip) => (
+          <TouchableOpacity key={chip.id} style={styles.filterChip} onPress={chip.onRemove}>
+            <AppText style={styles.filterChipText}>{chip.label}</AppText>
+          </TouchableOpacity>
+        ))}
+        {activeFilterCount > 0 && (
+          <TouchableOpacity style={styles.clearAllChip} onPress={clearAllFilters}>
+            <AppText style={styles.clearAllText}>Clear all</AppText>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   };
 
+  const renderSkeleton = () => (
+    <View style={styles.skeletonContainer}>
+      {[1, 2, 3, 4, 5].map((_, index) => (
+        <View key={index} style={styles.skeletonItem}>
+          <View style={styles.skeletonHeader}>
+            <Skeleton height={16} width={120} borderRadius={4} />
+            <Skeleton height={22} width={60} borderRadius={11} />
+          </View>
+          <Skeleton height={12} width={80} borderRadius={4} />
+          <View style={styles.skeletonRow}>
+            <Skeleton height={32} width={100} borderRadius={8} />
+            <Skeleton height={32} width={100} borderRadius={8} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderItem = ({ item }: { item: Topup }) => {
+    const statusConfig = getStatusConfig(item.status);
+    const isApproved = item.status === 'APPROVED';
+    const isRejected = item.status === 'REJECTED';
+    const isPending = item.status === 'PENDING';
+
+    const requestedValue = item.totalRequestedValue || 0;
+    const approvedValue = item.totalApprovedValue || 0;
+
+    return (
+      <TouchableOpacity style={styles.itemContainer} onPress={() => handleItemPress(item)}>
+        <View style={styles.itemHeader}>
+          <View>
+            <AppText style={styles.title}>{item.vanName || item.vanId}</AppText>
+            <AppText style={styles.reference}>
+              {item.reference || item.vanInventoryTopupId?.slice(-8)}
+            </AppText>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
+            <AppText style={[styles.statusText, { color: statusConfig.color }]}>
+              {statusConfig.label}
+            </AppText>
+          </View>
+        </View>
+
+        <View style={styles.metaRow}>
+          <AppText style={styles.metaText}>{formatDateSafe(item.date)}</AppText>
+          <AppText style={styles.metaText}>•</AppText>
+          <AppText style={styles.metaText}>{item.employeeName || item.employeeId}</AppText>
+        </View>
+
+        <View style={styles.amountSection}>
+          <View style={styles.amountBlock}>
+            <AppText style={styles.amountLabel}>Requested</AppText>
+            <AppText style={[styles.amountValue, { color: colors.warning }]}>
+              {formatCurrency(requestedValue)}
+            </AppText>
+            <AppText style={styles.quantityText}>
+              {item.totalRequestedCases || 0} cases / {item.totalRequestedPieces || 0} pieces
+            </AppText>
+          </View>
+
+          {(isApproved || isRejected) && approvedValue > 0 && (
+            <View style={styles.amountBlock}>
+              <AppText style={styles.amountLabel}>Approved</AppText>
+              <AppText style={[styles.amountValue, { color: colors.success }]}>
+                {formatCurrency(approvedValue)}
+              </AppText>
+              <AppText style={[styles.quantityText, { color: colors.success }]}>
+                {item.totalApprovedCases || 0} cases / {item.totalApprovedPieces || 0} pieces
+              </AppText>
+            </View>
+          )}
+        </View>
+
+        {isApproved && item.approvedByName && (
+          <View style={styles.infoRow}>
+            <AppText style={styles.infoText}>✓ Approved by {item.approvedByName}</AppText>
+          </View>
+        )}
+
+        {isRejected && item.rejectedReason && (
+          <View style={[styles.infoRow, styles.errorRow]}>
+            <AppText style={styles.errorText}>⚠ {item.rejectedReason}</AppText>
+          </View>
+        )}
+
+        {isPending && (
+          <View style={[styles.infoRow, styles.pendingRow]}>
+            <AppText style={styles.pendingInfoText}>⏳ Waiting for approval</AppText>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading && data.length === 0) return renderSkeleton();
+
   return (
-    <CommonListing<Topup>
+    <FlatList
       data={data}
       keyExtractor={(item) => item.vanInventoryTopupId}
-      /* Search */
-      enableSearch
-      searchValue={searchQuery}
-      onSearch={setSearchQuery}
-      searchPlaceholder={SEARCH.PLACEHOLDER}
-      /* Filters */
-      filterChips={filterChips}
-      onClearAllFilters={clearAllFilters}
-      /* Card UI */
-      useDefaultCard
-      cardProps={{
-        title: (item) => renderTopupCard(item).title,
-        leading: (item) => renderTopupCard(item).leading,
-        headerRight: (item) => renderTopupCard(item).headerRight,
-        subtitle: (item) => renderTopupCard(item).subtitle,
-        subtitleRight: (item) => renderTopupCard(item).subtitleRight,
-        children: (item) => renderTopupCard(item).children,
-        showChevron: true,
-        onPress: handleItemPress,
-      }}
-      /* Behavior */
+      renderItem={renderItem}
+      ListHeaderComponent={renderFilterChips()}
       refreshing={refreshing}
       onRefresh={onRefresh}
-      loading={loading}
       onEndReached={onEndReached}
-      emptyState={emptyStateConfig}
+      onEndReachedThreshold={0.5}
+      contentContainerStyle={styles.listContent}
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <AppText style={styles.emptyTitle}>{emptyStateConfig.title}</AppText>
+          <AppText style={styles.emptyDescription}>{emptyStateConfig.description}</AppText>
+          {emptyStateConfig.actionLabel && (
+            <TouchableOpacity onPress={emptyStateConfig.onAction}>
+              <AppText style={styles.emptyAction}>{emptyStateConfig.actionLabel}</AppText>
+            </TouchableOpacity>
+          )}
+        </View>
+      }
     />
   );
 };

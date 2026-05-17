@@ -1,5 +1,3 @@
-// ProductsScreen.tsx
-
 import React, {
   useState,
   useMemo,
@@ -17,12 +15,14 @@ import {
   Alert,
   ScrollView,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppText, SearchBar, Skeleton } from '@/core/components';
+import { AppText, Skeleton } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useProductsScreenStyles } from '../styles/ProductsScreen.styles';
 import { ProductCard } from '../components/product';
@@ -38,14 +38,11 @@ import { EmptyState } from '@/core/components/EmptyState';
 const { width } = Dimensions.get('window');
 const PAGE_SIZE = 20;
 const LOAD_MORE_THRESHOLD = 0.5;
-const CATEGORY_WIDTH = 50;
-const PRODUCT_WIDTH = width - CATEGORY_WIDTH;
+const CATEGORY_WIDTH = 60;
+const PRODUCT_WIDTH = width - CATEGORY_WIDTH - 16;
 
 type QuickFilterType = 'all' | 'focused';
 
-/**
- * Mapper: UI filters → API params
- */
 const mapFiltersToParams = (
   filters: {
     searchText?: string;
@@ -59,10 +56,9 @@ const mapFiltersToParams = (
   limit,
   searchText: filters.searchText?.trim() || undefined,
   categoryIds: filters.categoryIds?.length ? filters.categoryIds.join(',') : undefined,
-  brandIds: filters.brandIds?.length ? filters.brandIds.join(',') : undefined,
+  brandIds: filters.brands?.length ? filters.brands.join(',') : undefined,
 });
 
-// Helper to get initials from category name
 const getInitials = (name: string) => {
   if (!name) return '?';
   const words = name.split(' ');
@@ -76,10 +72,10 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   const { setHeader } = useHeader();
   const { setOpenProductFilterHandler, resetProductsFilterCount } = useFilterContext();
   const { items, addItems, clearCart } = useCartStore();
+  const insets = useSafeAreaInsets();
 
-  const { mode = 'sales', onCartUpdate, onSubmit, submitButtonText } = props;
+  const { mode = 'sales', onCartUpdate, onSubmit } = props;
 
-  // State
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [quickFilter, setQuickFilter] = useState<QuickFilterType>('all');
@@ -93,7 +89,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   const [brands, setBrands] = useState<string[]>([]);
   const [categoriesList, setCategoriesList] = useState<any[]>([]);
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -101,9 +97,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
 
-  /**
-   * Cart Summary
-   */
   const cartSummary = useMemo(() => {
     return items.reduce(
       (acc, item) => {
@@ -122,9 +115,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     );
   }, [items]);
 
-  /**
-   * Merge cart data into products
-   */
   const productsWithCart = useMemo(() => {
     return products.map((product) => {
       const cartItem = items.find((i) => i.productId === product.productId);
@@ -136,9 +126,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     });
   }, [products, items]);
 
-  /**
-   * Filter sections for modal
-   */
   const filterSections: any = useMemo(
     () => [
       {
@@ -156,9 +143,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     [brands, filters],
   );
 
-  /**
-   * Filter count
-   */
   const calculateActiveFilterCount = useCallback(() => {
     let count = 0;
     count += filters.categories.length;
@@ -168,24 +152,24 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     return count;
   }, [filters, searchQuery, quickFilter]);
 
-  /**
-   * Fetch Products
-   */
   const fetchProducts = useCallback(
-    async (page: number = 1, shouldAppend: boolean = false) => {
+    async (page: number = 1, shouldAppend: boolean = false, isSearch: boolean = false) => {
       try {
-        if (page === 1) setIsLoading(true);
-        else setIsLoadingMore(true);
+        if (isSearch || (page === 1 && !shouldAppend)) {
+          setIsLoading(true);
+          setProducts([]); // Clear products immediately to show skeleton
+        } else if (!shouldAppend) {
+          setIsLoading(true);
+        } else {
+          setIsLoadingMore(true);
+        }
 
         let categoryIds = filters.categories.map((c) => c.categoryId);
         if (selectedCategory) {
           categoryIds = [selectedCategory.categoryId];
         }
 
-        // Apply quick filter logic
-        let extraParams: any = {};
-
-        const params = mapFiltersToParams(
+        const params: any = mapFiltersToParams(
           {
             searchText: searchQuery,
             categoryIds: categoryIds,
@@ -199,7 +183,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           params['isFocusedPack'] = 'Y';
         }
 
-        const response = await productService.fetchProducts({ ...params, ...extraParams });
+        const response = await productService.fetchProducts(params);
 
         if (response?.success) {
           const newProducts = response.data || [];
@@ -214,16 +198,13 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         console.error('Error fetching products:', error);
         if (page === 1) setProducts([]);
       } finally {
-        if (page === 1) setIsLoading(false);
-        else setIsLoadingMore(false);
+        if (page === 1 || isSearch) setIsLoading(false);
+        if (shouldAppend) setIsLoadingMore(false);
       }
     },
     [searchQuery, filters, selectedCategory, quickFilter],
   );
 
-  /**
-   * Fetch Categories
-   */
   const fetchCategories = useCallback(async () => {
     try {
       const response = await categoryService.fetchCategory({
@@ -238,9 +219,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     }
   }, []);
 
-  /**
-   * Handle category selection
-   */
   const handleCategorySelect = useCallback(
     (category: any) => {
       if (selectedCategory?.categoryId === category.categoryId) {
@@ -254,9 +232,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     [selectedCategory],
   );
 
-  /**
-   * Handle quick filter change
-   */
   const handleQuickFilterChange = useCallback((filter: QuickFilterType) => {
     setQuickFilter(filter);
     setSelectedCategory(null);
@@ -264,27 +239,18 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     setSearchQuery('');
   }, []);
 
-  /**
-   * Refresh
-   */
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
     await fetchProducts(1, false);
     setIsRefreshing(false);
   }, [fetchProducts]);
 
-  /**
-   * Load More
-   */
   const loadMore = useCallback(() => {
     if (!isLoadingMore && hasMore && !isLoading) {
       fetchProducts(currentPage + 1, true);
     }
   }, [isLoadingMore, hasMore, isLoading, currentPage, fetchProducts]);
 
-  /**
-   * Add to Cart
-   */
   const handleAddToCart = useCallback(
     (cartItems: any[], product: any) => {
       if (!cartItems?.length || !product) return;
@@ -315,11 +281,8 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     [addItems],
   );
 
-  /**
-   * Apply Filters
-   */
   const handleApplyFilters = useCallback(
-    (sections: any[]) => {
+    async (sections: any[]) => {
       const newFilters = { ...filters };
 
       sections.forEach((section) => {
@@ -331,29 +294,32 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
       setFilters(newFilters);
       setShowFilters(false);
       setSelectedCategory(null);
+
+      // Immediately show skeleton and fetch products
+      setIsLoading(true);
+      setProducts([]);
+      await fetchProducts(1, false, true);
     },
-    [filters],
+    [filters, fetchProducts],
   );
 
-  /**
-   * Clear Filters
-   */
-  const clearAllFilters = useCallback(() => {
+  const clearAllFilters = useCallback(async () => {
     setFilters({ categories: [], brands: [] });
     setSelectedCategory(null);
     setSearchQuery('');
     setQuickFilter('all');
     setShowFilters(false);
     resetProductsFilterCount();
-    fetchProducts(1, false);
+
+    // Immediately show skeleton and fetch products
+    setIsLoading(true);
+    setProducts([]);
+    await fetchProducts(1, false, true);
   }, [resetProductsFilterCount, fetchProducts]);
 
-  /**
-   * Submit
-   */
   const handleSubmit = useCallback(() => {
     if (items.length === 0) {
-      Alert.alert('Cart Empty', 'Add items before proceeding');
+      Alert.alert('Cart Empty', 'Please add items to your cart before proceeding');
       return;
     }
 
@@ -364,17 +330,59 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     }
   }, [items, mode, onSubmit]);
 
-  /**
-   * Effects
-   */
+  const handleSearchClear = useCallback(() => {
+    setSearchQuery('');
+    setIsLoading(true);
+    setProducts([]);
+    fetchProducts(1, false, true);
+  }, [fetchProducts]);
+
+  const handleSearchSubmit = useCallback(() => {
+    if (searchQuery.trim()) {
+      setIsLoading(true);
+      setProducts([]);
+      fetchProducts(1, false, true);
+    }
+  }, [searchQuery, fetchProducts]);
+
+  const updateHeaderConfig = useCallback(() => {
+    const filterCount = calculateActiveFilterCount();
+
+    setHeader({
+      title: 'Products',
+      showBack: true,
+      showSearchBar: true,
+      searchPlaceholder: 'Search products...',
+      searchValue: searchQuery,
+      onSearchChange: setSearchQuery,
+      onSearchClear: handleSearchClear,
+      onSearchPress: handleSearchSubmit,
+      autoFocusSearch: false,
+      showFilter: true,
+      filterCount: filterCount,
+      filterActive: filterCount > 0,
+      onFilterPress: () => setShowFilters(true),
+      elevated: false,
+      centeredTitle: false,
+      size: 'sm',
+      showBorder: false,
+    });
+  }, [searchQuery, filters, quickFilter, calculateActiveFilterCount, setHeader]);
+
   useEffect(() => {
-    fetchProducts(1, false);
-    fetchCategories();
+    const initialize = async () => {
+      await Promise.all([fetchProducts(1, false), fetchCategories()]);
+    };
+    initialize();
   }, []);
 
   useEffect(() => {
-    fetchProducts(1, false);
-  }, [searchQuery, filters, selectedCategory, quickFilter]);
+    const timer = setTimeout(() => {
+      fetchProducts(1, false);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, filters, selectedCategory, quickFilter, fetchProducts]);
 
   useEffect(() => {
     if (onCartUpdate) {
@@ -385,19 +393,11 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   useEffect(() => {
     setOpenProductFilterHandler(() => setShowFilters(true));
     return () => setOpenProductFilterHandler(() => {});
-  }, []);
+  }, [setOpenProductFilterHandler]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const filterCount = calculateActiveFilterCount();
-      setHeader({
-        onFilterPress: () => setShowFilters(true),
-        badgeCount: filterCount,
-        filterActive: !!filterCount,
-        filterCount,
-      });
-    }, [filters, searchQuery, quickFilter]),
-  );
+  useEffect(() => {
+    updateHeaderConfig();
+  }, [updateHeaderConfig]);
 
   useImperativeHandle(ref, () => ({
     clearFilters: clearAllFilters,
@@ -408,11 +408,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     applyFilters: () => handleApplyFilters,
   }));
 
-  /**
-   * Render Helpers
-   */
-
-  // Render quick filters
   const renderQuickFilters = () => (
     <View style={styles.quickFiltersContainer}>
       <ScrollView
@@ -427,7 +422,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         >
           <Ionicons
             name="apps-outline"
-            size={16}
+            size={14}
             color={quickFilter === 'all' ? colors.primary : colors.textSecondary}
           />
           <AppText
@@ -447,7 +442,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         >
           <Ionicons
             name="star-outline"
-            size={16}
+            size={14}
             color={quickFilter === 'focused' ? colors.primary : colors.textSecondary}
           />
           <AppText
@@ -456,14 +451,13 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
               quickFilter === 'focused' && styles.quickFilterTextActive,
             ]}
           >
-            Focused Pack
+            Focused
           </AppText>
         </TouchableOpacity>
       </ScrollView>
     </View>
   );
 
-  // Render vertical category list with initials
   const renderCategoryList = () => (
     <View style={[styles.categoryContainer, { width: CATEGORY_WIDTH }]}>
       <ScrollView
@@ -471,7 +465,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.categoryListContent}
       >
-        {/* All Products Option */}
         <TouchableOpacity
           style={[
             styles.categoryItem,
@@ -491,30 +484,27 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           >
             <Ionicons
               name="grid-outline"
-              size={16}
+              size={18}
               color={
                 !selectedCategory && quickFilter === 'all' ? colors.primary : colors.textSecondary
               }
             />
           </View>
-          <View style={styles.categoryItemInfo}>
-            <AppText
-              style={[
-                styles.categoryItemName,
-                !selectedCategory && quickFilter === 'all' && styles.categoryItemNameActive,
-              ]}
-              numberOfLines={2}
-            >
-              All
-            </AppText>
-            <AppText style={styles.categoryItemCount}>{totalCount}</AppText>
-          </View>
+          <AppText
+            style={[
+              styles.categoryItemName,
+              !selectedCategory && quickFilter === 'all' && styles.categoryItemNameActive,
+            ]}
+            numberOfLines={1}
+          >
+            All
+          </AppText>
+          <AppText style={styles.categoryItemCount}>{totalCount}</AppText>
           {!selectedCategory && quickFilter === 'all' && (
             <View style={[styles.categoryItemIndicator, { backgroundColor: colors.primary }]} />
           )}
         </TouchableOpacity>
 
-        {/* Category Items */}
         {categoriesList.map((category) => {
           const isActive = selectedCategory?.categoryId === category.categoryId;
           const initials = getInitials(category.name);
@@ -538,14 +528,12 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
                   {initials}
                 </AppText>
               </View>
-              <View style={styles.categoryItemInfo}>
-                <AppText
-                  style={[styles.categoryItemName, isActive && styles.categoryItemNameActive]}
-                  numberOfLines={2}
-                >
-                  {category.name}
-                </AppText>
-              </View>
+              <AppText
+                style={[styles.categoryItemName, isActive && styles.categoryItemNameActive]}
+                numberOfLines={2}
+              >
+                {category.name}
+              </AppText>
               {isActive && (
                 <View style={[styles.categoryItemIndicator, { backgroundColor: colors.primary }]} />
               )}
@@ -556,60 +544,31 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     </View>
   );
 
-  // Render header stats
-  const renderHeaderStats = () => (
-    <View style={styles.statsContainer}>
-      <View style={styles.statItem}>
-        <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
-        <AppText style={styles.statText}>{products.length} Products</AppText>
-      </View>
-      {quickFilter === 'focused' && (
-        <View style={styles.statItem}>
-          <Ionicons name="star-outline" size={12} color={colors.textSecondary} />
-          <AppText style={styles.statText}>Focused Pack</AppText>
-        </View>
-      )}
-      {selectedCategory && (
-        <View style={styles.statItem}>
-          <Ionicons name="folder-outline" size={12} color={colors.textSecondary} />
-          <AppText style={styles.statText} numberOfLines={1}>
-            {selectedCategory.name}
-          </AppText>
-        </View>
-      )}
-      {searchQuery && (
-        <View style={styles.statItem}>
-          <Ionicons name="search-outline" size={12} color={colors.textSecondary} />
-          <AppText style={styles.statText} numberOfLines={1}>
-            "{searchQuery}"
-          </AppText>
-        </View>
-      )}
-    </View>
-  );
-
-  // Full page skeleton loader
-  const renderFullSkeleton = () => (
+  const renderSkeletonLoader = () => (
     <View style={styles.skeletonContainer}>
-      <View style={styles.searchWrapper}>
-        <Skeleton height={44} width="100%" borderRadius={12} />
-      </View>
       <View style={styles.skeletonQuickFilters}>
-        <Skeleton height={36} width={80} borderRadius={18} />
-        <Skeleton height={36} width={100} borderRadius={18} />
+        <Skeleton height={32} width={70} borderRadius={16} />
+        <Skeleton height={32} width={80} borderRadius={16} />
       </View>
       <View style={styles.skeletonMainContent}>
         <View style={[styles.skeletonCategoryList, { width: CATEGORY_WIDTH }]}>
           {[1, 2, 3, 4, 5].map((i) => (
             <View key={i} style={styles.skeletonCategoryItem}>
-              <Skeleton height={50} width="100%" borderRadius={8} />
+              <Skeleton height={44} width="100%" borderRadius={8} />
             </View>
           ))}
         </View>
         <View style={[styles.skeletonProductsList, { width: PRODUCT_WIDTH }]}>
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <View key={i} style={styles.skeletonProductItem}>
-              <Skeleton height={120} width="100%" borderRadius={12} />
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 12 }}>
+                <Skeleton height={80} width={80} borderRadius={12} />
+                <View style={{ flex: 1, gap: 8 }}>
+                  <Skeleton height={16} width="80%" borderRadius={4} />
+                  <Skeleton height={12} width="60%" borderRadius={4} />
+                  <Skeleton height={14} width="40%" borderRadius={4} />
+                </View>
+              </View>
             </View>
           ))}
         </View>
@@ -617,7 +576,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     </View>
   );
 
-  // Empty state
   const renderEmptyState = () => {
     const hasActiveFilters =
       calculateActiveFilterCount() > 0 || selectedCategory || quickFilter !== 'all';
@@ -641,7 +599,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     } else if (quickFilter === 'focused') {
       title = 'No focused packs available';
       description = 'Check back later for focused packs';
-      // icon = 'star-outline';
     }
 
     return (
@@ -652,12 +609,12 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           icon={icon}
           actionLabel={hasActiveFilters ? 'Clear filters' : undefined}
           onAction={hasActiveFilters ? clearAllFilters : undefined}
+          size="small"
         />
       </View>
     );
   };
 
-  // Footer loader
   const renderFooter = () => {
     if (!isLoadingMore) return null;
     return (
@@ -668,7 +625,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     );
   };
 
-  // Render product item
   const renderProductItem = ({ item, index }: { item: any; index: number }) => (
     <ProductCard
       index={index}
@@ -678,9 +634,10 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     />
   );
 
-  // Action button
   const renderActionButton = () => {
     const isNoSale = mode === 'sales' && items.length === 0;
+
+    if (!isNoSale && items.length === 0) return null;
 
     const handlePress = () => {
       if (isNoSale) {
@@ -691,77 +648,40 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     };
 
     return (
-      <TouchableOpacity
-        style={[styles.cartButton, { backgroundColor: colors.primary }]}
-        onPress={handlePress}
-        activeOpacity={0.9}
-      >
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.cartButtonGradient}
-        >
-          <View style={styles.cartButtonContent}>
-            <View>
+      <View style={[styles.cartButtonWrapper, { paddingBottom: insets.bottom || 16 }]}>
+        <TouchableOpacity style={styles.cartButton} onPress={handlePress} activeOpacity={0.8}>
+          <LinearGradient
+            colors={[colors.primary, colors.primaryDark || colors.primary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.cartButtonGradient}
+          >
+            <View style={styles.cartButtonContent}>
               <AppText style={styles.cartButtonLabel}>
-                {isNoSale
-                  ? 'Add No Sale Reason'
-                  : mode === 'topup'
-                    ? 'Ready to Submit'
-                    : 'Ready to Checkout'}
+                {isNoSale ? 'Add No Sale Reason' : 'Proceed'} • K{cartSummary.totalValue.toFixed(2)}
               </AppText>
-              {!isNoSale && (
-                <AppText style={styles.cartButtonTotal}>
-                  {cartSummary.totalItems} Items • K{cartSummary.totalValue.toFixed(2)}
-                  {mode === 'topup' &&
-                    cartSummary.totalWeight > 0 &&
-                    ` • ${cartSummary.totalWeight.toFixed(2)} kg`}
-                </AppText>
-              )}
+              <Ionicons name="arrow-forward" size={20} color="white" />
             </View>
-            <View style={styles.cartButtonIcon}>
-              <Ionicons name="arrow-forward-circle" size={28} color="white" />
-            </View>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     );
   };
 
-  // Show full skeleton on initial load
+  // Show skeleton on initial load or when fetching new data
   if (isLoading && products.length === 0) {
-    return renderFullSkeleton();
+    return renderSkeletonLoader();
   }
 
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchWrapper}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="Search products..."
-          debounceDelay={500}
-          clearable={true}
-          fullWidth={true}
-        />
-      </View>
-
-      {/* Quick Filters */}
       {renderQuickFilters()}
 
-      {/* Header Stats */}
-      {renderHeaderStats()}
-
-      {/* Main Content with Category Sidebar */}
       <View style={styles.mainContent}>
-        {/* Vertical Category List with Initials */}
         {renderCategoryList()}
 
-        {/* Product List */}
         <View style={[styles.productsSection, { width: PRODUCT_WIDTH }]}>
-          {products.length === 0 && !isLoading ? (
+          {products.length === 0 ? (
             renderEmptyState()
           ) : (
             <FlatList
@@ -789,7 +709,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         </View>
       </View>
 
-      {/* Filter Modal */}
       <FilterModal
         visible={showFilters}
         onClose={() => setShowFilters(false)}
@@ -797,13 +716,12 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         onApply={handleApplyFilters}
         onReset={clearAllFilters}
         title="Filter Products"
-        applyButtonText={`Show ${totalCount} products`}
-        resetButtonText="Reset"
+        applyButtonText={`Apply Filters`}
+        resetButtonText="Reset All"
         showCount={true}
         maxHeight={600}
       />
 
-      {/* Action Button */}
       {renderActionButton()}
     </View>
   );
