@@ -169,7 +169,7 @@ export default function CheckInScreen() {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={[styles.container]}>
       <ProductsScreen ref={productsScreenRef} />
     </View>
   );

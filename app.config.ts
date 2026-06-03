@@ -19,7 +19,7 @@ export default ({ config }: any) => {
       //   },
     ],
 
-    name: 'Expo JWT Tabs Template (Ultimate)',
+    name: 'SFA',
     slug: 'expo-jwt-tabs-template-ultimate',
     scheme: 'expojwttabsultimate',
     version: '2.0.0',

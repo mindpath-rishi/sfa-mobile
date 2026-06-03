@@ -13,6 +13,7 @@ import {
   NativeSyntheticEvent,
   BackHandler,
   AppState,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -136,6 +137,7 @@ export default function CustomerDetailScreen() {
   const locationInterval = useRef<NodeJS.Timeout | null>(null);
   const appStateListener = useRef<any>(null);
   const autoStartTimeout = useRef<NodeJS.Timeout | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const route = useRouteStore((s) => s.selectedRoute);
   const van = useRouteStore((s) => s.van);
@@ -168,14 +170,25 @@ export default function CustomerDetailScreen() {
     }, [customer]),
   );
 
-  useEffect(() => {
-    setHeader({
-      title: route?.routeName || customer?.name || 'Outlet Details',
-      showBack: true,
-      showMenu: false,
-      backgroundColor: colors.primary,
-    });
-  }, [setHeader, customer?.name, route?.routeName, colors.primary]);
+  // useEffect(() => {
+  //   setHeader({
+  //     title: route?.routeName || customer?.name || 'Outlet Details',
+  //     showBack: true,
+  //     showMenu: false,
+  //     backgroundColor: colors.primary,
+  //   });
+  // }, [setHeader, customer?.name, route?.routeName, colors.primary]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setHeader({
+        title: route?.routeName || customer?.name || 'Outlet Details',
+        showBack: true,
+        showMenu: false,
+        backgroundColor: colors.primary,
+      });
+    }, []),
+  );
 
   useEffect(() => {
     customerRef.current = customer;
@@ -230,15 +243,6 @@ export default function CustomerDetailScreen() {
   useEffect(() => {
     setIsTabScrolled(false);
   }, [activeTab]);
-
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace(`/beats`);
-      return true;
-    });
-
-    return () => backHandler.remove();
-  }, []);
 
   // Location tracking functions
   const getCurrentLocation = useCallback(() => {
@@ -387,23 +391,6 @@ export default function CustomerDetailScreen() {
             visitType: visitType,
           });
 
-          const visitTypeMessage =
-            visitType === ShopVisitType.ON_SITE
-              ? 'You are within the geofence area'
-              : 'You are outside the geofence area';
-
-          Alert.alert(
-            'Active Visit Found ✓',
-            `You already have an active visit at ${customer.name}\n${visitTypeMessage}`,
-            [
-              {
-                text: 'Proceed to Sale',
-                onPress: () => router.push(`/checkin`),
-              },
-              { text: 'Later', style: 'cancel' },
-            ],
-          );
-
           setIsAutoStarting(false);
           return;
         }
@@ -435,23 +422,6 @@ export default function CustomerDetailScreen() {
             customerId: visit?.customerId,
             visitType: visitType,
           });
-
-          const visitTypeMessage =
-            visitType === ShopVisitType.ON_SITE
-              ? 'You are within the geofence area'
-              : 'You are outside the geofence area';
-
-          Alert.alert(
-            'Visit Started ✓',
-            `You have been automatically checked in at ${customer.name}\n${visitTypeMessage}`,
-            [
-              {
-                text: 'Proceed to Sale',
-                onPress: () => router.push(`/checkin`),
-              },
-              { text: 'Later', style: 'cancel' },
-            ],
-          );
         } else {
           setAutoStartAttempted(false);
         }
@@ -570,161 +540,121 @@ export default function CustomerDetailScreen() {
   const currentVisitType = getVisitType();
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <CustomerHeader customer={customer} styles={styles} colors={colors} compact={isTabScrolled} />
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
 
-      {/* Last Visit and Last Order - Outside the card */}
-      <View style={styles.lastInfoContainer}>
-        <View style={styles.lastInfoCard}>
-          <View style={styles.lastInfoItem}>
-            <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
-            <AppText style={styles.lastInfoLabel}>Last Visit:</AppText>
-            <AppText style={styles.lastInfoValue}>
-              {lastVisitDate ? moment(lastVisitDate).format('DD MMM YYYY') : 'Never'}
-            </AppText>
-          </View>
-          <View style={styles.lastInfoDivider} />
-          <View style={styles.lastInfoItem}>
-            <Ionicons name="cart-outline" size={16} color={colors.textSecondary} />
-            <AppText style={styles.lastInfoLabel}>Last Order:</AppText>
-            <AppText style={styles.lastInfoValue}>
-              {lastOrderDate ? moment(lastOrderDate).format('DD MMM YYYY') : 'Never'}
-            </AppText>
-          </View>
-        </View>
-      </View>
-
-      {/* Show visit type badge */}
-      <View style={styles.visitTypeContainer}>
-        <View
-          style={[
-            styles.visitTypeBadge,
-            {
-              backgroundColor:
-                currentVisitType === ShopVisitType.ON_SITE
-                  ? colors.success + '20'
-                  : colors.warning + '20',
-            },
-          ]}
-        >
-          <Ionicons
-            name={currentVisitType === ShopVisitType.ON_SITE ? 'location' : 'location-outline'}
-            size={14}
-            color={currentVisitType === ShopVisitType.ON_SITE ? colors.success : colors.warning}
-          />
-          <AppText
-            style={[
-              styles.visitTypeText,
-              {
-                color: currentVisitType === ShopVisitType.ON_SITE ? colors.success : colors.warning,
-              },
-            ]}
-          >
-            {currentVisitType === ShopVisitType.ON_SITE ? 'ON-SITE Visit' : 'OFF-SITE Visit'}
-          </AppText>
-        </View>
-      </View>
-
-      {/* Show geofence status for debugging */}
-      {__DEV__ && distanceToOutlet !== null && (
-        <View
-          style={{
-            backgroundColor: isInsideGeofenceArea ? '#4CAF50' : '#FF9800',
-            padding: 4,
-            alignItems: 'center',
-            marginHorizontal: 16,
-            marginBottom: 8,
-            borderRadius: 8,
-          }}
-        >
-          <AppText style={{ color: '#FFF', fontSize: 12 }}>
-            {isInsideGeofenceArea ? '✓ Inside geofence' : '○ Outside geofence'} - Distance:{' '}
-            {Math.round(distanceToOutlet)}m / {GEOFENCE_RADIUS}m
-            {isAutoStarting && ' - Auto-starting...'}
-          </AppText>
-        </View>
-      )}
-
-      <TabBar activeTab={activeTab} setActiveTab={setActiveTab} styles={styles} colors={colors} />
-
-      <TabContent
-        activeTab={activeTab}
-        customer={customer}
-        sales={sales}
-        salesLoading={salesLoading}
-        salesTotal={salesTotal}
-        visitHistory={visitHistory}
-        visitsLoading={visitsLoading}
-        visitsTotal={visitsTotal}
-        styles={styles}
-        colors={colors}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
+      {/* Main ScrollView that contains everything except footer */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.mainScrollView}
+        contentContainerStyle={styles.mainScrollContent}
+        showsVerticalScrollIndicator={true}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onScroll={handleTabScroll}
-        formatCurrency={formatCurrency}
-        van={van}
-      />
+        scrollEventThrottle={16}
+      >
+        {/* Customer Header - Scrollable */}
+        <CustomerHeader
+          customer={customer}
+          styles={styles}
+          colors={colors}
+          compact={isTabScrolled}
+        />
 
-      {/* Footer Button - Proceed to Sale (always visible when there's an active visit) */}
-      {/* {hasActiveVisit && ( */}
-      <Animated.View entering={FadeInUp.duration(400)} style={styles.fullWidthButtonContainer}>
-        <TouchableOpacity
-          style={[styles.fullWidthButton, { backgroundColor: colors.primary }]}
-          onPress={handleProceedToSale}
-          activeOpacity={0.85}
-        >
-          <View style={styles.fullWidthButtonContent}>
-            <Ionicons name="cart-outline" size={24} color="#FFF" />
-            <View style={styles.fullWidthButtonTextContainer}>
-              <AppText style={styles.fullWidthButtonTitle}>Proceed to Sale</AppText>
-              {/* <AppText style={styles.fullWidthButtonSubtitle}>
-                {currentVisitType === ShopVisitType.ON_SITE
-                  ? 'ON-SITE visit - Create order'
-                  : 'OFF-SITE visit - Create order'}
-              </AppText> */}
+        {/* Last Visit and Last Order - Scrollable */}
+        <View style={styles.lastInfoContainer}>
+          <View style={styles.lastInfoCard}>
+            <View style={styles.lastInfoItem}>
+              <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+              <AppText style={styles.lastInfoLabel}>Last Visit:</AppText>
+              <AppText style={styles.lastInfoValue}>
+                {lastVisitDate ? moment(lastVisitDate).format('DD MMM YYYY') : 'Never'}
+              </AppText>
             </View>
-            <Ionicons name="arrow-forward-outline" size={20} color="#FFF" />
+            <View style={styles.lastInfoDivider} />
+            <View style={styles.lastInfoItem}>
+              <Ionicons name="cart-outline" size={16} color={colors.textSecondary} />
+              <AppText style={styles.lastInfoLabel}>Last Order:</AppText>
+              <AppText style={styles.lastInfoValue}>
+                {lastOrderDate ? moment(lastOrderDate).format('DD MMM YYYY') : 'Never'}
+              </AppText>
+            </View>
           </View>
-        </TouchableOpacity>
-      </Animated.View>
-      {/* )} */}
+        </View>
 
-      {/* Show auto-starting indicator */}
+        {/* Debug geofence info - Scrollable */}
+        {__DEV__ && distanceToOutlet !== null && (
+          <View style={styles.debugGeofenceContainer}>
+            <AppText style={styles.debugGeofenceText}>
+              {isInsideGeofenceArea ? '✓ Inside geofence' : '○ Outside geofence'} - Distance:{' '}
+              {Math.round(distanceToOutlet)}m / {GEOFENCE_RADIUS}m
+              {isAutoStarting && ' - Auto-starting...'}
+            </AppText>
+          </View>
+        )}
+
+        {/* TAB BAR - Scrollable (moves with content) */}
+        <TabBar activeTab={activeTab} setActiveTab={setActiveTab} styles={styles} colors={colors} />
+
+        {/* TAB CONTENT - Scrollable */}
+        <TabContent
+          activeTab={activeTab}
+          customer={customer}
+          sales={sales}
+          salesLoading={salesLoading}
+          salesTotal={salesTotal}
+          visitHistory={visitHistory}
+          visitsLoading={visitsLoading}
+          visitsTotal={visitsTotal}
+          styles={styles}
+          colors={colors}
+          formatCurrency={formatCurrency}
+          van={van}
+        />
+      </ScrollView>
+
+      {/* FIXED FOOTER BUTTON - Always at bottom, outside ScrollView */}
+      <SafeAreaView edges={['bottom']} style={styles.footerSafeArea}>
+        <Animated.View entering={FadeInUp.duration(400)} style={styles.fullWidthButtonContainer}>
+          <TouchableOpacity
+            style={[styles.fullWidthButton, { backgroundColor: colors.primary }]}
+            onPress={handleProceedToSale}
+            activeOpacity={0.85}
+          >
+            <View style={styles.fullWidthButtonContent}>
+              <Ionicons name="cart-outline" size={24} color="#FFF" />
+              <View style={styles.fullWidthButtonTextContainer}>
+                <AppText style={styles.fullWidthButtonTitle}>Proceed to Sale</AppText>
+              </View>
+              <Ionicons name="arrow-forward-outline" size={20} color="#FFF" />
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      </SafeAreaView>
+
+      {/* Auto-starting indicator */}
       {!hasActiveVisit && isAutoStarting && (
-        <View style={styles.fullWidthButtonContainer}>
-          <View
-            style={[styles.fullWidthAutoStartIndicator, { backgroundColor: colors.primary + '10' }]}
-          >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <AppText style={[styles.autoStartText, { color: colors.primary }]}>
-              Auto-starting {currentVisitType === ShopVisitType.ON_SITE ? 'ON-SITE' : 'OFF-SITE'}{' '}
-              visit...
-            </AppText>
+        <SafeAreaView edges={['bottom']} style={styles.footerSafeArea}>
+          <View style={styles.fullWidthButtonContainer}>
+            <View
+              style={[
+                styles.fullWidthAutoStartIndicator,
+                { backgroundColor: colors.primary + '10' },
+              ]}
+            >
+              <ActivityIndicator size="small" color={colors.primary} />
+              <AppText style={[styles.autoStartText, { color: colors.primary }]}>
+                Auto-starting visit...
+              </AppText>
+            </View>
           </View>
-        </View>
+        </SafeAreaView>
       )}
-
-      {/* Show waiting message when no active visit and not auto-starting */}
-      {/* {!hasActiveVisit && !isAutoStarting && (
-        <View style={styles.fullWidthButtonContainer}>
-          <View
-            style={[
-              styles.fullWidthAutoStartIndicator,
-              { backgroundColor: colors.textTertiary + '10' },
-            ]}
-          >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <AppText style={[styles.autoStartText, { color: colors.primary }]}>
-              Initializing visit...
-            </AppText>
-          </View>
-        </View>
-      )} */}
-    </SafeAreaView>
+    </View>
   );
 }
 
-// Sub-components (LoadingState, EmptyState, CustomerHeader, TabBar, TabContent, SummaryTab, SalesTab, VisitsTab remain the same)
+// Sub-components
 const LoadingState = ({ styles, colors }: any) => (
   <View style={styles.loadingContainer}>
     <ActivityIndicator size="large" color={colors.primary} />
@@ -733,17 +663,19 @@ const LoadingState = ({ styles, colors }: any) => (
 );
 
 const EmptyState = ({ styles, colors }: any) => (
-  <View style={styles.emptyState}>
-    <Ionicons name="alert-circle-outline" size={64} color={colors.textTertiary} />
-    <AppText style={styles.emptyStateTitle}>Customer Not Found</AppText>
-    <AppText style={styles.emptyStateText}>The customer doesn't exist or was removed.</AppText>
-    <TouchableOpacity
-      onPress={() => router.back()}
-      style={styles.emptyStateButton}
-      activeOpacity={0.8}
-    >
-      <AppText style={styles.emptyStateButtonText}>Go Back</AppText>
-    </TouchableOpacity>
+  <View style={{ flex: 1 }}>
+    <View style={styles.emptyState}>
+      <Ionicons name="alert-circle-outline" size={64} color={colors.textTertiary} />
+      <AppText style={styles.emptyStateTitle}>Customer Not Found</AppText>
+      <AppText style={styles.emptyStateText}>The customer doesn't exist or was removed.</AppText>
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={styles.emptyStateButton}
+        activeOpacity={0.8}
+      >
+        <AppText style={styles.emptyStateButtonText}>Go Back</AppText>
+      </TouchableOpacity>
+    </View>
   </View>
 );
 
@@ -794,7 +726,7 @@ const CustomerHeader = ({ customer, styles, colors, compact }: any) => (
 
 const TabBar = ({ activeTab, setActiveTab, styles, colors }: any) => (
   <View style={styles.tabBar}>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} scrollEventThrottle={16}>
       {TABS.map((tab) => (
         <TouchableOpacity
           key={tab.key}
@@ -827,39 +759,20 @@ const TabContent = ({
   visitsTotal,
   styles,
   colors,
-  refreshing,
-  onRefresh,
-  onScroll,
   formatCurrency,
   van,
 }: any) => (
-  <>
+  <View style={styles.tabContentContainer}>
     {activeTab === 'summary' && (
-      <ScrollView
-        style={styles.tabContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScroll={onScroll}
-        scrollEventThrottle={16}
-      >
-        <SummaryTab
-          customer={customer}
-          styles={styles}
-          colors={colors}
-          formatCurrency={formatCurrency}
-        />
-      </ScrollView>
-    )}
-    {activeTab === 'sales' && (
-      <SalesTab
+      <SummaryTab
+        customer={customer}
         styles={styles}
         colors={colors}
-        onScroll={onScroll}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
-        customerId={customer?.customerId}
-        van={van}
+        formatCurrency={formatCurrency}
       />
+    )}
+    {activeTab === 'sales' && (
+      <SalesTab styles={styles} colors={colors} customerId={customer?.customerId} van={van} />
     )}
     {activeTab === 'visits' && (
       <VisitsTab
@@ -868,12 +781,9 @@ const TabContent = ({
         total={visitsTotal}
         styles={styles}
         colors={colors}
-        onScroll={onScroll}
-        refreshing={refreshing}
-        onRefresh={onRefresh}
       />
     )}
-  </>
+  </View>
 );
 
 // Summary Tab
@@ -983,7 +893,7 @@ const SummaryTab = ({ customer, styles, colors, formatCurrency }: any) => {
   );
 };
 
-const SalesTab = ({ styles, colors, onScroll, refreshing, onRefresh, customerId, van }: any) => {
+const SalesTab = ({ styles, colors, customerId, van }: any) => {
   const [categorySales, setCategorySales] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -1094,40 +1004,19 @@ const SalesTab = ({ styles, colors, onScroll, refreshing, onRefresh, customerId,
   }
 
   return (
-    <FlatList
-      data={[{ key: 'table' }]}
-      keyExtractor={() => 'sales-table'}
-      renderItem={() => (
-        <View style={styles.salesTableContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <View>
-              {renderTableHeader()}
-              {categories.map((category) => renderTableRow(category))}
-            </View>
-          </ScrollView>
+    <View style={styles.salesTableContainer}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+        <View>
+          {renderTableHeader()}
+          {categories.map((category) => renderTableRow(category))}
         </View>
-      )}
-      contentContainerStyle={styles.tabContentContainer}
-      style={styles.tabContent}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      showsVerticalScrollIndicator={false}
-    />
+      </ScrollView>
+    </View>
   );
 };
 
 // Visits Tab
-const VisitsTab = ({
-  visits,
-  loading,
-  total,
-  styles,
-  colors,
-  onScroll,
-  refreshing,
-  onRefresh,
-}: any) => {
+const VisitsTab = ({ visits, loading, total, styles, colors }: any) => {
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
     return moment(dateString).format('DD MMM YYYY, hh:mm A');
@@ -1157,8 +1046,8 @@ const VisitsTab = ({
     }
   };
 
-  const renderVisitCard = ({ item }: { item: VisitHistory }) => (
-    <View style={styles.visitCard}>
+  const renderVisitCard = (item: VisitHistory) => (
+    <View key={item.visitId} style={styles.visitCard}>
       <View style={styles.visitCardHeader}>
         <View style={[styles.visitStatusDot, { backgroundColor: getStatusColor(item.status) }]} />
         <AppText style={styles.visitDate}>{formatDate(item.checkInTime)}</AppText>
@@ -1188,37 +1077,25 @@ const VisitsTab = ({
   }
 
   return (
-    <FlatList
-      data={visits}
-      keyExtractor={(item) => item.visitId}
-      renderItem={renderVisitCard}
-      contentContainerStyle={styles.tabContentContainer}
-      style={styles.tabContent}
-      onScroll={onScroll}
-      scrollEventThrottle={16}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      ListHeaderComponent={
-        visits.length > 0 && (
-          <View style={styles.listHeader}>
-            <AppText style={styles.listHeaderTitle}>
-              Last {Math.min(visits.length, 10)} Visits
-            </AppText>
-            {total > 10 && (
-              <AppText style={styles.listHeaderSubtitle}>Showing last 10 of {total} total</AppText>
-            )}
-          </View>
-        )
-      }
-      ListEmptyComponent={
-        !loading && (
-          <View style={styles.emptyTabContainer}>
-            <Ionicons name="time-outline" size={56} color={colors.textTertiary} />
-            <AppText style={styles.emptyTabTitle}>No Visits</AppText>
-            <AppText style={styles.emptyTabText}>No visit history found for this customer</AppText>
-          </View>
-        )
-      }
-      showsVerticalScrollIndicator={false}
-    />
+    <View>
+      {visits.length > 0 && (
+        <View style={styles.listHeader}>
+          <AppText style={styles.listHeaderTitle}>
+            Last {Math.min(visits.length, 10)} Visits
+          </AppText>
+          {total > 10 && (
+            <AppText style={styles.listHeaderSubtitle}>Showing last 10 of {total} total</AppText>
+          )}
+        </View>
+      )}
+      {visits.map((item) => renderVisitCard(item))}
+      {!loading && visits.length === 0 && (
+        <View style={styles.emptyTabContainer}>
+          <Ionicons name="time-outline" size={56} color={colors.textTertiary} />
+          <AppText style={styles.emptyTabTitle}>No Visits</AppText>
+          <AppText style={styles.emptyTabText}>No visit history found for this customer</AppText>
+        </View>
+      )}
+    </View>
   );
 };

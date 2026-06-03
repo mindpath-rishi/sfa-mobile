@@ -11,7 +11,8 @@ export type ModalType =
   | 'van-selection'
   | 'route-selection'
   | 'activity-change'
-  | 'other-work';
+  | 'other-work'
+  | 'leave-type';
 
 export interface UnifiedActionModalProps {
   visible: boolean;
@@ -44,6 +45,12 @@ export interface UnifiedActionModalProps {
   onActivitySelect?: (activity: any) => void;
   onOtherWorkSelect?: (work: any) => void;
   onBackToOptions?: () => void;
+
+  // Leave Type Modal Props
+  leaveTypes?: any[];
+  selectedLeaveType?: string;
+  onLeaveTypeSelect?: (leaveType: any) => void;
+  onLeaveBack?: () => void;
   
   // Mode Selection
   isDayStart?: boolean; // true for day start, false for activity change
@@ -75,6 +82,10 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
   onActivitySelect,
   onOtherWorkSelect,
   onBackToOptions,
+  leaveTypes,
+  selectedLeaveType,
+  onLeaveTypeSelect,
+  onLeaveBack,
   isDayStart = false,
   onClose,
 }) => {
@@ -84,6 +95,9 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
   const isVanSelectionValid = Boolean(selectedVan) && Boolean(vanChangeNote?.trim());
 
   const getModalTitle = () => {
+    if (modalType === 'leave-type') {
+      return 'SELECT LEAVE TYPE';
+    }
     if (isDayStart) {
       return 'START YOUR DAY';
     }
@@ -572,6 +586,56 @@ const renderRouteSelectionModal = () => (
     );
   };
 
+  const renderLeaveTypeModal = () => (
+    <>
+      <View style={styles.modalHeader}>
+        <View>
+          <AppText style={[styles.titleSmall, { color: colors.textPrimary }]}>
+            {getModalTitle()}
+          </AppText>
+          <AppText style={[styles.routeHeaderSubtitle, { color: colors.textSecondary }]}>
+            Choose leave category to continue
+          </AppText>
+        </View>
+        <TouchableOpacity onPress={onClose} style={styles.routeCloseButton}>
+          <Ionicons name="close" size={24} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      {(leaveTypes || []).map((item: any) => {
+        const isSelected = selectedLeaveType && item?.name === selectedLeaveType;
+        return (
+          <TouchableOpacity
+            key={item.id}
+            onPress={() => onLeaveTypeSelect?.(item)}
+            style={[styles.modalItem, isSelected && { borderColor: colors.primary, borderWidth: 1 }]}
+            activeOpacity={0.8}
+          >
+            <LinearGradient colors={[item.color, item.color + 'CC']} style={styles.modalItemIcon}>
+              <Ionicons name={item.icon as any} size={24} color="white" />
+            </LinearGradient>
+            <View style={styles.itemContent}>
+              <AppText style={[styles.itemTitle, { color: colors.textPrimary }]}>
+                {item.name}
+              </AppText>
+              <AppText style={[styles.itemSubtitle, { color: colors.textTertiary }]}>
+                Mark your day start as {item.name.toLowerCase()}
+              </AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        );
+      })}
+
+      <TouchableOpacity onPress={onLeaveBack} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={20} color={colors.primary} />
+        <AppText style={[styles.backButtonText, { color: colors.primary }]}>
+          BACK TO ACTIVITIES
+        </AppText>
+      </TouchableOpacity>
+    </>
+  );
+
   const renderActivityChangeModal = () => (
     <>
       <View style={styles.modalHeader}>
@@ -625,6 +689,8 @@ const renderRouteSelectionModal = () => (
         return renderVanSelectionModal();
       case 'route-selection':
         return renderRouteSelectionModal();
+      case 'leave-type':
+        return renderLeaveTypeModal();
       case 'activity-change':
       case 'other-work':
         return renderActivityChangeModal();

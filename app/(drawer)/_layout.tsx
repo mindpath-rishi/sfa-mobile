@@ -15,6 +15,7 @@ import { useRouteStore } from '@/core/store/route.store';
 import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSummaryModal';
 import { toast } from '@/core/utils';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 /* ============================
  * HELPERS
@@ -99,6 +100,274 @@ const ModernDrawerHeader = ({
 /* ============================
  * CUSTOM DRAWER CONTENT
  * ============================ */
+
+// const CustomDrawerContent = (props: any) => {
+//   const { colors } = useTheme();
+//   const logout = useAuthStore((s) => s.logout);
+//   const user = useAuthStore((s) => s.user);
+//   const { workSessionId, setWorkSessionId } = useAuthStore();
+
+//   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
+//   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
+//   const [showDayEndSummary, setShowDayEndSummary] = useState(false);
+//   const [showSettlementOptions, setShowSettlementOptions] = useState(false);
+//   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
+//   const [carryForwardStock, setCarryForwardStock] = useState(true);
+//   const settleInFlightRef = useRef(false);
+//   const bumpDashboardRefresh = useAppEventsStore((s) => s.bumpDashboardRefresh);
+
+//   const fetchDayEndSummary = useCallback(async () => {
+//     try {
+//       const vanIdToUse =
+//         useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
+
+//       if (!vanIdToUse) {
+//         toast.error('Van not found. Please start your day first.');
+//         return;
+//       }
+
+//       const res: any = await vanService.fetchTodayStockSummary({
+//         vanId: vanIdToUse,
+//         workSessionId,
+//       });
+//       setDayEndSummary(res?.data);
+//       setShowDayEndSummary(true);
+//     } catch (error) {
+//       console.error('Error fetching day end summary:', error);
+//       toast.error('Failed to load day end summary. Please try again.');
+//     }
+//   }, [user]);
+
+//   const submitSettlement = useCallback(async () => {
+//     if (settleInFlightRef.current) return;
+//     settleInFlightRef.current = true;
+//     try {
+//       const response: any = await homeService.dayComplete(carryForwardStock as any);
+//       if (response?.success || response?.statusCode === 200) {
+//         toast.success('Your day successfully completed');
+//         setShowFinalConfirm(false);
+//         setShowSettlementOptions(false);
+//         setShowDayEndSummary(false);
+//         bumpDashboardRefresh();
+//         setWorkSessionId(null);
+//         router.replace('/(drawer)/(tabs)/home');
+//         return;
+//       }
+//       toast.error(response?.message || 'Failed to complete day');
+//     } catch (error) {
+//       console.error('Error completing day:', error);
+//       toast.error('Failed to complete day. Please try again.');
+//     } finally {
+//       settleInFlightRef.current = false;
+//     }
+//   }, [carryForwardStock]);
+
+//   const handleVanSettlementPress = useCallback(async () => {
+//     try {
+//       const statusRes: any = await homeService.getDayStatus('');
+//       const status = statusRes?.data?.status;
+//       if (status !== 'ACTIVE') {
+//         toast.error('Day not started. Please start day before Van Settlement.');
+//         return;
+//       }
+
+//       setCarryForwardStock(true);
+//       setShowSettlementConfirm(true);
+//     } catch (error) {
+//       console.error('Error checking day status:', error);
+//       toast.error('Unable to check day status. Please try again.');
+//     }
+//   }, []);
+
+//   // Filter out hidden screens from the drawer list (collection hidden)
+//   const filteredProps = {
+//     ...props,
+//     state: {
+//       ...props.state,
+//       routes: props.state.routes.filter((route: any) => {
+//         // Hide 'collection' from drawer
+//         return route.name !== 'collection';
+//       }),
+//     },
+//   };
+
+//   return (
+//     <View style={{ flex: 1, backgroundColor: colors.background }}>
+//       <ModernDrawerHeader colors={colors} />
+
+//       <DrawerContentScrollView
+//         {...filteredProps}
+//         contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 8 }}
+//       >
+//         <DrawerItemList {...filteredProps} />
+//       </DrawerContentScrollView>
+
+//       {/* Logout Section with Divider */}
+//       <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
+//         <DrawerItem
+//           label="Van Settlement"
+//           labelStyle={{ fontWeight: '500', color: 'red' }}
+//           icon={({ size }) => <MaterialCommunityIcons name="power" size={size} color="red" />}
+//           onPress={() => {
+//             props.navigation?.closeDrawer?.();
+//             void handleVanSettlementPress();
+//           }}
+//           style={{
+//             borderRadius: 12,
+//             marginHorizontal: 8,
+//             marginTop: 8,
+//           }}
+//         />
+//       </View>
+
+//       <ConfirmationModal
+//         visible={showSettlementConfirm}
+//         title="Van Settlement"
+//         message="Do you want to settlement of van?"
+//         confirmText="Yes, Continue"
+//         cancelText="Cancel"
+//         type="info"
+//         onCancel={() => setShowSettlementConfirm(false)}
+//         onConfirm={() => {
+//           setShowSettlementConfirm(false);
+//           void fetchDayEndSummary();
+//         }}
+//       />
+
+//       <DayEndSummaryModal
+//         visible={showDayEndSummary}
+//         data={dayEndSummary}
+//         onClose={() => setShowDayEndSummary(false)}
+//         onProceed={() => {
+//           setShowDayEndSummary(false);
+//           setShowSettlementOptions(true);
+//         }}
+//       />
+
+//       <AppModal
+//         visible={showSettlementOptions}
+//         onClose={() => setShowSettlementOptions(false)}
+//         position="center"
+//         animation="fade"
+//         showBackdrop={true}
+//         closeOnBackdropPress={true}
+//         showHeader={false}
+//       >
+//         <View style={{ padding: 16 }}>
+//           <AppText style={{ fontSize: 16, fontWeight: '800', marginBottom: 8 }}>
+//             Settlement Options
+//           </AppText>
+//           <AppText style={{ fontSize: 12, opacity: 0.8, marginBottom: 14 }}>
+//             Choose how you want to handle remaining stock.
+//           </AppText>
+
+//           <TouchableOpacity
+//             onPress={() => setCarryForwardStock(true)}
+//             activeOpacity={0.8}
+//             style={{
+//               flexDirection: 'row',
+//               alignItems: 'center',
+//               padding: 12,
+//               borderRadius: 12,
+//               borderWidth: 1,
+//               borderColor: carryForwardStock ? colors.primary : colors.border,
+//               backgroundColor: carryForwardStock ? colors.primary + '10' : colors.surface,
+//               marginBottom: 10,
+//             }}
+//           >
+//             <Ionicons
+//               name={carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
+//               size={18}
+//               color={carryForwardStock ? colors.primary : colors.textSecondary}
+//             />
+//             <View style={{ marginLeft: 10, flex: 1 }}>
+//               <AppText style={{ fontSize: 14, fontWeight: '700' }}>Carry Forward Stock</AppText>
+//               <AppText style={{ fontSize: 12, opacity: 0.75 }}>
+//                 Keep remaining stock in van for next day.
+//               </AppText>
+//             </View>
+//           </TouchableOpacity>
+
+//           <TouchableOpacity
+//             onPress={() => setCarryForwardStock(false)}
+//             activeOpacity={0.8}
+//             style={{
+//               flexDirection: 'row',
+//               alignItems: 'center',
+//               padding: 12,
+//               borderRadius: 12,
+//               borderWidth: 1,
+//               borderColor: !carryForwardStock ? colors.primary : colors.border,
+//               backgroundColor: !carryForwardStock ? colors.primary + '10' : colors.surface,
+//             }}
+//           >
+//             <Ionicons
+//               name={!carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
+//               size={18}
+//               color={!carryForwardStock ? colors.primary : colors.textSecondary}
+//             />
+//             <View style={{ marginLeft: 10, flex: 1 }}>
+//               <AppText style={{ fontSize: 14, fontWeight: '700' }}>Unload Stock</AppText>
+//               <AppText style={{ fontSize: 12, opacity: 0.75 }}>
+//                 Return all remaining stock to warehouse.
+//               </AppText>
+//             </View>
+//           </TouchableOpacity>
+
+//           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+//             <TouchableOpacity
+//               onPress={() => {
+//                 setShowSettlementOptions(false);
+//                 setShowDayEndSummary(true);
+//               }}
+//               style={{
+//                 flex: 1,
+//                 paddingVertical: 12,
+//                 borderRadius: 12,
+//                 borderWidth: 1,
+//                 borderColor: colors.border,
+//                 alignItems: 'center',
+//               }}
+//             >
+//               <AppText style={{ fontWeight: '700', color: colors.textSecondary }}>Back</AppText>
+//             </TouchableOpacity>
+
+//             <TouchableOpacity
+//               onPress={() => {
+//                 setShowSettlementOptions(false);
+//                 setShowFinalConfirm(true);
+//               }}
+//               style={{
+//                 flex: 1,
+//                 paddingVertical: 12,
+//                 borderRadius: 12,
+//                 backgroundColor: colors.primary,
+//                 alignItems: 'center',
+//               }}
+//             >
+//               <AppText style={{ fontWeight: '800', color: '#fff' }}>Continue</AppText>
+//             </TouchableOpacity>
+//           </View>
+//         </View>
+//       </AppModal>
+
+//       <ConfirmationModal
+//         visible={showFinalConfirm}
+//         title="Final Confirmation"
+//         message={
+//           carryForwardStock
+//             ? 'Confirm van settlement with Carry Forward Stock?'
+//             : 'Confirm van settlement with Unload Stock?'
+//         }
+//         confirmText="Submit"
+//         cancelText="Cancel"
+//         type="warning"
+//         onCancel={() => setShowFinalConfirm(false)}
+//         onConfirm={() => void submitSettlement()}
+//       />
+//     </View>
+//   );
+// };
 
 const CustomDrawerContent = (props: any) => {
   const { colors } = useTheme();
@@ -191,202 +460,184 @@ const CustomDrawerContent = (props: any) => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ModernDrawerHeader colors={colors} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
+      <View style={{ flex: 1 }}>
+        <ModernDrawerHeader colors={colors} />
 
-      <DrawerContentScrollView
-        {...filteredProps}
-        contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 8 }}
-      >
-        <DrawerItemList {...filteredProps} />
-      </DrawerContentScrollView>
+        <DrawerContentScrollView
+          {...filteredProps}
+          contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 8 }}
+        >
+          <DrawerItemList {...filteredProps} />
+        </DrawerContentScrollView>
 
-      {/* Logout Section with Divider */}
-      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
-        <DrawerItem
-          label="Van Settlement"
-          labelStyle={{ fontWeight: '500' }}
-          icon={({ color, size }) => (
-            <MaterialCommunityIcons name="power" size={size} color={color} />
-          )}
-          onPress={() => {
-            props.navigation?.closeDrawer?.();
-            void handleVanSettlementPress();
-          }}
-          style={{
-            borderRadius: 12,
-            marginHorizontal: 8,
-            marginTop: 8,
+        {/* Logout Section with Divider */}
+        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
+          <DrawerItem
+            label="Van Settlement"
+            labelStyle={{ fontWeight: '500', color: 'red' }}
+            icon={({ size }) => <MaterialCommunityIcons name="power" size={size} color="red" />}
+            onPress={() => {
+              props.navigation?.closeDrawer?.();
+              void handleVanSettlementPress();
+            }}
+            style={{
+              borderRadius: 12,
+              marginHorizontal: 8,
+              marginTop: 8,
+            }}
+          />
+        </View>
+
+        <ConfirmationModal
+          visible={showSettlementConfirm}
+          title="Van Settlement"
+          message="Do you want to settlement of van?"
+          confirmText="Yes, Continue"
+          cancelText="Cancel"
+          type="info"
+          onCancel={() => setShowSettlementConfirm(false)}
+          onConfirm={() => {
+            setShowSettlementConfirm(false);
+            void fetchDayEndSummary();
           }}
         />
 
-        {/* <DrawerItem
-          label="Logout"
-          labelStyle={{ fontWeight: '500' }}
-          icon={({ color, size }) => (
-            <MaterialCommunityIcons name="logout-variant" size={size} color={color} />
-          )}
-          onPress={async () => {
-            await logout();
-            router.replace('/(auth)');
+        <DayEndSummaryModal
+          visible={showDayEndSummary}
+          data={dayEndSummary}
+          onClose={() => setShowDayEndSummary(false)}
+          onProceed={() => {
+            setShowDayEndSummary(false);
+            setShowSettlementOptions(true);
           }}
-          style={{
-            borderRadius: 12,
-            marginHorizontal: 8,
-            marginTop: 8,
-          }}
-        /> */}
-      </View>
+        />
 
-      <ConfirmationModal
-        visible={showSettlementConfirm}
-        title="Van Settlement"
-        message="Do you want to settlement of van?"
-        confirmText="Yes, Continue"
-        cancelText="Cancel"
-        type="info"
-        onCancel={() => setShowSettlementConfirm(false)}
-        onConfirm={() => {
-          setShowSettlementConfirm(false);
-          void fetchDayEndSummary();
-        }}
-      />
+        <AppModal
+          visible={showSettlementOptions}
+          onClose={() => setShowSettlementOptions(false)}
+          position="center"
+          animation="fade"
+          showBackdrop={true}
+          closeOnBackdropPress={true}
+          showHeader={false}
+        >
+          <View style={{ padding: 16 }}>
+            <AppText style={{ fontSize: 16, fontWeight: '800', marginBottom: 8 }}>
+              Settlement Options
+            </AppText>
+            <AppText style={{ fontSize: 12, opacity: 0.8, marginBottom: 14 }}>
+              Choose how you want to handle remaining stock.
+            </AppText>
 
-      <DayEndSummaryModal
-        visible={showDayEndSummary}
-        data={dayEndSummary}
-        onClose={() => setShowDayEndSummary(false)}
-        onProceed={() => {
-          setShowDayEndSummary(false);
-          setShowSettlementOptions(true);
-        }}
-      />
-
-      <AppModal
-        visible={showSettlementOptions}
-        onClose={() => setShowSettlementOptions(false)}
-        position="center"
-        animation="fade"
-        showBackdrop={true}
-        closeOnBackdropPress={true}
-        showHeader={false}
-      >
-        <View style={{ padding: 16 }}>
-          <AppText style={{ fontSize: 16, fontWeight: '800', marginBottom: 8 }}>
-            Settlement Options
-          </AppText>
-          <AppText style={{ fontSize: 12, opacity: 0.8, marginBottom: 14 }}>
-            Choose how you want to handle remaining stock.
-          </AppText>
-
-          <TouchableOpacity
-            onPress={() => setCarryForwardStock(true)}
-            activeOpacity={0.8}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              padding: 12,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: carryForwardStock ? colors.primary : colors.border,
-              backgroundColor: carryForwardStock ? colors.primary + '10' : colors.surface,
-              marginBottom: 10,
-            }}
-          >
-            <Ionicons
-              name={carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
-              size={18}
-              color={carryForwardStock ? colors.primary : colors.textSecondary}
-            />
-            <View style={{ marginLeft: 10, flex: 1 }}>
-              <AppText style={{ fontSize: 14, fontWeight: '700' }}>Carry Forward Stock</AppText>
-              <AppText style={{ fontSize: 12, opacity: 0.75 }}>
-                Keep remaining stock in van for next day.
-              </AppText>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setCarryForwardStock(false)}
-            activeOpacity={0.8}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              padding: 12,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: !carryForwardStock ? colors.primary : colors.border,
-              backgroundColor: !carryForwardStock ? colors.primary + '10' : colors.surface,
-            }}
-          >
-            <Ionicons
-              name={!carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
-              size={18}
-              color={!carryForwardStock ? colors.primary : colors.textSecondary}
-            />
-            <View style={{ marginLeft: 10, flex: 1 }}>
-              <AppText style={{ fontSize: 14, fontWeight: '700' }}>Unload Stock</AppText>
-              <AppText style={{ fontSize: 12, opacity: 0.75 }}>
-                Return all remaining stock to warehouse.
-              </AppText>
-            </View>
-          </TouchableOpacity>
-
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <TouchableOpacity
-              onPress={() => {
-                setShowSettlementOptions(false);
-                setShowDayEndSummary(true);
-              }}
+              onPress={() => setCarryForwardStock(true)}
+              activeOpacity={0.8}
               style={{
-                flex: 1,
-                paddingVertical: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                padding: 12,
                 borderRadius: 12,
                 borderWidth: 1,
-                borderColor: colors.border,
-                alignItems: 'center',
+                borderColor: carryForwardStock ? colors.primary : colors.border,
+                backgroundColor: carryForwardStock ? colors.primary + '10' : colors.surface,
+                marginBottom: 10,
               }}
             >
-              <AppText style={{ fontWeight: '700', color: colors.textSecondary }}>Back</AppText>
+              <Ionicons
+                name={carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
+                size={18}
+                color={carryForwardStock ? colors.primary : colors.textSecondary}
+              />
+              <View style={{ marginLeft: 10, flex: 1 }}>
+                <AppText style={{ fontSize: 14, fontWeight: '700' }}>Carry Forward Stock</AppText>
+                <AppText style={{ fontSize: 12, opacity: 0.75 }}>
+                  Keep remaining stock in van for next day.
+                </AppText>
+              </View>
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => {
-                setShowSettlementOptions(false);
-                setShowFinalConfirm(true);
-              }}
+              onPress={() => setCarryForwardStock(false)}
+              activeOpacity={0.8}
               style={{
-                flex: 1,
-                paddingVertical: 12,
-                borderRadius: 12,
-                backgroundColor: colors.primary,
+                flexDirection: 'row',
                 alignItems: 'center',
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: !carryForwardStock ? colors.primary : colors.border,
+                backgroundColor: !carryForwardStock ? colors.primary + '10' : colors.surface,
               }}
             >
-              <AppText style={{ fontWeight: '800', color: '#fff' }}>Continue</AppText>
+              <Ionicons
+                name={!carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
+                size={18}
+                color={!carryForwardStock ? colors.primary : colors.textSecondary}
+              />
+              <View style={{ marginLeft: 10, flex: 1 }}>
+                <AppText style={{ fontSize: 14, fontWeight: '700' }}>Unload Stock</AppText>
+                <AppText style={{ fontSize: 12, opacity: 0.75 }}>
+                  Return all remaining stock to warehouse.
+                </AppText>
+              </View>
             </TouchableOpacity>
-          </View>
-        </View>
-      </AppModal>
 
-      <ConfirmationModal
-        visible={showFinalConfirm}
-        title="Final Confirmation"
-        message={
-          carryForwardStock
-            ? 'Confirm van settlement with Carry Forward Stock?'
-            : 'Confirm van settlement with Unload Stock?'
-        }
-        confirmText="Submit"
-        cancelText="Cancel"
-        type="warning"
-        onCancel={() => setShowFinalConfirm(false)}
-        onConfirm={() => void submitSettlement()}
-      />
-    </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSettlementOptions(false);
+                  setShowDayEndSummary(true);
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: 'center',
+                }}
+              >
+                <AppText style={{ fontWeight: '700', color: colors.textSecondary }}>Back</AppText>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSettlementOptions(false);
+                  setShowFinalConfirm(true);
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  backgroundColor: colors.primary,
+                  alignItems: 'center',
+                }}
+              >
+                <AppText style={{ fontWeight: '800', color: '#fff' }}>Continue</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </AppModal>
+
+        <ConfirmationModal
+          visible={showFinalConfirm}
+          title="Final Confirmation"
+          message={
+            carryForwardStock
+              ? 'Confirm van settlement with Carry Forward Stock?'
+              : 'Confirm van settlement with Unload Stock?'
+          }
+          confirmText="Submit"
+          cancelText="Cancel"
+          type="warning"
+          onCancel={() => setShowFinalConfirm(false)}
+          onConfirm={() => void submitSettlement()}
+        />
+      </View>
+    </SafeAreaView>
   );
 };
-
 /* ============================
  * MAIN DRAWER
  * ============================ */
@@ -424,8 +675,15 @@ export default function DrawerLayout() {
       backgroundColor: colors.primary,
     },
 
-    'swith-route': {
+    'switch-route': {
       title: 'Change Route',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+    'my-pocket': {
+      title: 'My Pocket',
       showMenu: false,
       showFilter: false,
       showBack: true,
@@ -530,8 +788,13 @@ export default function DrawerLayout() {
         },
         'switch-route': {
           component: MaterialCommunityIcons,
-          focusedIcon: 'target',
-          unfocusedIcon: 'target',
+          focusedIcon: 'swap-horizontal-circle',
+          unfocusedIcon: 'swap-horizontal-circle-outline',
+        },
+        'my-pocket': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'pocket',
+          unfocusedIcon: 'pocket',
         },
         'stock-count': {
           component: MaterialCommunityIcons,
@@ -592,6 +855,14 @@ export default function DrawerLayout() {
         options={{
           title: 'Dashboard',
           drawerLabel: 'Dashboard',
+        }}
+      />
+
+      <Drawer.Screen
+        name="my-pocket"
+        options={{
+          title: 'My Pcoket',
+          drawerLabel: 'My Pocket',
         }}
       />
 

@@ -18,12 +18,18 @@ export const MOCK_DATA = {
 export const QUICK_ACTIONS: QuickAction[] = [
   { icon: 'cart', label: 'Retailing', color: '#4158D0', route: '/retailing' },
   { icon: 'briefcase', label: 'Other Work', color: '#C850C0', route: '/other-work' },
-  // { icon: 'calendar', label: 'Leaves', color: '#FF512F', route: '/leaves' },
+  { icon: 'calendar', label: 'Leave', color: '#FF512F', route: '/leave' },
 ];
 
 export const ACTIVITY_TYPES: ActivityType[] = [
   { id: '1', name: 'Retailing', icon: 'storefront', color: '#4158D0' },
   { id: '2', name: 'Other Work', icon: 'briefcase', color: '#C850C0' },
+  { id: '3', name: 'Leave', icon: 'calendar-outline', color: '#FF512F' },
+];
+
+export const LEAVE_TYPES: ActivityType[] = [
+  { id: 'leave_week_off', name: 'Week Off', icon: 'sunny-outline', color: '#FFB300' },
+  { id: 'leave_holiday', name: 'Holiday', icon: 'sparkles-outline', color: '#8E2DE2' },
 ];
 
 export const OTHER_WORK_OPTIONS: OtherWorkOption[] = [

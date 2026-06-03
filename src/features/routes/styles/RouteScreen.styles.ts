@@ -8,6 +8,54 @@ export const useRouteScreenStyles = () => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils) => ({
+    // Add these styles to your existing styles
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 32,
+    } as ViewStyle,
+
+    loadingText: {
+      marginTop: 16,
+      fontSize: 14,
+      textAlign: 'center',
+    } as TextStyle,
+
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 48,
+      minHeight: 400,
+    } as ViewStyle,
+
+    emptyStateTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginTop: 16,
+      marginBottom: 8,
+      textAlign: 'center',
+    } as TextStyle,
+
+    emptyStateText: {
+      fontSize: 14,
+      textAlign: 'center',
+      marginBottom: 16,
+      paddingHorizontal: 32,
+    } as TextStyle,
+
+    emptyStateButton: {
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+    } as ViewStyle,
+
+    emptyStateButtonText: {
+      fontSize: 14,
+      fontWeight: '500',
+    } as TextStyle,
+
     // ============= CONTAINER =============
     container: {
       flex: 1,
@@ -433,29 +481,6 @@ export const useRouteScreenStyles = () => {
     actionButton: {
       flex: 1,
     } as ViewStyle,
-
-    // ============= EMPTY STATE =============
-    emptyState: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: utils.spacing[8],
-      paddingHorizontal: utils.spacing[4],
-    } as ViewStyle,
-
-    emptyStateTitle: {
-      fontSize: utils.fontSize.lg,
-      fontWeight: 'bold',
-      color: colors.textPrimary,
-      marginTop: utils.spacing[4],
-      marginBottom: utils.spacing[2],
-    } as TextStyle,
-
-    emptyStateText: {
-      fontSize: utils.fontSize.sm,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginBottom: utils.spacing[4],
-    } as TextStyle,
 
     clearFiltersText: {
       fontSize: utils.fontSize.sm,

@@ -16,6 +16,7 @@ import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCustomerCreateStyles } from '@/shared/styles/CustomerCreateModal.styles';
 import CameraModal from '@/core/components/Camera/CameraModal';
+import { useRouteStore } from '@/core/store/route.store';
 
 interface CustomerCreateModalProps {
   visible: boolean;
@@ -40,6 +41,7 @@ export interface CustomerData {
   segmentation: string;
   creditLimit: number;
   creditDays: number;
+  countryId: string;
 }
 
 interface FormField {
@@ -134,7 +136,7 @@ const FORM_SECTIONS: FormSection[] = [
         label: 'Customer Name',
         type: 'text',
         icon: 'business-outline',
-        placeholder: 'Business name or company',
+        placeholder: 'Business name or customer',
         required: true,
       },
       {
@@ -207,22 +209,22 @@ const FORM_SECTIONS: FormSection[] = [
     description: 'Set market position and geographic details',
     icon: 'map',
     fields: [
-      {
-        key: 'marketId',
-        label: 'Market',
-        type: 'dropdown',
-        icon: 'stats-chart-outline',
-        placeholder: 'Select market',
-        required: true,
-      },
-      {
-        key: 'provinceId',
-        label: 'Province',
-        type: 'dropdown',
-        icon: 'map-outline',
-        placeholder: 'Select province',
-        required: true,
-      },
+      // {
+      //   key: 'marketId',
+      //   label: 'Market',
+      //   type: 'dropdown',
+      //   icon: 'stats-chart-outline',
+      //   placeholder: 'Select market',
+      //   required: true,
+      // },
+      // {
+      //   key: 'provinceId',
+      //   label: 'Province',
+      //   type: 'dropdown',
+      //   icon: 'map-outline',
+      //   placeholder: 'Select province',
+      //   required: true,
+      // },
       {
         key: 'segmentation',
         label: 'Segment',
@@ -265,7 +267,7 @@ const dropdownOptions = {
     { id: 'CAT003', name: 'Distributor' },
   ],
   channelId: [
-    { id: 'CH001', name: 'Pre Sale' },
+    { id: 'CH001', name: 'Van Sale' },
     { id: 'CH002', name: 'Retail' },
   ],
   customerTypeId: [
@@ -273,20 +275,28 @@ const dropdownOptions = {
     { id: 'TYPE002', name: 'Premium' },
     { id: 'TYPE003', name: 'VIP' },
   ],
-  marketId: [
-    { id: 'MKT001', name: 'Urban' },
-    { id: 'MKT002', name: 'Rural' },
-    { id: 'MKT003', name: 'Semi-Urban' },
-  ],
-  provinceId: [
-    { id: 'PROV001', name: 'Lusaka' },
-    { id: 'PROV002', name: 'Copperbelt' },
-    { id: 'PROV003', name: 'Southern' },
-  ],
+  // marketId: [
+  //   { id: 'MKT001', name: 'Urban' },
+  //   { id: 'MKT002', name: 'Rural' },
+  //   { id: 'MKT003', name: 'Semi-Urban' },
+  // ],
+  // provinceId: [
+  //   { id: 'PROV001', name: 'Lusaka' },
+  //   { id: 'PROV002', name: 'Copperbelt' },
+  //   { id: 'PROV003', name: 'Southern' },
+  // ],
   segmentation: [
-    { id: 'HIGH', name: 'High Value' },
-    { id: 'MEDIUM', name: 'Medium Value' },
-    { id: 'LOW', name: 'Low Value' },
+    { id: 'A', name: 'A' },
+    { id: 'A-', name: 'A-' },
+    { id: 'A+', name: 'A+' },
+
+    { id: 'B', name: 'B' },
+    { id: 'B-', name: 'B-' },
+    { id: 'B+', name: 'B+' },
+
+    { id: 'C', name: 'C' },
+    { id: 'C-', name: 'C-' },
+    { id: 'C+', name: 'C+' },
   ],
 };
 
@@ -306,6 +316,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
+  const selectedRoute = useRouteStore((state) => state.selectedRoute);
 
   // Dropdown state
   const [activeDropdown, setActiveDropdown] = useState<{
@@ -325,14 +336,15 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     ownerName: '',
     phoneNumber: '',
     address: { line1: '', line2: '' },
-    customerCategoryId: '',
-    channelId: 'CH002',
-    customerTypeId: '',
-    marketId: '',
-    provinceId: 'PROV001',
+    customerCategoryId: 'CAT001',
+    channelId: 'CH001',
+    customerTypeId: 'TYPE001',
+    marketId: selectedRoute?.marketId || 'TJJJJJJ',
+    provinceId: selectedRoute?.provinceId || 'TESTPRO',
     segmentation: '',
     creditLimit: 0,
     creditDays: 0,
+    countryId: 'ZAMBIA',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -559,7 +571,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             placeholderTextColor={colors.textTertiary}
             value={value?.toString() || ''}
             onChangeText={(text) => updateField(field.key, text)}
-            onFocus={() => handleFieldFocus(field.key)}
+            // onFocus={() => handleFieldFocus(field.key)}
             onBlur={() => {
               setFocusedField(null);
               setTouchedFields((prev) => new Set(prev).add(field.key));

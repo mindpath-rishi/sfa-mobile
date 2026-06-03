@@ -22,6 +22,7 @@ import {
   OTHER_WORK_OPTIONS,
   ASSIGNED_VAN,
   LOAD_SUMMARY_DATA,
+  LEAVE_TYPES,
 } from '../constants/mockData';
 
 // Types
@@ -45,6 +46,8 @@ import { DayEndConfirmationModal } from '@/shared/components/models/DayEndConfir
 import { useFocusEffect } from 'expo-router';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { leaveService } from '@/features/leave/services/leave.service';
+import type { LeaveType } from '@/features/leave/types/leave.types';
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
@@ -53,7 +56,12 @@ export default function SalesExecutiveScreen() {
   const [dayStarted, setDayStarted] = useState(false);
   const [unifiedModalVisible, setUnifiedModalVisible] = useState(false);
   const [unifiedModalType, setUnifiedModalType] = useState<
-    'van-change' | 'van-selection' | 'route-selection' | 'activity-change' | 'other-work'
+    | 'van-change'
+    | 'van-selection'
+    | 'route-selection'
+    | 'activity-change'
+    | 'other-work'
+    | 'leave-type'
   >('van-change');
   const [cameraVisible, setCameraVisible] = useState(false);
   const [loadSummaryVisible, setLoadSummaryVisible] = useState(false);
@@ -81,6 +89,7 @@ export default function SalesExecutiveScreen() {
   const [currentActivity, setCurrentActivity] = useState<string | null>('');
   const [filteredActivityTypes, setFilteredActivityTypes] = useState(ACTIVITY_TYPES);
   const [tempSelectedActivity, setTempSelectedActivity] = useState<ActivityType | null>(null);
+  const [selectedLeaveType, setSelectedLeaveType] = useState<string | null>(null);
 
   const cameraRef = useRef<any>(null);
   const [permission, requestPermission] = useCameraPermissions();
@@ -175,6 +184,7 @@ export default function SalesExecutiveScreen() {
     setIsChangingActivity(false);
     setShowChangeOtherOptions(false);
     setTempSelectedActivity(null);
+    setSelectedLeaveType(null);
   };
 
   const handleChangeActivityPress = () => {
@@ -189,6 +199,7 @@ export default function SalesExecutiveScreen() {
     setShowChangeOtherOptions(false);
     setIsChangingActivity(true);
     setTempSelectedActivity(null);
+    setSelectedLeaveType(null);
   };
 
   const handleActivitySelect = (activity: ActivityType) => {
@@ -199,6 +210,11 @@ export default function SalesExecutiveScreen() {
       setTempSelectedActivity(activity);
       setUnifiedModalVisible(true);
       setUnifiedModalType('other-work');
+    } else if (activity.name === 'Leave') {
+      setTempSelectedActivity(activity);
+      setUnifiedModalVisible(false);
+      setUnifiedModalType('leave-type');
+      setUnifiedModalVisible(true);
     } else if (activity.name === 'Retailing') {
       getRoutes();
       setSelectedActivity(activity.name);
@@ -294,6 +310,13 @@ export default function SalesExecutiveScreen() {
       setUnifiedModalType('other-work');
       setUnifiedModalVisible(true);
       setIsChangingActivity(true);
+    } else if (activity.name === 'Leave') {
+      setSelectedRoute(null);
+      setTempSelectedActivity(activity);
+      setUnifiedModalVisible(false);
+      setUnifiedModalType('leave-type');
+      setUnifiedModalVisible(true);
+      setIsChangingActivity(true);
     } else if (activity.name === 'Retailing') {
       getRoutes();
       setSelectedActivity(activity.name);
@@ -324,6 +347,49 @@ export default function SalesExecutiveScreen() {
     setUnifiedModalVisible(false);
     setShowChangeOtherOptions(false);
     completeActivityChange();
+  };
+
+  const handleLeaveTypeSelect = (leaveType: ActivityType) => {
+    const leaveTypeName = leaveType.name;
+    setSelectedLeaveType(leaveTypeName);
+    setSelectedRoute(null);
+    setSelectedActivity('Leave');
+    setPendingActivity(
+      { ...(tempSelectedActivity || { id: 'leave', name: 'Leave' }), name: 'Leave' } as any,
+    );
+    setUnifiedModalVisible(false);
+
+    (async () => {
+      try {
+        const mappedLeaveType: LeaveType | null =
+          leaveTypeName === 'Week Off' ? 'WEEK_OFF' : leaveTypeName === 'Holiday' ? 'HOLIDAY' : null;
+
+        if (!mappedLeaveType) {
+          toast.error('Invalid leave type selected');
+          return;
+        }
+
+        const today = new Date();
+        const date = today.toISOString().slice(0, 10);
+        const userId = useAuthStore.getState().user?.userId;
+
+        const response: ApiResponse<any> = await leaveService.applyLeave({
+          leaveType: mappedLeaveType,
+          date,
+          userId,
+        });
+
+        if (response?.statusCode === 200 || response?.statusCode === 201) {
+          await getDayStatus();
+          toast.success('Leave marked successfully.');
+        } else {
+          toast.error(response?.message || 'Failed to mark leave. Please try again.');
+        }
+      } catch (error) {
+        console.error('Error marking leave:', error);
+        toast.error('Failed to mark leave. Please try again.');
+      }
+    })();
   };
 
   const openCamera = async () => {
@@ -391,7 +457,9 @@ export default function SalesExecutiveScreen() {
         ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${mappedVan?.name || ASSIGNED_VAN.name}`
         : isVanChangePending
           ? `Van change request pending. Requested Van: ${selectedVanForChange?.name || mappedVan?.name || ''}`
-          : `Started ${pendingActivity?.name}`,
+          : selectedActivity === 'Leave'
+            ? `Leave: ${selectedLeaveType || 'Other'}`
+            : `Started ${pendingActivity?.name}`,
       totalShops: selectedRoute?.totalShops,
       routeName: selectedRoute?.name,
       vanId: van?.vanId,
@@ -433,7 +501,9 @@ export default function SalesExecutiveScreen() {
       routeId: selectedRoute?.routeId,
       description: selectedRoute
         ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${ASSIGNED_VAN.name}`
-        : `Started ${pendingActivity?.name}`,
+        : selectedActivity === 'Leave'
+          ? `Leave: ${selectedLeaveType || 'Other'}`
+          : `Started ${pendingActivity?.name}`,
       totalShops: selectedRoute?.totalShops,
       routeName: selectedRoute?.name,
       workSessionId,
@@ -457,6 +527,7 @@ export default function SalesExecutiveScreen() {
     setShowChangeOtherOptions(false);
     setShowOtherOptions(false);
     setTempSelectedActivity(null);
+    setSelectedLeaveType(null);
   };
 
   const handleCloseLoadSummary = () => {
@@ -487,11 +558,11 @@ export default function SalesExecutiveScreen() {
         }
         break;
 
-      case '/leaves':
+      case '/leave':
         if (dayStarted) {
-          handleChangeActivity({ name: 'Leaves' } as any);
+          handleChangeActivity({ name: 'Leave' } as any);
         } else {
-          handleActivitySelect('Leaves' as any);
+          handleActivitySelect({ name: 'Leave' } as any);
         }
         break;
     }
@@ -589,6 +660,9 @@ export default function SalesExecutiveScreen() {
               totalShops: item.route?.outletCount,
               distance: item.route.distance || 'N/A',
               stops: item.route?.outletCount || 0,
+              marketId: item.route.marketId,
+              provinceId: item.route.provinceId,
+              countryId: item.route.countryId,
             })),
           );
         }
@@ -824,6 +898,14 @@ export default function SalesExecutiveScreen() {
         otherWorkOptions={otherWorkOptionsForModal}
         onActivitySelect={isChangingActivity ? handleChangeActivity : handleActivitySelect}
         onOtherWorkSelect={isChangingActivity ? handleChangeOtherWork : handleOtherWorkSelect}
+        leaveTypes={LEAVE_TYPES}
+        selectedLeaveType={selectedLeaveType || undefined}
+        onLeaveTypeSelect={handleLeaveTypeSelect}
+        onLeaveBack={() => {
+          setUnifiedModalVisible(false);
+          setUnifiedModalType('activity-change');
+          setUnifiedModalVisible(true);
+        }}
         onBackToOptions={() => {
           setShowChangeOtherOptions(false);
           setShowOtherOptions(false);

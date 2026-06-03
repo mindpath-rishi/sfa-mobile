@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Alert, View, ScrollView } from 'react-native';
+import { Alert, View, ScrollView, StatusBar } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -87,6 +87,8 @@ export const VanInventoryTopupDetail: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+
       <TopupDetailHeader
         detail={detail}
         colors={colors}

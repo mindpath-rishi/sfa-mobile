@@ -471,7 +471,7 @@ export default function TargetDashboard() {
               marginBottom: 16,
             }}
           >
-            <View>
+            {/* <View>
               <Text style={{ color: colors.textSecondary, fontSize: 11, letterSpacing: 0.5 }}>
                 PERFORMANCE TREND
               </Text>
@@ -480,8 +480,8 @@ export default function TargetDashboard() {
               >
                 Weekly Progress
               </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            </View> */}
+            {/* <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Ionicons
                 name={currentData.growth >= 0 ? 'arrow-up' : 'arrow-down'}
                 size={14}
@@ -498,14 +498,14 @@ export default function TargetDashboard() {
                 {currentData.growth}%
               </Text>
               <Text style={{ color: colors.textSecondary, fontSize: 11 }}>vs last month</Text>
-            </View>
+            </View> */}
           </View>
 
-          <AreaChart
+          {/* <AreaChart
             data={chartData}
             color={selectedPeriod === 'currentMonth' ? colors.primary : colors.textSecondary}
-          />
-
+          /> */}
+          {/* 
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <View
@@ -519,7 +519,7 @@ export default function TargetDashboard() {
               />
               <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Weekly Progress (%)</Text>
             </View>
-          </View>
+          </View> */}
         </View>
 
         {/* Comparison Table */}

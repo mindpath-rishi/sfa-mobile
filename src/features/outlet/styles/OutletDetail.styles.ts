@@ -10,7 +10,43 @@ export const useOutletDetailStyles = () => {
     // ────────────────────────────────────────────────────────────────────────────
     // Container & Layout
     // ────────────────────────────────────────────────────────────────────────────
+    // Add these to your useOutletDetailStyles function
+    mainScrollView: {
+      flex: 1,
+    } as ViewStyle,
+
+    mainScrollContent: {
+      flexGrow: 1,
+      paddingBottom: 20,
+    } as ViewStyle,
+
+    // Update or add these styles
+    footerSafeArea: {
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    } as ViewStyle,
+
+    fullWidthButtonContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    } as ViewStyle,
+
+    // Remove tabContentWrapper and tabContent styles as they're no longer needed
+    // Update tabContentContainer
+    tabContentContainer: {
+      paddingHorizontal: utils.spacing[4],
+      paddingTop: utils.spacing[3],
+      paddingBottom: utils.spacing[4],
+    } as ViewStyle,
     container: {
+      flex: 1,
+      backgroundColor: colors.background,
+      flexDirection: 'column',
+    } as ViewStyle,
+
+    // Wrapper for tab content to take remaining space
+    tabContentWrapper: {
       flex: 1,
       backgroundColor: colors.background,
     } as ViewStyle,
@@ -85,38 +121,41 @@ export const useOutletDetailStyles = () => {
     } as TextStyle,
 
     // ────────────────────────────────────────────────────────────────────────────
-    // Header
+    // Header - Reduced height
     // ────────────────────────────────────────────────────────────────────────────
     detailHeader: {
-      padding: utils.spacing[4],
-      paddingBottom: utils.spacing[3],
+      paddingHorizontal: utils.spacing[4],
+      paddingTop: utils.spacing[2],
+      paddingBottom: utils.spacing[1],
       backgroundColor: colors.background,
     } as ViewStyle,
     detailHeroCard: {
       backgroundColor: colors.surface,
-      borderRadius: utils.borderRadius.xl,
-      padding: utils.spacing[4],
-      borderWidth: 1.5,
-      borderColor: colors.primary + '20',
+      borderRadius: utils.borderRadius.lg,
+      padding: utils.spacing[3],
+      borderWidth: 1,
+      borderColor: colors.primary + '15',
     } as ViewStyle,
     detailHeroCardCompact: {
-      paddingVertical: utils.spacing[3],
+      paddingVertical: utils.spacing[2],
+      paddingHorizontal: utils.spacing[3],
     } as ViewStyle,
     detailHeroTop: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
     } as ViewStyle,
     detailAvatarWrap: {
-      width: 64,
-      height: 64,
+      width: 50,
+      height: 50,
       borderRadius: utils.borderRadius.full,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: colors.primary + '10',
+      flexShrink: 0,
     } as ViewStyle,
     detailHeaderInfo: {
       flex: 1,
-      marginLeft: utils.spacing[3],
+      marginLeft: utils.spacing[2],
     } as ViewStyle,
     detailTitleRow: {
       flexDirection: 'row',
@@ -126,27 +165,27 @@ export const useOutletDetailStyles = () => {
       gap: utils.spacing[2],
     } as ViewStyle,
     detailName: {
-      fontSize: utils.fontSize.lg,
+      fontSize: utils.fontSize.md,
       fontWeight: utils.getFontWeight('bold'),
       color: colors.textPrimary,
       flex: 1,
     } as TextStyle,
     detailOwner: {
-      fontSize: utils.fontSize.sm,
+      fontSize: utils.fontSize.xs,
       color: colors.textSecondary,
-      marginBottom: utils.spacing[2],
+      marginBottom: utils.spacing[1],
     } as TextStyle,
     detailMetaRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: utils.spacing[2],
+      gap: utils.spacing[1],
     } as ViewStyle,
     detailMetaChip: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: utils.spacing[1],
-      paddingHorizontal: utils.spacing[2],
-      paddingVertical: utils.spacing[1.5],
+      paddingHorizontal: utils.spacing[1.5],
+      paddingVertical: utils.spacing[1],
       backgroundColor: colors.background,
       borderRadius: utils.borderRadius.full,
       borderWidth: 1,
@@ -160,39 +199,16 @@ export const useOutletDetailStyles = () => {
     detailLocationCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: utils.spacing[3],
-      padding: utils.spacing[3],
-      borderRadius: utils.borderRadius.lg,
-      backgroundColor: colors.primary + '08',
-      borderWidth: 1,
-      borderColor: colors.primary + '12',
+      marginTop: utils.spacing[2],
+      padding: utils.spacing[2],
+      borderRadius: utils.borderRadius.md,
+      backgroundColor: colors.primary + '05',
     } as ViewStyle,
     detailLocation: {
-      fontSize: utils.fontSize.sm,
+      fontSize: utils.fontSize.xs,
       color: colors.textSecondary,
-      marginLeft: utils.spacing[2],
+      marginLeft: utils.spacing[1],
       flex: 1,
-    } as TextStyle,
-
-    // ────────────────────────────────────────────────────────────────────────────
-    // Visit Type Badge (NEW)
-    // ────────────────────────────────────────────────────────────────────────────
-    visitTypeContainer: {
-      paddingHorizontal: 16,
-      marginBottom: 12,
-    } as ViewStyle,
-    visitTypeBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 20,
-      gap: 6,
-    } as ViewStyle,
-    visitTypeText: {
-      fontSize: 12,
-      fontWeight: '600',
     } as TextStyle,
 
     // ────────────────────────────────────────────────────────────────────────────
@@ -200,38 +216,56 @@ export const useOutletDetailStyles = () => {
     // ────────────────────────────────────────────────────────────────────────────
     lastInfoContainer: {
       paddingHorizontal: 16,
-      marginTop: -8,
-      marginBottom: 12,
-    },
+      marginBottom: 8,
+      marginTop: 0,
+    } as ViewStyle,
     lastInfoCard: {
       flexDirection: 'row',
       backgroundColor: '#F8F9FA',
-      borderRadius: 12,
-      padding: 12,
+      borderRadius: 10,
+      padding: 10,
       borderWidth: 1,
       borderColor: '#E9ECEF',
-    },
+    } as ViewStyle,
     lastInfoItem: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-    },
+      gap: 4,
+    } as ViewStyle,
     lastInfoDivider: {
       width: 1,
       backgroundColor: '#E9ECEF',
-      marginHorizontal: 12,
-    },
+      marginHorizontal: 8,
+    } as ViewStyle,
     lastInfoLabel: {
-      fontSize: 12,
+      fontSize: 11,
       color: '#6C757D',
-    },
+    } as TextStyle,
     lastInfoValue: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '600',
       color: '#212529',
-    },
+    } as TextStyle,
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Debug Geofence Container
+    // ────────────────────────────────────────────────────────────────────────────
+    debugGeofenceContainer: {
+      backgroundColor: '#4CAF50',
+      paddingVertical: 6,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      marginHorizontal: 16,
+      marginBottom: 8,
+      borderRadius: 8,
+    } as ViewStyle,
+    debugGeofenceText: {
+      color: '#FFF',
+      fontSize: 11,
+      fontWeight: '500',
+    } as TextStyle,
 
     // ────────────────────────────────────────────────────────────────────────────
     // Tab Bar
@@ -240,12 +274,11 @@ export const useOutletDetailStyles = () => {
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.divider,
-      paddingHorizontal: utils.spacing[4],
     } as ViewStyle,
     tab: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: utils.spacing[3],
+      paddingVertical: utils.spacing[2.5],
       paddingHorizontal: utils.spacing[4],
       gap: utils.spacing[2],
       borderBottomWidth: 2,
@@ -262,22 +295,26 @@ export const useOutletDetailStyles = () => {
     tabTextActive: {
       color: colors.primary,
     } as TextStyle,
+
+    // ────────────────────────────────────────────────────────────────────────────
+    // Tab Content
+    // ────────────────────────────────────────────────────────────────────────────
     tabContent: {
       flex: 1,
     } as ViewStyle,
-    tabContentContainer: {
-      paddingHorizontal: utils.spacing[4],
-      paddingTop: utils.spacing[3],
-      paddingBottom: utils.spacing[20],
-    } as ViewStyle,
+    // tabContentContainer: {
+    //   paddingHorizontal: utils.spacing[4],
+    //   paddingTop: utils.spacing[3],
+    //   paddingBottom: utils.spacing[20],
+    // } as ViewStyle,
 
     // ────────────────────────────────────────────────────────────────────────────
     // Summary Tab Styles
     // ────────────────────────────────────────────────────────────────────────────
     summaryContainer: {
-      padding: 16,
+      padding: 0,
       gap: 16,
-    },
+    } as ViewStyle,
     salesSectionCard: {
       backgroundColor: '#FFFFFF',
       borderRadius: 16,
@@ -289,12 +326,12 @@ export const useOutletDetailStyles = () => {
       elevation: 2,
       borderWidth: 1,
       borderColor: '#F0F0F0',
-    },
+    } as ViewStyle,
     statsGrid: {
       flexDirection: 'row',
       gap: 12,
       marginBottom: 16,
-    },
+    } as ViewStyle,
     statCard: {
       flex: 1,
       backgroundColor: '#F8F9FA',
@@ -302,40 +339,40 @@ export const useOutletDetailStyles = () => {
       padding: 12,
       alignItems: 'center',
       gap: 8,
-    },
+    } as ViewStyle,
     statValue: {
       fontSize: 20,
       fontWeight: '700',
       color: '#1A1A1A',
       textAlign: 'center',
-    },
+    } as TextStyle,
     statLabel: {
       fontSize: 12,
       color: '#6C757D',
       textAlign: 'center',
       fontWeight: '500',
-    },
+    } as TextStyle,
     statSubLabel: {
       fontSize: 9,
-      color: colors.textTertiary,
+      color: '#999',
       marginTop: 2,
-    },
+    } as TextStyle,
     statsDivider: {
       height: 1,
       backgroundColor: '#F0F0F0',
       marginVertical: 16,
-    },
+    } as ViewStyle,
     statsSubtitle: {
       fontSize: 13,
       fontWeight: '600',
       color: '#6C757D',
       marginBottom: 12,
       letterSpacing: 0.5,
-    },
+    } as TextStyle,
     statsGridSmall: {
       flexDirection: 'row',
       gap: 12,
-    },
+    } as ViewStyle,
     statCardSmall: {
       flex: 1,
       backgroundColor: '#F8F9FA',
@@ -343,57 +380,57 @@ export const useOutletDetailStyles = () => {
       padding: 12,
       alignItems: 'center',
       gap: 6,
-    },
+    } as ViewStyle,
     statValueSmall: {
       fontSize: 16,
       fontWeight: '700',
       color: '#1A1A1A',
       textAlign: 'center',
-    },
+    } as TextStyle,
     statLabelSmall: {
       fontSize: 11,
       color: '#6C757D',
       textAlign: 'center',
       fontWeight: '500',
-    },
+    } as TextStyle,
     insightsCard: {
       backgroundColor: '#F8F9FA',
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
       borderColor: '#E9ECEF',
-    },
+    } as ViewStyle,
     insightsHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
       marginBottom: 12,
-    },
+    } as ViewStyle,
     insightsTitle: {
       fontSize: 14,
       fontWeight: '600',
       color: '#1A1A1A',
-    },
+    } as TextStyle,
     insightItem: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 10,
       marginBottom: 10,
       paddingVertical: 4,
-    },
+    } as ViewStyle,
     insightDot: {
       width: 6,
       height: 6,
       borderRadius: 3,
       backgroundColor: '#4CAF50',
       marginTop: 6,
-    },
+    } as ViewStyle,
     insightText: {
       flex: 1,
       fontSize: 12,
       color: '#495057',
       lineHeight: 18,
-    },
+    } as TextStyle,
 
     // ────────────────────────────────────────────────────────────────────────────
     // Sales Table Styles
@@ -557,53 +594,56 @@ export const useOutletDetailStyles = () => {
     // ────────────────────────────────────────────────────────────────────────────
     // Footer Button Styles
     // ────────────────────────────────────────────────────────────────────────────
-    fullWidthButtonContainer: {
-      paddingHorizontal: 16,
-      paddingBottom: 16,
-      paddingTop: 8,
-    },
+    // fullWidthButtonContainer: {
+    //   backgroundColor: colors.surface,
+    //   borderTopWidth: 1,
+    //   borderTopColor: colors.divider,
+    //   paddingHorizontal: 16,
+    //   paddingVertical: 12,
+    //   paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+    // } as ViewStyle,
     fullWidthButton: {
       borderRadius: 12,
-      paddingVertical: 16,
+      paddingVertical: 14,
       paddingHorizontal: 20,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
-    },
+    } as ViewStyle,
     fullWidthButtonContent: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-    },
+    } as ViewStyle,
     fullWidthButtonTextContainer: {
       flex: 1,
       marginLeft: 12,
-    },
+    } as ViewStyle,
     fullWidthButtonTitle: {
       color: '#FFF',
       fontSize: 16,
       fontWeight: 'bold',
-    },
+    } as TextStyle,
     fullWidthButtonSubtitle: {
       color: '#FFF',
       fontSize: 12,
       opacity: 0.9,
       marginTop: 2,
-    },
+    } as TextStyle,
     fullWidthAutoStartIndicator: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 16,
+      paddingVertical: 14,
       borderRadius: 12,
       gap: 12,
-    },
+    } as ViewStyle,
     autoStartText: {
       fontSize: 14,
       fontWeight: '500',
-    },
+    } as TextStyle,
 
     // ────────────────────────────────────────────────────────────────────────────
     // Utilities
@@ -616,6 +656,18 @@ export const useOutletDetailStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
     } as ViewStyle,
+
+    // footerSafeArea: {
+    //   backgroundColor: colors.surface,
+    //   borderTopWidth: 1,
+    //   borderTopColor: colors.divider,
+    // } as ViewStyle,
+
+    // fullWidthButtonContainer: {
+    //   paddingHorizontal: 16,
+    //   paddingVertical: 12,
+    //   // paddingBottom removed - now handled by SafeAreaView
+    // } as ViewStyle,
   }));
 
   return styleGenerator(colors);

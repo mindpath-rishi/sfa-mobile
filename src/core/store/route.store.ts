@@ -20,7 +20,10 @@ export type Route = {
   totalShops: number;
   distance: string;
   vanId?: string;
-  routeName?: string
+  routeName?: string;
+  marketId?: string;
+  provinceId?: string;
+  countryId?: string;
 };
 
 type RouteStore = {
@@ -34,8 +37,8 @@ type RouteStore = {
   setSelectedRoute: (route: Route | null) => void;
 
   /* ================= RESET ================= */
-  reset: () => void;              // ✅ global reset support
-  resetRouteStore: () => void;    // ✅ manual reset (existing)
+  reset: () => void; // ✅ global reset support
+  resetRouteStore: () => void; // ✅ manual reset (existing)
 };
 
 /* ======================================================
