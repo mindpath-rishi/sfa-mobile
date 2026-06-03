@@ -1,23 +1,31 @@
 // app/(drawer)/(tabs)/_layout.tsx
 
 import React, { useCallback } from 'react';
-import { Tabs, useFocusEffect } from 'expo-router';
+import { Tabs, useFocusEffect, useSegments } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { useAuthStore } from '@/core/store/auth.store';
+import { isSalesman } from '@/core/navigation/role.utils';
 
 export default function TabsLayout() {
   const { colors } = useTheme();
   const { setHeader } = useHeader();
+  const segments = useSegments();
+  const user = useAuthStore((state) => state.user);
+  const salesman = isSalesman(user);
   useFocusEffect(
     useCallback(() => {
+      const activeTab = segments.filter((segment) => !segment.startsWith('('))[0];
+      if (activeTab === 'daily-summary' || activeTab === 'quick-viz') return;
+
       setHeader({
         showFilter: false,
         showBack: false,
         showMenu: true,
         title: '',
       });
-    }, [setHeader]),
+    }, [segments, setHeader]),
   );
 
   return (
@@ -43,21 +51,27 @@ export default function TabsLayout() {
       />
 
       <Tabs.Screen
-        name="explore"
+        name="daily-summary"
         options={{
-          title: 'Explore',
+          title: 'Daily Summary',
+          href: salesman ? null : undefined,
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'compass' : 'compass-outline'} size={size} color={color} />
+            <Ionicons name={focused ? 'pulse' : 'pulse-outline'} size={size} color={color} />
           ),
         }}
       />
 
       <Tabs.Screen
-        name="favorites"
+        name="quick-viz"
         options={{
-          title: 'Favorites',
+          title: 'Quick Viz',
+          href: salesman ? null : undefined,
           tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'heart' : 'heart-outline'} size={size} color={color} />
+            <Ionicons
+              name={focused ? 'analytics' : 'analytics-outline'}
+              size={size}
+              color={color}
+            />
           ),
         }}
       />

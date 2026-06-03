@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { Platform, View, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useFilterModalStyles } from '@/shared/styles/FilterModal.styles';
@@ -26,6 +27,25 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   const [sections, setSections] = useState<FilterSection[]>(initialSections);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [searchText, setSearchText] = useState('');
+  const [iosDatePicker, setIosDatePicker] = useState<{
+    sectionId: string;
+    type: 'min' | 'max';
+    value: Date;
+  } | null>(null);
+
+  const formatDateValue = useCallback((date: Date) => {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const parseDateValue = useCallback((value?: number | string) => {
+    if (!value || typeof value !== 'string') return new Date();
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return new Date();
+    return new Date(year, month - 1, day);
+  }, []);
 
   // Initialize sections and expanded state
   useEffect(() => {
@@ -82,6 +102,26 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     );
   }, []);
 
+  const openDatePicker = useCallback(
+    (section: FilterSection, type: 'min' | 'max') => {
+      const value = parseDateValue(section.rangeValue?.[type]);
+
+      if (Platform.OS === 'android') {
+        DateTimePickerAndroid.open({
+          value,
+          mode: 'date',
+          onChange: (_event, date) => {
+            if (date) handleRangeChange(section.id, type, formatDateValue(date));
+          },
+        });
+        return;
+      }
+
+      setIosDatePicker({ sectionId: section.id, type, value });
+    },
+    [formatDateValue, handleRangeChange, parseDateValue],
+  );
+
   const handleSearchChange = useCallback((sectionId: string, value: string) => {
     setSections((prev) => prev.map((s) => (s.id === sectionId ? { ...s, searchValue: value } : s)));
   }, []);
@@ -119,6 +159,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       } else if (s.type === 'toggle' && s.toggleValue) {
         count++;
       } else if (s.type === 'range' && (s.rangeValue?.min || s.rangeValue?.max)) {
+        count++;
+      } else if (s.type === 'date' && (s.rangeValue?.min || s.rangeValue?.max)) {
         count++;
       } else if (s.type === 'search' && s.searchValue) {
         count++;
@@ -249,6 +291,57 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </View>
           );
 
+        case 'date':
+          return (
+            <View style={styles.rangeContainer}>
+              <View style={styles.rangeInputs}>
+                <View style={styles.rangeInputWrapper}>
+                  <AppText variant="caption" style={styles.rangeLabel}>
+                    Start
+                  </AppText>
+                  <TouchableOpacity
+                    style={[styles.dateInput, { borderColor: colors.border }]}
+                    onPress={() => openDatePicker(section, 'min')}
+                    activeOpacity={0.75}
+                  >
+                    <AppText
+                      style={[
+                        styles.dateInputText,
+                        !section.rangeValue?.min && { color: colors.textTertiary },
+                      ]}
+                    >
+                      {section.rangeValue?.min?.toString() || 'Select date'}
+                    </AppText>
+                    <Ionicons name="calendar-outline" size={18} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.rangeSeparator}>
+                  <AppText style={styles.rangeSeparatorText}>to</AppText>
+                </View>
+                <View style={styles.rangeInputWrapper}>
+                  <AppText variant="caption" style={styles.rangeLabel}>
+                    End
+                  </AppText>
+                  <TouchableOpacity
+                    style={[styles.dateInput, { borderColor: colors.border }]}
+                    onPress={() => openDatePicker(section, 'max')}
+                    activeOpacity={0.75}
+                  >
+                    <AppText
+                      style={[
+                        styles.dateInputText,
+                        !section.rangeValue?.max && { color: colors.textTertiary },
+                      ]}
+                    >
+                      {section.rangeValue?.max?.toString() || 'Select date'}
+                    </AppText>
+                    <Ionicons name="calendar-outline" size={18} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          );
+
         case 'search':
           return (
             <View style={styles.searchContainer}>
@@ -283,6 +376,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       handleMultipleSelect,
       handleToggle,
       handleRangeChange,
+      openDatePicker,
       handleSearchChange,
     ],
   );
@@ -295,7 +389,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         (section.type === 'multiple' && (section.selectedIds?.length ?? 0) > 0) ||
         (section.type === 'single' && section.selectedId) ||
         (section.type === 'toggle' && section.toggleValue) ||
-        (section.type === 'range' && (section.rangeValue?.min || section.rangeValue?.max)) ||
+        ((section.type === 'range' || section.type === 'date') &&
+          (section.rangeValue?.min || section.rangeValue?.max)) ||
         (section.type === 'search' && section.searchValue);
 
       return (
@@ -397,6 +492,24 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         >
           {filteredSections.map(renderSection)}
         </ScrollView>
+
+        {Platform.OS !== 'android' && iosDatePicker && (
+          <DateTimePicker
+            value={iosDatePicker.value}
+            mode="date"
+            display="spinner"
+            onChange={(_event, date) => {
+              if (date) {
+                handleRangeChange(
+                  iosDatePicker.sectionId,
+                  iosDatePicker.type,
+                  formatDateValue(date),
+                );
+              }
+              setIosDatePicker(null);
+            }}
+          />
+        )}
 
         {/* Footer */}
         <View style={styles.modalFooter}>

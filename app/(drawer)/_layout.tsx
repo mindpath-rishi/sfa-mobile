@@ -16,6 +16,7 @@ import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSumm
 import { toast } from '@/core/utils';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getRoleId } from '@/core/navigation/role.utils';
 
 /* ============================
  * HELPERS
@@ -42,6 +43,28 @@ const isDetailScreen = (segments: string[]) => {
   const clean = getCleanSegments(segments);
   return clean.length > 1;
 };
+
+const SALESMAN_DRAWER_ROUTES = new Set([
+  '(tabs)',
+  'my-pocket',
+  'stock',
+  'route',
+  'my-target',
+  'switch-route',
+  'topup',
+  // 'stock-count',
+]);
+
+const MANAGER_DRAWER_ROUTES = new Set([
+  '(tabs)',
+  'manager-targets',
+  'team-coverage',
+  'beat-o-meter',
+  'survey-analytics',
+]);
+
+const SHARED_TAB_ROUTES = new Set(['home', 'profile']);
+const MANAGER_TAB_ROUTES = new Set(['daily-summary', 'quick-viz']);
 
 /* ============================
  * MODERN DRAWER HEADER
@@ -374,6 +397,8 @@ const CustomDrawerContent = (props: any) => {
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
   const { workSessionId, setWorkSessionId } = useAuthStore();
+  const roleId = getRoleId(user);
+  const allowedRoutes = roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
@@ -447,14 +472,26 @@ const CustomDrawerContent = (props: any) => {
     }
   }, []);
 
-  // Filter out hidden screens from the drawer list (collection hidden)
+  const filteredRoutes = props.state.routes.filter((route: any) => allowedRoutes.has(route.name));
+  const filteredRouteKeys = new Set(filteredRoutes.map((route: any) => route.key));
+  const currentRouteKey = props.state.routes[props.state.index]?.key;
+  const filteredIndex = Math.max(
+    0,
+    filteredRoutes.findIndex((route: any) => route.key === currentRouteKey),
+  );
+
   const filteredProps = {
     ...props,
     state: {
       ...props.state,
-      routes: props.state.routes.filter((route: any) => {
-        // Hide 'collection' from drawer
-        return route.name !== 'collection';
+      index: filteredIndex,
+      routeNames: props.state.routeNames?.filter((routeName: string) =>
+        allowedRoutes.has(routeName),
+      ),
+      routes: filteredRoutes,
+      history: props.state.history?.filter((item: any) => {
+        if (item.type !== 'route') return true;
+        return filteredRouteKeys.has(item.key);
       }),
     },
   };
@@ -462,7 +499,11 @@ const CustomDrawerContent = (props: any) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
       <View style={{ flex: 1 }}>
-        <ModernDrawerHeader colors={colors} />
+        <ModernDrawerHeader
+          colors={colors}
+          userName={user?.name || 'Field User'}
+          userRole={roleId === 'SALESMAN' ? 'Salesman' : 'Manager'}
+        />
 
         <DrawerContentScrollView
           {...filteredProps}
@@ -471,23 +512,24 @@ const CustomDrawerContent = (props: any) => {
           <DrawerItemList {...filteredProps} />
         </DrawerContentScrollView>
 
-        {/* Logout Section with Divider */}
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
-          <DrawerItem
-            label="Van Settlement"
-            labelStyle={{ fontWeight: '500', color: 'red' }}
-            icon={({ size }) => <MaterialCommunityIcons name="power" size={size} color="red" />}
-            onPress={() => {
-              props.navigation?.closeDrawer?.();
-              void handleVanSettlementPress();
-            }}
-            style={{
-              borderRadius: 12,
-              marginHorizontal: 8,
-              marginTop: 8,
-            }}
-          />
-        </View>
+        {roleId == 'SALESMAN' && (
+          <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
+            <DrawerItem
+              label="Van Settlement"
+              labelStyle={{ fontWeight: '500', color: 'red' }}
+              icon={({ size }) => <MaterialCommunityIcons name="power" size={size} color="red" />}
+              onPress={() => {
+                props.navigation?.closeDrawer?.();
+                void handleVanSettlementPress();
+              }}
+              style={{
+                borderRadius: 12,
+                marginHorizontal: 8,
+                marginTop: 8,
+              }}
+            />
+          </View>
+        )}
 
         <ConfirmationModal
           visible={showSettlementConfirm}
@@ -649,6 +691,10 @@ export default function DrawerLayout() {
 
   const isDetail = isDetailScreen(segments);
   const isProfile = isProfileScreen(segments);
+  const user = useAuthStore((state) => state.user);
+  const roleId = getRoleId(user);
+  const drawerAllowedRoutes =
+    roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
 
   const HEADER_MAP: Record<string, any> = {
     home: {
@@ -669,6 +715,39 @@ export default function DrawerLayout() {
 
     'my-target': {
       title: 'My Target',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'manager-targets': {
+      title: 'Primary Targets',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'team-coverage': {
+      title: 'Team Coverage',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'beat-o-meter': {
+      title: 'Beat-O-Meter',
+      showMenu: false,
+      showSearch: true,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'survey-analytics': {
+      title: 'Survey Analytics',
       showMenu: false,
       showFilter: false,
       showBack: true,
@@ -733,6 +812,25 @@ export default function DrawerLayout() {
       }
     }
   }, [segments]);
+
+  useEffect(() => {
+    const routeName = getRouteName(segments);
+    const isTabRoute = segments.includes('(tabs)');
+    const canViewTabRoute =
+      SHARED_TAB_ROUTES.has(routeName) ||
+      (roleId === 'MANAGER' && MANAGER_TAB_ROUTES.has(routeName));
+
+    if (isTabRoute) {
+      if (!canViewTabRoute) {
+        router.replace('/(drawer)/(tabs)/home');
+      }
+      return;
+    }
+
+    if (!drawerAllowedRoutes.has(routeName)) {
+      router.replace('/(drawer)/(tabs)/home');
+    }
+  }, [drawerAllowedRoutes, roleId, segments]);
 
   /* ============================
    * MODERN ICON MAP
@@ -800,6 +898,26 @@ export default function DrawerLayout() {
           component: MaterialCommunityIcons,
           focusedIcon: 'package-variant',
           unfocusedIcon: 'package-variant',
+        },
+        'manager-targets': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'target',
+          unfocusedIcon: 'target',
+        },
+        'team-coverage': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'account-group',
+          unfocusedIcon: 'account-group-outline',
+        },
+        'beat-o-meter': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'speedometer',
+          unfocusedIcon: 'speedometer',
+        },
+        'survey-analytics': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'clipboard-text-search',
+          unfocusedIcon: 'clipboard-text-search-outline',
         },
       };
 
@@ -921,8 +1039,39 @@ export default function DrawerLayout() {
         name="stock-count"
         options={{
           title: 'Van Settlement',
-          drawerLabel: () => null,
-          drawerItemStyle: { display: 'none' },
+          drawerLabel: 'Van Settlement',
+        }}
+      />
+
+      <Drawer.Screen
+        name="manager-targets"
+        options={{
+          title: 'Primary Targets',
+          drawerLabel: 'Primary Targets',
+        }}
+      />
+
+      <Drawer.Screen
+        name="team-coverage"
+        options={{
+          title: 'Team Coverage',
+          drawerLabel: 'Team Coverage',
+        }}
+      />
+
+      <Drawer.Screen
+        name="beat-o-meter"
+        options={{
+          title: 'Beat-O-Meter',
+          drawerLabel: 'Beat-O-Meter',
+        }}
+      />
+
+      <Drawer.Screen
+        name="survey-analytics"
+        options={{
+          title: 'Survey Analytics',
+          drawerLabel: 'Survey Analytics',
         }}
       />
     </Drawer>

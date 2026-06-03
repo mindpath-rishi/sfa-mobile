@@ -6,8 +6,12 @@ export const routes = {
     forgot: '/(auth)/forgot',
   },
   tabs: {
-    home: '/(tabs)/home',
-    settings: '/(tabs)/settings',
+    home: '/(drawer)/(tabs)/home',
+    dailySummary: '/(drawer)/(tabs)/daily-summary',
+    dailySummaryUsers: '/(drawer)/(tabs)/daily-summary/users',
+    dailySummaryTimeline: '/(drawer)/(tabs)/daily-summary/[userId]',
+    dailySummaryOrder: '/(drawer)/(tabs)/daily-summary/[userId]/order/[activityId]',
+    settings: '/(drawer)/(tabs)/settings',
   },
   app: {
     profile: '/profile',

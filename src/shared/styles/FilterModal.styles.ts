@@ -260,6 +260,25 @@ export const useFilterModalStyles = () => {
       color: colors.textPrimary,
     } as ViewStyle,
 
+    dateInput: {
+      minHeight: 42,
+      borderWidth: 1,
+      borderRadius: utils.borderRadius.md,
+      paddingHorizontal: utils.spacing[2],
+      paddingVertical: utils.spacing[1.5],
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: utils.spacing[1],
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    dateInputText: {
+      flex: 1,
+      fontSize: utils.fontSize.md,
+      color: colors.textPrimary,
+    } as TextStyle,
+
     rangeSeparator: {
       paddingHorizontal: utils.spacing[1],
     } as ViewStyle,

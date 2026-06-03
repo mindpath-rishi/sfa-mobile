@@ -82,7 +82,7 @@ export default function RootLayout() {
     if (!currentToken) {
       router.replace('/(auth)');
     } else {
-      router.replace('/(tabs)/home');
+      router.replace('/(drawer)/(tabs)/home');
     }
   }, [navigationState, themeHydrated, languageHydrated, authHydrated, router]);
 
@@ -138,7 +138,6 @@ export default function RootLayout() {
                 }}
               >
                 <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="(drawer)" />
               </Stack>
             </HeaderProvider>

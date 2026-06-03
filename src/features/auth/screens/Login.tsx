@@ -632,12 +632,18 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
       const user = {
         userId: resData.user.profileId,
         name: resData.user.profile?.name,
-        role: resData.user.profile?.role,
+        role: resData.user.profile?.role || resData.user.role,
+        // roleId:
+        //   resData.user.profile?.roleId ||
+        //   resData.user.profile?.role ||
+        //   resData.user.roleId ||
+        //   resData.user.role,
+        roleId: 'SALESMAN',
         vanId: resData.user.profile?.associatedVans?.[0] ?? null,
       };
       await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
       toast.success(t('auth.login.welcomeBack'));
-      router.replace('/(tabs)/home');
+      router.replace('/(drawer)/(tabs)/home');
     } catch (error: any) {
       if (!isWeb) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

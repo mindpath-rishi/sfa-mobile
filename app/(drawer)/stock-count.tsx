@@ -135,7 +135,7 @@ export default function StockCountScreen({
         setShowFinalConfirm(false);
         setShowSettlementOptions(false);
         setShowDayEndSummary(false);
-        router.replace('/(drawer)/(tabs)');
+        router.replace('/(drawer)/(tabs)/home');
         return;
       }
       toast.error((response?.message || 'Failed to complete day') as any);
@@ -209,7 +209,7 @@ export default function StockCountScreen({
     sections.push({
       id: 'dateRange',
       title: 'Date Range',
-      type: 'range',
+      type: 'date',
       rangeValue: {
         min: filters.dateRange.start,
         max: filters.dateRange.end,

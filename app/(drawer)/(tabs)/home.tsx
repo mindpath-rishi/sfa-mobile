@@ -1,5 +1,13 @@
-// export { HomeScreen as default } from '@/features/home';
-export { SalesExecutiveHomeScreen as default } from '@/features/home';
+import { useAuthStore } from '@/core/store/auth.store';
+import { isSalesman } from '@/core/navigation/role.utils';
+import { ManagerHomeScreen, SalesExecutiveHomeScreen } from '@/features/home';
+
+export default function RoleAwareHomeScreen() {
+  const user = useAuthStore((state) => state.user);
+  const HomeComponent = isSalesman(user) ? SalesExecutiveHomeScreen : ManagerHomeScreen;
+
+  return <HomeComponent />;
+}
 
 // import React, { useState, useEffect } from 'react';
 // import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';

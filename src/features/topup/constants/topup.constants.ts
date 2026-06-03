@@ -108,7 +108,7 @@ export const FILTER_SECTIONS = {
   DATE_RANGE: {
     id: 'dateRange',
     title: 'Date Range',
-    type: 'range' as const,
+    type: 'date' as const,
   },
   VALUE_RANGE: {
     id: 'valueRange',
@@ -147,5 +147,4 @@ export const VALIDATION = {
   MIN_SEARCH_LENGTH: 2,
   MAX_SEARCH_LENGTH: 100,
 } as const;
-
 
