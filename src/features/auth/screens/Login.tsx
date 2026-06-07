@@ -629,17 +629,29 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
       };
       const response = await authService.login(payload);
       const resData: any = response.data;
+      const profile = resData.user.profile;
       const user = {
-        userId: resData.user.profileId,
-        name: resData.user.profile?.name,
-        role: resData.user.profile?.role || resData.user.role,
-        // roleId:
-        //   resData.user.profile?.roleId ||
-        //   resData.user.profile?.role ||
-        //   resData.user.roleId ||
-        //   resData.user.role,
-        roleId: 'SALESMAN',
-        vanId: resData.user.profile?.associatedVans?.[0] ?? null,
+        userId: resData.user.profileId || resData.user.id,
+        id: resData.user.id,
+        name: profile?.name || resData.user.name,
+        email: profile?.email || resData.user.email,
+        mobile: profile?.mobile || profile?.phone || resData.user.mobile || resData.user.phone,
+        employeeId: profile?.employeeId || resData.user.employeeId || resData.user.profileId,
+        employeeName: profile?.employeeName,
+        designation: profile?.designation,
+        role: profile?.role || resData.user.role,
+        roleId:
+          profile?.roleId ||
+          profile?.role ||
+          resData.user.roleId ||
+          resData.user.role,
+        route: profile?.route,
+        routeName: profile?.routeName,
+        territory: profile?.territory,
+        manager: profile?.manager,
+        managerName: profile?.managerName,
+        vanId: profile?.associatedVans?.[0] ?? null,
+        avatar: profile?.avatar || profile?.profileImage || profile?.profileImageUrl || null,
       };
       await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
       toast.success(t('auth.login.welcomeBack'));

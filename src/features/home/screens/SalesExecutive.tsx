@@ -90,6 +90,7 @@ export default function SalesExecutiveScreen() {
   const [filteredActivityTypes, setFilteredActivityTypes] = useState(ACTIVITY_TYPES);
   const [tempSelectedActivity, setTempSelectedActivity] = useState<ActivityType | null>(null);
   const [selectedLeaveType, setSelectedLeaveType] = useState<string | null>(null);
+  const [isTodayLeave, setIsTodayLeave] = useState<boolean>(false);
 
   const cameraRef = useRef<any>(null);
   const [permission, requestPermission] = useCameraPermissions();
@@ -155,6 +156,7 @@ export default function SalesExecutiveScreen() {
     setCurrentActivity(null);
     setStartTime(null);
     setTodayActivities([]);
+    setIsTodayLeave(false);
     void getDayStatus();
     void getVan();
   }, [dashboardRefreshTick]);
@@ -354,15 +356,20 @@ export default function SalesExecutiveScreen() {
     setSelectedLeaveType(leaveTypeName);
     setSelectedRoute(null);
     setSelectedActivity('Leave');
-    setPendingActivity(
-      { ...(tempSelectedActivity || { id: 'leave', name: 'Leave' }), name: 'Leave' } as any,
-    );
+    setPendingActivity({
+      ...(tempSelectedActivity || { id: 'leave', name: 'Leave' }),
+      name: 'Leave',
+    } as any);
     setUnifiedModalVisible(false);
 
     (async () => {
       try {
         const mappedLeaveType: LeaveType | null =
-          leaveTypeName === 'Week Off' ? 'WEEK_OFF' : leaveTypeName === 'Holiday' ? 'HOLIDAY' : null;
+          leaveTypeName === 'Week Off'
+            ? 'WEEK_OFF'
+            : leaveTypeName === 'Holiday'
+              ? 'HOLIDAY'
+              : null;
 
         if (!mappedLeaveType) {
           toast.error('Invalid leave type selected');
@@ -374,8 +381,8 @@ export default function SalesExecutiveScreen() {
         const userId = useAuthStore.getState().user?.userId;
 
         const response: ApiResponse<any> = await leaveService.applyLeave({
-          leaveType: mappedLeaveType,
-          date,
+          type: mappedLeaveType,
+          userName: user?.name || '',
           userId,
         });
 
@@ -611,6 +618,13 @@ export default function SalesExecutiveScreen() {
       setDayStarted(response.data.status === 'ACTIVE');
       console.log('Day Status Response:', response);
       setTodayActivities(response?.data?.todayActivities || []);
+
+      // Check if today's activity is LEAVE
+      if (response?.data?.type === 'LEAVE') {
+        setIsTodayLeave(true);
+      } else {
+        setIsTodayLeave(false);
+      }
 
       if (response.statusCode === 200 && response?.data?.status === 'ACTIVE') {
         setWorkSessionId(response.data?.workSessionId || '');
@@ -857,10 +871,29 @@ export default function SalesExecutiveScreen() {
           </View>
 
           <View style={styles.sectionStack}>
-            <QuickActionsSection
-              actions={filteredQuickActions}
-              onPressAction={(route: any) => handleQuickAction(route)}
-            />
+            {isTodayLeave ? (
+              <View
+                style={[
+                  styles.leaveMessageContainer,
+                  { backgroundColor: colors.success + '15', borderColor: colors.success + '30' },
+                ]}
+              >
+                <Ionicons name="checkmark-circle-outline" size={24} color={colors.success} />
+                <View style={styles.leaveMessageContent}>
+                  <AppText style={[styles.leaveMessageTitle, { color: colors.textPrimary }]}>
+                    You have marked leave
+                  </AppText>
+                  <AppText style={[styles.leaveMessageSubtitle, { color: colors.textSecondary }]}>
+                    Enjoy your time off. Quick actions are not available when on leave.
+                  </AppText>
+                </View>
+              </View>
+            ) : (
+              <QuickActionsSection
+                actions={filteredQuickActions}
+                onPressAction={(route: any) => handleQuickAction(route)}
+              />
+            )}
 
             <StatsOverviewSection employeeId={user?.userId as any} />
 
@@ -1107,5 +1140,28 @@ const createStyles = (colors: any) =>
     },
     sectionStack: {
       gap: 12,
+    },
+    leaveMessageContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      marginBottom: 8,
+    },
+    leaveMessageContent: {
+      flex: 1,
+    },
+    leaveMessageTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      marginBottom: 2,
+    },
+    leaveMessageSubtitle: {
+      fontSize: 11,
+      lineHeight: 15,
+      opacity: 0.85,
     },
   });

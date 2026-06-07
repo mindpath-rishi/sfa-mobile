@@ -1,43 +1,123 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
 import { AppText } from '@/core/components';
+import { useAuthStore } from '@/core/store/auth.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { homeService } from '../services/home.service';
+import type { ManagerBeatOMeterResponse } from '../services/home.service';
 
 const BEATS = [
   { id: 'tk', title: 'TK Beatometer', subtitle: 'TK Beatometer' },
   { id: 'test', title: 'Test Beato metter', subtitle: 'Outlet performance' },
 ];
 
-const OUTLET_ROWS = [
-  { type: 'New', total: '1', visited: '1 (100.0%)', order: '0 (0.0%)', color: '#A855F7' },
-  {
-    type: 'Active',
-    total: '13871',
-    visited: '10864 (78.3%)',
-    order: '10404 (75.0%)',
-    color: '#22C55E',
+const INITIAL_BEAT_O_METER: ManagerBeatOMeterResponse = {
+  employeeId: '',
+  employeeName: 'Manager',
+  designation: 'Manager',
+  totalOutlets: 16904,
+  summary: {
+    visitedOutlets: 11681,
+    orderedOutlets: 11126,
+    visitedPercentage: 69.1,
+    orderedPercentage: 65.8,
   },
-  {
-    type: 'To Be Dormant',
-    total: '1414',
-    visited: '665 (47.0%)',
-    order: '598 (42.3%)',
-    color: '#3B82F6',
-  },
-  { type: 'Dormant', total: '294', visited: '98 (33.3%)', order: '88 (29.9%)', color: '#F59E0B' },
-  { type: 'No Order', total: '83', visited: '25 (30.1%)', order: '12 (14.5%)', color: '#F97316' },
-  { type: 'Never Visited', total: '1241', visited: '28 (2.3%)', order: '24 (1.9%)', color: '#EF4444' },
-];
+  outletTypes: [
+    {
+      type: 'New',
+      color: '#A855F7',
+      total: 1,
+      mtdVisited: { count: 1, percentage: 100 },
+      mtdOrder: { count: 0, percentage: 0 },
+    },
+    {
+      type: 'Active',
+      color: '#22C55E',
+      total: 13871,
+      mtdVisited: { count: 10864, percentage: 78.3 },
+      mtdOrder: { count: 10404, percentage: 75 },
+    },
+    {
+      type: 'To Be Dormant',
+      color: '#3B82F6',
+      total: 1414,
+      mtdVisited: { count: 665, percentage: 47 },
+      mtdOrder: { count: 598, percentage: 42.3 },
+    },
+    {
+      type: 'Dormant',
+      color: '#F59E0B',
+      total: 294,
+      mtdVisited: { count: 98, percentage: 33.3 },
+      mtdOrder: { count: 88, percentage: 29.9 },
+    },
+    {
+      type: 'No Order',
+      color: '#F97316',
+      total: 83,
+      mtdVisited: { count: 25, percentage: 30.1 },
+      mtdOrder: { count: 12, percentage: 14.5 },
+    },
+    {
+      type: 'Never Visited',
+      color: '#EF4444',
+      total: 1241,
+      mtdVisited: { count: 28, percentage: 2.3 },
+      mtdOrder: { count: 24, percentage: 1.9 },
+    },
+  ],
+};
+
+const toNumber = (value: unknown, fallback = 0) => {
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : fallback;
+};
+
+const formatNumber = (value: unknown) => new Intl.NumberFormat('en-US').format(toNumber(value));
+
+const formatCountPercentage = (count: unknown, percentage: unknown) =>
+  `${formatNumber(count)} (${toNumber(percentage).toFixed(1)}%)`;
+
+const clampPercentage = (value: unknown) => Math.max(0, Math.min(toNumber(value), 100));
 
 export default function ManagerBeatOMeterScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const { setHeader } = useHeader();
+  const user = useAuthStore((state) => state.user);
   const [selectedBeat, setSelectedBeat] = useState(BEATS[0]);
+  const [beatOMeter, setBeatOMeter] = useState<ManagerBeatOMeterResponse>(INITIAL_BEAT_O_METER);
+
+  const outletRows = useMemo(
+    () =>
+      (beatOMeter.outletTypes?.length
+        ? beatOMeter.outletTypes
+        : INITIAL_BEAT_O_METER.outletTypes
+      ).map((row, index) => {
+        const fallback = INITIAL_BEAT_O_METER.outletTypes[index];
+
+        return {
+          type: row.type || fallback?.type || 'Outlet',
+          color: row.color || fallback?.color || '#3B82F6',
+          total: formatNumber(row.total ?? fallback?.total),
+          visited: formatCountPercentage(
+            row.mtdVisited?.count ?? fallback?.mtdVisited?.count,
+            row.mtdVisited?.percentage ?? fallback?.mtdVisited?.percentage,
+          ),
+          order: formatCountPercentage(
+            row.mtdOrder?.count ?? fallback?.mtdOrder?.count,
+            row.mtdOrder?.percentage ?? fallback?.mtdOrder?.percentage,
+          ),
+        };
+      }),
+    [beatOMeter.outletTypes],
+  );
+  const visitedPercentage = clampPercentage(beatOMeter.summary?.visitedPercentage);
+  const unvisitedPercentage = 100 - visitedPercentage;
 
   useFocusEffect(
     useCallback(() => {
@@ -51,6 +131,32 @@ export default function ManagerBeatOMeterScreen() {
       });
     }, [colors.primary, setHeader]),
   );
+
+  const fetchBeatOMeter = useCallback(async () => {
+    try {
+      const response = await homeService.getManagerBeatOMeter();
+
+      if (response.success && response.data) {
+        setBeatOMeter({
+          ...INITIAL_BEAT_O_METER,
+          ...response.data,
+          summary: {
+            ...INITIAL_BEAT_O_METER.summary,
+            ...response.data.summary,
+          },
+          outletTypes: response.data.outletTypes?.length
+            ? response.data.outletTypes
+            : INITIAL_BEAT_O_METER.outletTypes,
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to load manager beat-o-meter', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchBeatOMeter();
+  }, [fetchBeatOMeter]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -75,8 +181,10 @@ export default function ManagerBeatOMeterScreen() {
         <View style={styles.cardHeader}>
           <View>
             <AppText style={styles.eyebrow}>All L6Position under you</AppText>
-            <AppText style={styles.title}>Distributor Manager</AppText>
-            <AppText style={styles.subtitle}>Anwar Quazi</AppText>
+            <AppText style={styles.title}>Manager</AppText>
+            <AppText style={styles.subtitle}>
+              {user?.name || beatOMeter.employeeName || 'Manager'}
+            </AppText>
           </View>
           <TouchableOpacity style={styles.shareButton} activeOpacity={0.8}>
             <Ionicons name="share-social-outline" size={18} color={colors.info} />
@@ -85,11 +193,11 @@ export default function ManagerBeatOMeterScreen() {
 
         <View style={styles.totalRow}>
           <AppText style={styles.totalLabel}>Total outlets</AppText>
-          <AppText style={styles.totalValue}>16904</AppText>
+          <AppText style={styles.totalValue}>{formatNumber(beatOMeter.totalOutlets)}</AppText>
         </View>
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: '82%' }]} />
-          <View style={[styles.progressTail, { width: '18%' }]} />
+          <View style={[styles.progressFill, { width: `${visitedPercentage}%` }]} />
+          <View style={[styles.progressTail, { width: `${unvisitedPercentage}%` }]} />
         </View>
 
         <View style={styles.tableHeader}>
@@ -99,7 +207,7 @@ export default function ManagerBeatOMeterScreen() {
           <AppText style={styles.tableHeadText}>MTD Order</AppText>
         </View>
 
-        {OUTLET_ROWS.map((row) => (
+        {outletRows.map((row) => (
           <View key={row.type} style={styles.tableRow}>
             <View style={[styles.colorBar, { backgroundColor: row.color }]} />
             <AppText style={[styles.cellText, styles.typeColumn]}>{row.type}</AppText>

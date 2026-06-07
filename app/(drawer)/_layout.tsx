@@ -52,6 +52,7 @@ const SALESMAN_DRAWER_ROUTES = new Set([
   'my-target',
   'switch-route',
   'topup',
+  'checkin',
   // 'stock-count',
 ]);
 
@@ -796,6 +797,14 @@ export default function DrawerLayout() {
       showLeftIcon: true,
       backgroundColor: colors.primary,
     },
+
+    checkin: {
+      title: 'Check In',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
   };
 
   /* ============================
@@ -919,6 +928,11 @@ export default function DrawerLayout() {
           focusedIcon: 'clipboard-text-search',
           unfocusedIcon: 'clipboard-text-search-outline',
         },
+        checkin: {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'clipboard-check',
+          unfocusedIcon: 'clipboard-check-outline',
+        },
       };
 
     const config = iconMap[routeName];
@@ -1028,6 +1042,15 @@ export default function DrawerLayout() {
       />
 
       <Drawer.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+
+      <Drawer.Screen
         name="topup"
         options={{
           title: 'Topup',
@@ -1072,6 +1095,14 @@ export default function DrawerLayout() {
         options={{
           title: 'Survey Analytics',
           drawerLabel: 'Survey Analytics',
+        }}
+      />
+
+      <Drawer.Screen
+        name="checkin"
+        options={{
+          title: 'Check In',
+          drawerLabel: 'Check In',
         }}
       />
     </Drawer>

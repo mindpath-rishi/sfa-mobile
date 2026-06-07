@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -6,66 +6,21 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { AppText } from '@/core/components';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { homeService, UserWiseTargetSummary } from '@/features/home/services/home.service';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
 
-type TargetUser = {
-  id: string;
-  name: string;
-  position: string;
-  target: string;
-  achievement: string;
-  rrr: string;
-  crr: string;
+type TargetUser = UserWiseTargetSummary & {
   children?: TargetUser[];
 };
 
-const TARGET_USERS: TargetUser[] = [
-  {
-    id: 'anuj-joshi',
-    name: 'Anup Joshi',
-    position: 'LSPosition',
-    target: '208795.04 Cases',
-    achievement: '71464.09 Cases',
-    rrr: '9876.66',
-    crr: '2646.82',
-    children: [
-      {
-        id: 'anwar-quazi',
-        name: 'Anwar Quazi',
-        position: 'L6Position',
-        target: '329337.70 Cases',
-        achievement: '111954.13 Cases',
-        rrr: '11244.39',
-        crr: '4146.45',
-      },
-    ],
-  },
-  {
-    id: 'l5-position',
-    name: 'L5Position',
-    position: 'LSPosition',
-    target: '89331.54 Cases',
-    achievement: '29179.70 Cases',
-    rrr: '4672.55',
-    crr: '1080.73',
-  },
-  {
-    id: 'mayank-shah',
-    name: 'Mayank Shah',
-    position: 'LSPosition',
-    target: '31211.12 Cases',
-    achievement: '11310.34 Cases',
-    rrr: '1421.5',
-    crr: '418.9',
-  },
-];
+const TARGET_USERS: TargetUser[] = [];
 
-const findUser = (id?: string | string[]) => {
+const findUser = (id?: string | string[], users: TargetUser[] = []) => {
   if (!id || Array.isArray(id)) return undefined;
 
-  for (const user of TARGET_USERS) {
-    if (user.id === id) return user;
-    const child = user.children?.find((item) => item.id === id);
+  for (const user of users) {
+    if (user.employeeId === id) return user;
+    const child = user.children?.find((item) => item.employeeId === id);
     if (child) return child;
   }
 
@@ -95,6 +50,9 @@ const formatSelectedDate = (date: Date) =>
     month: 'short',
     year: 'numeric',
   }).format(date);
+
+const formatCases = (value: number) =>
+  `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)} Cases`;
 
 function TargetMetric({ label, value }: { label: string; value: string }) {
   return (
@@ -129,7 +87,7 @@ function TargetUserCard({
       <View style={styles.userCardHeader}>
         <View style={styles.avatar}>
           <AppText style={styles.avatarText}>
-            {user.name
+            {user.employeeName
               .split(' ')
               .map((part) => part[0])
               .join('')
@@ -137,15 +95,15 @@ function TargetUserCard({
           </AppText>
         </View>
         <View style={styles.userTitleWrap}>
-          <AppText style={styles.userName}>{user.name}</AppText>
-          <AppText style={styles.userPosition}>{user.position}</AppText>
+          <AppText style={styles.userName}>{user.employeeName}</AppText>
+          <AppText style={styles.userPosition}>{user.designation}</AppText>
         </View>
         {hasDrillDown && <AppText style={styles.drillText}>User drilldown</AppText>}
       </View>
 
       <View style={styles.metricsRow}>
-        <TargetMetric label="Target" value={user.target} />
-        <TargetMetric label="Achievement" value={user.achievement} />
+        <TargetMetric label="Target" value={formatCases(user.targetCases)} />
+        <TargetMetric label="Achievement" value={formatCases(user.achievementCases)} />
       </View>
 
       <View style={styles.rateRow}>
@@ -172,9 +130,18 @@ export default function ManagerTargetsScreen() {
   const params = useLocalSearchParams<{ userId?: string; date?: string }>();
   const [selectedDate, setSelectedDate] = useState(() => parseRouteDate(getParam(params.date)));
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [targetUsers, setTargetUsers] = useState<TargetUser[]>(TARGET_USERS);
+  const [loading, setLoading] = useState(false);
 
-  const selectedUser = useMemo(() => findUser(params.userId), [params.userId]);
-  const users = selectedUser ? selectedUser.children || [] : TARGET_USERS;
+  const selectedUser = useMemo(
+    () => findUser(params.userId, targetUsers),
+    [params.userId, targetUsers],
+  );
+  const users = selectedUser
+    ? selectedUser.children?.length
+      ? selectedUser.children
+      : [selectedUser]
+    : targetUsers;
   const selectedRouteDate = formatRouteDate(selectedDate);
 
   useFocusEffect(
@@ -188,6 +155,26 @@ export default function ManagerTargetsScreen() {
       });
     }, [colors.primary, setHeader]),
   );
+
+  const fetchTargetSummary = async () => {
+    setLoading(true);
+
+    try {
+      const response = await homeService.getUserWiseTargetSummary();
+
+      if (response.success && response.data) {
+        setTargetUsers(response.data as TargetUser[]);
+      }
+    } catch (error) {
+      console.warn('Failed to load user-wise target summary', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTargetSummary();
+  }, []);
 
   const openDatePicker = () => {
     setShowDatePicker(true);
@@ -220,13 +207,18 @@ export default function ManagerTargetsScreen() {
           <View style={styles.parentBanner}>
             <Ionicons name="git-branch-outline" size={16} color={colors.primary} />
             <View style={styles.parentTextWrap}>
-              <AppText style={styles.parentTitle}>Viewing team under {selectedUser.name}</AppText>
+              <AppText style={styles.parentTitle}>
+                Viewing team under {selectedUser.employeeName}
+              </AppText>
               <AppText style={styles.parentSubtitle}>Primary category target drill-down</AppText>
             </View>
           </View>
         )}
 
-        {users.length === 0 && <AppText style={styles.emptyText}>No Data available</AppText>}
+        {loading && <AppText style={styles.emptyText}>Loading target summary...</AppText>}
+        {!loading && users.length === 0 && (
+          <AppText style={styles.emptyText}>No data available</AppText>
+        )}
 
         {users.map((user) => (
           <React.Fragment key={user.id}>

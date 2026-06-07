@@ -10,4 +10,3 @@ export const leaveService: LeaveService = {
   applyLeave: (payload) =>
     api.post<any, ApplyLeavePayload>('/leave', payload) as Promise<ApiResponse<any>>,
 };
-

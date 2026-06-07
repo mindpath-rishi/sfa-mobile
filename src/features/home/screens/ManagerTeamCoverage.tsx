@@ -1,25 +1,49 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
 import { AppText } from '@/core/components';
+import { useAuthStore } from '@/core/store/auth.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { homeService } from '../services/home.service';
+import type { ManagerTeamCoverageResponse } from '../services/home.service';
 
-const COVERAGE_STATS = [
-  { label: 'Warehouse', value: '12', icon: 'warehouse' },
-  { label: 'Routes', value: '463', icon: 'routes' },
-  { label: 'Outlets', value: '16,904', icon: 'storefront-outline' },
-  { label: 'Outlets Planned', value: '65', icon: 'calendar-check-outline' },
-  { label: 'UPC', value: '11,126', icon: 'chart-line' },
-  { label: 'UIC', value: '11,681', icon: 'clipboard-list-outline' },
-];
+const INITIAL_TEAM_COVERAGE: ManagerTeamCoverageResponse = {
+  warehouse: 12,
+  routes: 463,
+  outlets: 16904,
+  outletsPlanned: 65,
+  upc: 11126,
+  uic: 11681,
+};
+
+const formatNumber = (value: number) => new Intl.NumberFormat('en-US').format(value);
 
 export default function ManagerTeamCoverageScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const { setHeader } = useHeader();
+  const user = useAuthStore((state) => state.user);
+  const [teamCoverage, setTeamCoverage] =
+    useState<ManagerTeamCoverageResponse>(INITIAL_TEAM_COVERAGE);
+
+  const coverageStats = useMemo(
+    () => [
+      { label: 'Warehouse', value: formatNumber(teamCoverage.warehouse), icon: 'warehouse' },
+      { label: 'Routes', value: formatNumber(teamCoverage.routes), icon: 'routes' },
+      { label: 'Outlets', value: formatNumber(teamCoverage.outlets), icon: 'storefront-outline' },
+      {
+        label: 'Outlets Planned',
+        value: formatNumber(teamCoverage.outletsPlanned),
+        icon: 'calendar-check-outline',
+      },
+      { label: 'UPC', value: formatNumber(teamCoverage.upc), icon: 'chart-line' },
+      { label: 'UIC', value: formatNumber(teamCoverage.uic), icon: 'clipboard-list-outline' },
+    ],
+    [teamCoverage],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -32,6 +56,22 @@ export default function ManagerTeamCoverageScreen() {
       });
     }, [colors.primary, setHeader]),
   );
+
+  const fetchTeamCoverage = useCallback(async () => {
+    try {
+      const response = await homeService.getManagerTeamCoverage();
+
+      if (response.success && response.data) {
+        setTeamCoverage(response.data);
+      }
+    } catch (error) {
+      console.warn('Failed to load manager team coverage', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchTeamCoverage();
+  }, [fetchTeamCoverage]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -47,8 +87,8 @@ export default function ManagerTeamCoverageScreen() {
         <View style={styles.cardHeader}>
           <View>
             <AppText style={styles.position}>L6Position</AppText>
-            <AppText style={styles.title}>Distributor Manager</AppText>
-            <AppText style={styles.subtitle}>Anwar Quazi</AppText>
+            <AppText style={styles.title}>Manager</AppText>
+            <AppText style={styles.subtitle}>{user?.name || 'Manager'}</AppText>
           </View>
           <View style={styles.badge}>
             <AppText style={styles.badgeText}>MTD</AppText>
@@ -56,7 +96,7 @@ export default function ManagerTeamCoverageScreen() {
         </View>
 
         <View style={styles.grid}>
-          {COVERAGE_STATS.map((item) => (
+          {coverageStats.map((item) => (
             <View key={item.label} style={styles.stat}>
               <MaterialCommunityIcons name={item.icon as any} size={18} color={colors.primary} />
               <AppText style={styles.statValue}>{item.value}</AppText>

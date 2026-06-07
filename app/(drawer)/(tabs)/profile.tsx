@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,26 +13,23 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { Header } from '@/core/components/Header';
 import { AppCard } from '@/core/components/Card';
 
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuthStore } from '@/core/store/auth.store';
 
-// Mock salesman data
-const SALESMAN_DATA = {
+const DEFAULT_PROFILE_DATA = {
   id: 'EMP001',
-  name: 'Rahul Sharma',
-  email: 'rahul.sharma@company.com',
-  phone: '+91 98765 43210',
+  name: 'Field User',
+  email: 'Not available',
+  phone: 'Not available',
   avatar: null,
-  role: 'Senior Sales Representative',
-  territory: 'Mumbai - Western Suburbs',
-  manager: 'Amit Patel',
-  joinDate: '15 Jan 2022',
-  employeeId: 'SFA-2022-001',
+  role: 'Sales Representative',
+  territory: 'Not assigned',
+  manager: 'Not assigned',
+  joinDate: 'Not available',
+  employeeId: 'Not available',
   aadhar: 'XXXX-XXXX-1234',
   pan: 'ABCDE1234F',
   // bankDetails: {
@@ -78,6 +75,61 @@ const SALESMAN_DATA = {
     { id: 3, action: 'Updated bank details', time: '3 days ago' },
     { id: 4, action: 'Downloaded monthly report', time: '5 days ago' },
   ],
+};
+
+const humanizeRole = (value?: string) => {
+  if (!value) return DEFAULT_PROFILE_DATA.role;
+
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getProfileValue = (...values: unknown[]) => {
+  const value = values.find((item) => typeof item === 'string' && item.trim().length > 0);
+
+  return typeof value === 'string' ? value : undefined;
+};
+
+const buildProfileData = (authUser: any) => {
+  const employeeId = getProfileValue(authUser?.employeeId, authUser?.userId, authUser?.id);
+  const routeOrTerritory = getProfileValue(
+    authUser?.territory,
+    authUser?.routeName,
+    authUser?.route,
+    authUser?.vanId ? `Van ${authUser.vanId}` : undefined,
+  );
+
+  return {
+    ...DEFAULT_PROFILE_DATA,
+    id: employeeId || DEFAULT_PROFILE_DATA.id,
+    name:
+      getProfileValue(authUser?.name, authUser?.employeeName, authUser?.fullName) ||
+      DEFAULT_PROFILE_DATA.name,
+    email: getProfileValue(authUser?.email) || DEFAULT_PROFILE_DATA.email,
+    phone:
+      getProfileValue(authUser?.mobile, authUser?.phone, authUser?.phoneNumber) ||
+      DEFAULT_PROFILE_DATA.phone,
+    avatar:
+      getProfileValue(authUser?.avatar, authUser?.profileImage, authUser?.profileImageUrl) || null,
+    role: humanizeRole(getProfileValue(authUser?.role, authUser?.roleId, authUser?.designation)),
+    territory: routeOrTerritory || DEFAULT_PROFILE_DATA.territory,
+    manager: getProfileValue(authUser?.managerName, authUser?.manager) || DEFAULT_PROFILE_DATA.manager,
+    joinDate: getProfileValue(authUser?.joinDate, authUser?.createdAt) || DEFAULT_PROFILE_DATA.joinDate,
+    employeeId: employeeId || DEFAULT_PROFILE_DATA.employeeId,
+    stats: {
+      ...DEFAULT_PROFILE_DATA.stats,
+      ...(authUser?.stats || {}),
+    },
+    achievements: authUser?.achievements?.length
+      ? authUser.achievements
+      : DEFAULT_PROFILE_DATA.achievements,
+    recentActivity: authUser?.recentActivity?.length
+      ? authUser.recentActivity
+      : DEFAULT_PROFILE_DATA.recentActivity,
+  };
 };
 
 // Profile Header Component
@@ -335,7 +387,16 @@ const DocumentItem = ({ doc }: any) => {
 
 export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
-  const [userData, setUserData] = useState(SALESMAN_DATA);
+  const authUser = useAuthStore((s) => s.user);
+  const profileData = useMemo(() => buildProfileData(authUser), [authUser]);
+  const [settings, setSettings] = useState(DEFAULT_PROFILE_DATA.settings);
+  const userData = useMemo(
+    () => ({
+      ...profileData,
+      settings,
+    }),
+    [profileData, settings],
+  );
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'stats', 'settings', 'docs'
   const logout = useAuthStore((s) => s.logout);
 
@@ -344,14 +405,17 @@ export default function ProfileScreen() {
   };
 
   const handleCall = () => {
+    if (userData.phone === DEFAULT_PROFILE_DATA.phone) return;
     Linking.openURL(`tel:${userData.phone}`);
   };
 
   const handleMessage = () => {
+    if (userData.phone === DEFAULT_PROFILE_DATA.phone) return;
     Linking.openURL(`sms:${userData.phone}`);
   };
 
   const handleEmail = () => {
+    if (userData.email === DEFAULT_PROFILE_DATA.email) return;
     Linking.openURL(`mailto:${userData.email}`);
   };
 
@@ -549,35 +613,20 @@ export default function ProfileScreen() {
           icon="notifications"
           label="Push Notifications"
           value={userData.settings.notifications}
-          onPress={(val: boolean) =>
-            setUserData({
-              ...userData,
-              settings: { ...userData.settings, notifications: val },
-            })
-          }
+          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, notifications: val }))}
         />
         <SettingRow icon="moon" label="Dark Mode" value={isDark} />
         <SettingRow
           icon="finger-print"
           label="Biometric Login"
           value={userData.settings.biometricLogin}
-          onPress={(val: boolean) =>
-            setUserData({
-              ...userData,
-              settings: { ...userData.settings, biometricLogin: val },
-            })
-          }
+          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, biometricLogin: val }))}
         />
         <SettingRow
           icon="location"
           label="Location Tracking"
           value={userData.settings.locationTracking}
-          onPress={(val: boolean) =>
-            setUserData({
-              ...userData,
-              settings: { ...userData.settings, locationTracking: val },
-            })
-          }
+          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, locationTracking: val }))}
         />
       </AppCard>
 
@@ -592,23 +641,13 @@ export default function ProfileScreen() {
           icon="mail"
           label="Email Updates"
           value={userData.settings.emailUpdates}
-          onPress={(val: boolean) =>
-            setUserData({
-              ...userData,
-              settings: { ...userData.settings, emailUpdates: val },
-            })
-          }
+          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, emailUpdates: val }))}
         />
         <SettingRow
           icon="chatbubbles"
           label="SMS Alerts"
           value={userData.settings.smsAlerts}
-          onPress={(val: boolean) =>
-            setUserData({
-              ...userData,
-              settings: { ...userData.settings, smsAlerts: val },
-            })
-          }
+          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, smsAlerts: val }))}
         />
       </AppCard>
 
@@ -623,23 +662,13 @@ export default function ProfileScreen() {
           icon="log-in"
           label="Auto Check-in"
           value={userData.settings.autoCheckIn}
-          onPress={(val: boolean) =>
-            setUserData({
-              ...userData,
-              settings: { ...userData.settings, autoCheckIn: val },
-            })
-          }
+          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, autoCheckIn: val }))}
         />
         <SettingRow
           icon="cloud-offline"
           label="Offline Mode"
           value={userData.settings.offlineMode}
-          onPress={(val: boolean) =>
-            setUserData({
-              ...userData,
-              settings: { ...userData.settings, offlineMode: val },
-            })
-          }
+          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, offlineMode: val }))}
         />
       </AppCard>
 

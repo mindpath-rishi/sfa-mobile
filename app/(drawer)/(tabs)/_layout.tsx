@@ -1,12 +1,13 @@
 // app/(drawer)/(tabs)/_layout.tsx
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Tabs, useFocusEffect, useSegments } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useAuthStore } from '@/core/store/auth.store';
 import { isSalesman } from '@/core/navigation/role.utils';
+import { NotificationsModal } from '@/features/home/components/NotificationsModal';
 
 export default function TabsLayout() {
   const { colors } = useTheme();
@@ -14,6 +15,8 @@ export default function TabsLayout() {
   const segments = useSegments();
   const user = useAuthStore((state) => state.user);
   const salesman = isSalesman(user);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       const activeTab = segments.filter((segment) => !segment.startsWith('('))[0];
@@ -24,31 +27,39 @@ export default function TabsLayout() {
         showBack: false,
         showMenu: true,
         title: '',
+        rightIcon: activeTab === 'home' ? 'bell' : undefined,
+        onRightPress:
+          activeTab === 'home'
+            ? () => {
+                setNotificationsVisible(true);
+              }
+            : undefined,
       });
-    }, [segments, setHeader]),
+    }, [segments, setHeader, setNotificationsVisible]),
   );
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false, // ✅ we use Drawer Header
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.divider,
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
-      }}
-    >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
-          ),
+    <>
+      <Tabs
+        screenOptions={{
+          headerShown: false, // ✅ we use Drawer Header
+          tabBarStyle: {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.divider,
+          },
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.textTertiary,
         }}
-      />
+      >
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: 'Home',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons name={focused ? 'home' : 'home-outline'} size={size} color={color} />
+            ),
+          }}
+        />
 
       <Tabs.Screen
         name="daily-summary"
@@ -85,6 +96,11 @@ export default function TabsLayout() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+      <NotificationsModal
+        visible={notificationsVisible}
+        onClose={() => setNotificationsVisible(false)}
+      />
+    </>
   );
 }

@@ -165,10 +165,28 @@ import { storage } from '../storage';
 
 type AuthUser = {
   userId: string;
+  id?: string;
   name?: string;
+  email?: string;
+  mobile?: string;
+  phone?: string;
+  employeeId?: string;
+  employeeName?: string;
+  designation?: string;
   role?: string;
   roleId?: string;
+  route?: string;
+  routeName?: string;
+  territory?: string;
+  manager?: string;
+  managerName?: string;
   vanId?: string | null;
+  avatar?: string | null;
+  profileImage?: string | null;
+  profileImageUrl?: string | null;
+  stats?: Record<string, unknown>;
+  achievements?: unknown[];
+  recentActivity?: unknown[];
 };
 
 type JwtPayload = {

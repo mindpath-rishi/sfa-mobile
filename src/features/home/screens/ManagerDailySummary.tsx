@@ -1,11 +1,21 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { AppText } from '@/core/components';
+import { useAuthStore } from '@/core/store/auth.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { homeService } from '../services/home.service';
+import type { ManagerFieldUserSummary, ManagerStatsResponse } from '../services/home.service';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
 
 type SummaryStatus = 'retailing' | 'official-work' | 'leave' | 'absent';
@@ -63,6 +73,8 @@ type FieldUser = {
   name: string;
   position: string;
   status: SummaryStatus;
+  activityName?: string;
+  activityColor?: string;
   location: string;
   route: string;
   firstCall: string;
@@ -270,6 +282,24 @@ const SUMMARY_COUNTS: Record<SummaryStatus | 'total', number> = {
   absent: 37,
 };
 
+const INITIAL_MANAGER_STATS: ManagerStatsResponse = {
+  userSummary: {
+    total: SUMMARY_COUNTS.total,
+    retailing: SUMMARY_COUNTS.retailing,
+    officeWork: SUMMARY_COUNTS['official-work'],
+    leave: SUMMARY_COUNTS.leave,
+    absent: SUMMARY_COUNTS.absent,
+  },
+  callSummary: {
+    productivity: 89,
+    covered: 3,
+    pc: 463,
+    tc: 515,
+    sc: 19356,
+    qtyCases: 2425.1,
+  },
+};
+
 const getParam = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value);
 
 const parseRouteDate = (value?: string) => {
@@ -293,6 +323,57 @@ const formatSelectedDate = (date: Date) =>
     month: 'short',
     year: 'numeric',
   }).format(date);
+
+const getStatusFromActivity = (activityName?: string | null): SummaryStatus => {
+  const normalizedActivity = activityName?.trim().toLowerCase();
+
+  if (normalizedActivity === 'retailing') return 'retailing';
+  if (normalizedActivity === 'official work') return 'official-work';
+  if (normalizedActivity === 'leave') return 'leave';
+  if (normalizedActivity === 'absent') return 'absent';
+
+  return 'absent';
+};
+
+const formatApiTime = (value?: string | null) => {
+  if (!value) return '--';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '--';
+
+  const hours = date.getUTCHours();
+  const minutes = `${date.getUTCMinutes()}`.padStart(2, '0');
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHours = hours % 12 || 12;
+
+  return `${`${displayHours}`.padStart(2, '0')}:${minutes} ${period}`;
+};
+
+const mapFieldUserSummary = (user: ManagerFieldUserSummary): FieldUser => {
+  const status = getStatusFromActivity(user.activity?.name);
+  const summary = user.summary ?? {};
+
+  return {
+    id: user.employeeId,
+    name: user.employeeName || 'Unknown User',
+    position: user.employeeId,
+    status,
+    activityName: user.activity?.name,
+    activityColor: user.activity?.color,
+    location: user.location || '--',
+    route: user.routeName || '--',
+    firstCall: formatApiTime(summary.firstCallTime),
+    firstPc: formatApiTime(summary.firstPcTime),
+    tc: `${summary.tc ?? 0}`,
+    pc: `${summary.pc ?? 0}`,
+    lpc: `${summary.lpc ?? 0}`,
+    phone: user.mobile || '',
+    activities: [],
+  };
+};
+
+const getStaticTimelineUser = (user: FieldUser) =>
+  FIELD_USERS.find((fieldUser) => fieldUser.status === user.status) || FIELD_USERS[0];
 
 function SummaryMetric({
   label,
@@ -331,6 +412,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const { setHeader } = useHeader();
+  const user = useAuthStore((state) => state.user);
   const params = useLocalSearchParams<{
     status?: SummaryStatus;
     userId?: string;
@@ -341,12 +423,20 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => parseRouteDate(getParam(params.date)));
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [managerStats, setManagerStats] = useState<ManagerStatsResponse>(INITIAL_MANAGER_STATS);
+  const [fieldUsers, setFieldUsers] = useState<FieldUser[]>([]);
+  const [searchKey, setSearchKey] = useState('');
+  const [debouncedSearchKey, setDebouncedSearchKey] = useState('');
+  const [loadingFieldUsers, setLoadingFieldUsers] = useState(false);
 
   const status = getParam(params.status) as SummaryStatus | undefined;
   const userId = getParam(params.userId);
   const activityId = getParam(params.activityId);
   const selectedRouteDate = formatRouteDate(selectedDate);
-  const selectedUser = useMemo(() => FIELD_USERS.find((user) => user.id === userId), [userId]);
+  const selectedUser = useMemo(
+    () => [...fieldUsers, ...FIELD_USERS].find((user) => user.id === userId),
+    [fieldUsers, userId],
+  );
   const selectedActivity = useMemo(
     () => selectedUser?.activities.find((activity) => activity.id === activityId),
     [activityId, selectedUser],
@@ -360,9 +450,16 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         : 'summary';
   const view: DailyView = forcedView || routeView;
   const filteredUsers = useMemo(
-    () => FIELD_USERS.filter((user) => !status || user.status === status),
-    [status],
+    () => fieldUsers.filter((user) => !status || user.status === status),
+    [fieldUsers, status],
   );
+  const summaryCounts: Record<SummaryStatus | 'total', number> = {
+    total: managerStats.userSummary.total,
+    retailing: managerStats.userSummary.retailing,
+    'official-work': managerStats.userSummary.officeWork,
+    leave: managerStats.userSummary.leave,
+    absent: managerStats.userSummary.absent,
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -376,10 +473,64 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     }, [colors.primary, selectedUser, setHeader, view]),
   );
 
-  const onRefresh = () => {
+  const fetchManagerStats = useCallback(async (date?: string) => {
+    try {
+      const response = await homeService.getManagerStats(date);
+
+      if (response.success && response.data) {
+        setManagerStats({
+          userSummary: response.data.userSummary ?? INITIAL_MANAGER_STATS.userSummary,
+          callSummary: response.data.callSummary ?? INITIAL_MANAGER_STATS.callSummary,
+        });
+      }
+    } catch (error) {
+      console.warn('Failed to load daily summary manager stats', error);
+    }
+  }, []);
+
+  const fetchFieldUsers = useCallback(async (date?: string, nextSearchKey?: string) => {
+    setLoadingFieldUsers(true);
+
+    try {
+      const response = await homeService.getManagerFieldUsers({
+        date,
+        searchKey: nextSearchKey?.trim(),
+      });
+
+      if ((response.success || response.statusCode === 200) && Array.isArray(response.data)) {
+        setFieldUsers(response.data.map(mapFieldUserSummary));
+      }
+    } catch (error) {
+      console.warn('Failed to load manager field users', error);
+    } finally {
+      setLoadingFieldUsers(false);
+    }
+  }, []);
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 800);
+    await Promise.all([
+      fetchManagerStats(selectedRouteDate),
+      view === 'users' ? fetchFieldUsers(selectedRouteDate, debouncedSearchKey) : Promise.resolve(),
+    ]);
+    setRefreshing(false);
   };
+
+  useEffect(() => {
+    fetchManagerStats(selectedRouteDate);
+  }, [fetchManagerStats, selectedRouteDate]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchKey(searchKey.trim()), 350);
+
+    return () => clearTimeout(timer);
+  }, [searchKey]);
+
+  useEffect(() => {
+    if (view === 'users') {
+      fetchFieldUsers(selectedRouteDate, debouncedSearchKey);
+    }
+  }, [debouncedSearchKey, fetchFieldUsers, selectedRouteDate, view]);
 
   const openDatePicker = () => {
     setShowDatePicker(true);
@@ -392,10 +543,12 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     });
   };
 
-  const openTimeline = (nextUserId: string) => {
+  const openTimeline = (nextUser: FieldUser) => {
+    const staticTimelineUser = getStaticTimelineUser(nextUser);
+
     router.push({
       pathname: '/(drawer)/(tabs)/daily-summary/[userId]',
-      params: { userId: nextUserId, date: selectedRouteDate },
+      params: { userId: staticTimelineUser.id, date: selectedRouteDate },
     });
   };
 
@@ -453,8 +606,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
             <View style={styles.cardHeader}>
               <View>
                 <AppText style={styles.sectionTitle}>REPORTING TO YOU</AppText>
-                <AppText style={styles.cardTitle}>Anwar Quazi</AppText>
-                <AppText style={styles.cardSubTitle}>(Distributor Manager)</AppText>
+                <AppText style={styles.cardTitle}>{user?.name || 'Manager'}</AppText>
+                <AppText style={styles.cardSubTitle}>(Manager)</AppText>
               </View>
               <TouchableOpacity activeOpacity={0.78} onPress={() => openUsers()}>
                 <AppText style={styles.linkText}>ALL FIELD USER</AppText>
@@ -464,35 +617,39 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
             <View style={styles.summaryGrid}>
               <SummaryMetric
                 label="Total Users"
-                value={SUMMARY_COUNTS.total}
+                value={summaryCounts.total}
                 color={colors.info}
                 onPress={() => openUsers()}
               />
               <SummaryMetric
                 label="Retailing"
-                value={SUMMARY_COUNTS.retailing}
+                value={summaryCounts.retailing}
                 color={STATUS_META.retailing.color}
                 onPress={() => openUsers('retailing')}
               />
               <SummaryMetric
                 label="Official Work"
-                value={SUMMARY_COUNTS['official-work']}
+                value={summaryCounts['official-work']}
                 color={STATUS_META['official-work'].color}
                 onPress={() => openUsers('official-work')}
               />
               <SummaryMetric
                 label="Leave"
-                value={SUMMARY_COUNTS.leave}
+                value={summaryCounts.leave}
                 color={STATUS_META.leave.color}
                 onPress={() => openUsers('leave')}
               />
               <SummaryMetric
                 label="Absent"
-                value={SUMMARY_COUNTS.absent}
+                value={summaryCounts.absent}
                 color={STATUS_META.absent.color}
                 onPress={() => openUsers('absent')}
               />
-              <SummaryMetric label="SC" value={19356} color={colors.textSecondary} />
+              <SummaryMetric
+                label="SC"
+                value={managerStats.callSummary.sc}
+                color={colors.textSecondary}
+              />
             </View>
           </View>
         )}
@@ -501,8 +658,20 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
           <>
             <View style={styles.searchRow}>
               <Ionicons name="search" size={16} color={colors.textTertiary} />
-              <AppText style={styles.searchPlaceholder}>Search</AppText>
-              <Ionicons name="filter" size={16} color={colors.info} />
+              <TextInput
+                value={searchKey}
+                onChangeText={setSearchKey}
+                placeholder="Search"
+                placeholderTextColor={colors.textTertiary}
+                style={styles.searchInput}
+              />
+              {searchKey ? (
+                <TouchableOpacity activeOpacity={0.78} onPress={() => setSearchKey('')}>
+                  <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ) : (
+                <Ionicons name="filter" size={16} color={colors.info} />
+              )}
             </View>
             <View style={styles.compactStats}>
               {(['retailing', 'official-work', 'leave', 'absent'] as SummaryStatus[]).map((item) => (
@@ -516,26 +685,30 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   onPress={() => openUsers(item)}
                 >
                   <AppText style={styles.compactStatLabel}>{STATUS_META[item].label}</AppText>
-                  <AppText style={styles.compactStatValue}>{SUMMARY_COUNTS[item]}</AppText>
+                  <AppText style={styles.compactStatValue}>{summaryCounts[item]}</AppText>
                 </TouchableOpacity>
               ))}
               <View style={styles.compactStat}>
                 <AppText style={styles.compactStatLabel}>Total</AppText>
-                <AppText style={styles.compactStatValue}>{SUMMARY_COUNTS.total}</AppText>
+                <AppText style={styles.compactStatValue}>{summaryCounts.total}</AppText>
               </View>
             </View>
             <AppText style={styles.refreshed}>Last Refreshed Just Now</AppText>
             {filteredUsers.length === 0 ? (
-              <AppText style={styles.emptyText}>No field users found for this status.</AppText>
+              <AppText style={styles.emptyText}>
+                {loadingFieldUsers ? 'Loading field users...' : 'No field users found for this status.'}
+              </AppText>
             ) : (
               filteredUsers.map((user) => {
                 const meta = STATUS_META[user.status];
+                const activityColor = user.activityColor || meta.color;
+                const activityLabel = user.activityName || meta.label;
                 return (
                   <TouchableOpacity
                     key={user.id}
                     style={styles.userCard}
                     activeOpacity={0.82}
-                    onPress={() => openTimeline(user.id)}
+                    onPress={() => openTimeline(user)}
                   >
                     <View style={styles.userHeader}>
                       <View>
@@ -551,9 +724,9 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={[styles.routeBadge, { borderColor: meta.color }]}>
-                      <AppText style={[styles.routeBadgeText, { color: meta.color }]}>
-                        {meta.label}
+                    <View style={[styles.routeBadge, { borderColor: activityColor }]}>
+                      <AppText style={[styles.routeBadgeText, { color: activityColor }]}>
+                        {activityLabel}
                       </AppText>
                       <AppText style={styles.routeText}>{user.route}</AppText>
                     </View>
@@ -917,11 +1090,12 @@ const createStyles = (colors: any) =>
       borderWidth: 1,
       borderColor: colors.borderLight,
     },
-    searchPlaceholder: {
+    searchInput: {
       flex: 1,
       fontSize: 12,
       fontWeight: '700',
-      color: colors.textTertiary,
+      color: colors.textPrimary,
+      paddingVertical: 0,
     },
     compactStats: {
       borderRadius: 8,

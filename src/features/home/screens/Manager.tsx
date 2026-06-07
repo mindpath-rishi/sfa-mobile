@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -6,9 +6,13 @@ import Svg, { Circle, Path } from 'react-native-svg';
 
 import { AppText } from '@/core/components';
 import { useAuthStore } from '@/core/store/auth.store';
+import { homeService } from '@/features/home/services/home.service';
+import type {
+  ManagerOrderSummaryResponse,
+  ManagerTargetResponse,
+} from '@/features/home/services/home.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
-import { homeService } from '../services/home.service';
 
 type SummaryRow = {
   label: string;
@@ -30,113 +34,62 @@ type OutletSummary = {
   color: string;
 };
 
-type TargetSummary = {
-  title: string;
-  period: string;
-  percentage: number;
-  value: string;
-  hint: string;
+type UserSummaryData = {
+  retailing: number;
+  officeWork: number;
+  leave: number;
+  absent: number;
+  total: number;
 };
 
-type CallSummary = {
+type CallSummaryData = {
   productivity: number;
   covered: number;
   pc: number;
   tc: number;
   sc: number;
-  qtyCases: string;
+  qtyCases: number;
 };
 
-type PositionOrder = {
-  title: string;
-  subtitle: string;
-  initials: string;
-  orderCases: string;
-  validationCases: string;
-  validationProgress: number;
+const INITIAL_USER_SUMMARY: UserSummaryData = {
+  retailing: 152,
+  officeWork: 1,
+  leave: 0,
+  absent: 37,
+  total: 190,
 };
 
-type ProductivitySummary = {
-  pc: string;
-  tc: string;
+const INITIAL_CALL_SUMMARY: CallSummaryData = {
+  productivity: 89,
+  covered: 3,
+  pc: 463,
+  tc: 515,
+  sc: 19356,
+  qtyCases: 2425.1,
 };
 
-type ManagerDashboardData = {
-  userSummary: SummaryRow[];
-  callSummary: CallSummary;
-  targets: TargetSummary[];
-  categoryOrders: CategoryOrder[];
-  categoryTotal: string;
-  positionOrder: PositionOrder;
-  outletSummary: OutletSummary[];
-  productivity: ProductivitySummary;
-};
-
-const FALLBACK_USER_SUMMARY: SummaryRow[] = [
-  { label: 'Retailing', value: 152, color: '#16A34A' },
-  { label: 'Official Work', value: 1, color: '#2563EB' },
-  { label: 'Leave', value: 0, color: '#F59E0B' },
-  { label: 'Absent', value: 37, color: '#DC2626' },
-];
-
-const FALLBACK_CATEGORY_ORDERS: CategoryOrder[] = [
+const CATEGORY_ORDERS: CategoryOrder[] = [
   { label: 'Laundry', value: 54, cases: '60,603.8', color: '#58B989' },
   { label: 'Confectionery', value: 25, cases: '28,431.3', color: '#18B72D' },
   { label: 'Personal Care', value: 15, cases: '16,721.5', color: '#C75A95' },
   { label: 'Household', value: 6, cases: '6,699.8', color: '#EF5DA8' },
 ];
 
-const FALLBACK_OUTLET_SUMMARY: OutletSummary[] = [
+const OUTLET_SUMMARY: OutletSummary[] = [
   { label: 'UPC', value: '11,881.0', progress: 0.86, color: '#16A34A' },
   { label: 'Zero Order', value: '555.0', progress: 0.24, color: '#F59E0B' },
   { label: 'Not Visited', value: '5,223.0', progress: 0.69, color: '#EF5DA8' },
   { label: 'Total', value: '19,064.0', progress: 0.66, color: '#8B5CF6' },
 ];
 
-const FALLBACK_TARGETS: TargetSummary[] = [
-  {
-    title: 'User wise Primary Category Targets',
-    period: 'Saturday, 01-Nov-2025 - Sunday, 30-Nov-2025',
-    percentage: 34,
-    value: '112 K Cases',
-    hint: 'Only 217,383.55 more Cases to achieve your target',
-  },
-  {
-    title: 'User Wise Target UBO',
-    period: 'N/A - N/A',
-    percentage: 0,
-    value: '0',
-    hint: 'Target has not been configured for this period',
-  },
+const CATEGORY_ORDER_COLORS = [
+  '#58B989',
+  '#18B72D',
+  '#C75A95',
+  '#EF5DA8',
+  '#8B5CF6',
+  '#F59E0B',
 ];
-
-const FALLBACK_DASHBOARD_DATA: ManagerDashboardData = {
-  userSummary: FALLBACK_USER_SUMMARY,
-  callSummary: {
-    productivity: 89,
-    covered: 3,
-    pc: 463,
-    tc: 515,
-    sc: 19356,
-    qtyCases: '2,425.1',
-  },
-  targets: FALLBACK_TARGETS,
-  categoryOrders: FALLBACK_CATEGORY_ORDERS,
-  categoryTotal: '112,456.3',
-  positionOrder: {
-    title: 'Distributor Manager',
-    subtitle: 'Anwar Quazi',
-    initials: 'AQ',
-    orderCases: '112,456.3 Cases',
-    validationCases: '112,456.3 Cases',
-    validationProgress: 0.78,
-  },
-  outletSummary: FALLBACK_OUTLET_SUMMARY,
-  productivity: {
-    pc: '24,940',
-    tc: '28,711',
-  },
-};
 
 const formatSelectedDate = (date: Date) =>
   new Intl.DateTimeFormat('en-US', {
@@ -146,6 +99,19 @@ const formatSelectedDate = (date: Date) =>
     year: 'numeric',
   }).format(date);
 
+const getCurrentMonthPeriod = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const startDate = new Date(year, month, 1);
+  const endDate = new Date(year, month + 1, 0);
+
+  const formattedStart = formatSelectedDate(startDate);
+  const formattedEnd = formatSelectedDate(endDate);
+
+  return `${formattedStart} - ${formattedEnd}`;
+};
+
 const formatRouteDate = (date: Date) => {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -153,131 +119,10 @@ const formatRouteDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const pickNumber = (source: any, keys: string[], fallback: number) => {
-  for (const key of keys) {
-    const value = source?.[key];
-    if (value !== null && value !== undefined && value !== '') {
-      const numberValue = Number(value);
-      if (Number.isFinite(numberValue)) return numberValue;
-    }
-  }
+const formatNumber = (value: number) =>
+  new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
 
-  return fallback;
-};
-
-const normalizeProgressValue = (value: number) => {
-  const progress = value > 1 ? value / 100 : value;
-  return Math.max(0, Math.min(1, progress));
-};
-
-const pickString = (source: any, keys: string[], fallback: string) => {
-  for (const key of keys) {
-    const value = source?.[key];
-    if (value !== null && value !== undefined && value !== '') return String(value);
-  }
-
-  return fallback;
-};
-
-const normalizeSummaryRows = (rows: any, fallback: SummaryRow[]) => {
-  if (!Array.isArray(rows) || rows.length === 0) return fallback;
-
-  return rows.map((row: any, index: number) => ({
-    label: pickString(row, ['label', 'name', 'status', 'activityType'], fallback[index]?.label || 'Summary'),
-    value: pickNumber(row, ['value', 'count', 'total'], fallback[index]?.value || 0),
-    color: pickString(row, ['color'], fallback[index]?.color || '#2563EB'),
-  }));
-};
-
-const normalizeCategoryOrders = (rows: any, fallback: CategoryOrder[]) => {
-  if (!Array.isArray(rows) || rows.length === 0) return fallback;
-
-  return rows.map((row: any, index: number) => ({
-    label: pickString(row, ['label', 'name', 'category', 'categoryName'], fallback[index]?.label || 'Category'),
-    value: pickNumber(row, ['value', 'percentage', 'percent'], fallback[index]?.value || 0),
-    cases: pickString(row, ['cases', 'caseValue', 'quantity', 'qtyCases'], fallback[index]?.cases || '0'),
-    color: pickString(row, ['color'], fallback[index]?.color || '#2563EB'),
-  }));
-};
-
-const normalizeTargets = (rows: any, fallback: TargetSummary[]) => {
-  if (!Array.isArray(rows) || rows.length === 0) return fallback;
-
-  return rows.map((row: any, index: number) => ({
-    title: pickString(row, ['title', 'name', 'targetName'], fallback[index]?.title || 'Target'),
-    period: pickString(row, ['period', 'dateRange'], fallback[index]?.period || 'N/A - N/A'),
-    percentage: pickNumber(row, ['percentage', 'percent', 'achievementPercentage'], fallback[index]?.percentage || 0),
-    value: pickString(row, ['value', 'target', 'targetValue'], fallback[index]?.value || '0'),
-    hint: pickString(row, ['hint', 'message', 'description'], fallback[index]?.hint || ''),
-  }));
-};
-
-const normalizeOutletSummary = (rows: any, fallback: OutletSummary[]) => {
-  if (!Array.isArray(rows) || rows.length === 0) return fallback;
-
-  return rows.map((row: any, index: number) => ({
-    label: pickString(row, ['label', 'name', 'type'], fallback[index]?.label || 'Outlet'),
-    value: pickString(row, ['value', 'count', 'total'], fallback[index]?.value || '0'),
-    progress: normalizeProgressValue(
-      pickNumber(row, ['progress', 'percentage', 'percent'], fallback[index]?.progress || 0),
-    ),
-    color: pickString(row, ['color'], fallback[index]?.color || '#2563EB'),
-  }));
-};
-
-const normalizeManagerDashboardData = (responseData: any): ManagerDashboardData => {
-  const data = responseData?.data || responseData?.dashboard || responseData || {};
-  const callSummary = data.callSummary || data.calls || {};
-  const positionOrder = data.positionOrder || data.positionWiseOrder || {};
-  const productivity = data.productivity || {};
-
-  return {
-    userSummary: normalizeSummaryRows(
-      data.userSummary || data.usersSummary || data.activitySummary,
-      FALLBACK_DASHBOARD_DATA.userSummary,
-    ),
-    callSummary: {
-      productivity: pickNumber(callSummary, ['productivity', 'productivityPercentage'], FALLBACK_DASHBOARD_DATA.callSummary.productivity),
-      covered: pickNumber(callSummary, ['covered', 'coveredPercentage'], FALLBACK_DASHBOARD_DATA.callSummary.covered),
-      pc: pickNumber(callSummary, ['pc', 'productiveCalls'], FALLBACK_DASHBOARD_DATA.callSummary.pc),
-      tc: pickNumber(callSummary, ['tc', 'totalCalls'], FALLBACK_DASHBOARD_DATA.callSummary.tc),
-      sc: pickNumber(callSummary, ['sc', 'scheduledCalls'], FALLBACK_DASHBOARD_DATA.callSummary.sc),
-      qtyCases: pickString(callSummary, ['qtyCases', 'cases', 'quantityCases'], FALLBACK_DASHBOARD_DATA.callSummary.qtyCases),
-    },
-    targets: normalizeTargets(data.targets || data.primaryTargets, FALLBACK_DASHBOARD_DATA.targets),
-    categoryOrders: normalizeCategoryOrders(
-      data.categoryOrders || data.primaryCategoryOrders,
-      FALLBACK_DASHBOARD_DATA.categoryOrders,
-    ),
-    categoryTotal: pickString(data, ['categoryTotal', 'primaryCategoryTotal'], FALLBACK_DASHBOARD_DATA.categoryTotal),
-    positionOrder: {
-      title: pickString(positionOrder, ['title', 'position', 'role'], FALLBACK_DASHBOARD_DATA.positionOrder.title),
-      subtitle: pickString(positionOrder, ['subtitle', 'name', 'employeeName'], FALLBACK_DASHBOARD_DATA.positionOrder.subtitle),
-      initials: pickString(positionOrder, ['initials'], FALLBACK_DASHBOARD_DATA.positionOrder.initials),
-      orderCases: pickString(positionOrder, ['orderCases', 'orders', 'cases'], FALLBACK_DASHBOARD_DATA.positionOrder.orderCases),
-      validationCases: pickString(
-        positionOrder,
-        ['validationCases', 'validation', 'validatedCases'],
-        FALLBACK_DASHBOARD_DATA.positionOrder.validationCases,
-      ),
-      validationProgress: normalizeProgressValue(
-        pickNumber(
-          positionOrder,
-          ['validationProgress', 'progress'],
-          FALLBACK_DASHBOARD_DATA.positionOrder.validationProgress,
-        ),
-      ),
-    },
-    outletSummary: normalizeOutletSummary(
-      data.outletSummary || data.outletsSummary,
-      FALLBACK_DASHBOARD_DATA.outletSummary,
-    ),
-    productivity: {
-      pc: pickString(productivity, ['pc', 'productiveCalls'], FALLBACK_DASHBOARD_DATA.productivity.pc),
-      tc: pickString(productivity, ['tc', 'totalCalls'], FALLBACK_DASHBOARD_DATA.productivity.tc),
-    },
-  };
-};
+const clampPercentage = (value: number) => Math.max(0, Math.min(value, 100));
 
 const polarToCartesian = (
   centerX: number,
@@ -426,35 +271,141 @@ export default function ManagerHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dashboardData, setDashboardData] = useState<ManagerDashboardData>(FALLBACK_DASHBOARD_DATA);
+  const [userSummary, setUserSummary] = useState<UserSummaryData>(INITIAL_USER_SUMMARY);
+  const [callSummary, setCallSummary] = useState<CallSummaryData>(INITIAL_CALL_SUMMARY);
+  const [managerOrderSummary, setManagerOrderSummary] =
+    useState<ManagerOrderSummaryResponse | null>(null);
 
-  const totalUsers = dashboardData.userSummary.reduce((sum, item) => sum + item.value, 0);
   const selectedRouteDate = formatRouteDate(selectedDate);
+  const userSummaryRows: SummaryRow[] = [
+    { label: 'Retailing', value: userSummary.retailing, color: '#16A34A' },
+    { label: 'Official Work', value: userSummary.officeWork, color: '#2563EB' },
+    { label: 'Leave', value: userSummary.leave, color: '#F59E0B' },
+    { label: 'Absent', value: userSummary.absent, color: '#DC2626' },
+  ];
+  const totalUsers = userSummary.total ?? userSummaryRows.reduce((sum, item) => sum + item.value, 0);
+  const categoryOrders = useMemo<CategoryOrder[]>(() => {
+    const categories = managerOrderSummary?.primaryCategoryWiseOrder?.categories;
 
-  const fetchDashboardData = useCallback(async () => {
-    if (!user?.userId) {
-      setDashboardData(FALLBACK_DASHBOARD_DATA);
-      return;
-    }
+    if (!categories?.length) return CATEGORY_ORDERS;
 
+    return categories.map((item, index) => ({
+      label: item.category,
+      value: item.percentage,
+      cases: formatNumber(item.cases),
+      color: CATEGORY_ORDER_COLORS[index % CATEGORY_ORDER_COLORS.length],
+    }));
+  }, [managerOrderSummary]);
+  const categoryOrderTotal = managerOrderSummary?.primaryCategoryWiseOrder?.totalCases !== undefined
+    ? formatNumber(managerOrderSummary.primaryCategoryWiseOrder.totalCases)
+    : '112,456.3';
+  const orderCases = managerOrderSummary?.managerOrderSummary?.orders ?? 112456.3;
+  const validationCases = managerOrderSummary?.managerOrderSummary?.validation ?? 112456.3;
+  const validationPercentage =
+    orderCases > 0 ? clampPercentage((validationCases / orderCases) * 100) : 0;
+  const outletSummaryRows = useMemo<OutletSummary[]>(() => {
+    const summary = managerOrderSummary?.outletSummary;
+
+    if (!summary) return OUTLET_SUMMARY;
+
+    return [
+      {
+        label: 'UPC',
+        value: formatNumber(summary.upc.count),
+        progress: clampPercentage(summary.upc.percentage) / 100,
+        color: '#16A34A',
+      },
+      {
+        label: 'Zero Order',
+        value: formatNumber(summary.zeroOrder.count),
+        progress: clampPercentage(summary.zeroOrder.percentage) / 100,
+        color: '#F59E0B',
+      },
+      {
+        label: 'Not Visited',
+        value: formatNumber(summary.notVisited.count),
+        progress: clampPercentage(summary.notVisited.percentage) / 100,
+        color: '#EF5DA8',
+      },
+      {
+        label: 'Total',
+        value: formatNumber(summary.total.count),
+        progress: clampPercentage(summary.total.percentage) / 100,
+        color: '#8B5CF6',
+      },
+    ];
+  }, [managerOrderSummary]);
+  const outletProductivity = managerOrderSummary?.outletSummary?.productivity;
+  const productivityPercentage = outletProductivity?.percentage;
+
+  const TARGETS = [
+    {
+      title: 'User wise Primary Category Targets',
+      period: getCurrentMonthPeriod(),
+      percentage: 34,
+      value: '112 K Cases',
+      hint: 'Only 217,383.55 more Cases to achieve your target',
+    },
+    {
+      title: 'User Wise Target UBO',
+      period: 'N/A - N/A',
+      percentage: 0,
+      value: '0',
+      hint: 'Target has not been configured for this period',
+    },
+  ];
+
+  const [managerTarget, setManagerTarget] = useState<ManagerTargetResponse | null>(null);
+
+  const fetchManagerStats = async (date?: string) => {
     try {
-      const response = await homeService.getEmployeeStats(user.userId);
-      setDashboardData(normalizeManagerDashboardData(response?.data));
+      const response = await homeService.getManagerStats(date);
+
+      if (response.success && response.data) {
+        setUserSummary(response.data.userSummary ?? INITIAL_USER_SUMMARY);
+        setCallSummary(response.data.callSummary ?? INITIAL_CALL_SUMMARY);
+      }
     } catch (error) {
-      console.log('Error fetching manager dashboard data:', error);
-      setDashboardData(FALLBACK_DASHBOARD_DATA);
+      console.warn('Failed to load manager stats', error);
     }
-  }, [user?.userId]);
+  };
+
+  const fetchManagerTarget = async () => {
+    try {
+      const response = await homeService.getManagerTarget();
+
+      if (response.success && response.data) {
+        setManagerTarget(response.data as ManagerTargetResponse);
+      }
+    } catch (error) {
+      console.warn('Failed to load manager target', error);
+    }
+  };
+
+  const fetchManagerOrderSummary = async (date?: string) => {
+    try {
+      const response = await homeService.getManagerOrderSummary(date);
+
+      if (response.success && response.data) {
+        setManagerOrderSummary(response.data as ManagerOrderSummaryResponse);
+      }
+    } catch (error) {
+      console.warn('Failed to load manager order summary', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchManagerStats(selectedRouteDate);
+    await fetchManagerOrderSummary(selectedRouteDate);
+    setRefreshing(false);
+  };
 
   useEffect(() => {
-    void fetchDashboardData();
-  }, [fetchDashboardData, selectedRouteDate]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchDashboardData();
-    setRefreshing(false);
-  }, [fetchDashboardData]);
+    fetchManagerStats(selectedRouteDate);
+    fetchManagerTarget();
+    fetchManagerOrderSummary(selectedRouteDate);
+  }, [selectedRouteDate]);
 
   const openDatePicker = () => {
     setShowDatePicker(true);
@@ -509,7 +460,7 @@ export default function ManagerHomeScreen() {
                 )}
               </AppText>
             </View>
-            {dashboardData.userSummary.map((item) => (
+            {userSummaryRows.map((item) => (
               <TouchableOpacity
                 key={item.label}
                 style={styles.summaryRow}
@@ -544,36 +495,36 @@ export default function ManagerHomeScreen() {
             </View>
             <View style={styles.callCircleRow}>
               <View style={styles.callCircle}>
-                <AppText style={styles.callValue}>{dashboardData.callSummary.productivity}</AppText>
+                <AppText style={styles.callValue}>{callSummary.productivity}</AppText>
                 <AppText style={styles.callLabel}>Productivity %</AppText>
               </View>
               <View style={styles.callCircleMuted}>
-                <AppText style={styles.callValue}>{dashboardData.callSummary.covered}</AppText>
+                <AppText style={styles.callValue}>{callSummary.covered}</AppText>
                 <AppText style={styles.callLabel}>Covered %</AppText>
               </View>
             </View>
             <View style={styles.callMetrics}>
               <View style={styles.metricItem}>
-                <AppText style={styles.metricValue}>{dashboardData.callSummary.pc}</AppText>
+                <AppText style={styles.metricValue}>{callSummary.pc}</AppText>
                 <AppText style={styles.metricLabel}>PC</AppText>
               </View>
               <View style={styles.metricItem}>
-                <AppText style={styles.metricValue}>{dashboardData.callSummary.tc}</AppText>
+                <AppText style={styles.metricValue}>{callSummary.tc}</AppText>
                 <AppText style={styles.metricLabel}>TC</AppText>
               </View>
               <View style={styles.metricItem}>
-                <AppText style={styles.metricValue}>{dashboardData.callSummary.sc}</AppText>
+                <AppText style={styles.metricValue}>{callSummary.sc}</AppText>
                 <AppText style={styles.metricLabel}>SC</AppText>
               </View>
             </View>
             <View style={styles.orderValue}>
               <AppText style={styles.orderValueLabel}>Qty Cases</AppText>
-              <AppText style={styles.orderValueText}>{dashboardData.callSummary.qtyCases}</AppText>
+              <AppText style={styles.orderValueText}>{callSummary.qtyCases}</AppText>
             </View>
           </View>
         </View>
 
-        {dashboardData.targets.map((target, index) => {
+        {TARGETS.map((target, index) => {
           const content = (
             <>
               <View style={styles.cardHeader}>
@@ -588,8 +539,12 @@ export default function ManagerHomeScreen() {
                 />
               </View>
               <Gauge
-                percentage={target.percentage}
-                value={target.value}
+                percentage={
+                  index === 0
+                    ? managerTarget?.achievementPercentage ?? target.percentage
+                    : target.percentage
+                }
+                value={index === 0 ? managerTarget?.display?.achievedCases ?? target.value : target.value}
                 color={index === 0 ? '#10B981' : colors.border}
                 colors={colors}
               />
@@ -600,7 +555,7 @@ export default function ManagerHomeScreen() {
                   color={index === 0 ? colors.primaryContrast : colors.textTertiary}
                 />
                 <AppText style={[styles.targetHintText, index === 1 && styles.targetHintTextMuted]}>
-                  {target.hint}
+                  {index === 0 ? managerTarget?.display?.remainingMessage ?? target.hint : target.hint}
                 </AppText>
               </View>
             </>
@@ -637,13 +592,9 @@ export default function ManagerHomeScreen() {
             <AppText style={styles.mtdBadge}>MTD</AppText>
           </View>
           <View style={styles.chartRow}>
-            <DonutChart
-              data={dashboardData.categoryOrders}
-              total={dashboardData.categoryTotal}
-              colors={colors}
-            />
+            <DonutChart data={categoryOrders} total={categoryOrderTotal} colors={colors} />
             <View style={styles.legend}>
-              {dashboardData.categoryOrders.map((item) => (
+              {categoryOrders.map((item) => (
                 <View key={item.label} style={styles.legendRow}>
                   <View style={[styles.statusDot, { backgroundColor: item.color }]} />
                   <View style={styles.legendTextWrap}>
@@ -666,11 +617,18 @@ export default function ManagerHomeScreen() {
           </View>
           <View style={styles.routeInfo}>
             <View style={styles.avatar}>
-              <AppText style={styles.avatarText}>{dashboardData.positionOrder.initials}</AppText>
+              <AppText style={styles.avatarText}>
+                {user?.name
+                  ?.split(' ')
+                  ?.map((word: string) => word[0])
+                  ?.join('')
+                  ?.toUpperCase()
+                  ?.slice(0, 2) || 'M'}
+              </AppText>
             </View>
             <View style={styles.headerText}>
-              <AppText style={styles.routeName}>{dashboardData.positionOrder.title}</AppText>
-              <AppText style={styles.cardMeta}>{dashboardData.positionOrder.subtitle}</AppText>
+              <AppText style={styles.routeName}>Manager</AppText>
+              <AppText style={styles.cardMeta}>{user?.name || 'Manager'}</AppText>
             </View>
           </View>
           <View style={styles.progressLegend}>
@@ -685,19 +643,16 @@ export default function ManagerHomeScreen() {
           </View>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: '100%', backgroundColor: '#B15CC8' }]} />
-            <AppText style={styles.progressText}>{dashboardData.positionOrder.orderCases}</AppText>
+            <AppText style={styles.progressText}>{formatNumber(orderCases)} Cases</AppText>
           </View>
           <View style={styles.progressTrack}>
             <View
               style={[
                 styles.progressFill,
-                {
-                  width: `${dashboardData.positionOrder.validationProgress * 100}%`,
-                  backgroundColor: '#93C5FD',
-                },
+                { width: `${validationPercentage}%`, backgroundColor: '#93C5FD' },
               ]}
             />
-            <AppText style={styles.progressText}>{dashboardData.positionOrder.validationCases}</AppText>
+            <AppText style={styles.progressText}>{formatNumber(validationCases)} Cases</AppText>
           </View>
         </View>
 
@@ -706,7 +661,7 @@ export default function ManagerHomeScreen() {
             <AppText style={styles.cardTitle}>Outlets Summary</AppText>
             <AppText style={styles.mtdBadge}>MTD</AppText>
           </View>
-          {dashboardData.outletSummary.map((item) => (
+          {outletSummaryRows.map((item) => (
             <View key={item.label} style={styles.outletRow}>
               <View style={styles.outletText}>
                 <AppText style={styles.summaryLabel}>{item.label}</AppText>
@@ -732,7 +687,11 @@ export default function ManagerHomeScreen() {
             <View>
               <AppText style={styles.productivityTitle}>Productivity</AppText>
               <AppText style={styles.cardMeta}>
-                PC: {dashboardData.productivity.pc} | TC: {dashboardData.productivity.tc}
+                PC: {formatNumber(outletProductivity?.pc ?? 24940)} | TC:{' '}
+                {formatNumber(outletProductivity?.tc ?? 28711)}
+                {productivityPercentage !== undefined
+                  ? ` | ${formatNumber(productivityPercentage)}%`
+                  : ''}
               </AppText>
             </View>
           </View>
@@ -849,7 +808,7 @@ const createStyles = (colors: any) =>
       flex: 1,
       backgroundColor: colors.surface,
       borderRadius: 12,
-      padding: 12,
+      padding: 20,
       borderWidth: 1,
       borderColor: colors.border,
     },
@@ -858,7 +817,7 @@ const createStyles = (colors: any) =>
       alignItems: 'flex-start',
       justifyContent: 'space-between',
       gap: 8,
-      marginBottom: 10,
+      marginBottom: 8,
     },
     headerText: {
       flex: 1,
@@ -1115,16 +1074,16 @@ const createStyles = (colors: any) =>
     outletRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      marginBottom: 12,
+      gap: 8,
+      marginBottom: 0,
     },
     outletText: {
-      width: 76,
+      width: 70,
     },
     outletProgressTrack: {
       flex: 1,
-      height: 8,
-      borderRadius: 4,
+      height: 6,
+      borderRadius: 3,
       overflow: 'hidden',
       backgroundColor: colors.backgroundTertiary,
     },
@@ -1145,13 +1104,15 @@ const createStyles = (colors: any) =>
       fontWeight: '900',
     },
     productivityBox: {
-      minHeight: 46,
-      borderRadius: 10,
-      paddingHorizontal: 10,
+      minHeight: 28,
+      borderRadius: 6,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 3,
       backgroundColor: colors.successLight,
+      marginTop: 0,
     },
     productivityTitle: {
       fontSize: 12,
