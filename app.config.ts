@@ -13,6 +13,8 @@ export default ({ config }: any) => {
       'expo-web-browser',
       'expo-sqlite',
       'expo-location',
+      '@react-native-firebase/app',
+      '@react-native-firebase/messaging',
       //   {
       //     locationAlwaysAndWhenInUsePermission:
       //       'Allow $(PRODUCT_NAME) to use your location for route optimization.',
@@ -34,10 +36,15 @@ export default ({ config }: any) => {
     android: {
       softwareKeyboardLayoutMode: 'resize',
       package: 'com.anonymous.expojwttabstemplateultimate',
+      googleServicesFile:
+        process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
+      permissions: ['android.permission.POST_NOTIFICATIONS'],
     },
 
     ios: {
       bundleIdentifier: 'com.anonymous.expojwttabstemplateultimate',
+      googleServicesFile:
+        process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
     },
 
     extra: {

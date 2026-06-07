@@ -420,6 +420,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import * as Haptics from 'expo-haptics';
+import * as Application from 'expo-application';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
@@ -431,6 +432,8 @@ import { authService } from '../services/auth.service';
 import { LoginFormData, LoginScreenProps } from '../types/login.types';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useLoginStyles } from '../styles/Login.style';
+import { getPushNotificationTokenAsync } from '@/shared/services/push-notification.service';
+import { getClientDeviceIdAsync } from '@/shared/services/device.service';
 
 const isWeb = Platform.OS === 'web';
 const { height: screenHeight } = Dimensions.get('window');
@@ -606,13 +609,13 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
 
   // Device info
   const getDeviceInfo = async () => ({
-    deviceId: isWeb ? 'web-device' : 'mobile-device',
+    deviceId: await getClientDeviceIdAsync(),
     deviceType: Platform.OS,
     os: Platform.OS,
     osVersion: String(Platform.Version),
     browser: isWeb ? 'Modern Browser' : 'N/A',
-    appVersion: '1.3.0',
-    fcmToken: 'temp-token',
+    appVersion: Application.nativeApplicationVersion ?? '1.3.0',
+    fcmToken: await getPushNotificationTokenAsync(),
   });
 
   // Submit

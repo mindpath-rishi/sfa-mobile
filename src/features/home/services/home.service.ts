@@ -74,17 +74,6 @@ export interface UserWiseTargetSummary {
   hasTarget: boolean;
 }
 
-export interface UserWiseTargetResponse {
-  data: UserWiseTargetSummary[];
-  summary: {
-    totalUsers: number;
-    usersWithTarget: number;
-    totalTargetCases: number;
-    totalAchievementCases: number;
-    overallAchievementPercentage: number;
-  };
-}
-
 export interface ManagerOrderSummaryResponse {
   primaryCategoryWiseOrder: {
     totalCases: number;
@@ -178,6 +167,66 @@ export interface ManagerFieldUserSummary {
   } | null;
 }
 
+export interface SalesmanPocketTargetResponse {
+  startDate: string;
+  endDate: string;
+  retailingDays: number;
+  dayWiseSummary?: {
+    date: string;
+    label: string;
+    retailing: number;
+    officialWork: number;
+    leave: number;
+    absent: number;
+    totalActivities: number;
+    tc: number;
+    pc: number;
+    upc: number;
+    netValue: number;
+    cases: number;
+    firstCallTime?: string | null;
+    firstPcTime?: string | null;
+  }[];
+  target: {
+    metric?: TargetMetric;
+    selected?: {
+      target: number;
+      achieved: number;
+      remaining: number;
+      achievementPercentage: number;
+      mtd: number;
+      lmtd: number;
+      improvement: number;
+      crr: number;
+      rrr: number;
+    };
+    targetCases: number;
+    achievedCases: number;
+    remainingCases: number;
+    targetTonnage: number;
+    achievedTonnage: number;
+    remainingTonnage: number;
+    targetValue: number;
+    achievedValue: number;
+    remainingValue: number;
+    achievementPercentage: number;
+    crr: number;
+    rrr: number;
+  };
+  pocket: {
+    tc: number;
+    avgTc: number;
+    pc: number;
+    avgPc: number;
+    upc: number;
+    utc: number;
+    totalLinesSold: number;
+    lpc: number;
+  };
+}
+
+export type TargetMetric = 'cases' | 'tonnage' | 'value';
+
 export interface HomeService {
   /** Authenticates user and returns token/user payload from backend */
   dayStart(payload: DayStartPayload): Promise<ApiResponse<any>>;
@@ -190,9 +239,15 @@ export interface HomeService {
   getVans: (params?: { limit?: number; page?: number }) => Promise<ApiResponse<any>>;
   dayComplete(carryForwardStock: any): Promise<ApiResponse<any>>;
   getEmployeeStats(employeeId: string): Promise<ApiResponse<any>>;
+  getSalesmanPocketAndTarget: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+    metric?: TargetMetric;
+  }) => Promise<ApiResponse<SalesmanPocketTargetResponse>>;
   getManagerStats(date?: string): Promise<ApiResponse<ManagerStatsResponse>>;
-  getManagerTarget: () => Promise<ApiResponse<ManagerTargetResponse>>;
-  getUserWiseTargetSummary: () => Promise<ApiResponse<UserWiseTargetResponse>>;
+  getManagerTarget: (date?: string) => Promise<ApiResponse<ManagerTargetResponse>>;
+  getUserWiseTargetSummary: (date?: string) => Promise<ApiResponse<UserWiseTargetSummary[]>>;
   getManagerOrderSummary: (date?: string) => Promise<ApiResponse<ManagerOrderSummaryResponse>>;
   getManagerTeamCoverage: () => Promise<ApiResponse<ManagerTeamCoverageResponse>>;
   getManagerBeatOMeter: () => Promise<ApiResponse<ManagerBeatOMeterResponse>>;
@@ -228,20 +283,30 @@ export const homeService: HomeService = {
     api.post('/work-session/complete', { carryForwardStock }) as Promise<ApiResponse<any>>,
   getEmployeeStats: (employeeId: string) =>
     api.get<any>(`/employee/${employeeId}/stats`, {}) as Promise<ApiResponse<any>>,
+  getSalesmanPocketAndTarget: (params) =>
+    api.get<SalesmanPocketTargetResponse>(`/employee/salesman/my-pocket-target`, {
+      params,
+    }) as Promise<ApiResponse<SalesmanPocketTargetResponse>>,
   getManagerStats: (date?: string) =>
     api.get<ManagerStatsResponse>(`/employee/manager/stats`, {
       params: date ? { date } : undefined,
     }) as Promise<ApiResponse<ManagerStatsResponse>>,
-  getManagerTarget: () =>
-    api.get<ManagerTargetResponse>(`/employee/manager/target`, {}) as Promise<
+  getManagerTarget: (date?: string) =>
+    api.get<ManagerTargetResponse>(`/employee/manager/target`, {
+      params: date ? { date } : undefined,
+    }) as Promise<
       ApiResponse<ManagerTargetResponse>
     >,
-  getUserWiseTargetSummary: () =>
-    api.get<UserWiseTargetResponse>(`/employee/manager/user-wise-target`, {}) as Promise<
-      ApiResponse<UserWiseTargetResponse>
+  getUserWiseTargetSummary: (date?: string) =>
+    api.get<UserWiseTargetSummary[]>(`/employee/manager/user-wise-target`, {
+      params: date ? { date } : undefined,
+    }) as Promise<
+      ApiResponse<UserWiseTargetSummary[]>
     >,
   getManagerOrderSummary: (date?: string) =>
-    api.get<ManagerOrderSummaryResponse>(`/employee/manager/order-summary`, {}) as Promise<
+    api.get<ManagerOrderSummaryResponse>(`/employee/manager/order-summary`, {
+      params: date ? { date } : undefined,
+    }) as Promise<
       ApiResponse<ManagerOrderSummaryResponse>
     >,
   getManagerTeamCoverage: () =>

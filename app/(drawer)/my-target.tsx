@@ -1,7 +1,17 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, SafeAreaView, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  SafeAreaView,
+  TouchableOpacity,
+  Dimensions,
+  Modal,
+} from 'react-native';
 import { Ionicons, MaterialIcons, Feather, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFocusEffect } from 'expo-router';
 import Svg, {
   Path,
   Line,
@@ -13,58 +23,197 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 import { useTheme } from '@/shared/hooks/useTheme';
+import {
+  homeService,
+  type SalesmanPocketTargetResponse,
+  type TargetMetric,
+} from '@/features/home/services/home.service';
 
 const { width: screenWidth } = Dimensions.get('window');
+
+type TargetDashboardData = {
+  progress: number;
+  achieved: number;
+  target: number;
+  remaining: number;
+  rrr: number;
+  crr: number;
+  growth: number;
+  weeklyData: { week: string; progress: number; date: string }[];
+  lmtd: number;
+  mtd: number;
+  crrValue: number;
+  improvement: number;
+  asOfLabel: string;
+};
+
+const metricOptions: { value: TargetMetric; label: string }[] = [
+  { value: 'tonnage', label: 'Tonnage' },
+  { value: 'value', label: 'Value' },
+  { value: 'cases', label: 'Cases' },
+];
+
+const metricLabels: Record<TargetMetric, string> = {
+  cases: 'Cases',
+  tonnage: 'Tonnage',
+  value: 'Value',
+};
+
+const emptyTargetData: TargetDashboardData = {
+  progress: 0,
+  achieved: 0,
+  target: 0,
+  remaining: 0,
+  rrr: 0,
+  crr: 0,
+  growth: 0,
+  weeklyData: [
+    { week: 'Week 1', progress: 0, date: '' },
+    { week: 'Week 2', progress: 0, date: '' },
+    { week: 'Week 3', progress: 0, date: '' },
+    { week: 'Week 4', progress: 0, date: '' },
+  ],
+  lmtd: 0,
+  mtd: 0,
+  crrValue: 0,
+  improvement: 0,
+  asOfLabel: '',
+};
+
+const buildWeeklyData = (progress: number) =>
+  [0.25, 0.5, 0.75, 1].map((factor, index) => ({
+    week: `Week ${index + 1}`,
+    progress: Number((progress * factor).toFixed(2)),
+    date: '',
+  }));
+
+const formatNumber = (value: number, metric: TargetMetric) => {
+  const safeValue = Number.isFinite(value) ? value : 0;
+
+  if (metric === 'value') {
+    return Math.round(safeValue).toLocaleString('en-IN');
+  }
+
+  return safeValue.toLocaleString('en-IN', {
+    maximumFractionDigits: metric === 'tonnage' ? 2 : 0,
+  });
+};
+
+const formatPercent = (value: number) =>
+  Number.isFinite(value) ? Number(value.toFixed(2)).toString() : '0';
+
+const formatDateLabel = (date?: string) => {
+  const parsedDate = date ? new Date(date) : new Date();
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return '';
+  }
+
+  return parsedDate.toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+const mapTargetResponse = (
+  data: SalesmanPocketTargetResponse | undefined,
+  metric: TargetMetric,
+): TargetDashboardData => {
+  const target = data?.target;
+  const selected = target?.selected;
+  const achieved = Number(
+    selected?.achieved ??
+      (metric === 'tonnage'
+        ? target?.achievedTonnage
+        : metric === 'value'
+          ? target?.achievedValue
+          : target?.achievedCases) ??
+      0,
+  );
+  const targetValue = Number(
+    selected?.target ??
+      (metric === 'tonnage'
+        ? target?.targetTonnage
+        : metric === 'value'
+          ? target?.targetValue
+          : target?.targetCases) ??
+      0,
+  );
+  const progress = Number(selected?.achievementPercentage ?? target?.achievementPercentage ?? 0);
+  const remaining = Number(
+    selected?.remaining ??
+      (metric === 'tonnage'
+        ? target?.remainingTonnage
+        : metric === 'value'
+          ? target?.remainingValue
+          : target?.remainingCases) ??
+      Math.max(targetValue - achieved, 0),
+  );
+  const rrr = Number(selected?.rrr ?? target?.rrr ?? 0);
+  const crr = Number(selected?.crr ?? target?.crr ?? 0);
+
+  return {
+    progress,
+    achieved,
+    target: targetValue,
+    remaining,
+    rrr: Number(rrr.toFixed(2)),
+    crr: Number(crr.toFixed(2)),
+    growth: Number(selected?.improvement ?? progress),
+    weeklyData: buildWeeklyData(progress),
+    lmtd: Number(selected?.lmtd ?? 0),
+    mtd: Number(selected?.mtd ?? progress),
+    crrValue: Number(crr.toFixed(2)),
+    improvement: Number(selected?.improvement ?? 0),
+    asOfLabel: formatDateLabel(data?.endDate),
+  };
+};
 
 export default function TargetDashboard() {
   const { colors } = useTheme();
   const [selectedPeriod, setSelectedPeriod] = useState<'lastMonth' | 'currentMonth'>(
     'currentMonth',
   );
+  const [selectedMetric, setSelectedMetric] = useState<TargetMetric>('cases');
+  const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
+  const [currentMonthData, setCurrentMonthData] = useState<TargetDashboardData>(emptyTargetData);
+  const [lastMonthData, setLastMonthData] = useState<TargetDashboardData>(emptyTargetData);
+  const [loading, setLoading] = useState(true);
 
-  // Data for Last Month
-  const lastMonthData = {
-    progress: 0.7,
-    achieved: 1,
-    target: 150,
-    remaining: 149,
-    rrr: 68,
-    crr: 0.04,
-    growth: -0.6,
-    weeklyData: [
-      { week: 'Week 1', progress: 0.1, date: 'Mar 1-7' },
-      { week: 'Week 2', progress: 0.2, date: 'Mar 8-14' },
-      { week: 'Week 3', progress: 0.4, date: 'Mar 15-21' },
-      { week: 'Week 4', progress: 0.7, date: 'Mar 22-28' },
-    ],
-    lmtd: 0.7,
-    mtd: 0.7,
-    crrValue: 0.7,
-    improvement: 0,
-  };
+  const loadTarget = useCallback(async () => {
+    setLoading(true);
 
-  // Data for Current Month
-  const currentMonthData = {
-    progress: 1.3,
-    achieved: 2,
-    target: 150,
-    remaining: 148,
-    rrr: 74,
-    crr: 0.07,
-    growth: 0.7,
-    weeklyData: [
-      { week: 'Week 1', progress: 0.3, date: 'Apr 1-7' },
-      { week: 'Week 2', progress: 0.5, date: 'Apr 8-14' },
-      { week: 'Week 3', progress: 0.8, date: 'Apr 15-21' },
-      { week: 'Week 4', progress: 1.3, date: 'Apr 22-28' },
-    ],
-    lmtd: 0.7,
-    mtd: 1.3,
-    crrValue: 1.3,
-    improvement: 0.6,
-  };
+    try {
+      const now = new Date();
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+      const lastMonthDate = lastMonthEnd.toISOString().split('T')[0];
+      const [targetResponse, lastTargetResponse] = await Promise.all([
+        homeService.getSalesmanPocketAndTarget({ metric: selectedMetric }),
+        homeService.getSalesmanPocketAndTarget({ date: lastMonthDate, metric: selectedMetric }),
+      ]);
+
+      setCurrentMonthData(mapTargetResponse(targetResponse.data, selectedMetric));
+      setLastMonthData(mapTargetResponse(lastTargetResponse.data, selectedMetric));
+    } catch (error) {
+      console.warn('Failed to load target dashboard:', error);
+      setCurrentMonthData(emptyTargetData);
+      setLastMonthData(emptyTargetData);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedMetric]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTarget();
+    }, [loadTarget]),
+  );
 
   const currentData = selectedPeriod === 'currentMonth' ? currentMonthData : lastMonthData;
+  const selectedMetricLabel = metricLabels[selectedMetric];
+  const targetProgress =
+    currentData.target > 0 ? Math.min((currentData.achieved / currentData.target) * 100, 100) : 0;
 
   // Custom Area Chart Component
   const AreaChart = ({ data, color, height = 200, width = screenWidth - 72 }) => {
@@ -246,6 +395,29 @@ export default function TargetDashboard() {
           }}
         >
           {/* Period Selector - Working Tabs */}
+          <View style={{ alignItems: 'flex-end' }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setIsMetricDropdownOpen(true)}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                backgroundColor: colors.surface + '18',
+                borderColor: colors.surface + '22',
+                borderWidth: 1,
+                borderRadius: 14,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+              }}
+            >
+              <Text style={{ color: colors.surface, fontSize: 13, fontWeight: '700' }}>
+                {selectedMetricLabel}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={colors.surface} />
+            </TouchableOpacity>
+          </View>
+
           <View
             style={{
               flexDirection: 'row',
@@ -334,6 +506,15 @@ export default function TargetDashboard() {
           >
             {selectedPeriod === 'currentMonth' ? 'CURRENT' : 'LAST'} MONTH'S PROGRESS
           </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
+            Showing target by {selectedMetricLabel}
+          </Text>
+
+          {loading && selectedPeriod === 'currentMonth' && (
+            <View style={{ marginTop: 16, alignItems: 'flex-start' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          )}
 
           <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: 20, gap: 24 }}>
             <CircularProgress
@@ -346,13 +527,13 @@ export default function TargetDashboard() {
                 <View>
                   <Text style={{ color: colors.textSecondary, fontSize: 11 }}>ACHIEVED</Text>
                   <Text style={{ fontSize: 28, fontWeight: '800', color: colors.success }}>
-                    {currentData.achieved}
+                    {formatNumber(currentData.achieved, selectedMetric)}
                   </Text>
                 </View>
                 <View>
                   <Text style={{ color: colors.textSecondary, fontSize: 11 }}>TARGET</Text>
                   <Text style={{ fontSize: 28, fontWeight: '800', color: colors.textPrimary }}>
-                    {currentData.target}
+                    {formatNumber(currentData.target, selectedMetric)}
                   </Text>
                 </View>
               </View>
@@ -370,7 +551,8 @@ export default function TargetDashboard() {
               >
                 <Ionicons name="flag-outline" size={16} color={colors.warning} />
                 <Text style={{ color: colors.warning, fontSize: 12, fontWeight: '500' }}>
-                  {currentData.remaining} remaining to achieve target
+                  {formatNumber(currentData.remaining, selectedMetric)} {selectedMetricLabel}{' '}
+                  remaining to achieve target
                 </Text>
               </View>
             </View>
@@ -406,10 +588,10 @@ export default function TargetDashboard() {
               RRR
             </Text>
             <Text style={{ fontSize: 28, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
-              {currentData.rrr}%
+              {formatNumber(currentData.rrr, selectedMetric)}
             </Text>
             <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4 }}>
-              Repeat Rate Ratio
+              Required Run Rate
             </Text>
           </LinearGradient>
 
@@ -440,10 +622,10 @@ export default function TargetDashboard() {
               CRR
             </Text>
             <Text style={{ fontSize: 28, fontWeight: '800', color: colors.success, marginTop: 4 }}>
-              {currentData.crr.toFixed(3)}
+              {formatNumber(currentData.crr, selectedMetric)}
             </Text>
             <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4 }}>
-              Conversion Rate Ratio
+              Current Run Rate
             </Text>
           </LinearGradient>
         </View>
@@ -548,7 +730,9 @@ export default function TargetDashboard() {
             <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary }}>
               LMTD vs MTD
             </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 11 }}>as of 28 Apr 2024</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+              {currentData.asOfLabel ? `as of ${currentData.asOfLabel}` : ''}
+            </Text>
           </View>
 
           <View style={{ gap: 12 }}>
@@ -572,7 +756,7 @@ export default function TargetDashboard() {
                 </View>
                 <View>
                   <Text style={{ fontSize: 20, fontWeight: '700', color: colors.textPrimary }}>
-                    {currentData.lmtd}%
+                    {formatPercent(currentData.lmtd)}%
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                     <Ionicons name="remove-outline" size={12} color={colors.textSecondary} />
@@ -584,9 +768,9 @@ export default function TargetDashboard() {
               </View>
               <View style={{ flexDirection: 'row', gap: 24 }}>
                 <View style={{ alignItems: 'center' }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>CRR</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>ACH %</Text>
                   <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>
-                    {currentData.lmtd}%
+                    {formatPercent(currentData.lmtd)}%
                   </Text>
                 </View>
               </View>
@@ -614,7 +798,7 @@ export default function TargetDashboard() {
                 </View>
                 <View>
                   <Text style={{ fontSize: 20, fontWeight: '800', color: colors.primary }}>
-                    {currentData.mtd}%
+                    {formatPercent(currentData.mtd)}%
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                     <Ionicons
@@ -630,7 +814,7 @@ export default function TargetDashboard() {
                       }}
                     >
                       {currentData.growth >= 0 ? '+' : ''}
-                      {currentData.growth}% growth
+                      {formatPercent(currentData.growth)}% growth
                     </Text>
                   </View>
                 </View>
@@ -639,7 +823,7 @@ export default function TargetDashboard() {
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 10 }}>CRR</Text>
                   <Text style={{ fontSize: 14, fontWeight: '700', color: colors.success }}>
-                    {currentData.crrValue}%
+                    {formatNumber(currentData.crrValue, selectedMetric)}
                   </Text>
                 </View>
               </View>
@@ -673,7 +857,7 @@ export default function TargetDashboard() {
               >
                 <Ionicons name="trending-up" size={14} color={colors.success} />
                 <Text style={{ color: colors.success, fontSize: 12, fontWeight: '600' }}>
-                  +{currentData.improvement}% improvement
+                  +{formatPercent(currentData.improvement)}% improvement
                 </Text>
               </View>
               <Text style={{ color: colors.textSecondary, fontSize: 11 }}>in Conversion Rate</Text>
@@ -725,7 +909,7 @@ export default function TargetDashboard() {
               <>
                 Only{' '}
                 <Text style={{ color: colors.primary, fontWeight: '700' }}>
-                  {currentData.remaining}
+                  {formatNumber(currentData.remaining, selectedMetric)} {selectedMetricLabel}
                 </Text>{' '}
                 more to reach your target
               </>
@@ -754,7 +938,7 @@ export default function TargetDashboard() {
               >
                 <View
                   style={{
-                    width: `${(currentData.achieved / currentData.target) * 100}%`,
+                    width: `${targetProgress}%`,
                     height: '100%',
                     backgroundColor: colors.primary,
                     borderRadius: 3,
@@ -762,12 +946,80 @@ export default function TargetDashboard() {
                 />
               </View>
               <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>
-                {Math.round((currentData.achieved / currentData.target) * 100)}%
+                {Math.round(targetProgress)}%
               </Text>
             </View>
           )}
         </LinearGradient>
       </ScrollView>
+
+      <Modal
+        visible={isMetricDropdownOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMetricDropdownOpen(false)}
+      >
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setIsMetricDropdownOpen(false)}
+          style={{
+            flex: 1,
+            backgroundColor: '#00000055',
+            justifyContent: 'flex-start',
+            alignItems: 'flex-end',
+            paddingTop: 86,
+            paddingHorizontal: 20,
+          }}
+        >
+          <View
+            style={{
+              width: 180,
+              backgroundColor: colors.surface,
+              borderRadius: 16,
+              paddingVertical: 6,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.12,
+              shadowRadius: 16,
+              elevation: 10,
+            }}
+          >
+            {metricOptions.map((option) => {
+              const isSelected = option.value === selectedMetric;
+
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  activeOpacity={0.8}
+                  onPress={() => {
+                    setSelectedMetric(option.value);
+                    setIsMetricDropdownOpen(false);
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    backgroundColor: isSelected ? colors.primary + '08' : 'transparent',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: isSelected ? colors.primary : colors.textPrimary,
+                      fontSize: 14,
+                      fontWeight: isSelected ? '700' : '500',
+                    }}
+                  >
+                    {option.label}
+                  </Text>
+                  {isSelected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }

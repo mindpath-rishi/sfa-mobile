@@ -10,6 +10,12 @@ export interface AuthService {
   /** Authenticates user and returns token/user payload from backend */
   login(payload: LoginRequest): Promise<ApiResponse<LoginResponse>>;
 
+  /** Updates the active device push token after Firebase rotates it */
+  updatePushToken(payload: {
+    deviceId: string;
+    fcmToken: string;
+  }): Promise<ApiResponse<{ updated: boolean }>>;
+
   /** Clears server session/token (if backend supports it) */
   logout(): Promise<ApiResponse<{ loggedOut: boolean }>>;
 }
@@ -22,6 +28,10 @@ export const authService: AuthService = {
   login: (payload) =>
     api.post<LoginResponse, LoginRequest>('/user/login', payload) as Promise<
       ApiResponse<LoginResponse>
+    >,
+  updatePushToken: (payload) =>
+    api.patch<{ updated: boolean }, typeof payload>('/user/device/push-token', payload) as Promise<
+      ApiResponse<{ updated: boolean }>
     >,
   logout: () =>
     api.post<{ loggedOut: boolean }>('/user/logout') as Promise<

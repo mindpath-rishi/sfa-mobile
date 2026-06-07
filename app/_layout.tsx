@@ -19,6 +19,17 @@ import { useGlobalErrorStore } from '@/core/store/error.store';
 import AppErrorScreen from '@/core/screens/error/Error';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { HeaderProvider } from '@/shared/contexts/HeaderContext';
+import {
+  addFirebaseNotificationListeners,
+  addNotificationResponseListener,
+  addPushTokenRefreshListener,
+  setupNotificationChannelAsync,
+  setupBackgroundMessageHandler,
+} from '@/shared/services/push-notification.service';
+import { authService } from '@/features/auth/services/auth.service';
+import { getClientDeviceIdAsync } from '@/shared/services/device.service';
+
+setupBackgroundMessageHandler();
 
 export default function RootLayout() {
   const router = useRouter();
@@ -47,6 +58,35 @@ export default function RootLayout() {
     hydrateLanguage();
     hydrateAuth();
   }, [hydrateTheme, hydrateLanguage, hydrateAuth]);
+
+  useEffect(() => {
+    setupNotificationChannelAsync().catch((error) =>
+      console.warn('Notification channel setup failed:', error),
+    );
+  }, []);
+
+  useEffect(() => {
+    return addNotificationResponseListener(router);
+  }, [router]);
+
+  useEffect(() => {
+    return addFirebaseNotificationListeners(router);
+  }, [router]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    return addPushTokenRefreshListener(async (fcmToken) => {
+      try {
+        await authService.updatePushToken({
+          deviceId: await getClientDeviceIdAsync(),
+          fcmToken,
+        });
+      } catch (error) {
+        console.warn('Push token refresh sync failed:', error);
+      }
+    });
+  }, [token]);
 
   /* ======================================================
    * NAVIGATION BAR (ANDROID)

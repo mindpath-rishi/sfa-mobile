@@ -8,9 +8,15 @@ import { useTheme } from '@/shared/hooks/useTheme';
 type ManagerDatePickerModalProps = {
   visible: boolean;
   value: Date;
+  rangeValue?: {
+    startDate: Date;
+    endDate: Date;
+  };
+  mode?: 'single' | 'range';
   title?: string;
   onClose: () => void;
   onApply: (date: Date) => void;
+  onApplyRange?: (range: { startDate: Date; endDate: Date }) => void;
 };
 
 const formatPreviewDate = (date: Date) =>
@@ -54,27 +60,75 @@ const getCalendarDates = (monthDate: Date) => {
 export function ManagerDatePickerModal({
   visible,
   value,
+  rangeValue,
+  mode = 'single',
   title = 'Select date',
   onClose,
   onApply,
+  onApplyRange,
 }: ManagerDatePickerModalProps) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const [draftDate, setDraftDate] = useState(value);
+  const [draftRange, setDraftRange] = useState({
+    startDate: rangeValue?.startDate || value,
+    endDate: rangeValue?.endDate || value,
+  });
   const [visibleMonth, setVisibleMonth] = useState(startOfMonth(value));
   const calendarDates = useMemo(() => getCalendarDates(visibleMonth), [visibleMonth]);
   const today = useMemo(() => new Date(), []);
+  const isRangeMode = mode === 'range';
 
   useEffect(() => {
     if (visible) {
       setDraftDate(value);
-      setVisibleMonth(startOfMonth(value));
+      setDraftRange({
+        startDate: rangeValue?.startDate || value,
+        endDate: rangeValue?.endDate || value,
+      });
+      setVisibleMonth(startOfMonth(rangeValue?.startDate || value));
     }
-  }, [value, visible]);
+  }, [rangeValue?.endDate, rangeValue?.startDate, value, visible]);
 
   const handleApply = () => {
+    if (isRangeMode) {
+      const startDate =
+        draftRange.startDate <= draftRange.endDate ? draftRange.startDate : draftRange.endDate;
+      const endDate =
+        draftRange.startDate <= draftRange.endDate ? draftRange.endDate : draftRange.startDate;
+
+      onApplyRange?.({ startDate, endDate });
+      onClose();
+      return;
+    }
+
     onApply(draftDate);
     onClose();
+  };
+
+  const handleSelectDate = (date: Date) => {
+    if (!isRangeMode) {
+      setDraftDate(date);
+      return;
+    }
+
+    const sameRangeSelected = isSameDate(draftRange.startDate, draftRange.endDate);
+
+    if (!sameRangeSelected || date < draftRange.startDate) {
+      setDraftRange({ startDate: date, endDate: date });
+      return;
+    }
+
+    setDraftRange((current) => ({ ...current, endDate: date }));
+  };
+
+  const isInDraftRange = (date: Date) => {
+    const startDate =
+      draftRange.startDate <= draftRange.endDate ? draftRange.startDate : draftRange.endDate;
+    const endDate =
+      draftRange.startDate <= draftRange.endDate ? draftRange.endDate : draftRange.startDate;
+
+    return date >= startDate && date <= endDate;
   };
 
   return (
@@ -88,7 +142,13 @@ export function ManagerDatePickerModal({
               </View>
               <View style={styles.headerText}>
                 <AppText style={styles.title}>{title}</AppText>
-                <AppText style={styles.selectedText}>{formatPreviewDate(draftDate)}</AppText>
+                <AppText style={styles.selectedText}>
+                  {isRangeMode
+                    ? `${formatPreviewDate(draftRange.startDate)} - ${formatPreviewDate(
+                        draftRange.endDate,
+                      )}`
+                    : formatPreviewDate(draftDate)}
+                </AppText>
               </View>
             </View>
             <TouchableOpacity style={styles.closeButton} activeOpacity={0.78} onPress={onClose}>
@@ -125,7 +185,10 @@ export function ManagerDatePickerModal({
 
             <View style={styles.dayGrid}>
               {calendarDates.map((date) => {
-                const selected = isSameDate(date, draftDate);
+                const selected = isRangeMode
+                  ? isSameDate(date, draftRange.startDate) || isSameDate(date, draftRange.endDate)
+                  : isSameDate(date, draftDate);
+                const inRange = isRangeMode && isInDraftRange(date);
                 const currentMonth = date.getMonth() === visibleMonth.getMonth();
                 const currentDay = isSameDate(date, today);
 
@@ -134,12 +197,13 @@ export function ManagerDatePickerModal({
                     key={`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}
                     style={[
                       styles.dayButton,
+                      inRange && styles.dayButtonInRange,
                       currentDay && styles.dayButtonToday,
                       selected && styles.dayButtonSelected,
                     ]}
                     activeOpacity={0.78}
                     onPress={() => {
-                      setDraftDate(date);
+                      handleSelectDate(date);
                       if (!currentMonth) setVisibleMonth(startOfMonth(date));
                     }}
                   >
@@ -292,6 +356,9 @@ const createStyles = (colors: any) =>
     dayButtonToday: {
       borderWidth: 1,
       borderColor: colors.primary,
+    },
+    dayButtonInRange: {
+      backgroundColor: colors.primaryLight,
     },
     dayButtonSelected: {
       backgroundColor: colors.primary,

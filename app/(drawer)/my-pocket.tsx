@@ -3,8 +3,9 @@
 // INSTALL FIRST
 // expo install @react-native-community/datetimepicker expo-linear-gradient
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   ScrollView,
@@ -13,14 +14,14 @@ import {
   StatusBar,
   Modal,
   Dimensions,
-  Platform,
   Animated,
-  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { Ionicons, MaterialCommunityIcons, Feather, FontAwesome5 } from '@expo/vector-icons';
+import { useFocusEffect } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { homeService } from '@/features/home/services/home.service';
+import { ManagerDatePickerModal } from '@/features/home/components/models/ManagerDatePickerModal';
 
 const { width } = Dimensions.get('window');
 
@@ -39,37 +40,133 @@ const TYPOGRAPHY = {
   time: { size: 12, weight: '500' as const, lineHeight: 16 },
 };
 
+const defaultSummaryData = {
+  retailing: 0,
+  leaveAbsent: '0 / 0',
+  officialWork: 0,
+  total: 0,
+  avgRetailingTime: '--',
+  avgTotalTime: '--',
+};
+
+const defaultPerformanceData = {
+  tc: 0,
+  pc: 0,
+  upc: 0,
+  utc: 0,
+  lpc: 0,
+  avgFirstCall: '--',
+  avgFirstPC: '--',
+  avgTC: 0,
+  avgPC: 0,
+  achievement: 0,
+  target: 0,
+};
+
+const defaultProductData = {
+  sc: 0,
+  tc: 0,
+  pc: 0,
+  netValue: 0,
+  cases: 0,
+  lpc: 0,
+  categories: [] as {
+    name: string;
+    value: number;
+    pcs: number;
+    cases: number;
+    growth: number;
+  }[],
+};
+
+type PocketFilter = 'today' | 'week' | 'month' | 'custom';
+
+type DayWiseSummaryItem = {
+  date: string;
+  label: string;
+  retailing: number;
+  officialWork: number;
+  leave: number;
+  absent: number;
+  totalActivities: number;
+  tc: number;
+  pc: number;
+  upc: number;
+  netValue: number;
+  cases: number;
+  firstCallTime?: string | null;
+  firstPcTime?: string | null;
+};
+
+const filterOptions: { value: PocketFilter; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This Week' },
+  { value: 'month', label: 'Current Month' },
+  { value: 'custom', label: 'Custom Date' },
+];
+
+const formatApiDate = (date: Date) => date.toISOString().split('T')[0];
+const formatNumber = (value: number, decimals = 0) =>
+  Number(value || 0).toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const getFilterRange = (
+  filter: PocketFilter,
+  customRange: { startDate: Date; endDate: Date },
+) => {
+  const today = startOfDay(new Date());
+
+  if (filter === 'today') {
+    return { startDate: today, endDate: today };
+  }
+
+  if (filter === 'week') {
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - today.getDay());
+    return { startDate, endDate: today };
+  }
+
+  if (filter === 'month') {
+    return {
+      startDate: new Date(today.getFullYear(), today.getMonth(), 1),
+      endDate: today,
+    };
+  }
+
+  return customRange;
+};
+
 export default function PocketMISScreen() {
   const [showProductWiseModal, setShowProductWiseModal] = useState(false);
   const [showDayWiseModal, setShowDayWiseModal] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState('MTD');
+  const [selectedFilter, setSelectedFilter] = useState<PocketFilter>('month');
   const [selectedCategory, setSelectedCategory] = useState('PRIMARYCATEGORY');
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customRange, setCustomRange] = useState(() => {
+    const today = startOfDay(new Date());
+    return { startDate: today, endDate: today };
+  });
+  const [showDateRangePicker, setShowDateRangePicker] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>('performance');
+  const [summaryData, setSummaryData] = useState(defaultSummaryData);
+  const [performanceData, setPerformanceData] = useState(defaultPerformanceData);
+  const [productData, setProductData] = useState(defaultProductData);
+  const [dayWiseSummary, setDayWiseSummary] = useState<DayWiseSummaryItem[]>([]);
+  const [recentActivities, setRecentActivities] = useState<
+    { icon: string; text: string; time: string; color: string }[]
+  >([]);
+  const [loading, setLoading] = useState(true);
 
   const scrollY = new Animated.Value(0);
   const { colors, isDark } = useTheme();
+  const selectedRange = getFilterRange(selectedFilter, customRange);
 
-  const openDatePicker = () => {
-    if (Platform.OS === 'web') {
-      // For web, we'll use a modal with a date input
-      setShowDatePicker(true);
-    } else if (Platform.OS === 'android') {
-      DateTimePickerAndroid.open({
-        value: selectedDate,
-        mode: 'date',
-        is24Hour: true,
-        maximumDate: new Date(),
-        onChange: (_event, date) => {
-          if (date) {
-            setSelectedDate(date);
-          }
-        },
-      });
-    } else {
-      setShowDatePicker(true);
-    }
+  const openDateRangePicker = () => {
+    setSelectedFilter('custom');
+    setShowDateRangePicker(true);
   };
 
   const formatDate = (date: Date) => {
@@ -79,42 +176,107 @@ export default function PocketMISScreen() {
     return `${day} ${month} ${year}`;
   };
 
-  const summaryData = {
-    retailing: 3,
-    leaveAbsent: '0 / 18',
-    officialWork: 0,
-    total: 21,
-    avgRetailingTime: '2h 30m',
-    avgTotalTime: '6h 45m',
+  const formatRangeLabel = ({ startDate, endDate }: { startDate: Date; endDate: Date }) => {
+    if (formatApiDate(startDate) === formatApiDate(endDate)) {
+      return formatDate(startDate);
+    }
+
+    return `${formatDate(startDate)} - ${formatDate(endDate)}`;
   };
 
-  const performanceData = {
-    tc: 3,
-    pc: 2,
-    upc: 2,
-    utc: 3,
-    lpc: 2,
-    avgFirstCall: '10:53:32',
-    avgFirstPC: '10:53:32',
-    avgTC: 3,
-    avgPC: 2,
-    achievement: 87,
-    target: 100,
-  };
+  const loadPocketData = useCallback(async () => {
+    setLoading(true);
 
-  const productData = {
-    sc: 376,
-    tc: 3,
-    pc: 2,
-    netValue: 43,
-    cases: 3.071,
-    lpc: 2,
-    categories: [
-      { name: 'Confectionery', value: 43, pcs: 43, cases: 3.071, growth: 12 },
-      { name: 'Beverages', value: 82, pcs: 68, cases: 1.8, growth: 8 },
-      { name: 'Snacks', value: 56, pcs: 45, cases: 2.1, growth: 15 },
-    ],
-  };
+    try {
+      const range = getFilterRange(selectedFilter, customRange);
+      const response = await homeService.getSalesmanPocketAndTarget({
+        startDate: formatApiDate(range.startDate),
+        endDate: formatApiDate(range.endDate),
+      });
+      const data = response.data;
+      const pocket = data?.pocket;
+      const target = data?.target;
+      const dayWise = data?.dayWiseSummary || [];
+
+      setSummaryData({
+        retailing: Number(data?.retailingDays || 0),
+        leaveAbsent: `${dayWise.reduce((sum, item) => sum + Number(item.leave || 0), 0)} / ${dayWise.reduce(
+          (sum, item) => sum + Number(item.absent || 0),
+          0,
+        )}`,
+        officialWork: dayWise.reduce((sum, item) => sum + Number(item.officialWork || 0), 0),
+        total: dayWise.reduce((sum, item) => sum + Number(item.totalActivities || 0), 0),
+        avgRetailingTime: '--',
+        avgTotalTime: '--',
+      });
+
+      setPerformanceData({
+        tc: Number(pocket?.tc || 0),
+        pc: Number(pocket?.pc || 0),
+        upc: Number(pocket?.upc || 0),
+        utc: Number(pocket?.utc || 0),
+        lpc: Number(pocket?.lpc || 0),
+        avgFirstCall: '--',
+        avgFirstPC: '--',
+        avgTC: Number(pocket?.avgTc || 0),
+        avgPC: Number(pocket?.avgPc || 0),
+        achievement: Number(target?.achievementPercentage || 0),
+        target: Number(target?.targetCases || 0),
+      });
+
+      setProductData({
+        sc: Number(target?.achievedValue || 0),
+        tc: Number(pocket?.tc || 0),
+        pc: Number(pocket?.pc || 0),
+        netValue: Number(target?.achievedValue || 0),
+        cases: Number(target?.achievedCases || 0),
+        lpc: Number(pocket?.lpc || 0),
+        categories: [],
+      });
+
+      setDayWiseSummary(dayWise);
+
+      setRecentActivities([
+        {
+          icon: 'checkmark-circle',
+          text: `TC ${formatNumber(Number(pocket?.tc || 0))}, PC ${formatNumber(
+            Number(pocket?.pc || 0),
+          )}`,
+          time: formatRangeLabel(range),
+          color: colors.success,
+        },
+        {
+          icon: 'trending-up',
+          text: `Achievement ${formatNumber(Number(target?.achievementPercentage || 0), 2)}%`,
+          time: `${formatNumber(Number(target?.achievedCases || 0), 2)} cases`,
+          color: colors.primary,
+        },
+        {
+          icon: 'storefront',
+          text: `UPC ${formatNumber(Number(pocket?.upc || 0))}, UTC ${formatNumber(
+            Number(pocket?.utc || 0),
+          )}`,
+          time: `${Number(data?.retailingDays || 0)} retailing days`,
+          color: colors.warning,
+        },
+      ]);
+    } catch (error) {
+      console.warn('Failed to load pocket dashboard:', error);
+      setSummaryData(defaultSummaryData);
+      setPerformanceData(defaultPerformanceData);
+      setProductData(defaultProductData);
+      setDayWiseSummary([]);
+      setRecentActivities([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [colors.primary, colors.success, colors.warning, customRange, selectedFilter]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPocketData();
+    }, [loadPocketData]),
+  );
 
   const SummaryItem = ({ value, label, color, icon, trend }: any) => (
     <View style={{ width: '33%', alignItems: 'center', marginBottom: 16 }}>
@@ -275,121 +437,6 @@ export default function PocketMISScreen() {
     </TouchableOpacity>
   );
 
-  // Web Date Picker Modal Component
-  const WebDatePickerModal = () => {
-    const [tempDate, setTempDate] = useState(selectedDate);
-
-    const handleConfirm = () => {
-      setSelectedDate(tempDate);
-      setShowDatePicker(false);
-    };
-
-    return (
-      <Modal
-        visible={showDatePicker && Platform.OS === 'web'}
-        transparent={true}
-        animationType="fade"
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: 20,
-              padding: 20,
-              width: width - 40,
-              maxWidth: 400,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: TYPOGRAPHY.h3.size,
-                fontWeight: TYPOGRAPHY.h3.weight,
-                color: colors.textPrimary,
-                marginBottom: 20,
-                textAlign: 'center',
-              }}
-            >
-              Select Date
-            </Text>
-
-            <input
-              type="date"
-              value={tempDate.toISOString().split('T')[0]}
-              max={new Date().toISOString().split('T')[0]}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setTempDate(new Date(e.target.value));
-                }
-              }}
-              style={{
-                width: '100%',
-                padding: 12,
-                fontSize: '16px',
-                border: `1px solid ${colors.border}`,
-                borderRadius: 10,
-                backgroundColor: colors.background,
-                color: colors.textPrimary,
-                marginBottom: 20,
-                fontFamily: 'inherit',
-              }}
-            />
-
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <TouchableOpacity
-                onPress={() => setShowDatePicker(false)}
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  alignItems: 'center',
-                }}
-              >
-                <Text style={{ color: colors.textTertiary, fontSize: TYPOGRAPHY.button.size }}>
-                  Cancel
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleConfirm}
-                style={{
-                  flex: 1,
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                  backgroundColor: colors.primary,
-                  alignItems: 'center',
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.primaryContrast,
-                    fontSize: TYPOGRAPHY.button.size,
-                    fontWeight: '600',
-                  }}
-                >
-                  Confirm
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
-
   const ProductWiseModal = () => (
     <Modal visible={showProductWiseModal} animationType="slide">
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
@@ -437,17 +484,17 @@ export default function PocketMISScreen() {
             showsHorizontalScrollIndicator={false}
             style={{ marginVertical: 14 }}
           >
-            {['MTD', 'LAST MONTH', 'CUSTOM DATE', 'Calendar'].map((item) => (
+            {filterOptions.map((item) => (
               <TouchableOpacity
-                key={item}
+                key={item.value}
                 onPress={() => {
-                  setSelectedFilter(item);
-                  if (item === 'Calendar') openDatePicker();
+                  setSelectedFilter(item.value);
+                  if (item.value === 'custom') setShowDateRangePicker(true);
                 }}
                 style={{
                   borderWidth: 1,
                   borderColor: colors.primary,
-                  backgroundColor: selectedFilter === item ? colors.primary : colors.surface,
+                  backgroundColor: selectedFilter === item.value ? colors.primary : colors.surface,
                   borderRadius: 20,
                   paddingVertical: 6,
                   paddingHorizontal: 16,
@@ -458,10 +505,11 @@ export default function PocketMISScreen() {
                   style={{
                     fontSize: TYPOGRAPHY.button.size,
                     fontWeight: TYPOGRAPHY.button.weight,
-                    color: selectedFilter === item ? colors.primaryContrast : colors.textPrimary,
+                    color:
+                      selectedFilter === item.value ? colors.primaryContrast : colors.textPrimary,
                   }}
                 >
-                  {item}
+                  {item.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -601,8 +649,15 @@ export default function PocketMISScreen() {
               </Text>
             </View>
 
-            {productData.categories.map((item, index) => (
-              <TouchableOpacity key={index} activeOpacity={0.8}>
+            {productData.categories.length === 0 ? (
+              <View style={{ paddingVertical: 18, alignItems: 'center' }}>
+                <Text style={{ color: colors.textTertiary, fontSize: TYPOGRAPHY.bodySmall.size }}>
+                  No product sales available
+                </Text>
+              </View>
+            ) : (
+              productData.categories.map((item, index) => (
+                <TouchableOpacity key={index} activeOpacity={0.8}>
                 <View
                   style={{
                     flexDirection: 'row',
@@ -670,8 +725,9 @@ export default function PocketMISScreen() {
                     {item.cases}
                   </Text>
                 </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -710,8 +766,15 @@ export default function PocketMISScreen() {
         <ScrollView
           contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 30 }}
         >
-          {[1, 2].map((_, index) => (
-            <TouchableOpacity key={index} activeOpacity={0.9}>
+          {dayWiseSummary.length === 0 ? (
+            <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+              <Text style={{ color: colors.textTertiary, fontSize: TYPOGRAPHY.bodySmall.size }}>
+                No day wise summary available
+              </Text>
+            </View>
+          ) : (
+            dayWiseSummary.map((item) => (
+            <TouchableOpacity key={item.date} activeOpacity={0.9}>
               <View
                 style={{
                   backgroundColor: colors.surface,
@@ -737,7 +800,7 @@ export default function PocketMISScreen() {
                       fontWeight: '600',
                     }}
                   >
-                    Today - Wed, 22-Apr-2026
+                    {item.label}
                   </Text>
                   <View
                     style={{
@@ -754,7 +817,7 @@ export default function PocketMISScreen() {
                         fontWeight: '600',
                       }}
                     >
-                      2 min ago
+                      PC {formatNumber(item.pc)}
                     </Text>
                   </View>
                 </View>
@@ -787,7 +850,7 @@ export default function PocketMISScreen() {
                         fontWeight: '800',
                       }}
                     >
-                      10 Miles
+                      {formatNumber(item.retailing)}
                     </Text>
                   </View>
                 </LinearGradient>
@@ -811,7 +874,8 @@ export default function PocketMISScreen() {
                       flex: 1,
                     }}
                   >
-                    H7JC+GJ6, Chinika, Lusaka, Zambia
+                    TC {formatNumber(item.tc)} | UPC {formatNumber(item.upc)} | Cases{' '}
+                    {formatNumber(item.cases, 2)} | ZMW {formatNumber(item.netValue, 2)}
                   </Text>
                 </View>
 
@@ -825,7 +889,11 @@ export default function PocketMISScreen() {
                     borderTopColor: colors.border,
                   }}
                 >
-                  {['First Call', 'First PC', 'TC'].map((item, i) => (
+                  {[
+                    { label: 'First Call', value: item.firstCallTime || '--' },
+                    { label: 'First PC', value: item.firstPcTime || '--' },
+                    { label: 'TC', value: formatNumber(item.tc) },
+                  ].map((stat, i) => (
                     <View key={i} style={{ alignItems: 'center', flex: 1 }}>
                       <View
                         style={{
@@ -852,12 +920,12 @@ export default function PocketMISScreen() {
                       </View>
                       <Text
                         style={{
-                          fontSize: TYPOGRAPHY.statSmall.size,
+                          fontSize: i === 2 ? TYPOGRAPHY.statSmall.size : TYPOGRAPHY.bodySmall.size,
                           fontWeight: '800',
                           color: colors.textPrimary,
                         }}
                       >
-                        --
+                        {stat.value}
                       </Text>
                       <Text
                         style={{
@@ -866,14 +934,15 @@ export default function PocketMISScreen() {
                           color: colors.textTertiary,
                         }}
                       >
-                        {item}
+                        {stat.label}
                       </Text>
                     </View>
                   ))}
                 </View>
               </View>
             </TouchableOpacity>
-          ))}
+            ))
+          )}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -886,22 +955,16 @@ export default function PocketMISScreen() {
         barStyle={isDark ? 'light-content' : 'dark-content'}
       />
 
-      {/* iOS Date Picker */}
-      {Platform.OS === 'ios' && showDatePicker && (
-        <DateTimePicker
-          value={selectedDate}
-          mode="date"
-          display="spinner"
-          maximumDate={new Date()}
-          onChange={(_event, date) => {
-            setShowDatePicker(false);
-            if (date) setSelectedDate(date);
-          }}
-        />
-      )}
-
-      {/* Web Date Picker Modal */}
-      <WebDatePickerModal />
+      <ManagerDatePickerModal
+        visible={showDateRangePicker}
+        value={customRange.startDate}
+        rangeValue={customRange}
+        mode="range"
+        title="Select custom date range"
+        onClose={() => setShowDateRangePicker(false)}
+        onApply={() => {}}
+        onApplyRange={(range) => setCustomRange(range)}
+      />
 
       <ProductWiseModal />
       <DayWiseModal />
@@ -961,7 +1024,7 @@ export default function PocketMISScreen() {
             </View>
 
             <TouchableOpacity
-              onPress={openDatePicker}
+              onPress={openDateRangePicker}
               style={{
                 backgroundColor: colors.surface,
                 borderRadius: 12,
@@ -972,9 +1035,9 @@ export default function PocketMISScreen() {
                 flexDirection: 'row',
                 alignItems: 'center',
               }}
-            >
-              <Ionicons name="calendar-outline" size={14} color={colors.primary} />
-              <Text
+              >
+                <Ionicons name="calendar-outline" size={14} color={colors.primary} />
+                <Text
                 style={{
                   marginLeft: 4,
                   fontSize: TYPOGRAPHY.time.size,
@@ -982,10 +1045,55 @@ export default function PocketMISScreen() {
                   color: colors.textPrimary,
                 }}
               >
-                {formatDate(selectedDate)}
+                {formatRangeLabel(selectedRange)}
               </Text>
             </TouchableOpacity>
           </View>
+          {loading && (
+            <View style={{ marginTop: 10, alignItems: 'flex-start' }}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          )}
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 14 }}
+          >
+            {filterOptions.map((item) => {
+              const active = selectedFilter === item.value;
+
+              return (
+                <TouchableOpacity
+                  key={item.value}
+                  activeOpacity={0.82}
+                  onPress={() => {
+                    setSelectedFilter(item.value);
+                    if (item.value === 'custom') setShowDateRangePicker(true);
+                  }}
+                  style={{
+                    borderWidth: 1,
+                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: active ? colors.primary : colors.surface,
+                    borderRadius: 18,
+                    paddingVertical: 7,
+                    paddingHorizontal: 14,
+                    marginRight: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: TYPOGRAPHY.button.size,
+                      fontWeight: TYPOGRAPHY.button.weight,
+                      color: active ? colors.primaryContrast : colors.textPrimary,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
         </View>
 
         {/* QUICK ACTION BUTTONS */}
@@ -1359,33 +1467,21 @@ export default function PocketMISScreen() {
               borderColor: colors.border,
             }}
           >
-            {[
-              {
-                icon: 'checkmark-circle',
-                text: 'Completed 3 retailing visits',
-                time: '2 hours ago',
-                color: colors.success,
-              },
-              {
-                icon: 'trophy',
-                text: 'Achieved daily target',
-                time: '5 hours ago',
-                color: colors.warning,
-              },
-              {
-                icon: 'trending-up',
-                text: 'Increased PC by 15%',
-                time: 'Yesterday',
-                color: colors.primary,
-              },
-            ].map((item, index) => (
+            {recentActivities.length === 0 ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <Text style={{ color: colors.textTertiary, fontSize: TYPOGRAPHY.bodySmall.size }}>
+                  No recent activity available
+                </Text>
+              </View>
+            ) : (
+              recentActivities.map((item, index) => (
               <View
                 key={index}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   paddingVertical: 8,
-                  borderBottomWidth: index < 2 ? 1 : 0,
+                  borderBottomWidth: index < recentActivities.length - 1 ? 1 : 0,
                   borderBottomColor: colors.border,
                 }}
               >
@@ -1423,7 +1519,8 @@ export default function PocketMISScreen() {
                 </View>
                 <Feather name="more-horizontal" size={14} color={colors.textTertiary} />
               </View>
-            ))}
+              ))
+            )}
           </View>
         </View>
       </Animated.ScrollView>
