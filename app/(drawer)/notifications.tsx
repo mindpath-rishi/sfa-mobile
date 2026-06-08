@@ -17,6 +17,7 @@ import {
   notificationService,
   type NotificationItem as ApiNotificationItem,
 } from '@/features/notification/services/notification.service';
+import { toast } from '@/core/utils';
 
 type NotificationItem = {
   id: string;
@@ -25,6 +26,7 @@ type NotificationItem = {
   time: string;
   type: 'order' | 'route' | 'target' | 'system';
   unread?: boolean;
+  data?: Record<string, any>;
 };
 
 const formatRelativeTime = (value?: string) => {
@@ -60,6 +62,7 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
       ? (category as NotificationItem['type'])
       : 'system',
     unread: !item.isRead,
+    data: item.data as Record<string, any> | undefined,
   };
 };
 
@@ -84,6 +87,7 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const loadNotifications = useCallback(async (showRefresh = false) => {
     if (showRefresh) {
@@ -135,6 +139,38 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleVanChangeAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
+    const workSessionId = item.data?.workSessionId;
+    if (!workSessionId || processingId) return;
+
+    setProcessingId(item.id);
+    try {
+      const response =
+        action === 'approve'
+          ? await notificationService.approveVanChange(String(workSessionId))
+          : await notificationService.rejectVanChange(String(workSessionId));
+
+      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+        toast.error(response?.message || `Failed to ${action} request`);
+        return;
+      }
+
+      if (action === 'approve') {
+        toast.success('Van change approved');
+      } else {
+        toast.success('Van change rejected');
+      }
+
+      await notificationService.markAsRead(item.id);
+      await loadNotifications(true);
+    } catch (error: any) {
+      console.warn(`Failed to ${action} van change:`, error);
+      toast.error(error?.response?.data?.message || `Failed to ${action} request`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -165,24 +201,49 @@ export default function NotificationsScreen() {
       ) : (
         <View style={styles.list}>
           {notifications.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              activeOpacity={0.85}
-              onPress={() => handleNotificationPress(item)}
-              style={[styles.card, item.unread && styles.unreadCard]}
-            >
-              <View style={styles.iconWrap}>
-                <Ionicons name={getNotificationIcon(item.type)} size={18} color={colors.primary} />
-              </View>
-              <View style={styles.cardBody}>
-                <View style={styles.cardHeader}>
-                  <AppText style={styles.title}>{item.title}</AppText>
-                  {item.unread && <View style={styles.unreadDot} />}
+            <View key={item.id} style={[styles.card, item.unread && styles.unreadCard]}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleNotificationPress(item)}
+                style={styles.cardPressArea}
+              >
+                <View style={styles.iconWrap}>
+                  <Ionicons name={getNotificationIcon(item.type)} size={18} color={colors.primary} />
                 </View>
-                <AppText style={styles.message}>{item.message}</AppText>
-                <AppText style={styles.time}>{item.time}</AppText>
-              </View>
-            </TouchableOpacity>
+                <View style={styles.cardBody}>
+                  <View style={styles.cardHeader}>
+                    <AppText style={styles.title}>{item.title}</AppText>
+                    {item.unread && <View style={styles.unreadDot} />}
+                  </View>
+                  <AppText style={styles.message}>{item.message}</AppText>
+                  <AppText style={styles.time}>{item.time}</AppText>
+                </View>
+              </TouchableOpacity>
+
+              {item.data?.category === 'van_change' &&
+                item.data?.action === 'APPROVAL_REQUIRED' && (
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      disabled={processingId === item.id}
+                      onPress={() => handleVanChangeAction(item, 'reject')}
+                      style={[styles.actionButton, styles.rejectButton]}
+                    >
+                      <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                        Reject
+                      </AppText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      disabled={processingId === item.id}
+                      onPress={() => handleVanChangeAction(item, 'approve')}
+                      style={[styles.actionButton, styles.approveButton]}
+                    >
+                      <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                        Approve
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                )}
+            </View>
           ))}
         </View>
       )}
@@ -252,11 +313,41 @@ const createStyles = (colors: any) =>
       borderColor: colors.borderLight,
       backgroundColor: colors.surface,
       padding: 12,
+      gap: 10,
+    },
+    cardPressArea: {
       flexDirection: 'row',
       gap: 10,
     },
     unreadCard: {
       borderColor: colors.primary,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 8,
+      paddingLeft: 42,
+    },
+    actionButton: {
+      minWidth: 86,
+      height: 36,
+      borderRadius: 8,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+    },
+    approveButton: {
+      borderColor: colors.success,
+      backgroundColor: colors.success + '10',
+    },
+    rejectButton: {
+      borderColor: colors.error,
+      backgroundColor: colors.error + '10',
+    },
+    actionButtonText: {
+      fontSize: 12,
+      fontWeight: '800',
     },
     iconWrap: {
       width: 34,

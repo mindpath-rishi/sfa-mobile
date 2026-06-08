@@ -9,6 +9,7 @@ import {
   notificationService,
   type NotificationItem as ApiNotificationItem,
 } from '@/features/notification/services/notification.service';
+import { toast } from '@/core/utils';
 
 type NotificationItem = {
   id: string;
@@ -17,6 +18,7 @@ type NotificationItem = {
   time: string;
   type: 'order' | 'route' | 'target' | 'system';
   unread?: boolean;
+  data?: Record<string, any>;
 };
 
 type NotificationsModalProps = {
@@ -57,6 +59,7 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
       ? (category as NotificationItem['type'])
       : 'system',
     unread: !item.isRead,
+    data: item.data as Record<string, any> | undefined,
   };
 };
 
@@ -80,11 +83,10 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const styles = createStyles(colors, insets);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
   const unreadCount = notifications.filter((item) => item.unread).length;
 
-  useEffect(() => {
-    if (!visible) return;
-
+  const loadNotifications = () => {
     let isMounted = true;
     setLoading(true);
 
@@ -104,6 +106,11 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     return () => {
       isMounted = false;
     };
+  };
+
+  useEffect(() => {
+    if (!visible) return;
+    return loadNotifications();
   }, [visible]);
 
   const handleNotificationPress = async (item: NotificationItem) => {
@@ -119,6 +126,33 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
       await notificationService.markAsRead(item.id);
     } catch (error) {
       console.warn('Failed to mark notification read:', error);
+    }
+  };
+
+  const handleVanChangeAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
+    const workSessionId = item.data?.workSessionId;
+    if (!workSessionId || processingId) return;
+
+    setProcessingId(item.id);
+    try {
+      const response =
+        action === 'approve'
+          ? await notificationService.approveVanChange(String(workSessionId))
+          : await notificationService.rejectVanChange(String(workSessionId));
+
+      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+        toast.error(response?.message || `Failed to ${action} request`);
+        return;
+      }
+
+      toast.success(action === 'approve' ? 'Van change approved' : 'Van change rejected');
+      await notificationService.markAsRead(item.id);
+      loadNotifications();
+    } catch (error: any) {
+      console.warn(`Failed to ${action} van change:`, error);
+      toast.error(error?.response?.data?.message || `Failed to ${action} request`);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -156,23 +190,52 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
           ) : (
             <View style={styles.list}>
               {notifications.map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => handleNotificationPress(item)}
-                style={[styles.card, item.unread && styles.unreadCard]}
-              >
-                <View style={styles.iconWrap}>
-                  <Ionicons name={getNotificationIcon(item.type)} size={18} color={colors.primary} />
+                <View key={item.id} style={[styles.card, item.unread && styles.unreadCard]}>
+                  <Pressable
+                    onPress={() => handleNotificationPress(item)}
+                    style={styles.cardPressArea}
+                  >
+                    <View style={styles.iconWrap}>
+                      <Ionicons
+                        name={getNotificationIcon(item.type)}
+                        size={18}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <View style={styles.cardBody}>
+                      <View style={styles.cardHeader}>
+                        <AppText style={styles.title}>{item.title}</AppText>
+                        {item.unread && <View style={styles.unreadDot} />}
+                      </View>
+                      <AppText style={styles.message}>{item.message}</AppText>
+                      <AppText style={styles.time}>{item.time}</AppText>
+                    </View>
+                  </Pressable>
+
+                  {item.data?.category === 'van_change' &&
+                    item.data?.action === 'APPROVAL_REQUIRED' && (
+                      <View style={styles.actionRow}>
+                        <Pressable
+                          disabled={processingId === item.id}
+                          onPress={() => handleVanChangeAction(item, 'reject')}
+                          style={[styles.actionButton, styles.rejectButton]}
+                        >
+                          <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                            Reject
+                          </AppText>
+                        </Pressable>
+                        <Pressable
+                          disabled={processingId === item.id}
+                          onPress={() => handleVanChangeAction(item, 'approve')}
+                          style={[styles.actionButton, styles.approveButton]}
+                        >
+                          <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                            Approve
+                          </AppText>
+                        </Pressable>
+                      </View>
+                    )}
                 </View>
-                <View style={styles.cardBody}>
-                  <View style={styles.cardHeader}>
-                    <AppText style={styles.title}>{item.title}</AppText>
-                    {item.unread && <View style={styles.unreadDot} />}
-                  </View>
-                  <AppText style={styles.message}>{item.message}</AppText>
-                  <AppText style={styles.time}>{item.time}</AppText>
-                </View>
-              </Pressable>
               ))}
             </View>
           )}

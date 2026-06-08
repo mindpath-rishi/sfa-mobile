@@ -93,6 +93,7 @@ export default function SalesExecutiveScreen() {
   const [isTodayLeave, setIsTodayLeave] = useState<boolean>(false);
 
   const cameraRef = useRef<any>(null);
+  const handledApprovedVanChangeSessionRef = useRef<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [filteredOtherWorkOptions, setFilteredOtherWorkOptions] =
     useState<OtherWorkOption[]>(OTHER_WORK_OPTIONS);
@@ -284,7 +285,6 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
-    setMappedVan(selectedVanForChange);
     setUnifiedModalVisible(false);
 
     if (isChangingActivity) {
@@ -471,9 +471,12 @@ export default function SalesExecutiveScreen() {
       routeName: selectedRoute?.name,
       vanId: van?.vanId,
       requestedVanId: isVanChangePending ? selectedVanForChange?.vanId : undefined,
+      requestedVanName: isVanChangePending
+        ? selectedVanForChange?.name || selectedVanForChange?.vanName
+        : undefined,
+      vanChangeReason: isVanChangePending ? vanChangeNote.trim() : undefined,
+      // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
     };
-
-    if (payload?.requestedVanId) return;
 
     console.log('Day Start Payload:', payload);
 
@@ -484,8 +487,6 @@ export default function SalesExecutiveScreen() {
         getDayStatus();
         if (isVanChangePending) {
           setVanChangeRequestPending(true);
-          setUnifiedModalType('route-selection');
-          setUnifiedModalVisible(true);
           toast.success('Day started. Van change request pending approval.');
         } else {
           toast.success('Your day successfully started.');
@@ -507,19 +508,22 @@ export default function SalesExecutiveScreen() {
       name: selectedActivity,
       routeId: selectedRoute?.routeId,
       description: selectedRoute
-        ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${ASSIGNED_VAN.name}`
+        ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${mappedVan?.name || van?.name || ASSIGNED_VAN.name}`
         : selectedActivity === 'Leave'
           ? `Leave: ${selectedLeaveType || 'Other'}`
           : `Started ${pendingActivity?.name}`,
       totalShops: selectedRoute?.totalShops,
       routeName: selectedRoute?.name,
       workSessionId,
+      vanId: selectedRoute?.vanId || van?.vanId,
+      vanName: mappedVan?.name || van?.name,
     };
 
     try {
       const response: any = await homeService.createActivity(payload);
 
       if (response.statusCode === 201) {
+        setIsChangingActivity(false);
         getDayStatus();
         toast.success(`Activity changed to ${selectedActivity}`);
       }
@@ -614,27 +618,28 @@ export default function SalesExecutiveScreen() {
   const getDayStatus = async () => {
     try {
       const response: any = await homeService.getDayStatus(workSessionId);
+      const data = response?.data;
 
-      setDayStarted(response.data.status === 'ACTIVE');
+      setDayStarted(data?.status === 'ACTIVE');
       console.log('Day Status Response:', response);
-      setTodayActivities(response?.data?.todayActivities || []);
+      setTodayActivities(data?.todayActivities || []);
 
       // Check if today's activity is LEAVE
-      if (response?.data?.type === 'LEAVE') {
+      if (data?.type === 'LEAVE') {
         setIsTodayLeave(true);
       } else {
         setIsTodayLeave(false);
       }
 
-      if (response.statusCode === 200 && response?.data?.status === 'ACTIVE') {
-        setWorkSessionId(response.data?.workSessionId || '');
-        setCurrentActivity(response?.data?.activeActivity?.name);
-        setStartTime(response?.data?.activeActivity?.startTime);
+      if (response.statusCode === 200 && data?.status === 'ACTIVE') {
+        setWorkSessionId(data?.workSessionId || '');
+        setCurrentActivity(data?.activeActivity?.name || null);
+        setStartTime(data?.activeActivity?.startTime || null);
         setSelectedActivityColor('#4158D0');
         setSelectedActivityIcon('storefront');
 
-        const selectedRoute = response?.data?.selectedRoute;
-        const van = response?.data?.van;
+        const selectedRoute = data?.selectedRoute;
+        const van = data?.van;
         const routeStore = useRouteStore.getState();
 
         if (selectedRoute) {
@@ -647,11 +652,32 @@ export default function SalesExecutiveScreen() {
           routeStore.setVan(van);
         }
 
-        const activeDescription = response?.data?.activeActivity?.description || '';
-        setVanChangePendingBanner(
-          typeof activeDescription === 'string' &&
-            activeDescription.includes('Van change request pending'),
-        );
+        const isPendingVanChange = data?.vanChangeStatus === 'PENDING';
+        setVanChangePendingBanner(isPendingVanChange);
+        setVanChangeRequestPending(isPendingVanChange);
+
+        if (
+          data?.vanChangeStatus === 'APPROVED' &&
+          !data?.activeActivity &&
+          handledApprovedVanChangeSessionRef.current !== data.workSessionId
+        ) {
+          handledApprovedVanChangeSessionRef.current = data.workSessionId;
+          setVanChangePendingBanner(false);
+          setVanChangeRequestPending(false);
+          setMappedVan({
+            ...(mappedVan || ASSIGNED_VAN),
+            vanId: data.vanId,
+            name: data.vanName || data.requestedVanName || mappedVan?.name,
+          });
+          await getVan();
+          await getRoutes();
+          setSelectedActivity('Retailing');
+          setPendingActivity(ACTIVITY_TYPES.find((activity) => activity.name === 'Retailing') || null);
+          setIsChangingActivity(true);
+          setUnifiedModalType('route-selection');
+          setUnifiedModalVisible(true);
+          toast.success('Van change approved. Please select a route.');
+        }
       }
     } catch (error) {
       console.error('Error fetching day status:', error);

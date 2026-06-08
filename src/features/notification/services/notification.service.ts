@@ -32,5 +32,14 @@ export const notificationService = {
     api.patch<null>(`/notification/${notificationId}/read`, undefined, {
       showLoader: false,
     }) as Promise<ApiResponse<null>>,
-};
 
+  approveVanChange: (workSessionId: string) =>
+    api.patch<any>(`/work-session/van-change/${workSessionId}/approve`, {}) as Promise<
+      ApiResponse<any>
+    >,
+
+  rejectVanChange: (workSessionId: string) =>
+    api.patch<any>(`/work-session/van-change/${workSessionId}/reject`, {}) as Promise<
+      ApiResponse<any>
+    >,
+};
