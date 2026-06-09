@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { AppCard } from '@/core/components/Card';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuthStore } from '@/core/store/auth.store';
+import { useThemeStore } from '@/core/store/theme.store';
 
 const DEFAULT_PROFILE_DATA = {
   id: 'EMP001',
@@ -116,8 +117,10 @@ const buildProfileData = (authUser: any) => {
       getProfileValue(authUser?.avatar, authUser?.profileImage, authUser?.profileImageUrl) || null,
     role: humanizeRole(getProfileValue(authUser?.role, authUser?.roleId, authUser?.designation)),
     territory: routeOrTerritory || DEFAULT_PROFILE_DATA.territory,
-    manager: getProfileValue(authUser?.managerName, authUser?.manager) || DEFAULT_PROFILE_DATA.manager,
-    joinDate: getProfileValue(authUser?.joinDate, authUser?.createdAt) || DEFAULT_PROFILE_DATA.joinDate,
+    manager:
+      getProfileValue(authUser?.managerName, authUser?.manager) || DEFAULT_PROFILE_DATA.manager,
+    joinDate:
+      getProfileValue(authUser?.joinDate, authUser?.createdAt) || DEFAULT_PROFILE_DATA.joinDate,
     employeeId: employeeId || DEFAULT_PROFILE_DATA.employeeId,
     stats: {
       ...DEFAULT_PROFILE_DATA.stats,
@@ -294,6 +297,10 @@ const SettingRow = ({ icon, label, value, type = 'toggle', onPress }: any) => {
   const { colors } = useTheme();
   const [enabled, setEnabled] = useState(value);
 
+  useEffect(() => {
+    setEnabled(value);
+  }, [value]);
+
   const handleToggle = () => {
     const newValue = !enabled;
     setEnabled(newValue);
@@ -387,6 +394,7 @@ const DocumentItem = ({ doc }: any) => {
 
 export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
+  const setThemeMode = useThemeStore((s) => s.setMode);
   const authUser = useAuthStore((s) => s.user);
   const profileData = useMemo(() => buildProfileData(authUser), [authUser]);
   const [settings, setSettings] = useState(DEFAULT_PROFILE_DATA.settings);
@@ -400,6 +408,10 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'stats', 'settings', 'docs'
   const logout = useAuthStore((s) => s.logout);
 
+  useEffect(() => {
+    setSettings((prev) => ({ ...prev, darkMode: isDark }));
+  }, [isDark]);
+
   const handleEditProfile = () => {
     router.push('/profile/edit');
   };
@@ -407,6 +419,11 @@ export default function ProfileScreen() {
   const handleCall = () => {
     if (userData.phone === DEFAULT_PROFILE_DATA.phone) return;
     Linking.openURL(`tel:${userData.phone}`);
+  };
+
+  const handleDarkModeToggle = (value: boolean) => {
+    setSettings((prev) => ({ ...prev, darkMode: value }));
+    setThemeMode(value ? 'dark' : 'light');
   };
 
   const handleMessage = () => {
@@ -563,7 +580,7 @@ export default function ProfileScreen() {
         >
           Achievements & Awards
         </Text>
-        {userData.achievements.map((achievement) => (
+        {userData.achievements.map((achievement: any) => (
           <View
             key={achievement.id}
             style={{
@@ -615,7 +632,7 @@ export default function ProfileScreen() {
           value={userData.settings.notifications}
           onPress={(val: boolean) => setSettings((prev) => ({ ...prev, notifications: val }))}
         />
-        <SettingRow icon="moon" label="Dark Mode" value={isDark} />
+        <SettingRow icon="moon" label="Dark Mode" value={isDark} onPress={handleDarkModeToggle} />
         <SettingRow
           icon="finger-print"
           label="Biometric Login"
@@ -764,7 +781,7 @@ export default function ProfileScreen() {
         >
           Recent Activity
         </Text>
-        {userData.recentActivity.map((activity) => (
+        {userData.recentActivity.map((activity: any) => (
           <View
             key={activity.id}
             style={{

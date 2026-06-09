@@ -22,6 +22,8 @@ export interface ManagerStatsResponse {
     tc: number;
     sc: number;
     qtyCases: number;
+    qtyTonnage?: number;
+    qtyValue?: number;
   };
 }
 
@@ -64,29 +66,62 @@ export interface ManagerTargetResponse {
 export interface UserWiseTargetSummary {
   employeeId: string;
   employeeName: string;
-  designation: string;
+  designation?: string;
   targetCases: number;
   achievementCases: number;
   remainingCases: number;
+  targetTonnage?: number;
+  achievementTonnage?: number;
+  remainingTonnage?: number;
+  targetValue?: number;
+  achievementValue?: number;
+  remainingValue?: number;
   achievementPercentage: number;
   rrr: number;
   crr: number;
   hasTarget: boolean;
 }
 
+export interface UserPrimaryCategoryTargetSummary {
+  categoryId: string;
+  category: string;
+  targetCases: number;
+  achievementCases: number;
+  remainingCases: number;
+  targetTonnage: number;
+  achievementTonnage: number;
+  remainingTonnage: number;
+  targetValue: number;
+  achievementValue: number;
+  remainingValue: number;
+  achievementPercentage: number;
+}
+
 export interface ManagerOrderSummaryResponse {
   primaryCategoryWiseOrder: {
     totalCases: number;
+    totalTonnage?: number;
+    totalValue?: number;
     categories: {
       categoryId: string;
       category: string;
       cases: number;
+      tonnage?: number;
+      value?: number;
       percentage: number;
+      tonnagePercentage?: number;
+      valuePercentage?: number;
     }[];
   };
   managerOrderSummary: {
     orders: number;
     validation: number;
+    orderCases?: number;
+    orderTonnage?: number;
+    orderValue?: number;
+    validationCases?: number;
+    validationTonnage?: number;
+    validationValue?: number;
   };
   outletSummary: {
     upc: {
@@ -167,6 +202,54 @@ export interface ManagerFieldUserSummary {
   } | null;
 }
 
+export interface ManagerUserTimelineResponse {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  dayStartTime?: string | null;
+  dayStartImageUrl?: string | null;
+  dayStartImageMediaId?: string | null;
+  activities: {
+    id: string;
+    source?: string;
+    type: string;
+    time: string;
+    duration: string;
+    outlet: string;
+    owner: string;
+    metrics: {
+      label: string;
+      value: string;
+    }[];
+    order?: {
+      orderNo: string;
+      outlet: string;
+      quantityCases: string;
+      quantitySuperUnit: string;
+      totalPieces: string;
+      netValue: string;
+      categories: {
+        id: string;
+        name: string;
+        meta: string;
+        value: string;
+        lines: {
+          id: string;
+          name: string;
+          ptr: string;
+          qty: string;
+          unit: string;
+          value: string;
+        }[];
+      }[];
+      schemeDiscount: string;
+      cashDiscount: string;
+      tax: string;
+      payableAmount: string;
+    };
+  }[];
+}
+
 export interface SalesmanPocketTargetResponse {
   startDate: string;
   endDate: string;
@@ -230,6 +313,10 @@ export type TargetMetric = 'cases' | 'tonnage' | 'value';
 export interface HomeService {
   /** Authenticates user and returns token/user payload from backend */
   dayStart(payload: DayStartPayload): Promise<ApiResponse<any>>;
+  uploadDayStartImage: (params: {
+    uri: string;
+    ownerId: string;
+  }) => Promise<ApiResponse<{ mediaId: string; url: string }>>;
   getDayStatus(workSessionId: string): Promise<ApiResponse<any>>;
   getTodayActivities(workSessionId: string): Promise<ApiResponse<any>>;
   createActivity(payload: CreateActivityPayload): Promise<ApiResponse<any>>;
@@ -245,16 +332,32 @@ export interface HomeService {
     endDate?: string;
     metric?: TargetMetric;
   }) => Promise<ApiResponse<SalesmanPocketTargetResponse>>;
-  getManagerStats(date?: string): Promise<ApiResponse<ManagerStatsResponse>>;
+  getManagerStats(
+    params?:
+      | string
+      | {
+          date?: string;
+          startDate?: string;
+          endDate?: string;
+        },
+  ): Promise<ApiResponse<ManagerStatsResponse>>;
   getManagerTarget: (date?: string) => Promise<ApiResponse<ManagerTargetResponse>>;
   getUserWiseTargetSummary: (date?: string) => Promise<ApiResponse<UserWiseTargetSummary[]>>;
-  getManagerOrderSummary: (date?: string) => Promise<ApiResponse<ManagerOrderSummaryResponse>>;
+  getUserPrimaryCategoryTargets: (params: {
+    employeeId: string;
+    date?: string;
+  }) => Promise<ApiResponse<UserPrimaryCategoryTargetSummary[]>>;
+  getManagerOrderSummary: () => Promise<ApiResponse<ManagerOrderSummaryResponse>>;
   getManagerTeamCoverage: () => Promise<ApiResponse<ManagerTeamCoverageResponse>>;
   getManagerBeatOMeter: () => Promise<ApiResponse<ManagerBeatOMeterResponse>>;
   getManagerFieldUsers: (params?: {
     date?: string;
     searchKey?: string;
   }) => Promise<ApiResponse<ManagerFieldUserSummary[]>>;
+  getManagerUserTimeline: (params: {
+    employeeId: string;
+    date?: string;
+  }) => Promise<ApiResponse<ManagerUserTimelineResponse>>;
 }
 
 /**
@@ -264,6 +367,28 @@ export interface HomeService {
 export const homeService: HomeService = {
   dayStart: (payload) =>
     api.post<any, DayStartPayload>('/work-session', payload) as Promise<ApiResponse<any>>,
+  uploadDayStartImage: ({ uri, ownerId }) => {
+    const formData = new FormData();
+    const extension = uri.split('.').pop()?.split('?')[0] || 'jpg';
+    const mimeType = extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+
+    formData.append('file', {
+      uri,
+      name: `day-start-${Date.now()}.${extension}`,
+      type: mimeType,
+    } as any);
+    formData.append('ownerType', 'EMPLOYEE');
+    formData.append('ownerId', ownerId);
+    formData.append('mediaType', 'IMAGE');
+    formData.append('purpose', 'PROOF');
+    formData.append('title', 'Day Start Selfie');
+    formData.append('isPrimary', 'false');
+
+    return api.post<{ mediaId: string; url: string }, FormData>(
+      '/media/upload',
+      formData,
+    ) as Promise<ApiResponse<{ mediaId: string; url: string }>>;
+  },
   getDayStatus: () => api.get<any>(`/work-session/today-activity`, {}) as Promise<ApiResponse<any>>,
   getTodayActivities: (workSessionId) =>
     api.get<any>(`/activity`, {
@@ -287,26 +412,27 @@ export const homeService: HomeService = {
     api.get<SalesmanPocketTargetResponse>(`/employee/salesman/my-pocket-target`, {
       params,
     }) as Promise<ApiResponse<SalesmanPocketTargetResponse>>,
-  getManagerStats: (date?: string) =>
-    api.get<ManagerStatsResponse>(`/employee/manager/stats`, {
-      params: date ? { date } : undefined,
-    }) as Promise<ApiResponse<ManagerStatsResponse>>,
+  getManagerStats: (params) => {
+    const queryParams = typeof params === 'string' ? { date: params } : params;
+
+    return api.get<ManagerStatsResponse>(`/employee/manager/stats`, {
+      params: queryParams,
+    }) as Promise<ApiResponse<ManagerStatsResponse>>;
+  },
   getManagerTarget: (date?: string) =>
     api.get<ManagerTargetResponse>(`/employee/manager/target`, {
       params: date ? { date } : undefined,
-    }) as Promise<
-      ApiResponse<ManagerTargetResponse>
-    >,
+    }) as Promise<ApiResponse<ManagerTargetResponse>>,
   getUserWiseTargetSummary: (date?: string) =>
     api.get<UserWiseTargetSummary[]>(`/employee/manager/user-wise-target`, {
       params: date ? { date } : undefined,
-    }) as Promise<
-      ApiResponse<UserWiseTargetSummary[]>
-    >,
-  getManagerOrderSummary: (date?: string) =>
-    api.get<ManagerOrderSummaryResponse>(`/employee/manager/order-summary`, {
-      params: date ? { date } : undefined,
-    }) as Promise<
+    }) as Promise<ApiResponse<UserWiseTargetSummary[]>>,
+  getUserPrimaryCategoryTargets: (params) =>
+    api.get<UserPrimaryCategoryTargetSummary[]>(`/employee/manager/user-primary-category-target`, {
+      params,
+    }) as Promise<ApiResponse<UserPrimaryCategoryTargetSummary[]>>,
+  getManagerOrderSummary: () =>
+    api.get<ManagerOrderSummaryResponse>(`/employee/manager/order-summary`, {}) as Promise<
       ApiResponse<ManagerOrderSummaryResponse>
     >,
   getManagerTeamCoverage: () =>
@@ -324,4 +450,8 @@ export const homeService: HomeService = {
         ...(params?.searchKey ? { searchKey: params.searchKey } : {}),
       },
     }) as Promise<ApiResponse<ManagerFieldUserSummary[]>>,
+  getManagerUserTimeline: (params) =>
+    api.get<ManagerUserTimelineResponse>(`/employee/manager/user-timeline`, {
+      params,
+    }) as Promise<ApiResponse<ManagerUserTimelineResponse>>,
 };

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
@@ -9,6 +9,7 @@ import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { homeService } from '../services/home.service';
 import type { ManagerTeamCoverageResponse } from '../services/home.service';
+import { createManagerTeamCoverageStyles } from '../styles/ManagerTeamCoverage.styles';
 
 const INITIAL_TEAM_COVERAGE: ManagerTeamCoverageResponse = {
   warehouse: 12,
@@ -23,7 +24,7 @@ const formatNumber = (value: number) => new Intl.NumberFormat('en-US').format(va
 
 export default function ManagerTeamCoverageScreen() {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = createManagerTeamCoverageStyles(colors);
   const { setHeader } = useHeader();
   const user = useAuthStore((state) => state.user);
   const [teamCoverage, setTeamCoverage] =
@@ -108,104 +109,3 @@ export default function ManagerTeamCoverageScreen() {
     </ScrollView>
   );
 }
-
-const createStyles = (colors: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.backgroundSecondary,
-    },
-    content: {
-      padding: 14,
-      paddingBottom: 32,
-    },
-    toolbar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 10,
-    },
-    toolbarLabel: {
-      color: colors.textTertiary,
-      fontSize: 11,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-    },
-    linkButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 2,
-    },
-    linkText: {
-      color: colors.info,
-      fontSize: 11,
-      fontWeight: '800',
-      textTransform: 'uppercase',
-    },
-    card: {
-      backgroundColor: colors.surface,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      padding: 14,
-      shadowColor: colors.shadow,
-      shadowOpacity: 1,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 4 },
-      elevation: 2,
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      marginBottom: 16,
-    },
-    position: {
-      color: colors.textTertiary,
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-    },
-    title: {
-      color: colors.textPrimary,
-      fontSize: 16,
-      fontWeight: '800',
-      marginTop: 3,
-    },
-    subtitle: {
-      color: colors.textTertiary,
-      fontSize: 12,
-      marginTop: 2,
-    },
-    badge: {
-      backgroundColor: colors.infoLight,
-      borderRadius: 16,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-    },
-    badgeText: {
-      color: colors.info,
-      fontSize: 11,
-      fontWeight: '800',
-    },
-    grid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      rowGap: 16,
-    },
-    stat: {
-      width: '33.333%',
-      alignItems: 'center',
-      gap: 5,
-    },
-    statValue: {
-      color: colors.textPrimary,
-      fontSize: 15,
-      fontWeight: '800',
-    },
-    statLabel: {
-      color: colors.textTertiary,
-      fontSize: 11,
-      textAlign: 'center',
-    },
-  });

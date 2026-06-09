@@ -32,10 +32,11 @@ export interface VisitStatusParams {
 export interface StartVisitPayload {
   routeSessionId: string;
   workSessionId: string;
-  employeeId: string;
+  employeeId?: string;
   vanId: string;
   outletId: string;
-  sequence: number;
+  sequence?: number;
+  visitType?: 'ON_SITE' | 'OFF_SITE';
 }
 
 /**
@@ -45,7 +46,7 @@ export interface OutletService {
   getRouteOutlets(params: GetRouteOutletsParams): Promise<ApiResponse<any>>;
   getOutletDetail(customerId: string): Promise<ApiResponse<any>>;
   startVisit(payload: StartVisitPayload): Promise<ApiResponse<any>>;
-  visitStatus(payload: StartVisitPayload): Promise<ApiResponse<any>>;
+  visitStatus(payload: VisitStatusParams): Promise<ApiResponse<any>>;
   completeVisit(visitId: string | undefined): Promise<ApiResponse<any>>;
   createCustomer(payload: any): Promise<ApiResponse<any>>;
   getVisitHistory(payload: any): Promise<ApiResponse<any>>;

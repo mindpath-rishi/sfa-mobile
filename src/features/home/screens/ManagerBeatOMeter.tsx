@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
@@ -9,6 +9,7 @@ import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { homeService } from '../services/home.service';
 import type { ManagerBeatOMeterResponse } from '../services/home.service';
+import { createManagerBeatOMeterStyles } from '../styles/ManagerBeatOMeter.styles';
 
 const BEATS = [
   { id: 'tk', title: 'TK Beatometer', subtitle: 'TK Beatometer' },
@@ -29,42 +30,36 @@ const INITIAL_BEAT_O_METER: ManagerBeatOMeterResponse = {
   outletTypes: [
     {
       type: 'New',
-      color: '#A855F7',
       total: 1,
       mtdVisited: { count: 1, percentage: 100 },
       mtdOrder: { count: 0, percentage: 0 },
     },
     {
       type: 'Active',
-      color: '#22C55E',
       total: 13871,
       mtdVisited: { count: 10864, percentage: 78.3 },
       mtdOrder: { count: 10404, percentage: 75 },
     },
     {
       type: 'To Be Dormant',
-      color: '#3B82F6',
       total: 1414,
       mtdVisited: { count: 665, percentage: 47 },
       mtdOrder: { count: 598, percentage: 42.3 },
     },
     {
       type: 'Dormant',
-      color: '#F59E0B',
       total: 294,
       mtdVisited: { count: 98, percentage: 33.3 },
       mtdOrder: { count: 88, percentage: 29.9 },
     },
     {
       type: 'No Order',
-      color: '#F97316',
       total: 83,
       mtdVisited: { count: 25, percentage: 30.1 },
       mtdOrder: { count: 12, percentage: 14.5 },
     },
     {
       type: 'Never Visited',
-      color: '#EF4444',
       total: 1241,
       mtdVisited: { count: 28, percentage: 2.3 },
       mtdOrder: { count: 24, percentage: 1.9 },
@@ -86,36 +81,52 @@ const clampPercentage = (value: unknown) => Math.max(0, Math.min(toNumber(value)
 
 export default function ManagerBeatOMeterScreen() {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = createManagerBeatOMeterStyles(colors);
   const { setHeader } = useHeader();
   const user = useAuthStore((state) => state.user);
   const [selectedBeat, setSelectedBeat] = useState(BEATS[0]);
   const [beatOMeter, setBeatOMeter] = useState<ManagerBeatOMeterResponse>(INITIAL_BEAT_O_METER);
 
-  const outletRows = useMemo(
-    () =>
-      (beatOMeter.outletTypes?.length
-        ? beatOMeter.outletTypes
-        : INITIAL_BEAT_O_METER.outletTypes
-      ).map((row, index) => {
-        const fallback = INITIAL_BEAT_O_METER.outletTypes[index];
-
-        return {
-          type: row.type || fallback?.type || 'Outlet',
-          color: row.color || fallback?.color || '#3B82F6',
-          total: formatNumber(row.total ?? fallback?.total),
-          visited: formatCountPercentage(
-            row.mtdVisited?.count ?? fallback?.mtdVisited?.count,
-            row.mtdVisited?.percentage ?? fallback?.mtdVisited?.percentage,
-          ),
-          order: formatCountPercentage(
-            row.mtdOrder?.count ?? fallback?.mtdOrder?.count,
-            row.mtdOrder?.percentage ?? fallback?.mtdOrder?.percentage,
-          ),
-        };
-      }),
-    [beatOMeter.outletTypes],
+  const outletPalette = useMemo(
+    () => [
+      colors.secondary,
+      colors.success,
+      colors.info,
+      colors.warning,
+      colors.warningDark,
+      colors.error,
+    ],
+    [
+      colors.error,
+      colors.info,
+      colors.secondary,
+      colors.success,
+      colors.warning,
+      colors.warningDark,
+    ],
   );
+
+  const outletRows = useMemo(() => {
+    const fallbackOutletTypes = INITIAL_BEAT_O_METER.outletTypes ?? [];
+    const rows = beatOMeter.outletTypes?.length ? beatOMeter.outletTypes : fallbackOutletTypes;
+
+    return rows.map((row, index) => {
+      const fallback = fallbackOutletTypes[index];
+      return {
+        type: row.type || fallback?.type || 'Outlet',
+        color: row.color || fallback?.color || outletPalette[index % outletPalette.length],
+        total: formatNumber(row.total ?? fallback?.total),
+        visited: formatCountPercentage(
+          row.mtdVisited?.count ?? fallback?.mtdVisited?.count,
+          row.mtdVisited?.percentage ?? fallback?.mtdVisited?.percentage,
+        ),
+        order: formatCountPercentage(
+          row.mtdOrder?.count ?? fallback?.mtdOrder?.count,
+          row.mtdOrder?.percentage ?? fallback?.mtdOrder?.percentage,
+        ),
+      };
+    });
+  }, [beatOMeter.outletTypes, outletPalette]);
   const visitedPercentage = clampPercentage(beatOMeter.summary?.visitedPercentage);
   const unvisitedPercentage = 100 - visitedPercentage;
 
@@ -220,148 +231,3 @@ export default function ManagerBeatOMeterScreen() {
     </ScrollView>
   );
 }
-
-const createStyles = (colors: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.backgroundSecondary,
-    },
-    content: {
-      padding: 12,
-      paddingBottom: 32,
-      gap: 12,
-    },
-    listCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 8,
-      overflow: 'hidden',
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-    },
-    beatRow: {
-      minHeight: 62,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    beatRowActive: {
-      backgroundColor: colors.infoLight,
-    },
-    beatTitle: {
-      color: colors.textPrimary,
-      fontSize: 14,
-      fontWeight: '800',
-    },
-    beatSubtitle: {
-      color: colors.textTertiary,
-      fontSize: 12,
-      marginTop: 2,
-    },
-    card: {
-      backgroundColor: colors.surface,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      padding: 12,
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 12,
-    },
-    eyebrow: {
-      color: colors.textTertiary,
-      fontSize: 10,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      marginBottom: 8,
-    },
-    title: {
-      color: colors.textPrimary,
-      fontSize: 15,
-      fontWeight: '800',
-    },
-    subtitle: {
-      color: colors.textTertiary,
-      fontSize: 12,
-      marginTop: 2,
-    },
-    shareButton: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      backgroundColor: colors.infoLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    totalRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginTop: 16,
-    },
-    totalLabel: {
-      color: colors.textTertiary,
-      fontSize: 11,
-      fontWeight: '800',
-      textTransform: 'uppercase',
-    },
-    totalValue: {
-      color: colors.textPrimary,
-      fontSize: 16,
-      fontWeight: '900',
-    },
-    progressTrack: {
-      height: 18,
-      borderRadius: 4,
-      overflow: 'hidden',
-      flexDirection: 'row',
-      marginTop: 6,
-      marginBottom: 18,
-    },
-    progressFill: {
-      backgroundColor: '#42A832',
-    },
-    progressTail: {
-      backgroundColor: '#F04D4D',
-    },
-    tableHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 8,
-    },
-    tableHeadText: {
-      flex: 1,
-      color: colors.primaryDark,
-      fontSize: 11,
-      fontWeight: '900',
-      textAlign: 'right',
-      textTransform: 'uppercase',
-    },
-    typeColumn: {
-      flex: 1.35,
-      textAlign: 'left',
-    },
-    tableRow: {
-      minHeight: 32,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    colorBar: {
-      width: 6,
-      height: 24,
-      borderRadius: 2,
-      marginRight: 8,
-    },
-    cellText: {
-      flex: 1,
-      color: colors.textSecondary,
-      fontSize: 11,
-      textAlign: 'right',
-    },
-  });

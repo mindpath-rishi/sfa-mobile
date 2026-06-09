@@ -105,11 +105,11 @@ export default function SalesExecutiveScreen() {
   const [showDayEndConfirm, setShowDayEndConfirm] = useState<boolean>(false);
   const currency = 'K';
   const van = useRouteStore.getState().van;
-  const user = useAuthStore.getState().user;
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
   const [finalConfirmation, setFinalConfirmation] = useState(false);
   const { setVan } = useRouteStore();
   const { setHeader } = useHeader();
+  const user = useAuthStore((state) => state.user);
   const { setWorkSessionId, workSessionId } = useAuthStore();
 
   const { guard } = useVisitGuard();
@@ -457,6 +457,22 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
+    let dayStartImage: { mediaId?: string; url?: string } | null = null;
+
+    if (userPhoto) {
+      const mediaResponse = await homeService.uploadDayStartImage({
+        uri: userPhoto,
+        ownerId: user?.employeeId || user?.id || 'day-start',
+      });
+
+      if (mediaResponse?.statusCode === 201 && mediaResponse.data) {
+        dayStartImage = {
+          mediaId: mediaResponse.data.mediaId,
+          url: mediaResponse.data.url,
+        };
+      }
+    }
+
     const payload: DayStartPayload = {
       activityName: selectedActivity,
       routeId: selectedRoute?.routeId,
@@ -475,6 +491,8 @@ export default function SalesExecutiveScreen() {
         ? selectedVanForChange?.name || selectedVanForChange?.vanName
         : undefined,
       vanChangeReason: isVanChangePending ? vanChangeNote.trim() : undefined,
+      dayStartImageMediaId: dayStartImage?.mediaId,
+      dayStartImageUrl: dayStartImage?.url,
       // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
     };
 
@@ -672,7 +690,9 @@ export default function SalesExecutiveScreen() {
           await getVan();
           await getRoutes();
           setSelectedActivity('Retailing');
-          setPendingActivity(ACTIVITY_TYPES.find((activity) => activity.name === 'Retailing') || null);
+          setPendingActivity(
+            ACTIVITY_TYPES.find((activity) => activity.name === 'Retailing') || null,
+          );
           setIsChangingActivity(true);
           setUnifiedModalType('route-selection');
           setUnifiedModalVisible(true);

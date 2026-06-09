@@ -80,6 +80,28 @@ const getNotificationIcon = (type: NotificationItem['type']) => {
   }
 };
 
+const isPendingVanChangeApproval = (item: NotificationItem) => {
+  const category = String(item.data?.category || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.vanChangeStatus || item.data?.status || '').toUpperCase();
+
+  return (
+    category === 'van_change' && action === 'APPROVAL_REQUIRED' && (!status || status === 'PENDING')
+  );
+};
+
+const getVanChangeReason = (item: NotificationItem) =>
+  String(item.data?.reason || item.data?.vanChangeReason || '').trim();
+
+const getVanChangeStatus = (item: NotificationItem) => {
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.vanChangeStatus || item.data?.status || '').toUpperCase();
+
+  if (['APPROVED', 'REJECTED'].includes(status)) return status;
+  if (['APPROVED', 'REJECTED'].includes(action)) return action;
+  return '';
+};
+
 export default function NotificationsScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -161,6 +183,22 @@ export default function NotificationsScreen() {
         toast.success('Van change rejected');
       }
 
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === item.id
+            ? {
+                ...notification,
+                unread: false,
+                data: {
+                  ...notification.data,
+                  action: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                  vanChangeStatus: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                },
+              }
+            : notification,
+        ),
+      );
+
       await notificationService.markAsRead(item.id);
       await loadNotifications(true);
     } catch (error: any) {
@@ -200,28 +238,50 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <View style={styles.list}>
-          {notifications.map((item) => (
-            <View key={item.id} style={[styles.card, item.unread && styles.unreadCard]}>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={() => handleNotificationPress(item)}
-                style={styles.cardPressArea}
-              >
-                <View style={styles.iconWrap}>
-                  <Ionicons name={getNotificationIcon(item.type)} size={18} color={colors.primary} />
-                </View>
-                <View style={styles.cardBody}>
-                  <View style={styles.cardHeader}>
-                    <AppText style={styles.title}>{item.title}</AppText>
-                    {item.unread && <View style={styles.unreadDot} />}
-                  </View>
-                  <AppText style={styles.message}>{item.message}</AppText>
-                  <AppText style={styles.time}>{item.time}</AppText>
-                </View>
-              </TouchableOpacity>
+          {notifications.map((item) => {
+            const vanChangeReason = getVanChangeReason(item);
+            const vanChangeStatus = getVanChangeStatus(item);
 
-              {item.data?.category === 'van_change' &&
-                item.data?.action === 'APPROVAL_REQUIRED' && (
+            return (
+              <View key={item.id} style={[styles.card, item.unread && styles.unreadCard]}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => handleNotificationPress(item)}
+                  style={styles.cardPressArea}
+                >
+                  <View style={styles.iconWrap}>
+                    <Ionicons
+                      name={getNotificationIcon(item.type)}
+                      size={18}
+                      color={colors.primary}
+                    />
+                  </View>
+                  <View style={styles.cardBody}>
+                    <View style={styles.cardHeader}>
+                      <AppText style={styles.title}>{item.title}</AppText>
+                      {item.unread && <View style={styles.unreadDot} />}
+                    </View>
+                    <AppText style={styles.message}>{item.message}</AppText>
+                    {vanChangeReason && (
+                      <AppText style={styles.reasonText}>Reason: {vanChangeReason}</AppText>
+                    )}
+                    {vanChangeStatus && (
+                      <AppText
+                        style={[
+                          styles.statusText,
+                          {
+                            color: vanChangeStatus === 'APPROVED' ? colors.success : colors.error,
+                          },
+                        ]}
+                      >
+                        {vanChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                      </AppText>
+                    )}
+                    <AppText style={styles.time}>{item.time}</AppText>
+                  </View>
+                </TouchableOpacity>
+
+                {isPendingVanChangeApproval(item) && (
                   <View style={styles.actionRow}>
                     <TouchableOpacity
                       disabled={processingId === item.id}
@@ -243,8 +303,9 @@ export default function NotificationsScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
-            </View>
-          ))}
+              </View>
+            );
+          })}
         </View>
       )}
     </ScrollView>
@@ -383,6 +444,19 @@ const createStyles = (colors: any) =>
       color: colors.textSecondary,
       fontSize: 12,
       lineHeight: 17,
+    },
+    reasonText: {
+      marginTop: 4,
+      color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+      lineHeight: 17,
+    },
+    statusText: {
+      marginTop: 4,
+      fontSize: 11,
+      fontWeight: '800',
+      textTransform: 'uppercase',
     },
     time: {
       marginTop: 8,

@@ -170,24 +170,15 @@ export default function CustomerDetailScreen() {
     }, [customer]),
   );
 
-  // useEffect(() => {
-  //   setHeader({
-  //     title: route?.routeName || customer?.name || 'Outlet Details',
-  //     showBack: true,
-  //     showMenu: false,
-  //     backgroundColor: colors.primary,
-  //   });
-  // }, [setHeader, customer?.name, route?.routeName, colors.primary]);
-
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       setHeader({
         title: route?.routeName || customer?.name || 'Outlet Details',
         showBack: true,
         showMenu: false,
         backgroundColor: colors.primary,
       });
-    }, []),
+    }, [colors.primary, customer?.name, route?.routeName, setHeader]),
   );
 
   useEffect(() => {
@@ -253,9 +244,7 @@ export default function CustomerDetailScreen() {
           setCurrentLocation({ latitude, longitude });
           checkGeofenceStatus(latitude, longitude);
         },
-        (error) => {
-          console.log('Error getting location:', error);
-        },
+        (error) => console.warn('Error getting location:', error),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
       );
     }
@@ -493,7 +482,7 @@ export default function CustomerDetailScreen() {
 
       const visits = response?.data || [];
       setVisitHistory(visits);
-      setVisitsTotal(response?.total || 0);
+      setVisitsTotal((response as any)?.total || 0);
     } catch (error) {
       console.error('Failed to load visit history:', error);
     } finally {
@@ -1088,7 +1077,7 @@ const VisitsTab = ({ visits, loading, total, styles, colors }: any) => {
           )}
         </View>
       )}
-      {visits.map((item) => renderVisitCard(item))}
+      {visits.map((item: VisitHistory) => renderVisitCard(item))}
       {!loading && visits.length === 0 && (
         <View style={styles.emptyTabContainer}>
           <Ionicons name="time-outline" size={56} color={colors.textTertiary} />

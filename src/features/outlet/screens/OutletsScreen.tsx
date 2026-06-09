@@ -117,7 +117,6 @@ export default function OutletsScreen() {
 
   const getRouteOutlets = async (pageNumber = 1, isRefresh = false) => {
     try {
-      console.log(route, '===============route=============');
       if (!route?.routeId) return;
 
       const payload = {
@@ -139,8 +138,8 @@ export default function OutletsScreen() {
         setHasMore(newData.length === LIMIT);
         setPage(pageNumber);
       }
-    } catch (e) {
-      console.log('Pagination error:', e);
+    } catch (error) {
+      console.warn('Failed to load route outlets:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -151,11 +150,7 @@ export default function OutletsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // ✅ Only run when screen comes into focus
       getRouteOutlets(1, true);
-
-      // optional cleanup (not required here)
-      return () => {};
     }, [route]),
   );
 

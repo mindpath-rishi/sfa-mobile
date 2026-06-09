@@ -39,6 +39,24 @@ export interface Outlet {
   tags?: string[];
   recentActivity?: Activity[];
   contacts?: Contact[];
+  lastVisitedAt?: string;
+  summary?: OutletSummary;
+}
+
+export interface OutletSummary {
+  mtd?: {
+    orderValue?: number;
+    orderQuantity?: number;
+    orderCount?: number;
+  };
+  last5Orders?: {
+    avgOrderValue?: number;
+    avgOrderQuantity?: number;
+    avgLPC?: number;
+    orders?: unknown[];
+  };
+  lastOrderDate?: string | null;
+  lastVisitDate?: string | null;
 }
 
 export interface Address {

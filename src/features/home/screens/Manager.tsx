@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -10,9 +10,12 @@ import { homeService } from '@/features/home/services/home.service';
 import type {
   ManagerOrderSummaryResponse,
   ManagerTargetResponse,
+  TargetMetric,
 } from '@/features/home/services/home.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
+
+import { createManagerStyles, managerStylesBase as stylesBase } from '../styles/Manager.styles';
 
 type SummaryRow = {
   label: string;
@@ -23,7 +26,7 @@ type SummaryRow = {
 type CategoryOrder = {
   label: string;
   value: number;
-  cases: string;
+  metricValue: string;
   color: string;
 };
 
@@ -68,27 +71,18 @@ const INITIAL_CALL_SUMMARY: CallSummaryData = {
   qtyCases: 2425.1,
 };
 
-const CATEGORY_ORDERS: CategoryOrder[] = [
-  { label: 'Laundry', value: 54, cases: '60,603.8', color: '#58B989' },
-  { label: 'Confectionery', value: 25, cases: '28,431.3', color: '#18B72D' },
-  { label: 'Personal Care', value: 15, cases: '16,721.5', color: '#C75A95' },
-  { label: 'Household', value: 6, cases: '6,699.8', color: '#EF5DA8' },
+const CATEGORY_ORDERS: Omit<CategoryOrder, 'color'>[] = [
+  { label: 'Laundry', value: 54, metricValue: '60,603.8' },
+  { label: 'Confectionery', value: 25, metricValue: '28,431.3' },
+  { label: 'Personal Care', value: 15, metricValue: '16,721.5' },
+  { label: 'Household', value: 6, metricValue: '6,699.8' },
 ];
 
-const OUTLET_SUMMARY: OutletSummary[] = [
-  { label: 'UPC', value: '11,881.0', progress: 0.86, color: '#16A34A' },
-  { label: 'Zero Order', value: '555.0', progress: 0.24, color: '#F59E0B' },
-  { label: 'Not Visited', value: '5,223.0', progress: 0.69, color: '#EF5DA8' },
-  { label: 'Total', value: '19,064.0', progress: 0.66, color: '#8B5CF6' },
-];
-
-const CATEGORY_ORDER_COLORS = [
-  '#58B989',
-  '#18B72D',
-  '#C75A95',
-  '#EF5DA8',
-  '#8B5CF6',
-  '#F59E0B',
+const OUTLET_SUMMARY: Omit<OutletSummary, 'color'>[] = [
+  { label: 'UPC', value: '0', progress: 0 },
+  { label: 'Zero Order', value: '0', progress: 0 },
+  { label: 'Not Visited', value: '0', progress: 0 },
+  { label: 'Total', value: '0', progress: 0 },
 ];
 
 const formatSelectedDate = (date: Date) =>
@@ -112,6 +106,15 @@ const getCurrentMonthPeriod = () => {
   return `${formattedStart} - ${formattedEnd}`;
 };
 
+const getCurrentMonthRange = () => {
+  const now = new Date();
+
+  return {
+    startDate: new Date(now.getFullYear(), now.getMonth(), 1),
+    endDate: now,
+  };
+};
+
 const formatRouteDate = (date: Date) => {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -119,8 +122,98 @@ const formatRouteDate = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+const formatRangeLabel = (startDate: Date, endDate: Date) =>
+  `${new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(startDate)} - ${new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(endDate)}`;
+
 const formatNumber = (value: number) =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+
+const METRIC_OPTIONS: { value: TargetMetric; label: string; unit: string }[] = [
+  { value: 'cases', label: 'Cases', unit: 'Cases' },
+  { value: 'value', label: 'Value', unit: 'Value' },
+  { value: 'tonnage', label: 'Tonnage', unit: 'Tonnage' },
+];
+
+const getMetricLabel = (metric: TargetMetric) =>
+  METRIC_OPTIONS.find((item) => item.value === metric)?.unit || 'Cases';
+
+const getCategoryMetric = (
+  item: ManagerOrderSummaryResponse['primaryCategoryWiseOrder']['categories'][number],
+  metric: TargetMetric,
+) => {
+  if (metric === 'value') return Number(item.value || 0);
+  if (metric === 'tonnage') return Number(item.tonnage || 0);
+  return Number(item.cases || 0);
+};
+
+const getCategoryPercentage = (
+  item: ManagerOrderSummaryResponse['primaryCategoryWiseOrder']['categories'][number],
+  metric: TargetMetric,
+) => {
+  if (metric === 'value') return Number(item.valuePercentage ?? item.percentage ?? 0);
+  if (metric === 'tonnage') return Number(item.tonnagePercentage ?? item.percentage ?? 0);
+  return Number(item.percentage || 0);
+};
+
+const getOrderMetricValue = (
+  summary: ManagerOrderSummaryResponse['managerOrderSummary'] | undefined,
+  metric: TargetMetric,
+  type: 'order' | 'validation',
+) => {
+  if (!summary) return 0;
+
+  if (metric === 'value') {
+    return Number(
+      type === 'order'
+        ? (summary.orderValue ?? summary.validation)
+        : (summary.validationValue ?? summary.validation),
+    );
+  }
+
+  if (metric === 'tonnage') {
+    return Number(type === 'order' ? summary.orderTonnage : summary.validationTonnage || 0);
+  }
+
+  return Number(
+    type === 'order'
+      ? (summary.orderCases ?? summary.orders)
+      : (summary.validationCases ?? summary.orders),
+  );
+};
+
+const getManagerTargetMetric = (target: ManagerTargetResponse | null, metric: TargetMetric) => {
+  const targetValue =
+    metric === 'value'
+      ? Number(target?.targetValue || 0)
+      : metric === 'tonnage'
+        ? Number(target?.targetTonnage || 0)
+        : Number(target?.targetCases || 0);
+
+  const achievedValue =
+    metric === 'value'
+      ? Number(target?.achievedValue || 0)
+      : metric === 'tonnage'
+        ? Number(target?.achievedTonnage || 0)
+        : Number(target?.achievedCases || 0);
+
+  const remainingValue = Math.max(targetValue - achievedValue, 0);
+  const percentage = targetValue > 0 ? clampPercentage((achievedValue / targetValue) * 100) : 0;
+
+  return {
+    targetValue,
+    achievedValue,
+    remainingValue,
+    percentage,
+  };
+};
 
 const clampPercentage = (value: number) => Math.max(0, Math.min(value, 100));
 
@@ -246,7 +339,7 @@ function Gauge({
         />
         <Path
           d={describeArc(centerX, centerY, radius, 65, 115)}
-          stroke="#FDE68A"
+          stroke={colors.warningLight}
           strokeWidth={14}
           strokeLinecap="round"
           fill="transparent"
@@ -266,75 +359,142 @@ function Gauge({
 
 export default function ManagerHomeScreen() {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = createManagerStyles(colors);
   const user = useAuthStore((state) => state.user);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [summaryDateRange, setSummaryDateRange] = useState(getCurrentMonthRange);
+  const [showSummaryDatePicker, setShowSummaryDatePicker] = useState(false);
   const [userSummary, setUserSummary] = useState<UserSummaryData>(INITIAL_USER_SUMMARY);
   const [callSummary, setCallSummary] = useState<CallSummaryData>(INITIAL_CALL_SUMMARY);
   const [managerOrderSummary, setManagerOrderSummary] =
     useState<ManagerOrderSummaryResponse | null>(null);
+  const [primaryTargetMetric, setPrimaryTargetMetric] = useState<TargetMetric>('cases');
+  const [uboTargetMetric, setUboTargetMetric] = useState<TargetMetric>('cases');
+  const [categoryOrderMetric, setCategoryOrderMetric] = useState<TargetMetric>('cases');
+  const [positionOrderMetric, setPositionOrderMetric] = useState<TargetMetric>('cases');
+  const categoryOrderColors = useMemo(
+    () => [
+      colors.success,
+      colors.successDark,
+      colors.secondary,
+      colors.info,
+      colors.warning,
+      colors.error,
+    ],
+    [
+      colors.error,
+      colors.info,
+      colors.secondary,
+      colors.success,
+      colors.successDark,
+      colors.warning,
+    ],
+  );
+  const outletSummaryColors = useMemo(
+    () => [colors.success, colors.warning, colors.secondary, colors.info],
+    [colors.info, colors.secondary, colors.success, colors.warning],
+  );
+  const orderProgressColor = colors.secondary;
+  const validationProgressColor = colors.info;
 
-  const selectedRouteDate = formatRouteDate(selectedDate);
+  const selectedRouteDate = formatRouteDate(new Date());
+  const summaryStartRouteDate = formatRouteDate(summaryDateRange.startDate);
+  const summaryEndRouteDate = formatRouteDate(summaryDateRange.endDate);
+  const summaryDateRangeLabel = formatRangeLabel(
+    summaryDateRange.startDate,
+    summaryDateRange.endDate,
+  );
   const userSummaryRows: SummaryRow[] = [
-    { label: 'Retailing', value: userSummary.retailing, color: '#16A34A' },
-    { label: 'Official Work', value: userSummary.officeWork, color: '#2563EB' },
-    { label: 'Leave', value: userSummary.leave, color: '#F59E0B' },
-    { label: 'Absent', value: userSummary.absent, color: '#DC2626' },
+    { label: 'Retailing', value: userSummary.retailing, color: colors.success },
+    { label: 'Official Work', value: userSummary.officeWork, color: colors.info },
+    { label: 'Leave', value: userSummary.leave, color: colors.warning },
+    { label: 'Absent', value: userSummary.absent, color: colors.error },
   ];
-  const totalUsers = userSummary.total ?? userSummaryRows.reduce((sum, item) => sum + item.value, 0);
+  const totalUsers =
+    userSummary.total ?? userSummaryRows.reduce((sum, item) => sum + item.value, 0);
   const categoryOrders = useMemo<CategoryOrder[]>(() => {
     const categories = managerOrderSummary?.primaryCategoryWiseOrder?.categories;
 
-    if (!categories?.length) return CATEGORY_ORDERS;
+    if (!categories?.length) {
+      return CATEGORY_ORDERS.map((item, index) => ({
+        ...item,
+        color: categoryOrderColors[index % categoryOrderColors.length],
+      }));
+    }
 
     return categories.map((item, index) => ({
       label: item.category,
-      value: item.percentage,
-      cases: formatNumber(item.cases),
-      color: CATEGORY_ORDER_COLORS[index % CATEGORY_ORDER_COLORS.length],
+      value: getCategoryPercentage(item, categoryOrderMetric),
+      metricValue: formatNumber(getCategoryMetric(item, categoryOrderMetric)),
+      color: categoryOrderColors[index % categoryOrderColors.length],
     }));
-  }, [managerOrderSummary]);
-  const categoryOrderTotal = managerOrderSummary?.primaryCategoryWiseOrder?.totalCases !== undefined
-    ? formatNumber(managerOrderSummary.primaryCategoryWiseOrder.totalCases)
-    : '112,456.3';
-  const orderCases = managerOrderSummary?.managerOrderSummary?.orders ?? 112456.3;
-  const validationCases = managerOrderSummary?.managerOrderSummary?.validation ?? 112456.3;
+  }, [categoryOrderColors, categoryOrderMetric, managerOrderSummary]);
+  const categoryOrderTotal =
+    categoryOrderMetric === 'value'
+      ? formatNumber(managerOrderSummary?.primaryCategoryWiseOrder?.totalValue ?? 0)
+      : categoryOrderMetric === 'tonnage'
+        ? formatNumber(managerOrderSummary?.primaryCategoryWiseOrder?.totalTonnage ?? 0)
+        : managerOrderSummary?.primaryCategoryWiseOrder?.totalCases !== undefined
+          ? formatNumber(managerOrderSummary.primaryCategoryWiseOrder.totalCases)
+          : '112,456.3';
+  const categoryOrderUnit = getMetricLabel(categoryOrderMetric);
+  const positionOrderUnit = getMetricLabel(positionOrderMetric);
+  const orderCases = getOrderMetricValue(
+    managerOrderSummary?.managerOrderSummary,
+    positionOrderMetric,
+    'order',
+  );
+  const validationCases = getOrderMetricValue(
+    managerOrderSummary?.managerOrderSummary,
+    positionOrderMetric,
+    'validation',
+  );
   const validationPercentage =
     orderCases > 0 ? clampPercentage((validationCases / orderCases) * 100) : 0;
   const outletSummaryRows = useMemo<OutletSummary[]>(() => {
     const summary = managerOrderSummary?.outletSummary;
 
-    if (!summary) return OUTLET_SUMMARY;
+    if (!summary) {
+      return OUTLET_SUMMARY.map((item, index) => ({
+        ...item,
+        color: outletSummaryColors[index % outletSummaryColors.length],
+      }));
+    }
 
     return [
       {
         label: 'UPC',
         value: formatNumber(summary.upc.count),
         progress: clampPercentage(summary.upc.percentage) / 100,
-        color: '#16A34A',
+        color: colors.success,
       },
       {
         label: 'Zero Order',
         value: formatNumber(summary.zeroOrder.count),
         progress: clampPercentage(summary.zeroOrder.percentage) / 100,
-        color: '#F59E0B',
+        color: colors.warning,
       },
       {
         label: 'Not Visited',
         value: formatNumber(summary.notVisited.count),
         progress: clampPercentage(summary.notVisited.percentage) / 100,
-        color: '#EF5DA8',
+        color: colors.secondary,
       },
       {
         label: 'Total',
         value: formatNumber(summary.total.count),
         progress: clampPercentage(summary.total.percentage) / 100,
-        color: '#8B5CF6',
+        color: colors.info,
       },
     ];
-  }, [managerOrderSummary]);
+  }, [
+    colors.info,
+    colors.secondary,
+    colors.success,
+    colors.warning,
+    managerOrderSummary,
+    outletSummaryColors,
+  ]);
   const outletProductivity = managerOrderSummary?.outletSummary?.productivity;
   const productivityPercentage = outletProductivity?.percentage;
 
@@ -357,9 +517,12 @@ export default function ManagerHomeScreen() {
 
   const [managerTarget, setManagerTarget] = useState<ManagerTargetResponse | null>(null);
 
-  const fetchManagerStats = async (date?: string) => {
+  const fetchManagerStats = async (range = summaryDateRange) => {
     try {
-      const response = await homeService.getManagerStats(date);
+      const response = await homeService.getManagerStats({
+        startDate: formatRouteDate(range.startDate),
+        endDate: formatRouteDate(range.endDate),
+      });
 
       if (response.success && response.data) {
         setUserSummary(response.data.userSummary ?? INITIAL_USER_SUMMARY);
@@ -382,9 +545,9 @@ export default function ManagerHomeScreen() {
     }
   };
 
-  const fetchManagerOrderSummary = async (date?: string) => {
+  const fetchManagerOrderSummary = async () => {
     try {
-      const response = await homeService.getManagerOrderSummary(date);
+      const response = await homeService.getManagerOrderSummary();
 
       if (response.success && response.data) {
         setManagerOrderSummary(response.data as ManagerOrderSummaryResponse);
@@ -396,29 +559,57 @@ export default function ManagerHomeScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchManagerStats(selectedRouteDate);
-    await fetchManagerOrderSummary(selectedRouteDate);
+    await fetchManagerStats(summaryDateRange);
+    await fetchManagerOrderSummary();
     setRefreshing(false);
   };
 
   useEffect(() => {
-    fetchManagerStats(selectedRouteDate);
-    fetchManagerTarget();
-    fetchManagerOrderSummary(selectedRouteDate);
-  }, [selectedRouteDate]);
+    fetchManagerStats(summaryDateRange);
+  }, [summaryStartRouteDate, summaryEndRouteDate]);
 
-  const openDatePicker = () => {
-    setShowDatePicker(true);
+  useEffect(() => {
+    fetchManagerTarget();
+    fetchManagerOrderSummary();
+  }, []);
+
+  const openSummaryDatePicker = () => {
+    setShowSummaryDatePicker(true);
   };
+
+  const renderMetricToggle = (value: TargetMetric, onChange: (metric: TargetMetric) => void) => (
+    <View style={styles.metricToggle}>
+      {METRIC_OPTIONS.map((option) => (
+        <TouchableOpacity
+          key={option.value}
+          activeOpacity={0.82}
+          onPress={() => onChange(option.value)}
+          style={[styles.metricToggleItem, value === option.value && styles.metricToggleItemActive]}
+        >
+          <AppText
+            style={[
+              styles.metricToggleText,
+              value === option.value && styles.metricToggleTextActive,
+            ]}
+          >
+            {option.label}
+          </AppText>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 
   return (
     <View style={styles.container}>
       <ManagerDatePickerModal
-        visible={showDatePicker}
-        value={selectedDate}
-        title="Select dashboard date"
-        onClose={() => setShowDatePicker(false)}
-        onApply={setSelectedDate}
+        visible={showSummaryDatePicker}
+        value={summaryDateRange.startDate}
+        rangeValue={summaryDateRange}
+        mode="range"
+        title="Select summary date range"
+        onClose={() => setShowSummaryDatePicker(false)}
+        onApply={() => {}}
+        onApplyRange={setSummaryDateRange}
       />
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -438,13 +629,20 @@ export default function ManagerHomeScreen() {
         </View>
 
         <View style={styles.dateCard}>
-          <TouchableOpacity style={styles.dateHeader} activeOpacity={0.82} onPress={openDatePicker}>
+          <TouchableOpacity
+            style={styles.dateHeader}
+            activeOpacity={0.82}
+            onPress={openSummaryDatePicker}
+          >
             <View style={styles.dateTitleRow}>
-              <Ionicons name="calendar-clear-outline" size={16} color={colors.primary} />
-              <AppText style={styles.dateLabel}>{formatSelectedDate(selectedDate)}</AppText>
+              <Ionicons name="calendar-number-outline" size={16} color={colors.primary} />
+              <View style={styles.headerText}>
+                <AppText style={styles.dateLabel}>User & Call Summary</AppText>
+                <AppText style={styles.cardMeta}>{summaryDateRangeLabel}</AppText>
+              </View>
             </View>
             <View style={styles.dateAction}>
-              <AppText style={styles.refreshedText}>Change date</AppText>
+              <AppText style={styles.refreshedText}>Change range</AppText>
               <Ionicons name="chevron-down" size={14} color={colors.textQuaternary} />
             </View>
           </TouchableOpacity>
@@ -454,11 +652,7 @@ export default function ManagerHomeScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <AppText style={styles.cardTitle}>User Summary</AppText>
-              <AppText style={styles.cardMeta}>
-                {new Intl.DateTimeFormat('en-US', { day: '2-digit', month: 'short' }).format(
-                  selectedDate,
-                )}
-              </AppText>
+              <AppText style={styles.cardMeta}>{summaryDateRangeLabel}</AppText>
             </View>
             {userSummaryRows.map((item) => (
               <TouchableOpacity
@@ -525,6 +719,23 @@ export default function ManagerHomeScreen() {
         </View>
 
         {TARGETS.map((target, index) => {
+          const sectionMetric = index === 0 ? primaryTargetMetric : uboTargetMetric;
+          const sectionMetricUnit = getMetricLabel(sectionMetric);
+          const targetMetric =
+            index === 0
+              ? getManagerTargetMetric(managerTarget, sectionMetric)
+              : {
+                  targetValue: 0,
+                  achievedValue: 0,
+                  remainingValue: 0,
+                  percentage: 0,
+                };
+          const targetMetricValue = `${formatNumber(targetMetric.achievedValue)} ${sectionMetricUnit}`;
+          const targetMetricHint =
+            index === 0 && targetMetric.targetValue > 0
+              ? `Only ${formatNumber(targetMetric.remainingValue)} more ${sectionMetricUnit} to achieve your target`
+              : target.hint;
+
           const content = (
             <>
               <View style={styles.cardHeader}>
@@ -538,14 +749,14 @@ export default function ManagerHomeScreen() {
                   color={colors.primary}
                 />
               </View>
+              {renderMetricToggle(
+                sectionMetric,
+                index === 0 ? setPrimaryTargetMetric : setUboTargetMetric,
+              )}
               <Gauge
-                percentage={
-                  index === 0
-                    ? managerTarget?.achievementPercentage ?? target.percentage
-                    : target.percentage
-                }
-                value={index === 0 ? managerTarget?.display?.achievedCases ?? target.value : target.value}
-                color={index === 0 ? '#10B981' : colors.border}
+                percentage={index === 0 ? targetMetric.percentage : target.percentage}
+                value={index === 0 ? targetMetricValue : `0 ${sectionMetricUnit}`}
+                color={index === 0 ? colors.success : colors.border}
                 colors={colors}
               />
               <View style={[styles.targetHint, index === 1 && styles.targetHintMuted]}>
@@ -555,7 +766,7 @@ export default function ManagerHomeScreen() {
                   color={index === 0 ? colors.primaryContrast : colors.textTertiary}
                 />
                 <AppText style={[styles.targetHintText, index === 1 && styles.targetHintTextMuted]}>
-                  {index === 0 ? managerTarget?.display?.remainingMessage ?? target.hint : target.hint}
+                  {targetMetricHint}
                 </AppText>
               </View>
             </>
@@ -591,6 +802,7 @@ export default function ManagerHomeScreen() {
             <AppText style={styles.cardTitle}>Primary Category Wise Order</AppText>
             <AppText style={styles.mtdBadge}>MTD</AppText>
           </View>
+          {renderMetricToggle(categoryOrderMetric, setCategoryOrderMetric)}
           <View style={styles.chartRow}>
             <DonutChart data={categoryOrders} total={categoryOrderTotal} colors={colors} />
             <View style={styles.legend}>
@@ -601,7 +813,9 @@ export default function ManagerHomeScreen() {
                     <AppText style={styles.legendLabel} numberOfLines={1}>
                       {item.label}
                     </AppText>
-                    <AppText style={styles.legendValue}>{item.cases} Cases</AppText>
+                    <AppText style={styles.legendValue}>
+                      {item.metricValue} {categoryOrderUnit}
+                    </AppText>
                   </View>
                   <AppText style={styles.legendPercent}>{item.value}%</AppText>
                 </View>
@@ -615,6 +829,7 @@ export default function ManagerHomeScreen() {
             <AppText style={styles.cardTitle}>Position Wise Order</AppText>
             <AppText style={styles.mtdBadge}>MTD</AppText>
           </View>
+          {renderMetricToggle(positionOrderMetric, setPositionOrderMetric)}
           <View style={styles.routeInfo}>
             <View style={styles.avatar}>
               <AppText style={styles.avatarText}>
@@ -633,26 +848,32 @@ export default function ManagerHomeScreen() {
           </View>
           <View style={styles.progressLegend}>
             <View style={styles.progressLegendItem}>
-              <View style={[styles.statusDot, { backgroundColor: '#B15CC8' }]} />
+              <View style={[styles.statusDot, { backgroundColor: orderProgressColor }]} />
               <AppText style={styles.cardMeta}>Order</AppText>
             </View>
             <View style={styles.progressLegendItem}>
-              <View style={[styles.statusDot, { backgroundColor: '#3B82F6' }]} />
+              <View style={[styles.statusDot, { backgroundColor: validationProgressColor }]} />
               <AppText style={styles.cardMeta}>Validation</AppText>
             </View>
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: '100%', backgroundColor: '#B15CC8' }]} />
-            <AppText style={styles.progressText}>{formatNumber(orderCases)} Cases</AppText>
+            <View
+              style={[styles.progressFill, { width: '100%', backgroundColor: orderProgressColor }]}
+            />
+            <AppText style={styles.progressText}>
+              {formatNumber(orderCases)} {positionOrderUnit}
+            </AppText>
           </View>
           <View style={styles.progressTrack}>
             <View
               style={[
                 styles.progressFill,
-                { width: `${validationPercentage}%`, backgroundColor: '#93C5FD' },
+                { width: `${validationPercentage}%`, backgroundColor: validationProgressColor },
               ]}
             />
-            <AppText style={styles.progressText}>{formatNumber(validationCases)} Cases</AppText>
+            <AppText style={styles.progressText}>
+              {formatNumber(validationCases)} {positionOrderUnit}
+            </AppText>
           </View>
         </View>
 
@@ -687,8 +908,8 @@ export default function ManagerHomeScreen() {
             <View>
               <AppText style={styles.productivityTitle}>Productivity</AppText>
               <AppText style={styles.cardMeta}>
-                PC: {formatNumber(outletProductivity?.pc ?? 24940)} | TC:{' '}
-                {formatNumber(outletProductivity?.tc ?? 28711)}
+                PC: {formatNumber(outletProductivity?.pc ?? 0)} | TC:{' '}
+                {formatNumber(outletProductivity?.tc ?? 0)}
                 {productivityPercentage !== undefined
                   ? ` | ${formatNumber(productivityPercentage)}%`
                   : ''}
@@ -700,423 +921,3 @@ export default function ManagerHomeScreen() {
     </View>
   );
 }
-
-const stylesBase = StyleSheet.create({
-  donutWrap: {
-    width: 128,
-    height: 128,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  donutCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gaugeWrap: {
-    height: 122,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gaugeValue: {
-    position: 'absolute',
-    top: 56,
-    alignItems: 'center',
-  },
-});
-
-const createStyles = (colors: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.backgroundSecondary,
-    },
-    scrollContent: {
-      paddingHorizontal: 14,
-      paddingTop: 14,
-      paddingBottom: 28,
-      gap: 12,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-    },
-    eyebrow: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.primary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    title: {
-      fontSize: 24,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      marginTop: 2,
-    },
-    filterButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    dateCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    dateHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 8,
-    },
-    dateTitleRow: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    dateAction: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    dateLabel: {
-      fontSize: 13,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    refreshedText: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: colors.textQuaternary,
-    },
-    summaryGrid: {
-      flexDirection: 'row',
-      gap: 10,
-    },
-    card: {
-      flex: 1,
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 8,
-      marginBottom: 8,
-    },
-    headerText: {
-      flex: 1,
-    },
-    cardTitle: {
-      fontSize: 13,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    cardMeta: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: colors.textTertiary,
-      marginTop: 2,
-    },
-    summaryRow: {
-      minHeight: 30,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
-    },
-    summaryLabelWrap: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingRight: 4,
-    },
-    statusDot: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-    },
-    summaryLabel: {
-      flex: 1,
-      fontSize: 11,
-      fontWeight: '600',
-      color: colors.textSecondary,
-    },
-    summaryValue: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    totalRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingTop: 9,
-    },
-    totalLabel: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    totalValue: {
-      fontSize: 13,
-      fontWeight: '900',
-      color: colors.primary,
-    },
-    callCircleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      gap: 10,
-      marginBottom: 10,
-    },
-    callCircle: {
-      width: 58,
-      height: 58,
-      borderRadius: 29,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 3,
-      borderColor: colors.success,
-    },
-    callCircleMuted: {
-      width: 58,
-      height: 58,
-      borderRadius: 29,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 3,
-      borderColor: colors.border,
-    },
-    callValue: {
-      fontSize: 14,
-      fontWeight: '900',
-      color: colors.textPrimary,
-    },
-    callLabel: {
-      fontSize: 8,
-      fontWeight: '700',
-      color: colors.textTertiary,
-      textAlign: 'center',
-    },
-    callMetrics: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 10,
-    },
-    metricItem: {
-      alignItems: 'center',
-      flex: 1,
-    },
-    metricValue: {
-      fontSize: 12,
-      fontWeight: '900',
-      color: colors.textPrimary,
-    },
-    metricLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.textTertiary,
-    },
-    orderValue: {
-      borderRadius: 10,
-      backgroundColor: colors.info,
-      paddingVertical: 8,
-      alignItems: 'center',
-    },
-    orderValueLabel: {
-      fontSize: 9,
-      fontWeight: '700',
-      color: colors.primaryContrast,
-      opacity: 0.85,
-    },
-    orderValueText: {
-      fontSize: 20,
-      fontWeight: '900',
-      color: colors.primaryContrast,
-    },
-    targetHint: {
-      minHeight: 34,
-      borderRadius: 10,
-      paddingHorizontal: 10,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: colors.primary,
-    },
-    targetHintMuted: {
-      backgroundColor: colors.backgroundSecondary,
-    },
-    targetHintText: {
-      flex: 1,
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.primaryContrast,
-    },
-    targetHintTextMuted: {
-      color: colors.textTertiary,
-    },
-    mtdBadge: {
-      fontSize: 10,
-      fontWeight: '900',
-      color: colors.primary,
-      backgroundColor: colors.infoLight,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 7,
-      overflow: 'hidden',
-    },
-    chartRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    legend: {
-      flex: 1,
-      gap: 8,
-    },
-    legendRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    legendTextWrap: {
-      flex: 1,
-    },
-    legendLabel: {
-      fontSize: 11,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    legendValue: {
-      fontSize: 9,
-      fontWeight: '600',
-      color: colors.textTertiary,
-    },
-    legendPercent: {
-      fontSize: 10,
-      fontWeight: '800',
-      color: colors.textSecondary,
-    },
-    routeInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 10,
-    },
-    avatar: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primary + '18',
-    },
-    avatarText: {
-      fontSize: 11,
-      fontWeight: '900',
-      color: colors.primary,
-    },
-    routeName: {
-      fontSize: 12,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    progressLegend: {
-      flexDirection: 'row',
-      gap: 16,
-      marginBottom: 8,
-    },
-    progressLegendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-    },
-    progressTrack: {
-      height: 22,
-      borderRadius: 5,
-      backgroundColor: colors.backgroundTertiary,
-      overflow: 'hidden',
-      marginBottom: 6,
-      justifyContent: 'center',
-    },
-    progressFill: {
-      position: 'absolute',
-      left: 0,
-      top: 0,
-      bottom: 0,
-      borderRadius: 5,
-    },
-    progressText: {
-      alignSelf: 'flex-end',
-      paddingRight: 8,
-      fontSize: 10,
-      fontWeight: '900',
-      color: colors.textPrimary,
-    },
-    outletRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      marginBottom: 0,
-    },
-    outletText: {
-      width: 70,
-    },
-    outletProgressTrack: {
-      flex: 1,
-      height: 6,
-      borderRadius: 3,
-      overflow: 'hidden',
-      backgroundColor: colors.backgroundTertiary,
-    },
-    outletProgressFill: {
-      height: '100%',
-      borderRadius: 4,
-    },
-    percentBadge: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      borderWidth: 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    percentBadgeText: {
-      fontSize: 11,
-      fontWeight: '900',
-    },
-    productivityBox: {
-      minHeight: 28,
-      borderRadius: 6,
-      paddingHorizontal: 4,
-      paddingVertical: 2,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 3,
-      backgroundColor: colors.successLight,
-      marginTop: 0,
-    },
-    productivityTitle: {
-      fontSize: 12,
-      fontWeight: '900',
-      color: colors.success,
-    },
-  });

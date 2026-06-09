@@ -9,6 +9,8 @@ export type DayStartPayload = {
   vanChangeNote?: string;
   requestedVanId?: string;
   requestedVanName?: string;
+  dayStartImageMediaId?: string;
+  dayStartImageUrl?: string;
 };
 
 export type DayStartResponse = {

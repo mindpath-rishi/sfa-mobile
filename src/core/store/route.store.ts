@@ -21,6 +21,7 @@ export type Route = {
   distance: string;
   vanId?: string;
   routeName?: string;
+  routeCode?: string;
   marketId?: string;
   provinceId?: string;
   countryId?: string;

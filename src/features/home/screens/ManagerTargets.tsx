@@ -1,13 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { AppText } from '@/core/components';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { homeService, UserWiseTargetSummary } from '@/features/home/services/home.service';
-import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
+import {
+  homeService,
+  TargetMetric,
+  UserPrimaryCategoryTargetSummary,
+  UserWiseTargetSummary,
+} from '@/features/home/services/home.service';
+import {
+  createManagerTargetsBaseStyles,
+  createManagerTargetsStyles,
+} from '../styles/ManagerTargets.styles';
 
 type TargetUser = UserWiseTargetSummary & {
   children?: TargetUser[];
@@ -27,15 +35,6 @@ const findUser = (id?: string | string[], users: TargetUser[] = []) => {
   return undefined;
 };
 
-const getParam = (value?: string | string[]) => (Array.isArray(value) ? value[0] : value);
-
-const parseRouteDate = (value?: string) => {
-  if (!value) return new Date();
-  const [year, month, day] = value.split('-').map(Number);
-  if (!year || !month || !day) return new Date();
-  return new Date(year, month - 1, day);
-};
-
 const formatRouteDate = (date: Date) => {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -51,10 +50,60 @@ const formatSelectedDate = (date: Date) =>
     year: 'numeric',
   }).format(date);
 
-const formatCases = (value: number) =>
-  `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)} Cases`;
+const getCurrentMonthPeriod = () => {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+  return `${formatSelectedDate(startDate)} - ${formatSelectedDate(now)}`;
+};
 
-function TargetMetric({ label, value }: { label: string; value: string }) {
+const METRIC_OPTIONS: { value: TargetMetric; label: string; unit: string }[] = [
+  { value: 'cases', label: 'Cases', unit: 'Cases' },
+  { value: 'value', label: 'Value', unit: 'Value' },
+  { value: 'tonnage', label: 'Tonnage', unit: 'Tonnage' },
+];
+
+const formatMetric = (value: number, metric: TargetMetric) => {
+  const unit = METRIC_OPTIONS.find((option) => option.value === metric)?.unit || 'Cases';
+  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)} ${unit}`;
+};
+
+const getTargetValue = (user: TargetUser, metric: TargetMetric) => {
+  if (metric === 'value') return Number(user.targetValue || 0);
+  if (metric === 'tonnage') return Number(user.targetTonnage || 0);
+  return Number(user.targetCases || 0);
+};
+
+const getAchievementValue = (user: TargetUser, metric: TargetMetric) => {
+  if (metric === 'value') return Number(user.achievementValue || 0);
+  if (metric === 'tonnage') return Number(user.achievementTonnage || 0);
+  return Number(user.achievementCases || 0);
+};
+
+const getRemainingValue = (item: UserPrimaryCategoryTargetSummary, metric: TargetMetric) => {
+  if (metric === 'value') return Number(item.remainingValue || 0);
+  if (metric === 'tonnage') return Number(item.remainingTonnage || 0);
+  return Number(item.remainingCases || 0);
+};
+
+const getCategoryTargetValue = (item: UserPrimaryCategoryTargetSummary, metric: TargetMetric) => {
+  if (metric === 'value') return Number(item.targetValue || 0);
+  if (metric === 'tonnage') return Number(item.targetTonnage || 0);
+  return Number(item.targetCases || 0);
+};
+
+const getCategoryAchievementValue = (
+  item: UserPrimaryCategoryTargetSummary,
+  metric: TargetMetric,
+) => {
+  if (metric === 'value') return Number(item.achievementValue || 0);
+  if (metric === 'tonnage') return Number(item.achievementTonnage || 0);
+  return Number(item.achievementCases || 0);
+};
+
+function TargetMetricItem({ label, value }: { label: string; value: string }) {
+  const { colors } = useTheme();
+  const stylesBase = createManagerTargetsBaseStyles(colors);
+
   return (
     <View style={stylesBase.metric}>
       <AppText style={stylesBase.metricValue} numberOfLines={1}>
@@ -68,22 +117,27 @@ function TargetMetric({ label, value }: { label: string; value: string }) {
 function TargetUserCard({
   user,
   colors,
+  metric,
   onPress,
+  onViewCategory,
+  categoryExpanded,
 }: {
   user: TargetUser;
   colors: any;
+  metric: TargetMetric;
   onPress?: () => void;
+  onViewCategory: () => void;
+  categoryExpanded: boolean;
 }) {
-  const styles = createStyles(colors);
+  const styles = createManagerTargetsStyles(colors);
   const hasDrillDown = Boolean(onPress);
+  const targetValue = getTargetValue(user, metric);
+  const achievementValue = getAchievementValue(user, metric);
+  const achievementPercentage =
+    targetValue > 0 ? Math.min((achievementValue / targetValue) * 100, 100) : 0;
 
   return (
-    <TouchableOpacity
-      style={styles.userCard}
-      activeOpacity={hasDrillDown ? 0.82 : 1}
-      onPress={onPress}
-      disabled={!hasDrillDown}
-    >
+    <View style={styles.userCard}>
       <View style={styles.userCardHeader}>
         <View style={styles.avatar}>
           <AppText style={styles.avatarText}>
@@ -96,14 +150,29 @@ function TargetUserCard({
         </View>
         <View style={styles.userTitleWrap}>
           <AppText style={styles.userName}>{user.employeeName}</AppText>
-          <AppText style={styles.userPosition}>{user.designation}</AppText>
+          <AppText style={styles.userPosition}>{user.designation || 'User'}</AppText>
         </View>
-        {hasDrillDown && <AppText style={styles.drillText}>User drilldown</AppText>}
+        {hasDrillDown && (
+          <TouchableOpacity style={styles.drillButton} activeOpacity={0.82} onPress={onPress}>
+            <AppText style={styles.drillText}>Team</AppText>
+            <Ionicons name="chevron-forward" size={13} color={colors.primary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.metricsRow}>
-        <TargetMetric label="Target" value={formatCases(user.targetCases)} />
-        <TargetMetric label="Achievement" value={formatCases(user.achievementCases)} />
+        <TargetMetricItem label="Target" value={formatMetric(targetValue, metric)} />
+        <TargetMetricItem label="Achievement" value={formatMetric(achievementValue, metric)} />
+      </View>
+
+      <View style={styles.progressTrack}>
+        <View style={[styles.progressFill, { width: `${achievementPercentage}%` }]} />
+      </View>
+      <View style={styles.progressMetaRow}>
+        <AppText style={styles.progressMetaText}>{achievementPercentage.toFixed(1)}%</AppText>
+        <AppText style={styles.progressMetaText}>
+          Remaining {formatMetric(Math.max(targetValue - achievementValue, 0), metric)}
+        </AppText>
       </View>
 
       <View style={styles.rateRow}>
@@ -115,23 +184,95 @@ function TargetUserCard({
         </View>
       </View>
 
-      <View style={styles.categoryButton}>
-        <AppText style={styles.categoryButtonText}>View Primary Category</AppText>
-        <Ionicons name="chevron-down" size={14} color={colors.info} />
+      <TouchableOpacity style={styles.categoryButton} activeOpacity={0.82} onPress={onViewCategory}>
+        <AppText style={styles.categoryButtonText}>
+          {categoryExpanded ? 'Hide Primary Category' : 'View Primary Category'}
+        </AppText>
+        <Ionicons
+          name={categoryExpanded ? 'chevron-up' : 'chevron-down'}
+          size={14}
+          color={colors.primary}
+        />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function CategoryTargetPanel({
+  user,
+  data,
+  metric,
+  colors,
+  loading,
+}: {
+  user: TargetUser;
+  data: UserPrimaryCategoryTargetSummary[];
+  metric: TargetMetric;
+  colors: any;
+  loading: boolean;
+}) {
+  const styles = createManagerTargetsStyles(colors);
+
+  return (
+    <View style={styles.categoryPanel}>
+      <View style={styles.categoryPanelHeader}>
+        <View>
+          <AppText style={styles.categoryPanelTitle}>Primary Category Targets</AppText>
+          <AppText style={styles.categoryPanelSubtitle}>{user.employeeName}</AppText>
+        </View>
+        <AppText style={styles.categoryPanelBadge}>
+          {METRIC_OPTIONS.find((item) => item.value === metric)?.label}
+        </AppText>
       </View>
-    </TouchableOpacity>
+
+      {loading ? (
+        <AppText style={styles.emptyText}>Loading categories...</AppText>
+      ) : data.length === 0 ? (
+        <AppText style={styles.emptyText}>No category targets found</AppText>
+      ) : (
+        data.map((item) => {
+          const target = getCategoryTargetValue(item, metric);
+          const achievement = getCategoryAchievementValue(item, metric);
+          const remaining = getRemainingValue(item, metric);
+          const percentage = target > 0 ? Math.min((achievement / target) * 100, 100) : 0;
+
+          return (
+            <View key={item.categoryId} style={styles.categoryRow}>
+              <View style={styles.categoryRowTop}>
+                <AppText style={styles.categoryName} numberOfLines={1}>
+                  {item.category}
+                </AppText>
+                <AppText style={styles.categoryPercent}>{percentage.toFixed(1)}%</AppText>
+              </View>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${percentage}%` }]} />
+              </View>
+              <View style={styles.categoryMetricsGrid}>
+                <TargetMetricItem label="Target" value={formatMetric(target, metric)} />
+                <TargetMetricItem label="Achieved" value={formatMetric(achievement, metric)} />
+                <TargetMetricItem label="Remaining" value={formatMetric(remaining, metric)} />
+              </View>
+            </View>
+          );
+        })
+      )}
+    </View>
   );
 }
 
 export default function ManagerTargetsScreen() {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = createManagerTargetsStyles(colors);
   const { setHeader } = useHeader();
   const params = useLocalSearchParams<{ userId?: string; date?: string }>();
-  const [selectedDate, setSelectedDate] = useState(() => parseRouteDate(getParam(params.date)));
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [targetUsers, setTargetUsers] = useState<TargetUser[]>(TARGET_USERS);
   const [loading, setLoading] = useState(false);
+  const [selectedMetric, setSelectedMetric] = useState<TargetMetric>('cases');
+  const [expandedCategoryUserId, setExpandedCategoryUserId] = useState<string | null>(null);
+  const [categoryTargetsByUser, setCategoryTargetsByUser] = useState<
+    Record<string, UserPrimaryCategoryTargetSummary[]>
+  >({});
+  const [categoryLoadingUserId, setCategoryLoadingUserId] = useState<string | null>(null);
 
   const selectedUser = useMemo(
     () => findUser(params.userId, targetUsers),
@@ -142,25 +283,25 @@ export default function ManagerTargetsScreen() {
       ? selectedUser.children
       : [selectedUser]
     : targetUsers;
-  const selectedRouteDate = formatRouteDate(selectedDate);
+  const selectedRouteDate = formatRouteDate(new Date());
 
   useFocusEffect(
     useCallback(() => {
       setHeader({
-        title: 'Primary Targets (Cases)',
+        title: `Primary Targets (${METRIC_OPTIONS.find((item) => item.value === selectedMetric)?.label})`,
         showBack: true,
         showMenu: false,
         showFilter: false,
         backgroundColor: colors.primary,
       });
-    }, [colors.primary, setHeader]),
+    }, [colors.primary, selectedMetric, setHeader]),
   );
 
   const fetchTargetSummary = async () => {
     setLoading(true);
 
     try {
-      const response = await homeService.getUserWiseTargetSummary();
+      const response = await homeService.getUserWiseTargetSummary(selectedRouteDate);
 
       if (response.success && response.data) {
         setTargetUsers(response.data as TargetUser[]);
@@ -172,35 +313,56 @@ export default function ManagerTargetsScreen() {
     }
   };
 
+  const handleToggleCategoryTargets = async (user: TargetUser) => {
+    if (expandedCategoryUserId === user.employeeId) {
+      setExpandedCategoryUserId(null);
+      return;
+    }
+
+    setExpandedCategoryUserId(user.employeeId);
+
+    if (categoryTargetsByUser[user.employeeId]) return;
+
+    setCategoryLoadingUserId(user.employeeId);
+
+    try {
+      const response = await homeService.getUserPrimaryCategoryTargets({
+        employeeId: user.employeeId,
+        date: selectedRouteDate,
+      });
+
+      if (response.success && response.data) {
+        setCategoryTargetsByUser((current) => ({
+          ...current,
+          [user.employeeId]: response.data || [],
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to load user primary category targets', error);
+      setCategoryTargetsByUser((current) => ({
+        ...current,
+        [user.employeeId]: [],
+      }));
+    } finally {
+      setCategoryLoadingUserId(null);
+    }
+  };
+
   useEffect(() => {
     fetchTargetSummary();
   }, []);
 
-  const openDatePicker = () => {
-    setShowDatePicker(true);
-  };
-
   return (
     <View style={styles.container}>
-      <ManagerDatePickerModal
-        visible={showDatePicker}
-        value={selectedDate}
-        title="Select target date"
-        onClose={() => setShowDatePicker(false)}
-        onApply={setSelectedDate}
-      />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.dateCard}>
-          <TouchableOpacity style={styles.dateHeader} activeOpacity={0.82} onPress={openDatePicker}>
-            <View style={styles.dateTitleRow}>
-              <Ionicons name="calendar-clear-outline" size={16} color={colors.primary} />
-              <AppText style={styles.dateLabel}>{formatSelectedDate(selectedDate)}</AppText>
-            </View>
-            <View style={styles.dateAction}>
-              <AppText style={styles.changeDateText}>Change date</AppText>
-              <Ionicons name="chevron-down" size={14} color={colors.textQuaternary} />
-            </View>
-          </TouchableOpacity>
+        <View style={styles.heroBand}>
+          <View style={styles.heroIcon}>
+            <Ionicons name="flag-outline" size={18} color={colors.primary} />
+          </View>
+          <View style={styles.parentTextWrap}>
+            <AppText style={styles.heroTitle}>User wise Primary Category Targets</AppText>
+            <AppText style={styles.parentSubtitle}>{getCurrentMonthPeriod()}</AppText>
+          </View>
         </View>
 
         {selectedUser && (
@@ -215,28 +377,57 @@ export default function ManagerTargetsScreen() {
           </View>
         )}
 
+        <View style={styles.metricToggle}>
+          {METRIC_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.value}
+              activeOpacity={0.82}
+              onPress={() => setSelectedMetric(option.value)}
+              style={[
+                styles.metricToggleItem,
+                selectedMetric === option.value && styles.metricToggleItemActive,
+              ]}
+            >
+              <AppText
+                style={[
+                  styles.metricToggleText,
+                  selectedMetric === option.value && styles.metricToggleTextActive,
+                ]}
+              >
+                {option.label}
+              </AppText>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         {loading && <AppText style={styles.emptyText}>Loading target summary...</AppText>}
-        {!loading && users.length === 0 && (
-          <AppText style={styles.emptyText}>No data available</AppText>
-        )}
 
         {users.map((user) => (
-          <React.Fragment key={user.id}>
+          <React.Fragment key={user.employeeId}>
             <TargetUserCard
               user={user}
               colors={colors}
+              metric={selectedMetric}
+              categoryExpanded={expandedCategoryUserId === user.employeeId}
+              onViewCategory={() => handleToggleCategoryTargets(user)}
               onPress={
                 user.children?.length
                   ? () =>
                       router.push({
                         pathname: '/(drawer)/manager-targets',
-                        params: { userId: user.id, date: selectedRouteDate },
+                        params: { userId: user.employeeId },
                       })
                   : undefined
               }
             />
-            {!selectedUser && !user.children?.length && (
-              <AppText style={styles.emptyText}>No Data available</AppText>
+            {expandedCategoryUserId === user.employeeId && (
+              <CategoryTargetPanel
+                user={user}
+                data={categoryTargetsByUser[user.employeeId] || []}
+                metric={selectedMetric}
+                colors={colors}
+                loading={categoryLoadingUserId === user.employeeId}
+              />
             )}
           </React.Fragment>
         ))}
@@ -244,189 +435,3 @@ export default function ManagerTargetsScreen() {
     </View>
   );
 }
-
-const stylesBase = StyleSheet.create({
-  metric: {
-    flex: 1,
-    minWidth: 0,
-  },
-  metricValue: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#111827',
-  },
-  metricLabel: {
-    marginTop: 3,
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#6B7280',
-  },
-});
-
-const createStyles = (colors: any) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.backgroundSecondary,
-    },
-    content: {
-      padding: 12,
-      gap: 10,
-      paddingBottom: 28,
-    },
-    dateCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 10,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    dateHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 8,
-    },
-    dateTitleRow: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      minWidth: 0,
-    },
-    dateLabel: {
-      flex: 1,
-      fontSize: 13,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    dateAction: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    changeDateText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.textQuaternary,
-    },
-    parentBanner: {
-      minHeight: 52,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      backgroundColor: colors.infoLight,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    parentTextWrap: {
-      flex: 1,
-    },
-    parentTitle: {
-      fontSize: 12,
-      fontWeight: '900',
-      color: colors.textPrimary,
-    },
-    parentSubtitle: {
-      marginTop: 2,
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.textTertiary,
-    },
-    userCard: {
-      borderRadius: 10,
-      padding: 12,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.12,
-      shadowRadius: 3,
-      elevation: 2,
-    },
-    userCardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 9,
-      marginBottom: 12,
-    },
-    avatar: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primary + '18',
-    },
-    avatarText: {
-      fontSize: 11,
-      fontWeight: '900',
-      color: colors.primary,
-    },
-    userTitleWrap: {
-      flex: 1,
-      minWidth: 0,
-    },
-    userName: {
-      fontSize: 13,
-      fontWeight: '900',
-      color: colors.textPrimary,
-    },
-    userPosition: {
-      marginTop: 2,
-      fontSize: 9,
-      fontWeight: '700',
-      color: colors.textTertiary,
-    },
-    drillText: {
-      fontSize: 9,
-      fontWeight: '800',
-      color: colors.textQuaternary,
-    },
-    metricsRow: {
-      flexDirection: 'row',
-      gap: 14,
-    },
-    rateRow: {
-      marginTop: 8,
-      flexDirection: 'row',
-      gap: 6,
-      justifyContent: 'flex-end',
-    },
-    rateBadge: {
-      borderRadius: 5,
-      paddingHorizontal: 7,
-      paddingVertical: 3,
-      backgroundColor: colors.backgroundSecondary,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-    },
-    rateLabel: {
-      fontSize: 8,
-      fontWeight: '800',
-      color: colors.textTertiary,
-    },
-    categoryButton: {
-      marginTop: 14,
-      minHeight: 26,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 5,
-    },
-    categoryButtonText: {
-      fontSize: 10,
-      fontWeight: '800',
-      color: colors.info,
-    },
-    emptyText: {
-      paddingVertical: 6,
-      textAlign: 'center',
-      fontSize: 13,
-      fontWeight: '800',
-      color: colors.textSecondary,
-    },
-  });
