@@ -22,6 +22,7 @@ import {
 
 type SummaryStatus = 'retailing' | 'official-work' | 'leave' | 'absent';
 type DailyView = 'summary' | 'users' | 'timeline' | 'order';
+type TimelineTab = 'timeline' | 'mtd' | 'route';
 
 type UserMetric = {
   label: string;
@@ -109,6 +110,21 @@ type FieldUser = {
   activities: TimelineActivity[];
 };
 
+type MTDStat = {
+  label: string;
+  value: string;
+  change?: string;
+  isPositive?: boolean;
+};
+
+type RouteStop = {
+  id: string;
+  name: string;
+  time: string;
+  status: 'completed' | 'pending' | 'missed';
+  type: string;
+};
+
 const STATUS_LABELS: Record<SummaryStatus, string> = {
   retailing: 'Retailing',
   'official-work': 'Official Work',
@@ -162,10 +178,9 @@ const formatRouteDate = (date: Date) => {
 
 const formatSelectedDate = (date: Date) =>
   new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
+    weekday: 'short',
     day: '2-digit',
     month: 'short',
-    year: 'numeric',
   }).format(date);
 
 const getStatusFromActivity = (activityName?: string | null): SummaryStatus => {
@@ -190,7 +205,7 @@ const formatApiTime = (value?: string | null) => {
   const period = hours >= 12 ? 'PM' : 'AM';
   const displayHours = hours % 12 || 12;
 
-  return `${`${displayHours}`.padStart(2, '0')}:${minutes} ${period}`;
+  return `${displayHours}:${minutes} ${period}`;
 };
 
 const mapFieldUserSummary = (user: ManagerFieldUserSummary): FieldUser => {
@@ -253,10 +268,10 @@ function SummaryMetric({
   onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.summaryMetric} activeOpacity={0.78} onPress={onPress}>
+    <TouchableOpacity style={styles.summaryMetric} activeOpacity={0.7} onPress={onPress}>
       <View style={styles.summaryMetricTop}>
         <View style={[styles.summaryMarker, { backgroundColor: color }]} />
-        <Ionicons name="chevron-forward" size={12} color={mutedColor} />
+        <Ionicons name="chevron-forward" size={10} color={mutedColor} />
       </View>
       <AppText style={styles.summaryLabel}>{label}</AppText>
       <AppText style={styles.summaryValue}>{formatNumber(value)}</AppText>
@@ -271,8 +286,8 @@ function UserStat({
 }: UserMetric & { styles: ReturnType<typeof createBaseStyles> }) {
   return (
     <View style={styles.userStat}>
+      <AppText style={styles.userStatValue}>{value || '--'}</AppText>
       <AppText style={styles.userStatLabel}>{label}</AppText>
-      <AppText style={styles.userStatValue}>{value}</AppText>
     </View>
   );
 }
@@ -307,6 +322,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     Record<string, ManagerUserTimelineResponse>
   >({});
   const [loadingTimeline, setLoadingTimeline] = useState(false);
+  const [activeTab, setActiveTab] = useState<TimelineTab>('timeline');
 
   const status = getParam(params.status) as SummaryStatus | undefined;
   const userId = getParam(params.userId);
@@ -377,6 +393,26 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       unit: 'Cases',
     };
   }, [managerStats.callSummary, summaryMetric]);
+
+  // Mock MTD data
+  const mtdStats: MTDStat[] = useMemo(() => [
+    { label: 'Total Calls', value: '1,247', change: '+12%', isPositive: true },
+    { label: 'Orders', value: '342', change: '+8%', isPositive: true },
+    { label: 'Revenue', value: 'ZMW 45,231', change: '+15%', isPositive: true },
+    { label: 'Cases Sold', value: '2,431', change: '-3%', isPositive: false },
+    { label: 'Coverage', value: '87%', change: '+5%', isPositive: true },
+    { label: 'Productivity', value: '92%', change: '+2%', isPositive: true },
+  ], []);
+
+  // Mock Route stops data
+  const routeStops: RouteStop[] = useMemo(() => [
+    { id: '1', name: 'George Supermarket', time: '08:30 AM', status: 'completed', type: 'Outlet' },
+    { id: '2', name: 'Linda Store', time: '10:00 AM', status: 'completed', type: 'Outlet' },
+    { id: '3', name: 'Peter Mart', time: '11:30 AM', status: 'completed', type: 'Outlet' },
+    { id: '4', name: 'City Mall', time: '01:00 PM', status: 'pending', type: 'Outlet' },
+    { id: '5', name: 'Downtown Shop', time: '02:30 PM', status: 'pending', type: 'Outlet' },
+    { id: '6', name: 'Main Street Store', time: '04:00 PM', status: 'pending', type: 'Outlet' },
+  ], []);
 
   useFocusEffect(
     useCallback(() => {
@@ -524,36 +560,6 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     });
   };
 
-  const flowSteps = [
-    {
-      key: 'summary',
-      label: 'Summary',
-      enabled: true,
-      active: view === 'summary',
-      onPress: openSummary,
-    },
-    {
-      key: 'users',
-      label: 'Users',
-      enabled: true,
-      active: view === 'users',
-      onPress: () => openUsers(status),
-    },
-    {
-      key: 'timeline',
-      label: 'Timeline',
-      enabled: Boolean(selectedUser),
-      active: view === 'timeline',
-      onPress: () => selectedUser && openTimeline(selectedUser),
-    },
-    {
-      key: 'order',
-      label: 'Order',
-      enabled: Boolean(selectedActivity),
-      active: view === 'order',
-      onPress: () => {},
-    },
-  ];
   const userInitials = (user?.name || 'Manager')
     .split(' ')
     .filter(Boolean)
@@ -561,6 +567,27 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     .map((item) => item[0])
     .join('')
     .toUpperCase();
+
+  const handleWhatsApp = (phoneNumber: string) => {
+    console.log('WhatsApp to:', phoneNumber);
+  };
+
+  const handleCall = (phoneNumber: string) => {
+    console.log('Call to:', phoneNumber);
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch(status) {
+      case 'completed':
+        return <Ionicons name="checkmark-circle" size={16} color={colors.success} />;
+      case 'pending':
+        return <Ionicons name="time-outline" size={16} color={colors.warning} />;
+      case 'missed':
+        return <Ionicons name="close-circle" size={16} color={colors.error} />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -578,61 +605,24 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {view !== 'order' && (
-          <View style={styles.dailyHeader}>
+        {/* Date selection - Only show on summary screen */}
+        {view === 'summary' && (
+          <TouchableOpacity style={styles.dailyHeader} activeOpacity={0.7} onPress={openDatePicker}>
             <View style={styles.dailyHeaderMain}>
               <View style={styles.dailyIcon}>
-                <Ionicons name="calendar-clear-outline" size={18} color={colors.primary} />
+                <Ionicons name="calendar-clear-outline" size={16} color={colors.primary} />
               </View>
               <View style={styles.dailyHeaderText}>
                 <AppText style={styles.sectionTitle}>DAILY SUMMARY</AppText>
                 <AppText style={styles.dailyTitle}>{formatSelectedDate(selectedDate)}</AppText>
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.dateButton}
-              activeOpacity={0.82}
-              onPress={openDatePicker}
-            >
-              <Ionicons name="swap-horizontal" size={15} color={colors.primary} />
-              <AppText style={styles.dateButtonText}>Change</AppText>
-            </TouchableOpacity>
-          </View>
+            <Ionicons name="chevron-down" size={14} color={colors.primary} />
+          </TouchableOpacity>
         )}
 
-        <View style={styles.flowNav}>
-          {flowSteps.map((step, index) => (
-            <React.Fragment key={step.key}>
-              <TouchableOpacity
-                style={[
-                  styles.flowStep,
-                  step.active && styles.flowStepActive,
-                  !step.enabled && styles.flowStepDisabled,
-                ]}
-                activeOpacity={step.enabled ? 0.82 : 1}
-                onPress={step.enabled ? step.onPress : undefined}
-              >
-                <AppText
-                  style={[
-                    styles.flowStepText,
-                    step.active && styles.flowStepTextActive,
-                    !step.enabled && styles.flowStepTextDisabled,
-                  ]}
-                >
-                  {step.label}
-                </AppText>
-              </TouchableOpacity>
-              {index < flowSteps.length - 1 && (
-                <Ionicons name="chevron-forward" size={12} color={colors.textQuaternary} />
-              )}
-            </React.Fragment>
-          ))}
-          <TouchableOpacity style={styles.flowRefresh} activeOpacity={0.78} onPress={onRefresh}>
-            <Ionicons name="refresh" size={16} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {(view === 'summary' || view === 'users') && (
+        {/* Summary Card - Only on summary screen */}
+        {view === 'summary' && (
           <View style={styles.summaryCard}>
             <View style={styles.cardHeader}>
               <View style={styles.managerInfo}>
@@ -642,26 +632,22 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 <View style={styles.managerTextBlock}>
                   <AppText style={styles.sectionTitle}>REPORTING TO YOU</AppText>
                   <AppText style={styles.cardTitle}>{user?.name || 'Manager'}</AppText>
-                  <AppText style={styles.cardSubTitle}>(Manager)</AppText>
                 </View>
               </View>
               <TouchableOpacity
                 style={styles.linkButton}
-                activeOpacity={0.78}
+                activeOpacity={0.7}
                 onPress={() => openUsers()}
               >
-                <AppText style={styles.linkText}>ALL FIELD USER</AppText>
+                <AppText style={styles.linkText}>All Users</AppText>
               </TouchableOpacity>
             </View>
-            <View style={styles.refreshMetaRow}>
-              <Ionicons name="time-outline" size={12} color={colors.textQuaternary} />
-              <AppText style={styles.refreshed}>Last refreshed just now</AppText>
-            </View>
+            
             <View style={styles.metricToggle}>
               {METRIC_OPTIONS.map((option) => (
                 <TouchableOpacity
                   key={option.value}
-                  activeOpacity={0.82}
+                  activeOpacity={0.7}
                   onPress={() => setSummaryMetric(option.value)}
                   style={[
                     styles.metricToggleItem,
@@ -679,9 +665,10 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 </TouchableOpacity>
               ))}
             </View>
+            
             <View style={styles.summaryGrid}>
               <SummaryMetric
-                label="Total Users"
+                label="Total"
                 value={summaryCounts.total}
                 color={colors.info}
                 mutedColor={colors.textQuaternary}
@@ -697,7 +684,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 onPress={() => openUsers('retailing')}
               />
               <SummaryMetric
-                label="Official Work"
+                label="Office Work"
                 value={summaryCounts['official-work']}
                 color={statusMeta['official-work'].color}
                 mutedColor={colors.textQuaternary}
@@ -752,57 +739,34 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
           </View>
         )}
 
+        {/* Users Screen */}
         {view === 'users' && (
           <>
             <View style={styles.searchRow}>
-              <Ionicons name="search" size={16} color={colors.textTertiary} />
+              <Ionicons name="search" size={14} color={colors.textTertiary} />
               <TextInput
                 value={searchKey}
                 onChangeText={setSearchKey}
-                placeholder="Search"
+                placeholder="Search users..."
                 placeholderTextColor={colors.textTertiary}
                 style={styles.searchInput}
               />
               {searchKey ? (
-                <TouchableOpacity activeOpacity={0.78} onPress={() => setSearchKey('')}>
-                  <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+                <TouchableOpacity activeOpacity={0.7} onPress={() => setSearchKey('')}>
+                  <Ionicons name="close-circle" size={14} color={colors.textTertiary} />
                 </TouchableOpacity>
               ) : (
-                <Ionicons name="filter" size={16} color={colors.info} />
+                <Ionicons name="filter" size={14} color={colors.info} />
               )}
             </View>
-            <View style={styles.compactStats}>
-              {(['retailing', 'official-work', 'leave', 'absent'] as SummaryStatus[]).map(
-                (item) => (
-                  <TouchableOpacity
-                    key={item}
-                    style={[
-                      styles.compactStat,
-                      status === item && { borderBottomColor: statusMeta[item].color },
-                    ]}
-                    activeOpacity={0.78}
-                    onPress={() => openUsers(item)}
-                  >
-                    <AppText style={styles.compactStatLabel}>{statusMeta[item].label}</AppText>
-                    <AppText style={styles.compactStatValue}>{summaryCounts[item]}</AppText>
-                  </TouchableOpacity>
-                ),
-              )}
-              <TouchableOpacity
-                style={[styles.compactStat, !status && { borderBottomColor: colors.info }]}
-                activeOpacity={0.78}
-                onPress={() => openUsers()}
-              >
-                <AppText style={styles.compactStatLabel}>Total</AppText>
-                <AppText style={styles.compactStatValue}>{summaryCounts.total}</AppText>
-              </TouchableOpacity>
-            </View>
+            
             <View style={styles.listHeaderRow}>
               <AppText style={styles.listHeaderTitle}>Field Users</AppText>
               <AppText style={styles.listHeaderMeta}>
-                {filteredUsers.length} of {fieldUsers.length}
+                {filteredUsers.length}/{fieldUsers.length}
               </AppText>
             </View>
+            
             {filteredUsers.length === 0 ? (
               <AppText style={styles.emptyText}>
                 {loadingFieldUsers
@@ -818,13 +782,13 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   <TouchableOpacity
                     key={user.id}
                     style={styles.userCard}
-                    activeOpacity={0.82}
+                    activeOpacity={0.7}
                     onPress={() => openTimeline(user)}
                   >
                     <View style={styles.userHeader}>
                       <View style={styles.userIdentity}>
                         <View style={styles.userAvatar}>
-                          <AppText style={[styles.userAvatarText, { color: activityColor }]}>
+                          <AppText style={[styles.userAvatarText]}>
                             {user.name
                               .split(' ')
                               .filter(Boolean)
@@ -836,30 +800,41 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         </View>
                         <View style={styles.userNameBlock}>
                           <AppText style={styles.userName}>{user.name}</AppText>
-                          <AppText style={styles.userPosition}>({user.position})</AppText>
+                          <AppText style={styles.userPosition}>{user.position}</AppText>
                         </View>
                       </View>
                       <View style={styles.iconActions}>
-                        <TouchableOpacity style={styles.circleIcon} activeOpacity={0.78}>
-                          <Ionicons name="logo-whatsapp" size={14} color={colors.info} />
+                        <TouchableOpacity 
+                          style={styles.whatsappButton} 
+                          activeOpacity={0.7}
+                          onPress={() => handleWhatsApp(user.phone)}
+                        >
+                          <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.circleIcon} activeOpacity={0.78}>
-                          <Ionicons name="call" size={14} color={colors.info} />
+                        <TouchableOpacity 
+                          style={styles.callButton} 
+                          activeOpacity={0.7}
+                          onPress={() => handleCall(user.phone)}
+                        >
+                          <Ionicons name="call" size={14} color={colors.primary} />
                         </TouchableOpacity>
                       </View>
                     </View>
+                    
                     <View style={[styles.routeBadge, { borderColor: activityColor }]}>
                       <AppText style={[styles.routeBadgeText, { color: activityColor }]}>
                         {activityLabel}
                       </AppText>
                       <AppText style={styles.routeText}>{user.route}</AppText>
                     </View>
+                    
                     <AppText style={styles.locationText} numberOfLines={1}>
                       {user.location}
                     </AppText>
+                    
                     <View style={styles.userStats}>
-                      <UserStat label="First Call" value={user.firstCall} styles={baseStyles} />
-                      <UserStat label="First PC" value={user.firstPc} styles={baseStyles} />
+                      <UserStat label="FC" value={user.firstCall} styles={baseStyles} />
+                      <UserStat label="FPC" value={user.firstPc} styles={baseStyles} />
                       <UserStat label="TC" value={user.tc} styles={baseStyles} />
                       <UserStat label="PC" value={user.pc} styles={baseStyles} />
                       <UserStat label="LPC" value={user.lpc} styles={baseStyles} />
@@ -871,6 +846,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
           </>
         )}
 
+        {/* Timeline Screen */}
         {view === 'timeline' && selectedUser && (
           <>
             <View style={styles.timelineHeader}>
@@ -891,108 +867,236 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   <AppText style={styles.userPosition}>{selectedUser.position}</AppText>
                 </View>
               </View>
-              <View style={styles.refreshMetaRow}>
-                <Ionicons name="time-outline" size={12} color={colors.textQuaternary} />
-                <AppText style={styles.refreshed}>Last refreshed just now</AppText>
-              </View>
             </View>
+            
             <View style={styles.tabsRow}>
-              {['TIMELINE', 'MTD', 'ROUTE'].map((tab, index) => (
-                <View key={tab} style={[styles.tabItem, index === 0 && styles.tabItemActive]}>
-                  <AppText style={[styles.tabText, index === 0 && styles.tabTextActive]}>
-                    {tab}
+              {(['timeline', 'mtd', 'route'] as TimelineTab[]).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabItem, activeTab === tab && styles.tabItemActive]}
+                  onPress={() => setActiveTab(tab)}
+                  activeOpacity={0.7}
+                >
+                  <AppText style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                    {tab.toUpperCase()}
                   </AppText>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
-            <AppText style={styles.dateTitle}>{formatSelectedDate(selectedDate)}</AppText>
-            <View
-              style={[styles.routeBadge, { borderColor: statusMeta[selectedUser.status].color }]}
-            >
-              <AppText
-                style={[styles.routeBadgeText, { color: statusMeta[selectedUser.status].color }]}
-              >
-                {statusMeta[selectedUser.status].label}
-              </AppText>
-              <AppText style={styles.routeText}>{selectedUser.route}</AppText>
+            
+            <View style={styles.routeInfoCard}>
+              <View style={[styles.statusBadge, { backgroundColor: statusMeta[selectedUser.status].color + '15' }]}>
+                <View style={[styles.statusDot, { backgroundColor: statusMeta[selectedUser.status].color }]} />
+                <AppText style={[styles.statusText, { color: statusMeta[selectedUser.status].color }]}>
+                  {statusMeta[selectedUser.status].label}
+                </AppText>
+              </View>
+              <View style={styles.routeInfoRow}>
+                <Ionicons name="map-outline" size={12} color={colors.textTertiary} />
+                <AppText style={styles.routeInfoText}>{selectedUser.route}</AppText>
+              </View>
+              <View style={styles.routeInfoRow}>
+                <Ionicons name="location-outline" size={12} color={colors.textTertiary} />
+                <AppText style={styles.routeInfoText} numberOfLines={1}>
+                  {selectedUser.location}
+                </AppText>
+              </View>
             </View>
-            <View style={styles.timeline}>
-              <View style={styles.timelineLine} />
-              <View style={styles.dayStart}>
-                <View style={styles.timelineDot}>
-                  <Ionicons
-                    name="radio-button-on"
-                    size={14}
-                    color={statusMeta[selectedUser.status].color}
-                  />
-                </View>
-                <View style={styles.dayStartText}>
-                  <AppText style={styles.activityTitle}>DAY START</AppText>
-                  <AppText style={styles.activityTime}>
-                    {userId ? timelinesByUser[userId]?.dayStartTime || '--' : '--'}
-                  </AppText>
-                </View>
-                <View style={styles.selfiePill}>
-                  <MaterialCommunityIcons name="camera" size={13} color={colors.primary} />
-                  <AppText style={styles.selfieText}>SELFIE</AppText>
-                </View>
-                {userId && timelinesByUser[userId]?.dayStartImageUrl ? (
-                  <Image
-                    source={{ uri: timelinesByUser[userId].dayStartImageUrl }}
-                    style={styles.dayStartImage}
-                  />
-                ) : (
-                  <View style={styles.dayStartImagePlaceholder}>
-                    <MaterialCommunityIcons
-                      name="camera-off"
-                      size={16}
-                      color={colors.textQuaternary}
+            
+            <View style={styles.userStatsSummary}>
+              <View style={styles.userStatItem}>
+                <AppText style={styles.userStatItemValue}>{selectedUser.firstCall || '--'}</AppText>
+                <AppText style={styles.userStatItemLabel}>First Call</AppText>
+              </View>
+              <View style={styles.userStatDivider} />
+              <View style={styles.userStatItem}>
+                <AppText style={styles.userStatItemValue}>{selectedUser.firstPc || '--'}</AppText>
+                <AppText style={styles.userStatItemLabel}>First PC</AppText>
+              </View>
+              <View style={styles.userStatDivider} />
+              <View style={styles.userStatItem}>
+                <AppText style={styles.userStatItemValue}>{selectedUser.tc || '0'}</AppText>
+                <AppText style={styles.userStatItemLabel}>TC</AppText>
+              </View>
+              <View style={styles.userStatDivider} />
+              <View style={styles.userStatItem}>
+                <AppText style={styles.userStatItemValue}>{selectedUser.pc || '0'}</AppText>
+                <AppText style={styles.userStatItemLabel}>PC</AppText>
+              </View>
+              <View style={styles.userStatDivider} />
+              <View style={styles.userStatItem}>
+                <AppText style={styles.userStatItemValue}>{selectedUser.lpc || '0'}</AppText>
+                <AppText style={styles.userStatItemLabel}>LPC</AppText>
+              </View>
+            </View>
+
+            {/* Timeline Tab Content */}
+            {activeTab === 'timeline' && (
+              <View style={styles.timeline}>
+                <View style={styles.timelineLine} />
+                
+                <View style={styles.dayStartContainer}>
+                  <View style={styles.timelineDot}>
+                    <Ionicons
+                      name="radio-button-on"
+                      size={14}
+                      color={statusMeta[selectedUser.status].color}
                     />
                   </View>
-                )}
-              </View>
-              {loadingTimeline && selectedUser.activities.length === 0 ? (
-                <AppText style={styles.emptyText}>Loading timeline...</AppText>
-              ) : selectedUser.activities.length === 0 ? (
-                <AppText style={styles.emptyText}>No timeline data found for this date.</AppText>
-              ) : (
-                selectedUser.activities.map((activity) => (
-                  <TouchableOpacity
-                    key={activity.id}
-                    style={styles.activityCard}
-                    activeOpacity={activity.order ? 0.82 : 1}
-                    onPress={() => openOrder(activity)}
-                  >
-                    <View style={styles.timelineDotSmall} />
-                    <View style={styles.activityHeader}>
-                      <View>
-                        <AppText style={styles.activityTitle}>{activity.type}</AppText>
-                        <AppText style={styles.activityTime}>{activity.time}</AppText>
+                  <View style={styles.dayStartCard}>
+                    <View style={styles.dayStartContent}>
+                      <View style={styles.dayStartInfo}>
+                        <AppText style={styles.dayStartTitle}>DAY START</AppText>
+                        <AppText style={styles.dayStartTime}>
+                          {userId ? timelinesByUser[userId]?.dayStartTime || '--' : '--'}
+                        </AppText>
                       </View>
-                      <AppText style={styles.duration}>{activity.duration}</AppText>
+                      <View style={styles.selfieContainer}>
+                        <TouchableOpacity style={styles.selfieButton} activeOpacity={0.7}>
+                          <MaterialCommunityIcons name="camera" size={14} color={colors.primaryContrast} />
+                          <AppText style={styles.selfieButtonText}>SELFIE</AppText>
+                        </TouchableOpacity>
+                        {userId && timelinesByUser[userId]?.dayStartImageUrl ? (
+                          <Image
+                            source={{ uri: timelinesByUser[userId].dayStartImageUrl }}
+                            style={styles.dayStartImage}
+                          />
+                        ) : (
+                          <View style={styles.dayStartImagePlaceholder}>
+                            <MaterialCommunityIcons
+                              name="camera-off"
+                              size={16}
+                              color={colors.textTertiary}
+                            />
+                          </View>
+                        )}
+                      </View>
                     </View>
-                    <View style={styles.outletRow}>
-                      <AppText style={styles.outletName} numberOfLines={1}>
-                        {activity.outlet}
-                      </AppText>
-                      <AppText style={styles.ownerName} numberOfLines={1}>
-                        {activity.owner}
-                      </AppText>
-                    </View>
-                    <View style={styles.metricGrid}>
-                      {activity.metrics.map((metric) => (
-                        <View key={`${activity.id}-${metric.label}`} style={styles.metricCell}>
-                          <AppText style={styles.metricValue}>{metric.value}</AppText>
-                          <AppText style={styles.metricLabel} numberOfLines={2}>
-                            {metric.label}
+                  </View>
+                </View>
+                
+                {loadingTimeline && selectedUser.activities.length === 0 ? (
+                  <AppText style={styles.emptyText}>Loading timeline...</AppText>
+                ) : selectedUser.activities.length === 0 ? (
+                  <AppText style={styles.emptyText}>No timeline data found for this date.</AppText>
+                ) : (
+                  selectedUser.activities.map((activity) => (
+                    <TouchableOpacity
+                      key={activity.id}
+                      style={styles.activityCardWrapper}
+                      activeOpacity={activity.order ? 0.7 : 1}
+                      onPress={() => openOrder(activity)}
+                    >
+                      <View style={styles.timelineDotSmall} />
+                      <View style={styles.activityCard}>
+                        <View style={styles.activityHeader}>
+                          <View style={styles.activityHeaderLeft}>
+                            <AppText style={styles.activityTitle}>{activity.type}</AppText>
+                            <AppText style={styles.activityTime}>{activity.time}</AppText>
+                          </View>
+                          <AppText style={styles.duration}>{activity.duration}</AppText>
+                        </View>
+                        <View style={styles.outletRow}>
+                          <AppText style={styles.outletName} numberOfLines={1}>
+                            {activity.outlet}
+                          </AppText>
+                          <AppText style={styles.ownerName} numberOfLines={1}>
+                            {activity.owner}
                           </AppText>
                         </View>
-                      ))}
+                        <View style={styles.metricGrid}>
+                          {activity.metrics.map((metric) => (
+                            <View key={`${activity.id}-${metric.label}`} style={styles.metricCell}>
+                              <AppText style={styles.metricValue}>{metric.value}</AppText>
+                              <AppText style={styles.metricLabel}>{metric.label}</AppText>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            )}
+
+            {/* MTD Tab Content */}
+            {activeTab === 'mtd' && (
+              <View style={styles.mtdContainer}>
+                <View style={styles.mtdHeader}>
+                  <AppText style={styles.mtdHeaderTitle}>Month-to-Date Performance</AppText>
+                  <AppText style={styles.mtdHeaderSubtitle}>
+                    {new Date().toLocaleString('default', { month: 'long' })} {new Date().getFullYear()}
+                  </AppText>
+                </View>
+                <View style={styles.mtdGrid}>
+                  {mtdStats.map((stat, index) => (
+                    <View key={index} style={styles.mtdCard}>
+                      <AppText style={styles.mtdCardLabel}>{stat.label}</AppText>
+                      <AppText style={styles.mtdCardValue}>{stat.value}</AppText>
+                      {stat.change && (
+                        <View style={styles.mtdChangeContainer}>
+                          <Ionicons 
+                            name={stat.isPositive ? 'trending-up' : 'trending-down'} 
+                            size={10} 
+                            color={stat.isPositive ? colors.success : colors.error} 
+                          />
+                          <AppText style={[styles.mtdChange, { color: stat.isPositive ? colors.success : colors.error }]}>
+                            {stat.change}
+                          </AppText>
+                        </View>
+                      )}
                     </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Route Tab Content */}
+            {activeTab === 'route' && (
+              <View style={styles.routeContainer}>
+                <View style={styles.routeHeader}>
+                  <View style={styles.routeHeaderLeft}>
+                    <MaterialCommunityIcons name="map-marker-path" size={18} color={colors.primary} />
+                    <AppText style={styles.routeHeaderTitle}>Today's Route Plan</AppText>
+                  </View>
+                  <View style={styles.routeProgress}>
+                    <AppText style={styles.routeProgressText}>
+                      {routeStops.filter(s => s.status === 'completed').length}/{routeStops.length} Completed
+                    </AppText>
+                  </View>
+                </View>
+                
+                <View style={styles.routeTimeline}>
+                  {routeStops.map((stop, index) => (
+                    <View key={stop.id} style={styles.routeStopItem}>
+                      <View style={styles.routeStopLine}>
+                        {index === 0 && <View style={styles.routeLineTop} />}
+                        {getStatusIcon(stop.status)}
+                        {index < routeStops.length - 1 && <View style={styles.routeLineBottom} />}
+                      </View>
+                      <View style={styles.routeStopContent}>
+                        <View style={styles.routeStopHeader}>
+                          <AppText style={styles.routeStopName}>{stop.name}</AppText>
+                          <AppText style={styles.routeStopType}>{stop.type}</AppText>
+                        </View>
+                        <View style={styles.routeStopTime}>
+                          <Ionicons name="time-outline" size={10} color={colors.textTertiary} />
+                          <AppText style={styles.routeStopTimeText}>{stop.time}</AppText>
+                        </View>
+                        <View style={styles.routeStopStatus}>
+                          <AppText style={[styles.routeStopStatusText, {
+                            color: stop.status === 'completed' ? colors.success : 
+                                   stop.status === 'pending' ? colors.warning : colors.error
+                          }]}>
+                            {stop.status.toUpperCase()}
+                          </AppText>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
           </>
         )}
 
@@ -1013,13 +1117,13 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
             <View style={styles.orderHero}>
               <View>
                 <AppText style={styles.orderHeroText}>
-                  Quantity(Cases)/ {selectedActivity.order.quantityCases}
+                  Cases: {selectedActivity.order.quantityCases}
                 </AppText>
                 <AppText style={styles.orderHeroText}>
-                  Quantity(SuperUnit): {selectedActivity.order.quantitySuperUnit}
+                  SuperUnit: {selectedActivity.order.quantitySuperUnit}
                 </AppText>
                 <AppText style={styles.orderHeroSub}>
-                  LC : {selectedActivity.order.totalPieces}
+                  Pieces: {selectedActivity.order.totalPieces}
                 </AppText>
               </View>
               <View style={styles.orderHeroRight}>
@@ -1055,10 +1159,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   <View key={line.id} style={styles.orderLine}>
                     <AppText style={styles.orderLineName}>{line.name}</AppText>
                     <View style={styles.orderLineMeta}>
-                      <AppText style={styles.orderLineMetaText}>PTR</AppText>
-                      <AppText style={styles.orderLineMetaText}>{line.ptr}</AppText>
-                      <AppText style={styles.orderLineMetaText}>x</AppText>
-                      <AppText style={styles.orderLineMetaText}>{line.qty}</AppText>
+                      <AppText style={styles.orderLineMetaText}>PTR {line.ptr}</AppText>
+                      <AppText style={styles.orderLineMetaText}>×{line.qty}</AppText>
                       <View style={styles.orderUnitPill}>
                         <AppText style={styles.orderUnitPillText}>{line.unit}</AppText>
                       </View>
