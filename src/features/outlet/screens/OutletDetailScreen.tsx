@@ -89,11 +89,12 @@ interface VisitHistory {
   visitType?: ShopVisitType;
 }
 
-type TabType = 'summary' | 'sales' | 'visits';
+type TabType = 'summary' | 'sales' | 'invoices' | 'visits';
 
 const TABS: { key: TabType; label: string; icon: string }[] = [
   { key: 'summary', label: 'Summary', icon: 'stats-chart-outline' },
   { key: 'sales', label: 'Sales', icon: 'receipt-outline' },
+  { key: 'invoices', label: 'Last 10 Invoice', icon: 'document-text-outline' },
   { key: 'visits', label: 'Visits', icon: 'time-outline' },
 ];
 
@@ -451,7 +452,7 @@ export default function CustomerDetailScreen() {
     try {
       const params: any = {
         page: 1,
-        limit: 100,
+        limit: PAGE_SIZE,
         customerId: customer.customerId,
         vanId: van?.vanId,
         employeeId: user?.userId,
@@ -460,7 +461,7 @@ export default function CustomerDetailScreen() {
 
       const salesData = response?.data || [];
       setSales(salesData);
-      setSalesTotal(response?.total || 0);
+      setSalesTotal(response?.meta?.total || response?.total || salesData.length);
     } catch (error) {
       console.error('Failed to load sales:', error);
     } finally {
@@ -763,6 +764,16 @@ const TabContent = ({
     {activeTab === 'sales' && (
       <SalesTab styles={styles} colors={colors} customerId={customer?.customerId} van={van} />
     )}
+    {activeTab === 'invoices' && (
+      <InvoicesTab
+        invoices={sales}
+        loading={salesLoading}
+        total={salesTotal}
+        styles={styles}
+        colors={colors}
+        formatCurrency={formatCurrency}
+      />
+    )}
     {activeTab === 'visits' && (
       <VisitsTab
         visits={visitHistory}
@@ -819,7 +830,7 @@ const SummaryTab = ({ customer, styles, colors, formatCurrency }: any) => {
           <View style={styles.statCard}>
             <Ionicons name="cube-outline" size={24} color={colors.info} />
             <AppText style={styles.statValue}>{mtdOrderQuantity.toFixed(1)}</AppText>
-            <AppText style={styles.statLabel}>MTD Quantity (Cases)</AppText>
+            <AppText style={styles.statLabel}>MTD Total Cases</AppText>
           </View>
         </View>
 
@@ -873,7 +884,7 @@ const SummaryTab = ({ customer, styles, colors, formatCurrency }: any) => {
         <View style={styles.insightItem}>
           <View style={styles.insightDot} />
           <AppText style={styles.insightText}>
-            LPC ratio: {avgLPC.toFixed(2)} per case
+            LPC: {avgLPC.toFixed(2)} cases per PC
             {avgLPC > 10 ? ' (Good)' : avgLPC > 5 ? ' (Average)' : ' (Needs Improvement)'}
           </AppText>
         </View>
@@ -1000,6 +1011,115 @@ const SalesTab = ({ styles, colors, customerId, van }: any) => {
           {categories.map((category) => renderTableRow(category))}
         </View>
       </ScrollView>
+    </View>
+  );
+};
+
+const InvoicesTab = ({ invoices, loading, total, styles, colors, formatCurrency }: any) => {
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    return moment(dateString).format('DD MMM YYYY');
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toUpperCase()) {
+      case 'PAID':
+        return colors.success;
+      case 'PARTIAL':
+        return colors.warning;
+      case 'OVERDUE':
+        return colors.error;
+      default:
+        return colors.textSecondary;
+    }
+  };
+
+  const renderInvoiceCard = (invoice: SaleItem) => {
+    const invoiceNo = invoice.saleId || 'N/A';
+    const paymentStatus = invoice.paymentStatus || 'UNPAID';
+    const statusColor = getStatusColor(paymentStatus);
+
+    return (
+      <View key={invoiceNo} style={styles.invoiceCard}>
+        <View style={styles.invoiceTopRow}>
+          <View style={styles.invoiceMeta}>
+            <AppText style={styles.invoiceDate}>{formatDate(invoice.date)}</AppText>
+            <AppText style={styles.invoiceNumber} numberOfLines={1}>
+              {invoiceNo}
+            </AppText>
+          </View>
+          <View style={styles.invoiceAmountCol}>
+            <AppText style={[styles.invoiceAmount, { color: colors.primary }]}>
+              {formatCurrency(invoice.totalValue || 0)}
+            </AppText>
+            <AppText style={styles.invoiceAmountLabel}>invoice amount</AppText>
+          </View>
+        </View>
+
+        <View style={styles.invoiceDetailGrid}>
+          <View style={styles.invoiceDetailItem}>
+            <AppText style={styles.invoiceDetailLabel}>Type</AppText>
+            <AppText style={styles.invoiceDetailValue}>{invoice.type || 'N/A'}</AppText>
+          </View>
+          <View style={styles.invoiceDetailItem}>
+            <AppText style={styles.invoiceDetailLabel}>Cases</AppText>
+            <AppText style={styles.invoiceDetailValue}>{invoice.totalCases || 0}</AppText>
+          </View>
+          <View style={styles.invoiceDetailItem}>
+            <AppText style={styles.invoiceDetailLabel}>Pieces</AppText>
+            <AppText style={styles.invoiceDetailValue}>{invoice.totalPieces || 0}</AppText>
+          </View>
+        </View>
+
+        <View style={styles.invoiceFooter}>
+          <View style={[styles.invoiceStatusBadge, { backgroundColor: statusColor + '14' }]}>
+            <View style={[styles.invoiceStatusDot, { backgroundColor: statusColor }]} />
+            <AppText style={[styles.invoiceStatusText, { color: statusColor }]}>
+              {paymentStatus}
+            </AppText>
+          </View>
+          {invoice.pendingAmount > 0 && (
+            <AppText style={styles.invoicePendingText}>
+              Pending {formatCurrency(invoice.pendingAmount)}
+            </AppText>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  if (loading && invoices.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <AppText style={styles.loadingText}>Loading invoices...</AppText>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {invoices.length > 0 && (
+        <View style={styles.listHeader}>
+          <AppText style={styles.listHeaderTitle}>
+            Last {Math.min(invoices.length, PAGE_SIZE)}{' '}
+            {invoices.length === 1 ? 'Invoice' : 'Invoices'}
+          </AppText>
+          {total > PAGE_SIZE && (
+            <AppText style={styles.listHeaderSubtitle}>
+              Showing last {PAGE_SIZE} of {total} total
+            </AppText>
+          )}
+        </View>
+      )}
+      {invoices.map((invoice: SaleItem) => renderInvoiceCard(invoice))}
+      {!loading && invoices.length === 0 && (
+        <View style={styles.emptyTabContainer}>
+          <Ionicons name="document-text-outline" size={56} color={colors.textTertiary} />
+          <AppText style={styles.emptyTabTitle}>No Invoices</AppText>
+          <AppText style={styles.emptyTabText}>No invoices found for this customer</AppText>
+        </View>
+      )}
     </View>
   );
 };

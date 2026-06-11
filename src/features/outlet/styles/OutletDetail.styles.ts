@@ -525,6 +525,107 @@ export const useOutletDetailStyles = () => {
     } as TextStyle,
 
     // ────────────────────────────────────────────────────────────────────────────
+    // Invoice Card Styles
+    // ────────────────────────────────────────────────────────────────────────────
+    invoiceCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.divider,
+    } as ViewStyle,
+    invoiceTopRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    } as ViewStyle,
+    invoiceMeta: {
+      flex: 1,
+      minWidth: 0,
+    } as ViewStyle,
+    invoiceDate: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginBottom: 4,
+    } as TextStyle,
+    invoiceNumber: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    } as TextStyle,
+    invoiceAmountCol: {
+      alignItems: 'flex-end',
+      flexShrink: 0,
+    } as ViewStyle,
+    invoiceAmount: {
+      fontSize: 15,
+      fontWeight: '700',
+    } as TextStyle,
+    invoiceAmountLabel: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      marginTop: 2,
+    } as TextStyle,
+    invoiceDetailGrid: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 12,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.divider,
+    } as ViewStyle,
+    invoiceDetailItem: {
+      flex: 1,
+      backgroundColor: colors.background,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+    } as ViewStyle,
+    invoiceDetailLabel: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      marginBottom: 3,
+    } as TextStyle,
+    invoiceDetailValue: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    } as TextStyle,
+    invoiceFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      marginTop: 12,
+    } as ViewStyle,
+    invoiceStatusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+    } as ViewStyle,
+    invoiceStatusDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    } as ViewStyle,
+    invoiceStatusText: {
+      fontSize: 11,
+      fontWeight: '700',
+    } as TextStyle,
+    invoicePendingText: {
+      flex: 1,
+      textAlign: 'right',
+      fontSize: 11,
+      color: colors.textSecondary,
+      fontWeight: '600',
+    } as TextStyle,
+
+    // ────────────────────────────────────────────────────────────────────────────
     // Visit Card Styles
     // ────────────────────────────────────────────────────────────────────────────
     visitCard: {

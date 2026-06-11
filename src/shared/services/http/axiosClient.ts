@@ -4,8 +4,9 @@ import {
   getAccessToken,
   getRefreshToken,
   setTokens,
-  clearTokens,
 } from '@/shared/services/tokenStorage';
+import { useAuthStore } from '@/core/store/auth.store';
+import { isTokenExpired } from '@/shared/utils/auth-token.utils';
 
 type RefreshResponse = { accessToken: string; refreshToken?: string };
 
@@ -18,6 +19,11 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   const token = await getAccessToken();
   console.log('Attaching token to request:', token);
   if (token) {
+    if (isTokenExpired(token)) {
+      await useAuthStore.getState().logout();
+      return config;
+    }
+
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -65,7 +71,7 @@ api.interceptors.response.use(
     try {
       const token = await refresh();
       if (!token) {
-        await clearTokens();
+        await useAuthStore.getState().logout();
         flush(null);
         return Promise.reject(err);
       }
@@ -74,7 +80,7 @@ api.interceptors.response.use(
       original.headers.Authorization = `Bearer ${token}`;
       return api(original);
     } catch (e) {
-      await clearTokens();
+      await useAuthStore.getState().logout();
       flush(null);
       return Promise.reject(e);
     } finally {

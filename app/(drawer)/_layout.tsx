@@ -33,7 +33,6 @@ const getRouteName = (segments: string[]) => {
 
   return clean[0] || 'home';
 };
-
 const isProfileScreen = (segments: string[]) => {
   const clean = getCleanSegments(segments);
   return clean[0] === 'home';
@@ -46,6 +45,7 @@ const isDetailScreen = (segments: string[]) => {
 
 const SALESMAN_DRAWER_ROUTES = new Set([
   '(tabs)',
+  'change-password',
   'my-pocket',
   'stock',
   'route',
@@ -58,6 +58,7 @@ const SALESMAN_DRAWER_ROUTES = new Set([
 
 const MANAGER_DRAWER_ROUTES = new Set([
   '(tabs)',
+  'change-password',
   'manager-targets',
   'team-coverage',
   'beat-o-meter',
@@ -691,7 +692,7 @@ export default function DrawerLayout() {
   const { setHeader } = useHeader();
 
   const isDetail = isDetailScreen(segments);
-  const isProfile = isProfileScreen(segments);
+    const isProfile = isProfileScreen(segments);
   const user = useAuthStore((state) => state.user);
   const roleId = getRoleId(user);
   const drawerAllowedRoutes =
@@ -805,13 +806,21 @@ export default function DrawerLayout() {
       showBack: true,
       backgroundColor: colors.primary,
     },
+
+    'change-password': {
+      title: 'Change Password',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
   };
 
   /* ============================
    * HEADER CONFIG
    * ============================ */
 
-  useEffect(() => {
+   useEffect(() => {
     if (isProfile) {
       const routeName = getRouteName(segments);
       const config = HEADER_MAP[routeName];
@@ -1045,6 +1054,15 @@ export default function DrawerLayout() {
         name="notifications"
         options={{
           title: 'Notifications',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+
+      <Drawer.Screen
+        name="change-password"
+        options={{
+          title: 'Change Password',
           drawerLabel: () => null,
           drawerItemStyle: { display: 'none' },
         }}

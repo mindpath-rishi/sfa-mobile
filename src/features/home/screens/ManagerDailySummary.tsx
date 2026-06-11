@@ -7,6 +7,7 @@ import { AppText } from '@/core/components';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { formatLocalApiDate } from '@/shared/utils/date.utils';
 import { homeService } from '../services/home.service';
 import type {
   ManagerFieldUserSummary,
@@ -169,13 +170,6 @@ const parseRouteDate = (value?: string) => {
   return new Date(year, month - 1, day);
 };
 
-const formatRouteDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 const formatSelectedDate = (date: Date) =>
   new Intl.DateTimeFormat('en-US', {
     weekday: 'short',
@@ -327,7 +321,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const status = getParam(params.status) as SummaryStatus | undefined;
   const userId = getParam(params.userId);
   const activityId = getParam(params.activityId);
-  const selectedRouteDate = formatRouteDate(selectedDate);
+  const selectedRouteDate = formatLocalApiDate(selectedDate);
   const statusMeta = useMemo(
     () => ({
       retailing: { label: STATUS_LABELS.retailing, color: colors.success },

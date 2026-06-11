@@ -156,6 +156,7 @@ import { create } from 'zustand';
 import { jwtDecode } from 'jwt-decode';
 
 import { clearTokens, getAccessToken, setTokens } from '@/shared/services/tokenStorage';
+import { isTokenExpired } from '@/shared/utils/auth-token.utils';
 import { resetAllStores } from './reset.store';
 import { storage } from '../storage';
 
@@ -196,6 +197,7 @@ type JwtPayload = {
   role?: string;
   roleId?: string;
   vanId?: string;
+  exp?: number;
 };
 
 type WorkSessionId = string | null;
@@ -272,6 +274,20 @@ export const useAuthStore = create<AuthStore>((set) => ({
         return;
       }
 
+      if (isTokenExpired(token)) {
+        await clearTokens();
+        await storage.removeItem(AUTH_USER_KEY);
+        resetAllStores();
+
+        set({
+          accessToken: null,
+          user: null,
+          workSessionId: null,
+          isHydrated: true,
+        });
+        return;
+      }
+
       let user: AuthUser | null = null;
 
       try {
@@ -308,6 +324,19 @@ export const useAuthStore = create<AuthStore>((set) => ({
    * Login
    */
   setAuth: async (accessToken, refreshToken, userFromApi) => {
+    if (isTokenExpired(accessToken)) {
+      await clearTokens();
+      await storage.removeItem(AUTH_USER_KEY);
+      resetAllStores();
+
+      set({
+        accessToken: null,
+        user: null,
+        workSessionId: null,
+      });
+      return;
+    }
+
     await setTokens(accessToken, refreshToken);
 
     const user = userFromApi ?? decodeToken(accessToken);

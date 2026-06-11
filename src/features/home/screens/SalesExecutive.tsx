@@ -116,8 +116,16 @@ export default function SalesExecutiveScreen() {
   const dashboardRefreshTick = useAppEventsStore((s) => s.dashboardRefreshTick);
 
   const filteredQuickActions = useMemo(() => {
-    if (!currentActivity) return QUICK_ACTIONS;
-    return QUICK_ACTIONS.filter((a) => a.label !== currentActivity);
+    const hideLeave =
+      currentActivity === 'Retailing' ||
+      currentActivity === 'Office Work' ||
+      currentActivity === 'Other Work';
+
+    return QUICK_ACTIONS.filter((action) => {
+      if (currentActivity && action.label === currentActivity) return false;
+      if (hideLeave && action.label === 'Leave') return false;
+      return true;
+    });
   }, [currentActivity]);
 
   const otherWorkOptionsForModal = useMemo(() => {
@@ -376,8 +384,6 @@ export default function SalesExecutiveScreen() {
           return;
         }
 
-        const today = new Date();
-        const date = today.toISOString().slice(0, 10);
         const userId = useAuthStore.getState().user?.userId;
 
         const response: ApiResponse<any> = await leaveService.applyLeave({
@@ -463,6 +469,7 @@ export default function SalesExecutiveScreen() {
       const mediaResponse = await homeService.uploadDayStartImage({
         uri: userPhoto,
         ownerId: user?.employeeId || user?.id || 'day-start',
+        subOwnnerId: workSessionId as any,
       });
 
       if (mediaResponse?.statusCode === 201 && mediaResponse.data) {

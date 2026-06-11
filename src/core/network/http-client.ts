@@ -11,6 +11,7 @@ import { errorHandler } from '@/core/errors/error.handler';
 import { logger } from '@/core/logger/logger';
 import { useAuthStore } from '@/core/store/auth.store';
 import { getAccessToken } from '@/shared/services/tokenStorage';
+import { isTokenExpired } from '@/shared/utils/auth-token.utils';
 import { useLoaderStore } from '../loader/loader.store';
 
 import type { ApiRequestConfig, ApiResponse, HttpMethod } from './api.types';
@@ -63,7 +64,16 @@ const getToken = async (): Promise<string | null> => {
 
     if (storeToken) return storeToken;
 
-    return await getAccessToken();
+    const storedToken = await getAccessToken();
+
+    if (!storedToken) return null;
+
+    if (isTokenExpired(storedToken)) {
+      await useAuthStore.getState().logout();
+      return null;
+    }
+
+    return storedToken;
   } catch (error) {
     logger.error('Token fetch error', { error });
     return null;
@@ -84,6 +94,11 @@ httpClient.interceptors.request.use(
       const token = await getToken();
 
       if (token) {
+        if (isTokenExpired(token)) {
+          await useAuthStore.getState().logout();
+          return config;
+        }
+
         const headers = AxiosHeaders.from(config.headers ?? {});
         headers.set(AUTH_HEADER_KEY, `${TOKEN_PREFIX} ${token}`);
         config.headers = headers;
@@ -120,6 +135,10 @@ httpClient.interceptors.response.use(
     }
 
     const appError = errorHandler(error);
+
+    if (error.response?.status === 401) {
+      useAuthStore.getState().logout();
+    }
 
     logger.error('HTTP Error', {
       code: appError.code,

@@ -16,6 +16,7 @@ import {
   setBackgroundMessageHandler,
   type FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
+import { storage } from '@/shared/utils/storage';
 
 type NotificationRouteData = {
   url?: unknown;
@@ -23,6 +24,7 @@ type NotificationRouteData = {
 };
 
 const ANDROID_CHANNEL_ID = 'default';
+const PUSH_NOTIFICATIONS_ENABLED_KEY = 'push_notifications_enabled';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -76,8 +78,19 @@ export const setupNotificationChannelAsync = async () => {
   });
 };
 
+export const isPushNotificationsEnabledAsync = async () => {
+  const value = await storage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY);
+  return value !== 'false';
+};
+
+export const setPushNotificationsEnabledAsync = async (enabled: boolean) => {
+  await storage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, String(enabled));
+};
+
 export const getPushNotificationTokenAsync = async (): Promise<string | null> => {
   if (Platform.OS === 'web' || !Device.isDevice) return null;
+
+  if (!(await isPushNotificationsEnabledAsync())) return null;
 
   await setupNotificationChannelAsync();
   await Notifications.requestPermissionsAsync();

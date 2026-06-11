@@ -13,6 +13,7 @@ import type {
   TargetMetric,
 } from '@/features/home/services/home.service';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { formatLocalApiDate } from '@/shared/utils/date.utils';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
 
 import { createManagerStyles, managerStylesBase as stylesBase } from '../styles/Manager.styles';
@@ -113,13 +114,6 @@ const getCurrentMonthRange = () => {
     startDate: new Date(now.getFullYear(), now.getMonth(), 1),
     endDate: now,
   };
-};
-
-const formatRouteDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
 };
 
 const formatRangeLabel = (startDate: Date, endDate: Date) =>
@@ -397,9 +391,9 @@ export default function ManagerHomeScreen() {
   const orderProgressColor = colors.secondary;
   const validationProgressColor = colors.info;
 
-  const selectedRouteDate = formatRouteDate(new Date());
-  const summaryStartRouteDate = formatRouteDate(summaryDateRange.startDate);
-  const summaryEndRouteDate = formatRouteDate(summaryDateRange.endDate);
+  const selectedRouteDate = formatLocalApiDate(new Date());
+  const summaryStartRouteDate = formatLocalApiDate(summaryDateRange.startDate);
+  const summaryEndRouteDate = formatLocalApiDate(summaryDateRange.endDate);
   const summaryDateRangeLabel = formatRangeLabel(
     summaryDateRange.startDate,
     summaryDateRange.endDate,
@@ -520,8 +514,8 @@ export default function ManagerHomeScreen() {
   const fetchManagerStats = async (range = summaryDateRange) => {
     try {
       const response = await homeService.getManagerStats({
-        startDate: formatRouteDate(range.startDate),
-        endDate: formatRouteDate(range.endDate),
+        startDate: formatLocalApiDate(range.startDate),
+        endDate: formatLocalApiDate(range.endDate),
       });
 
       if (response.success && response.data) {

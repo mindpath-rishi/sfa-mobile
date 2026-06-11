@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Switch,
   Image,
   Alert,
   Linking,
@@ -19,6 +18,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useThemeStore } from '@/core/store/theme.store';
+import { authService } from '@/features/auth/services/auth.service';
+import { getClientDeviceIdAsync } from '@/shared/services/device.service';
+import {
+  getPushNotificationTokenAsync,
+  isPushNotificationsEnabledAsync,
+  setPushNotificationsEnabledAsync,
+} from '@/shared/services/push-notification.service';
 
 const DEFAULT_PROFILE_DATA = {
   id: 'EMP001',
@@ -293,18 +299,12 @@ const InfoRow = ({ icon, label, value, onPress }: any) => {
 };
 
 // Setting Row Component
-const SettingRow = ({ icon, label, value, type = 'toggle', onPress }: any) => {
+const SettingRow = ({ icon, label, value, type = 'toggle', onPress, disabled }: any) => {
   const { colors } = useTheme();
-  const [enabled, setEnabled] = useState(value);
 
-  useEffect(() => {
-    setEnabled(value);
-  }, [value]);
-
-  const handleToggle = () => {
-    const newValue = !enabled;
-    setEnabled(newValue);
-    onPress?.(newValue);
+  const handleToggle = (nextValue: boolean) => {
+    if (disabled) return;
+    onPress?.(nextValue);
   };
 
   return (
@@ -324,12 +324,36 @@ const SettingRow = ({ icon, label, value, type = 'toggle', onPress }: any) => {
         {label}
       </Text>
       {type === 'toggle' ? (
-        <Switch
-          value={enabled}
-          onValueChange={handleToggle}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor="white"
-        />
+        <TouchableOpacity
+          activeOpacity={0.8}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: Boolean(value), disabled: Boolean(disabled) }}
+          onPress={() => handleToggle(!value)}
+          style={{
+            width: 48,
+            height: 28,
+            borderRadius: 14,
+            padding: 3,
+            justifyContent: 'center',
+            backgroundColor: value ? colors.primary : colors.borderLight || colors.border,
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          <View
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              backgroundColor: colors.surface,
+              alignSelf: value ? 'flex-end' : 'flex-start',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.18,
+              shadowRadius: 2,
+              elevation: 2,
+            }}
+          />
+        </TouchableOpacity>
       ) : (
         <TouchableOpacity onPress={onPress}>
           <Text style={{ color: colors.primary, fontSize: 14 }}>Change</Text>
@@ -407,10 +431,17 @@ export default function ProfileScreen() {
   );
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'stats', 'settings', 'docs'
   const logout = useAuthStore((s) => s.logout);
+  const [notificationSyncing, setNotificationSyncing] = useState(false);
 
   useEffect(() => {
     setSettings((prev) => ({ ...prev, darkMode: isDark }));
   }, [isDark]);
+
+  useEffect(() => {
+    isPushNotificationsEnabledAsync()
+      .then((enabled) => setSettings((prev) => ({ ...prev, notifications: enabled })))
+      .catch((error) => console.warn('Failed to load push notification setting:', error));
+  }, []);
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
@@ -424,6 +455,61 @@ export default function ProfileScreen() {
   const handleDarkModeToggle = (value: boolean) => {
     setSettings((prev) => ({ ...prev, darkMode: value }));
     setThemeMode(value ? 'dark' : 'light');
+  };
+
+  const handlePushNotificationsToggle = async (value: boolean) => {
+    if (notificationSyncing) return;
+
+    const previousValue = userData.settings.notifications;
+
+    setSettings((prev) => ({ ...prev, notifications: value }));
+    setNotificationSyncing(true);
+
+    try {
+      await setPushNotificationsEnabledAsync(value);
+      const deviceId = await getClientDeviceIdAsync();
+
+      if (value) {
+        const fcmToken = await getPushNotificationTokenAsync();
+
+        if (!fcmToken) {
+          await setPushNotificationsEnabledAsync(false);
+          setSettings((prev) => ({ ...prev, notifications: false }));
+          Alert.alert(
+            'Push Notifications',
+            'Permission was not granted or this device cannot receive push notifications.',
+          );
+          return;
+        }
+
+        const response = await authService.updatePushToken({ deviceId, fcmToken });
+
+        if (!response.success) {
+          throw new Error(response.message || 'Unable to enable push notifications');
+        }
+
+        Alert.alert('Push Notifications', 'Push notifications enabled.');
+      } else {
+        const response = await authService.updatePushToken({ deviceId, fcmToken: null });
+
+        if (!response.success) {
+          console.warn('Failed to clear push token:', response.message);
+        }
+
+        Alert.alert('Push Notifications', 'Push notifications disabled.');
+      }
+    } catch (error: any) {
+      const shouldRollback = value;
+
+      if (shouldRollback) {
+        await setPushNotificationsEnabledAsync(previousValue);
+        setSettings((prev) => ({ ...prev, notifications: previousValue }));
+      }
+
+      Alert.alert('Push Notifications', error?.message || 'Failed to update push notifications.');
+    } finally {
+      setNotificationSyncing(false);
+    }
   };
 
   const handleMessage = () => {
@@ -630,7 +716,7 @@ export default function ProfileScreen() {
           icon="notifications"
           label="Push Notifications"
           value={userData.settings.notifications}
-          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, notifications: val }))}
+          onPress={handlePushNotificationsToggle}
         />
         <SettingRow icon="moon" label="Dark Mode" value={isDark} onPress={handleDarkModeToggle} />
         <SettingRow
@@ -696,7 +782,7 @@ export default function ProfileScreen() {
         >
           Account
         </Text>
-        <TouchableOpacity onPress={() => router.push('/profile/change-password')}>
+        <TouchableOpacity onPress={() => router.push('/change-password')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="key" size={20} color={colors.textSecondary} />
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>

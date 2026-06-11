@@ -7,7 +7,6 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Dimensions,
-  Modal,
 } from 'react-native';
 import { Ionicons, MaterialIcons, Feather, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +27,7 @@ import {
   type SalesmanPocketTargetResponse,
   type TargetMetric,
 } from '@/features/home/services/home.service';
+import { formatLocalApiDate } from '@/shared/utils/date.utils';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -49,8 +49,8 @@ type TargetDashboardData = {
 
 const metricOptions: { value: TargetMetric; label: string }[] = [
   { value: 'tonnage', label: 'Tonnage' },
-  { value: 'value', label: 'Value' },
   { value: 'cases', label: 'Cases' },
+  { value: 'value', label: 'Value' },
 ];
 
 const metricLabels: Record<TargetMetric, string> = {
@@ -176,7 +176,6 @@ export default function TargetDashboard() {
     'currentMonth',
   );
   const [selectedMetric, setSelectedMetric] = useState<TargetMetric>('cases');
-  const [isMetricDropdownOpen, setIsMetricDropdownOpen] = useState(false);
   const [currentMonthData, setCurrentMonthData] = useState<TargetDashboardData>(emptyTargetData);
   const [lastMonthData, setLastMonthData] = useState<TargetDashboardData>(emptyTargetData);
   const [loading, setLoading] = useState(true);
@@ -187,7 +186,7 @@ export default function TargetDashboard() {
     try {
       const now = new Date();
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-      const lastMonthDate = lastMonthEnd.toISOString().split('T')[0];
+      const lastMonthDate = formatLocalApiDate(lastMonthEnd);
       const [targetResponse, lastTargetResponse] = await Promise.all([
         homeService.getSalesmanPocketAndTarget({ metric: selectedMetric }),
         homeService.getSalesmanPocketAndTarget({ date: lastMonthDate, metric: selectedMetric }),
@@ -395,35 +394,11 @@ export default function TargetDashboard() {
           }}
         >
           {/* Period Selector - Working Tabs */}
-          <View style={{ alignItems: 'flex-end' }}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setIsMetricDropdownOpen(true)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 8,
-                backgroundColor: colors.surface + '18',
-                borderColor: colors.surface + '22',
-                borderWidth: 1,
-                borderRadius: 14,
-                paddingHorizontal: 14,
-                paddingVertical: 10,
-              }}
-            >
-              <Text style={{ color: colors.surface, fontSize: 13, fontWeight: '700' }}>
-                {selectedMetricLabel}
-              </Text>
-              <Ionicons name="chevron-down" size={16} color={colors.surface} />
-            </TouchableOpacity>
-          </View>
-
           <View
             style={{
               flexDirection: 'row',
               backgroundColor: colors.surface + '15',
               borderRadius: 16,
-              marginTop: 24,
               padding: 4,
               borderWidth: 1,
               borderColor: colors.surface + '10',
@@ -481,11 +456,59 @@ export default function TargetDashboard() {
           </View>
         </LinearGradient>
 
+        <View
+          style={{
+            flexDirection: 'row',
+            marginHorizontal: 16,
+            marginTop: -24,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.borderLight,
+            backgroundColor: colors.surface,
+            overflow: 'hidden',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.06,
+            shadowRadius: 10,
+            elevation: 4,
+          }}
+        >
+          {metricOptions.map((option) => {
+            const isSelected = option.value === selectedMetric;
+
+            return (
+              <TouchableOpacity
+                key={option.value}
+                activeOpacity={0.82}
+                onPress={() => setSelectedMetric(option.value)}
+                style={{
+                  flex: 1,
+                  minHeight: 34,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 8,
+                  backgroundColor: isSelected ? colors.primary : 'transparent',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10,
+                    fontWeight: '800',
+                    color: isSelected ? colors.primaryContrast : colors.textSecondary,
+                  }}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         {/* Progress Card */}
         <View
           style={{
             marginHorizontal: 16,
-            marginTop: -24,
+            marginTop: 12,
             backgroundColor: colors.surface,
             borderRadius: 24,
             padding: 20,
@@ -952,74 +975,6 @@ export default function TargetDashboard() {
           )}
         </LinearGradient>
       </ScrollView>
-
-      <Modal
-        visible={isMetricDropdownOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsMetricDropdownOpen(false)}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => setIsMetricDropdownOpen(false)}
-          style={{
-            flex: 1,
-            backgroundColor: '#00000055',
-            justifyContent: 'flex-start',
-            alignItems: 'flex-end',
-            paddingTop: 86,
-            paddingHorizontal: 20,
-          }}
-        >
-          <View
-            style={{
-              width: 180,
-              backgroundColor: colors.surface,
-              borderRadius: 16,
-              paddingVertical: 6,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.12,
-              shadowRadius: 16,
-              elevation: 10,
-            }}
-          >
-            {metricOptions.map((option) => {
-              const isSelected = option.value === selectedMetric;
-
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    setSelectedMetric(option.value);
-                    setIsMetricDropdownOpen(false);
-                  }}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                    backgroundColor: isSelected ? colors.primary + '08' : 'transparent',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: isSelected ? colors.primary : colors.textPrimary,
-                      fontSize: 14,
-                      fontWeight: isSelected ? '700' : '500',
-                    }}
-                  >
-                    {option.label}
-                  </Text>
-                  {isSelected && <Ionicons name="checkmark" size={18} color={colors.primary} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </SafeAreaView>
   );
 }

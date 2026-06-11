@@ -484,6 +484,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       segmentation: '',
       creditLimit: 0,
       creditDays: 0,
+      countryId: selectedRoute?.countryId || 'ZAMBIA',
     });
     setErrors({});
     setTouchedFields(new Set());

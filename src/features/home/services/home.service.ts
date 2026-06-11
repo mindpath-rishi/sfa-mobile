@@ -2,6 +2,7 @@ import { api } from '@/core/network';
 import type { ApiResponse } from '@/core/network/api.types';
 import { LoginRequest, LoginResponse } from '@/features/auth/types/login.types';
 import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
+import { Platform } from 'react-native';
 
 /**
  * Auth API contract used by the app.
@@ -250,26 +251,54 @@ export interface ManagerUserTimelineResponse {
   }[];
 }
 
+export interface SalesmanDayWiseSummaryItem {
+  date: string;
+  label: string;
+  dayStatus?: 'Retailing' | 'Official Work' | 'Leave' | 'Absent';
+  retailing: number;
+  officialWork: number;
+  leave: number;
+  absent: number;
+  totalActivities: number;
+  retailingDuration?: string | null;
+  totalDuration?: string | null;
+  tc: number;
+  pc: number;
+  upc: number;
+  netValue: number;
+  cases: number;
+  firstCallTime?: string | null;
+  firstPcTime?: string | null;
+}
+
+export type SalesmanProductSalesGroupBy = 'PRIMARYCATEGORY' | 'SECONDARYCATEGORY' | 'SKU';
+
+export interface SalesmanProductSalesResponse {
+  overview: {
+    sc: number;
+    tc: number;
+    pc: number;
+    netValue: number;
+    cases: number;
+    lpc: number;
+  };
+  categories: {
+    id: string;
+    name: string;
+    value: number;
+    pcs: number;
+    cases: number;
+    growth: number;
+  }[];
+}
+
 export interface SalesmanPocketTargetResponse {
   startDate: string;
   endDate: string;
   retailingDays: number;
-  dayWiseSummary?: {
-    date: string;
-    label: string;
-    retailing: number;
-    officialWork: number;
-    leave: number;
-    absent: number;
-    totalActivities: number;
-    tc: number;
-    pc: number;
-    upc: number;
-    netValue: number;
-    cases: number;
-    firstCallTime?: string | null;
-    firstPcTime?: string | null;
-  }[];
+  avgRetailingTime?: string | null;
+  avgTotalTime?: string | null;
+  dayWiseSummary?: SalesmanDayWiseSummaryItem[];
   target: {
     metric?: TargetMetric;
     selected?: {
@@ -305,6 +334,8 @@ export interface SalesmanPocketTargetResponse {
     utc: number;
     totalLinesSold: number;
     lpc: number;
+    avgFirstCallTime?: string | null;
+    avgFirstPcTime?: string | null;
   };
 }
 
@@ -316,6 +347,7 @@ export interface HomeService {
   uploadDayStartImage: (params: {
     uri: string;
     ownerId: string;
+    subOwnnerId: string;
   }) => Promise<ApiResponse<{ mediaId: string; url: string }>>;
   getDayStatus(workSessionId: string): Promise<ApiResponse<any>>;
   getTodayActivities(workSessionId: string): Promise<ApiResponse<any>>;
@@ -332,6 +364,17 @@ export interface HomeService {
     endDate?: string;
     metric?: TargetMetric;
   }) => Promise<ApiResponse<SalesmanPocketTargetResponse>>;
+  getSalesmanDayWiseSummary: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<ApiResponse<SalesmanDayWiseSummaryItem[]>>;
+  getSalesmanProductSales: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+    groupBy?: SalesmanProductSalesGroupBy;
+  }) => Promise<ApiResponse<SalesmanProductSalesResponse>>;
   getManagerStats(
     params?:
       | string
@@ -367,22 +410,39 @@ export interface HomeService {
 export const homeService: HomeService = {
   dayStart: (payload) =>
     api.post<any, DayStartPayload>('/work-session', payload) as Promise<ApiResponse<any>>,
-  uploadDayStartImage: ({ uri, ownerId }) => {
+  uploadDayStartImage: async ({ uri, ownerId, subOwnnerId }) => {
     const formData = new FormData();
-    const extension = uri.split('.').pop()?.split('?')[0] || 'jpg';
+    const cleanUri = uri.split('?')[0];
+    const extension = cleanUri.includes('.')
+      ? cleanUri.split('.').pop() || 'jpg'
+      : 'jpg';
     const mimeType = extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+    const fileName = `day-start-${Date.now()}.${extension}`;
 
-    formData.append('file', {
-      uri,
-      name: `day-start-${Date.now()}.${extension}`,
-      type: mimeType,
-    } as any);
+    if (Platform.OS === 'web') {
+      const blob = await fetch(uri).then((response) => response.blob());
+      const WebFile = (globalThis as any).File;
+      const file =
+        typeof WebFile !== 'undefined'
+          ? new WebFile([blob], fileName, { type: blob.type || mimeType })
+          : blob;
+
+      formData.append('file', file, fileName);
+    } else {
+      formData.append('file', {
+        uri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+    }
+
     formData.append('ownerType', 'EMPLOYEE');
     formData.append('ownerId', ownerId);
     formData.append('mediaType', 'IMAGE');
     formData.append('purpose', 'PROOF');
     formData.append('title', 'Day Start Selfie');
     formData.append('isPrimary', 'false');
+    formData.append('subOwnerId', subOwnnerId || '');
 
     return api.post<{ mediaId: string; url: string }, FormData>(
       '/media/upload',
@@ -412,6 +472,14 @@ export const homeService: HomeService = {
     api.get<SalesmanPocketTargetResponse>(`/employee/salesman/my-pocket-target`, {
       params,
     }) as Promise<ApiResponse<SalesmanPocketTargetResponse>>,
+  getSalesmanDayWiseSummary: (params) =>
+    api.get<SalesmanDayWiseSummaryItem[]>(`/employee/salesman/day-wise-summary`, {
+      params,
+    }) as Promise<ApiResponse<SalesmanDayWiseSummaryItem[]>>,
+  getSalesmanProductSales: (params) =>
+    api.get<SalesmanProductSalesResponse>(`/employee/salesman/product-sales`, {
+      params,
+    }) as Promise<ApiResponse<SalesmanProductSalesResponse>>,
   getManagerStats: (params) => {
     const queryParams = typeof params === 'string' ? { date: params } : params;
 

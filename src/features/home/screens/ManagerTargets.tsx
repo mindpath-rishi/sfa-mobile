@@ -12,6 +12,7 @@ import {
   UserPrimaryCategoryTargetSummary,
   UserWiseTargetSummary,
 } from '@/features/home/services/home.service';
+import { formatLocalApiDate } from '@/shared/utils/date.utils';
 import {
   createManagerTargetsBaseStyles,
   createManagerTargetsStyles,
@@ -33,13 +34,6 @@ const findUser = (id?: string | string[], users: TargetUser[] = []) => {
   }
 
   return undefined;
-};
-
-const formatRouteDate = (date: Date) => {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
 };
 
 const formatSelectedDate = (date: Date) =>
@@ -283,7 +277,7 @@ export default function ManagerTargetsScreen() {
       ? selectedUser.children
       : [selectedUser]
     : targetUsers;
-  const selectedRouteDate = formatRouteDate(new Date());
+  const selectedRouteDate = formatLocalApiDate(new Date());
 
   useFocusEffect(
     useCallback(() => {

@@ -432,7 +432,10 @@ import { authService } from '../services/auth.service';
 import { LoginFormData, LoginScreenProps } from '../types/login.types';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useLoginStyles } from '../styles/Login.style';
-import { getPushNotificationTokenAsync } from '@/shared/services/push-notification.service';
+import {
+  getPushNotificationTokenAsync,
+  isPushNotificationsEnabledAsync,
+} from '@/shared/services/push-notification.service';
 import { getClientDeviceIdAsync } from '@/shared/services/device.service';
 
 const isWeb = Platform.OS === 'web';
@@ -615,7 +618,9 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
     osVersion: String(Platform.Version),
     browser: isWeb ? 'Modern Browser' : 'N/A',
     appVersion: Application.nativeApplicationVersion ?? '1.3.0',
-    fcmToken: await getPushNotificationTokenAsync(),
+    fcmToken: (await isPushNotificationsEnabledAsync())
+      ? await getPushNotificationTokenAsync()
+      : null,
   });
 
   // Submit

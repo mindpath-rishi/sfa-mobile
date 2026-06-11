@@ -13,7 +13,13 @@ export interface AuthService {
   /** Updates the active device push token after Firebase rotates it */
   updatePushToken(payload: {
     deviceId: string;
-    fcmToken: string;
+    fcmToken?: string | null;
+  }): Promise<ApiResponse<{ updated: boolean }>>;
+
+  /** Changes the current user's password */
+  changePassword(payload: {
+    currentPassword: string;
+    newPassword: string;
   }): Promise<ApiResponse<{ updated: boolean }>>;
 
   /** Clears server session/token (if backend supports it) */
@@ -31,6 +37,10 @@ export const authService: AuthService = {
     >,
   updatePushToken: (payload) =>
     api.patch<{ updated: boolean }, typeof payload>('/user/device/push-token', payload) as Promise<
+      ApiResponse<{ updated: boolean }>
+    >,
+  changePassword: (payload) =>
+    api.patch<{ updated: boolean }, typeof payload>('/user/password', payload) as Promise<
       ApiResponse<{ updated: boolean }>
     >,
   logout: () =>

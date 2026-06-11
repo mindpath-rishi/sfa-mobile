@@ -1313,6 +1313,30 @@ export default function RouteScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      setMapsLoaded(true);
+      return;
+    }
+
+    if (MapView && Marker && Polyline) {
+      setMapsLoaded(true);
+      return;
+    }
+
+    try {
+      const Maps = require('react-native-maps');
+      MapView = Maps.default;
+      Marker = Maps.Marker;
+      Polyline = Maps.Polyline;
+      PROVIDER_GOOGLE = Maps.PROVIDER_GOOGLE;
+      setMapsLoaded(true);
+    } catch (error) {
+      console.log('Error loading maps:', error);
+      setMapsLoaded(false);
+    }
+  }, []);
+
   // ========== SUMMARY STATS ==========
   const summaryStats = useMemo(() => {
     const visitedCount = outlets.filter((o) => o.isVisited).length;
@@ -1560,7 +1584,7 @@ export default function RouteScreen() {
 
   // ========== COMPUTED VALUES ==========
   const outletsWithDistance = useMemo(() => {
-    return filteredOutlets
+    return [...filteredOutlets]
       .sort((a, b) => a.sequence - b.sequence)
       .map((outlet) => ({
         ...outlet,
@@ -1584,6 +1608,22 @@ export default function RouteScreen() {
             : false,
       }));
   }, [filteredOutlets, currentLocation]);
+
+  const mapOutlets = useMemo(
+    () => outletsWithDistance.filter((outlet) => outlet.geoTag?.lat && outlet.geoTag?.lng),
+    [outletsWithDistance],
+  );
+
+  const mapCoordinates = useMemo(
+    () => [
+      currentLocation,
+      ...mapOutlets.map((outlet) => ({
+        latitude: outlet.geoTag.lat,
+        longitude: outlet.geoTag.lng,
+      })),
+    ],
+    [currentLocation, mapOutlets],
+  );
 
   // ========== HEADER SETUP ==========
   const handleRightPress = useCallback(() => setShowMapModal(true), []);
@@ -1723,19 +1763,21 @@ export default function RouteScreen() {
     async (formValue: any) => {
       formValue.routeId = activeRoute?.routeId;
       if (!formValue.countryId) {
-        formValue.countryId = 'KE';
+        formValue.countryId = activeRoute?.countryId || 'ZAMBIA';
       }
       const response = await outletService?.createCustomer(formValue);
-      if (response?.success) {
+      if (response?.success || response?.statusCode === 200 || response?.statusCode === 201) {
         toast.success(response.message as any);
         setShowCustomerCreateModal(false);
         // Reset data loaded flag to allow reload
         isDataLoadedRef.current = false;
         routeIdRef.current = undefined;
         getRouteOutlets();
+      } else {
+        toast.error('Error', response?.message || 'Failed to create customer');
       }
     },
-    [activeRoute?.routeId, getRouteOutlets],
+    [activeRoute?.countryId, activeRoute?.routeId, getRouteOutlets],
   );
 
   const handleNavigation = useCallback((outlet: Outlet) => {
@@ -2059,6 +2101,86 @@ export default function RouteScreen() {
         onClose={() => setShowCustomerCreateModal(false)}
         onSubmit={handleCreateCustomer}
       />
+
+      <Modal
+        visible={showMapModal}
+        animationType="slide"
+        onRequestClose={() => setShowMapModal(false)}
+      >
+        <View style={styles.fullScreenContainer}>
+          {mapsLoaded && MapView ? (
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={styles.fullScreenMap}
+              initialRegion={{
+                latitude: currentLocation.latitude,
+                longitude: currentLocation.longitude,
+                latitudeDelta: 0.08,
+                longitudeDelta: 0.08,
+              }}
+            >
+              <Marker coordinate={currentLocation} title="Current Location">
+                <View style={[styles.fullScreenMarker, styles.fullScreenMarkerCurrent]}>
+                  <View style={styles.fullScreenCurrentDot} />
+                </View>
+              </Marker>
+
+              {mapOutlets.map((outlet, index) => (
+                <Marker
+                  key={outlet._id}
+                  coordinate={{
+                    latitude: outlet.geoTag.lat,
+                    longitude: outlet.geoTag.lng,
+                  }}
+                  title={outlet.name}
+                  description={outlet.address?.line1}
+                >
+                  <View
+                    style={[
+                      styles.fullScreenMarker,
+                      outlet.isVisited && styles.fullScreenMarkerCompleted,
+                    ]}
+                  >
+                    <Text style={styles.fullScreenMarkerText}>{index + 1}</Text>
+                  </View>
+                </Marker>
+              ))}
+
+              {mapCoordinates.length > 1 && (
+                <Polyline
+                  coordinates={mapCoordinates}
+                  strokeColor={colors.primary}
+                  strokeWidth={4}
+                />
+              )}
+            </MapView>
+          ) : (
+            <View style={styles.fullScreenMapPlaceholder}>
+              <Ionicons name="map-outline" size={64} color={colors.surface} />
+              <Text style={styles.fullScreenMapText}>
+                {Platform.OS === 'web' ? 'Map is not available on web' : 'Map is loading...'}
+              </Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={() => setShowMapModal(false)}
+            style={{
+              position: 'absolute',
+              top: 48,
+              right: 16,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.surface,
+            }}
+          >
+            <Ionicons name="close" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
+      </Modal>
 
       <FilterModal
         visible={showFilters}

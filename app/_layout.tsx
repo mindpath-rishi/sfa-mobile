@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Stack, useRouter, useRootNavigationState } from 'expo-router';
+import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-router';
 import { ActivityIndicator, View, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -23,6 +23,7 @@ import {
   addFirebaseNotificationListeners,
   addNotificationResponseListener,
   addPushTokenRefreshListener,
+  isPushNotificationsEnabledAsync,
   setupNotificationChannelAsync,
   setupBackgroundMessageHandler,
 } from '@/shared/services/push-notification.service';
@@ -34,6 +35,7 @@ setupBackgroundMessageHandler();
 export default function RootLayout() {
   const router = useRouter();
   const navigationState = useRootNavigationState();
+  const segments = useSegments();
 
   /* ======================================================
    * STORES
@@ -78,6 +80,8 @@ export default function RootLayout() {
 
     return addPushTokenRefreshListener(async (fcmToken) => {
       try {
+        if (!(await isPushNotificationsEnabledAsync())) return;
+
         await authService.updatePushToken({
           deviceId: await getClientDeviceIdAsync(),
           fcmToken,
@@ -119,12 +123,14 @@ export default function RootLayout() {
 
     const currentToken = useAuthStore.getState().accessToken;
 
-    if (!currentToken) {
+    const currentGroup = segments[0];
+    const isAuthRoute = currentGroup === '(auth)';
+    if (!currentToken && !isAuthRoute) {
       router.replace('/(auth)');
-    } else {
+    } else if (currentToken && isAuthRoute) {
       router.replace('/(drawer)/(tabs)/home');
     }
-  }, [navigationState, themeHydrated, languageHydrated, authHydrated, router]);
+  }, [navigationState, themeHydrated, languageHydrated, authHydrated, token, segments, router]);
 
   /* ======================================================
    * LOADING STATE

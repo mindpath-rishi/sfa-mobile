@@ -45,7 +45,7 @@ export interface FetchSaleQuery {
   searchText?: number;
   vanId?: string;
   customerId?: string;
-  exployeeId?: string;
+  employeeId?: string;
 }
 
 /* ======================================================

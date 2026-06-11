@@ -40,6 +40,8 @@ const startOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(
 const addMonths = (date: Date, amount: number) =>
   new Date(date.getFullYear(), date.getMonth() + amount, 1);
 
+const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
 const isSameDate = (left: Date, right: Date) =>
   left.getFullYear() === right.getFullYear() &&
   left.getMonth() === right.getMonth() &&
@@ -77,7 +79,12 @@ export function ManagerDatePickerModal({
   const [visibleMonth, setVisibleMonth] = useState(startOfMonth(value));
   const calendarDates = useMemo(() => getCalendarDates(visibleMonth), [visibleMonth]);
   const today = useMemo(() => new Date(), []);
+  const todayStart = useMemo(() => startOfDay(today), [today]);
+  const currentMonth = useMemo(() => startOfMonth(today), [today]);
   const isRangeMode = mode === 'range';
+
+  const clampFutureDate = (date: Date) =>
+    startOfDay(date) > todayStart ? todayStart : date;
 
   useEffect(() => {
     if (visible) {
@@ -92,21 +99,25 @@ export function ManagerDatePickerModal({
 
   const handleApply = () => {
     if (isRangeMode) {
-      const startDate =
-        draftRange.startDate <= draftRange.endDate ? draftRange.startDate : draftRange.endDate;
-      const endDate =
-        draftRange.startDate <= draftRange.endDate ? draftRange.endDate : draftRange.startDate;
+      const startDate = clampFutureDate(
+        draftRange.startDate <= draftRange.endDate ? draftRange.startDate : draftRange.endDate,
+      );
+      const endDate = clampFutureDate(
+        draftRange.startDate <= draftRange.endDate ? draftRange.endDate : draftRange.startDate,
+      );
 
       onApplyRange?.({ startDate, endDate });
       onClose();
       return;
     }
 
-    onApply(draftDate);
+    onApply(clampFutureDate(draftDate));
     onClose();
   };
 
   const handleSelectDate = (date: Date) => {
+    if (startOfDay(date) > todayStart) return;
+
     if (!isRangeMode) {
       setDraftDate(date);
       return;
@@ -130,6 +141,8 @@ export function ManagerDatePickerModal({
 
     return date >= startDate && date <= endDate;
   };
+
+  const canGoNextMonth = addMonths(visibleMonth, 1) <= currentMonth;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -169,9 +182,18 @@ export function ManagerDatePickerModal({
               <TouchableOpacity
                 style={styles.monthButton}
                 activeOpacity={0.78}
-                onPress={() => setVisibleMonth((current) => addMonths(current, 1))}
+                disabled={!canGoNextMonth}
+                onPress={() => {
+                  if (canGoNextMonth) {
+                    setVisibleMonth((current) => addMonths(current, 1));
+                  }
+                }}
               >
-                <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={canGoNextMonth ? colors.textSecondary : colors.textQuaternary}
+                />
               </TouchableOpacity>
             </View>
 
@@ -189,29 +211,33 @@ export function ManagerDatePickerModal({
                   ? isSameDate(date, draftRange.startDate) || isSameDate(date, draftRange.endDate)
                   : isSameDate(date, draftDate);
                 const inRange = isRangeMode && isInDraftRange(date);
-                const currentMonth = date.getMonth() === visibleMonth.getMonth();
+                const currentMonthDay = date.getMonth() === visibleMonth.getMonth();
                 const currentDay = isSameDate(date, today);
+                const futureDate = startOfDay(date) > todayStart;
 
                 return (
                   <TouchableOpacity
                     key={`${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`}
                     style={[
                       styles.dayButton,
-                      inRange && styles.dayButtonInRange,
-                      currentDay && styles.dayButtonToday,
-                      selected && styles.dayButtonSelected,
+                      inRange && !futureDate && styles.dayButtonInRange,
+                      currentDay && !futureDate && styles.dayButtonToday,
+                      selected && !futureDate && styles.dayButtonSelected,
+                      futureDate && styles.dayButtonDisabled,
                     ]}
                     activeOpacity={0.78}
+                    disabled={futureDate}
                     onPress={() => {
                       handleSelectDate(date);
-                      if (!currentMonth) setVisibleMonth(startOfMonth(date));
+                      if (!currentMonthDay) setVisibleMonth(startOfMonth(date));
                     }}
                   >
                     <AppText
                       style={[
                         styles.dayText,
-                        !currentMonth && styles.dayTextMuted,
-                        selected && styles.dayTextSelected,
+                        !currentMonthDay && styles.dayTextMuted,
+                        futureDate && styles.dayTextDisabled,
+                        selected && !futureDate && styles.dayTextSelected,
                       ]}
                     >
                       {date.getDate()}
@@ -363,12 +389,18 @@ const createStyles = (colors: any) =>
     dayButtonSelected: {
       backgroundColor: colors.primary,
     },
+    dayButtonDisabled: {
+      opacity: 0.45,
+    },
     dayText: {
       fontSize: 13,
       fontWeight: '800',
       color: colors.textPrimary,
     },
     dayTextMuted: {
+      color: colors.textQuaternary,
+    },
+    dayTextDisabled: {
       color: colors.textQuaternary,
     },
     dayTextSelected: {
