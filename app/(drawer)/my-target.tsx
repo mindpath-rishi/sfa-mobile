@@ -4,32 +4,21 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
-  Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, Feather, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
-import Svg, {
-  Path,
-  Line,
-  Text as SvgText,
-  Circle,
-  G,
-  Defs,
-  LinearGradient as SvgGradient,
-  Stop,
-} from 'react-native-svg';
+import Svg, { Text as SvgText, Circle } from 'react-native-svg';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { useHeader } from '@/shared/contexts/HeaderContext';
 import {
   homeService,
   type SalesmanPocketTargetResponse,
   type TargetMetric,
 } from '@/features/home/services/home.service';
 import { formatLocalApiDate } from '@/shared/utils/date.utils';
-
-const { width: screenWidth } = Dimensions.get('window');
 
 type TargetDashboardData = {
   progress: number;
@@ -172,6 +161,7 @@ const mapTargetResponse = (
 
 export default function TargetDashboard() {
   const { colors } = useTheme();
+  const { setHeader } = useHeader();
   const [selectedPeriod, setSelectedPeriod] = useState<'lastMonth' | 'currentMonth'>(
     'currentMonth',
   );
@@ -205,116 +195,21 @@ export default function TargetDashboard() {
 
   useFocusEffect(
     useCallback(() => {
+      setHeader({
+        title: 'My Target',
+        showBack: true,
+        showMenu: false,
+        showFilter: false,
+        backgroundColor: colors.primary,
+      });
       loadTarget();
-    }, [loadTarget]),
+    }, [colors.primary, loadTarget, setHeader]),
   );
 
   const currentData = selectedPeriod === 'currentMonth' ? currentMonthData : lastMonthData;
   const selectedMetricLabel = metricLabels[selectedMetric];
   const targetProgress =
     currentData.target > 0 ? Math.min((currentData.achieved / currentData.target) * 100, 100) : 0;
-
-  // Custom Area Chart Component
-  const AreaChart = ({ data, color, height = 200, width = screenWidth - 72 }) => {
-    const padding = { top: 20, bottom: 30, left: 35, right: 20 };
-    const chartHeight = height - padding.top - padding.bottom;
-    const chartWidth = width - padding.left - padding.right;
-
-    const maxValue = Math.max(...data.map((d) => d.value), 2);
-    const minValue = 0;
-
-    const getX = (index: number) => padding.left + (index / (data.length - 1)) * chartWidth;
-    const getY = (value: number) =>
-      height - padding.bottom - ((value - minValue) / (maxValue - minValue)) * chartHeight;
-
-    let areaPath = '';
-    let linePath = '';
-    let points: { x: number; y: number }[] = [];
-
-    data.forEach((point, index) => {
-      const x = getX(index);
-      const y = getY(point.value);
-      points.push({ x, y });
-
-      if (index === 0) {
-        areaPath += `M ${x} ${y}`;
-        linePath += `M ${x} ${y}`;
-      } else {
-        areaPath += ` L ${x} ${y}`;
-        linePath += ` L ${x} ${y}`;
-      }
-    });
-
-    areaPath += ` L ${getX(data.length - 1)} ${height - padding.bottom} L ${getX(0)} ${height - padding.bottom} Z`;
-
-    return (
-      <Svg width={width} height={height}>
-        <Defs>
-          <SvgGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={color} stopOpacity="0.3" />
-            <Stop offset="100%" stopColor={color} stopOpacity="0.02" />
-          </SvgGradient>
-        </Defs>
-
-        {[0, 0.5, 1, 1.5, 2].map((value) => {
-          const y = getY(value);
-          if (y >= padding.top && y <= height - padding.bottom) {
-            return (
-              <G key={value}>
-                <Line
-                  x1={padding.left}
-                  y1={y}
-                  x2={width - padding.right}
-                  y2={y}
-                  stroke="#E5E7EB"
-                  strokeWidth={1}
-                  strokeDasharray="4,4"
-                />
-                <SvgText
-                  x={padding.left - 8}
-                  y={y + 4}
-                  fontSize={10}
-                  fill="#9CA3AF"
-                  textAnchor="end"
-                >
-                  {value}%
-                </SvgText>
-              </G>
-            );
-          }
-          return null;
-        })}
-
-        <Path d={areaPath} fill="url(#areaGradient)" />
-        <Path d={linePath} stroke={color} strokeWidth={2.5} fill="none" />
-
-        {points.map((point, index) => (
-          <G key={index}>
-            <Circle cx={point.x} cy={point.y} r={4} fill={color} stroke="#FFF" strokeWidth={2} />
-            <SvgText
-              x={point.x}
-              y={point.y - 12}
-              fontSize={11}
-              fill={color}
-              fontWeight="bold"
-              textAnchor="middle"
-            >
-              {data[index].value}%
-            </SvgText>
-            <SvgText
-              x={point.x}
-              y={height - padding.bottom + 20}
-              fontSize={11}
-              fill="#6B7280"
-              textAnchor="middle"
-            >
-              {data[index].label}
-            </SvgText>
-          </G>
-        ))}
-      </Svg>
-    );
-  };
 
   // Circular Progress Component
   const CircularProgress = ({
@@ -355,7 +250,7 @@ export default function TargetDashboard() {
         <SvgText
           x={size / 2}
           y={size / 2 - 5}
-          fontSize={28}
+          fontSize={24}
           fontWeight="bold"
           fill={color}
           textAnchor="middle"
@@ -369,13 +264,8 @@ export default function TargetDashboard() {
     );
   };
 
-  const chartData = currentData.weeklyData.map((item) => ({
-    label: item.week,
-    value: item.progress,
-  }));
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView edges={['top', 'bottom']} style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 32 }}
@@ -422,7 +312,7 @@ export default function TargetDashboard() {
                 style={{
                   color: selectedPeriod === 'lastMonth' ? colors.primary : colors.surface,
                   fontWeight: selectedPeriod === 'lastMonth' ? '700' : '500',
-                  fontSize: 14,
+                  fontSize: 12,
                 }}
               >
                 Last Month
@@ -447,7 +337,7 @@ export default function TargetDashboard() {
                 style={{
                   color: selectedPeriod === 'currentMonth' ? colors.primary : colors.surface,
                   fontWeight: selectedPeriod === 'currentMonth' ? '700' : '500',
-                  fontSize: 14,
+                  fontSize: 12,
                 }}
               >
                 Current Month
@@ -549,13 +439,13 @@ export default function TargetDashboard() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <View>
                   <Text style={{ color: colors.textSecondary, fontSize: 11 }}>ACHIEVED</Text>
-                  <Text style={{ fontSize: 28, fontWeight: '800', color: colors.success }}>
+                  <Text style={{ fontSize: 22, fontWeight: '800', color: colors.success }}>
                     {formatNumber(currentData.achieved, selectedMetric)}
                   </Text>
                 </View>
                 <View>
                   <Text style={{ color: colors.textSecondary, fontSize: 11 }}>TARGET</Text>
-                  <Text style={{ fontSize: 28, fontWeight: '800', color: colors.textPrimary }}>
+                  <Text style={{ fontSize: 22, fontWeight: '800', color: colors.textPrimary }}>
                     {formatNumber(currentData.target, selectedMetric)}
                   </Text>
                 </View>
@@ -610,7 +500,7 @@ export default function TargetDashboard() {
             <Text style={{ color: colors.textSecondary, fontSize: 11, letterSpacing: 0.5 }}>
               RRR
             </Text>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: colors.primary, marginTop: 4 }}>
               {formatNumber(currentData.rrr, selectedMetric)}
             </Text>
             <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4 }}>
@@ -644,87 +534,13 @@ export default function TargetDashboard() {
             <Text style={{ color: colors.textSecondary, fontSize: 11, letterSpacing: 0.5 }}>
               CRR
             </Text>
-            <Text style={{ fontSize: 28, fontWeight: '800', color: colors.success, marginTop: 4 }}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: colors.success, marginTop: 4 }}>
               {formatNumber(currentData.crr, selectedMetric)}
             </Text>
             <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 4 }}>
               Current Run Rate
             </Text>
           </LinearGradient>
-        </View>
-
-        {/* Trend Chart */}
-        <View
-          style={{
-            marginHorizontal: 16,
-            marginTop: 16,
-            backgroundColor: colors.surface,
-            borderRadius: 24,
-            padding: 20,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.05,
-            shadowRadius: 12,
-            elevation: 4,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 16,
-            }}
-          >
-            {/* <View>
-              <Text style={{ color: colors.textSecondary, fontSize: 11, letterSpacing: 0.5 }}>
-                PERFORMANCE TREND
-              </Text>
-              <Text
-                style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary, marginTop: 2 }}
-              >
-                Weekly Progress
-              </Text>
-            </View> */}
-            {/* <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Ionicons
-                name={currentData.growth >= 0 ? 'arrow-up' : 'arrow-down'}
-                size={14}
-                color={currentData.growth >= 0 ? colors.success : colors.error}
-              />
-              <Text
-                style={{
-                  color: currentData.growth >= 0 ? colors.success : colors.error,
-                  fontSize: 13,
-                  fontWeight: '600',
-                }}
-              >
-                {currentData.growth >= 0 ? '+' : ''}
-                {currentData.growth}%
-              </Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>vs last month</Text>
-            </View> */}
-          </View>
-
-          {/* <AreaChart
-            data={chartData}
-            color={selectedPeriod === 'currentMonth' ? colors.primary : colors.textSecondary}
-          /> */}
-          {/* 
-          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <View
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: 6,
-                  backgroundColor:
-                    selectedPeriod === 'currentMonth' ? colors.primary : colors.textSecondary,
-                }}
-              />
-              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Weekly Progress (%)</Text>
-            </View>
-          </View> */}
         </View>
 
         {/* Comparison Table */}
@@ -750,7 +566,7 @@ export default function TargetDashboard() {
               marginBottom: 16,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textPrimary }}>
               LMTD vs MTD
             </Text>
             <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
@@ -778,7 +594,7 @@ export default function TargetDashboard() {
                   </Text>
                 </View>
                 <View>
-                  <Text style={{ fontSize: 20, fontWeight: '700', color: colors.textPrimary }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: colors.textPrimary }}>
                     {formatPercent(currentData.lmtd)}%
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
@@ -820,7 +636,7 @@ export default function TargetDashboard() {
                   </Text>
                 </View>
                 <View>
-                  <Text style={{ fontSize: 20, fontWeight: '800', color: colors.primary }}>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: colors.primary }}>
                     {formatPercent(currentData.mtd)}%
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>

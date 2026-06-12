@@ -1,10 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Image, RefreshControl, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  Image,
+  Linking,
+  RefreshControl,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { AppText } from '@/core/components';
 import { useAuthStore } from '@/core/store/auth.store';
+import { toast } from '@/core/utils';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { formatLocalApiDate } from '@/shared/utils/date.utils';
@@ -12,6 +22,8 @@ import { homeService } from '../services/home.service';
 import type {
   ManagerFieldUserSummary,
   ManagerStatsResponse,
+  ManagerUserMtdSummaryResponse,
+  ManagerUserRoutePlanResponse,
   ManagerUserTimelineResponse,
   TargetMetric,
 } from '../services/home.service';
@@ -114,8 +126,6 @@ type FieldUser = {
 type MTDStat = {
   label: string;
   value: string;
-  change?: string;
-  isPositive?: boolean;
 };
 
 type RouteStop = {
@@ -181,9 +191,11 @@ const getStatusFromActivity = (activityName?: string | null): SummaryStatus => {
   const normalizedActivity = activityName?.trim().toLowerCase();
 
   if (normalizedActivity === 'retailing') return 'retailing';
-  if (normalizedActivity === 'official work') return 'official-work';
+  if (normalizedActivity === 'official work' || normalizedActivity === 'office work') {
+    return 'official-work';
+  }
   if (normalizedActivity === 'leave') return 'leave';
-  if (normalizedActivity === 'absent') return 'absent';
+  if (normalizedActivity === 'absent' || normalizedActivity === 'offline') return 'absent';
 
   return 'absent';
 };
@@ -205,21 +217,22 @@ const formatApiTime = (value?: string | null) => {
 const mapFieldUserSummary = (user: ManagerFieldUserSummary): FieldUser => {
   const status = getStatusFromActivity(user.activity?.name);
   const summary = user.summary ?? {};
+  const isAbsent = status === 'absent';
 
   return {
     id: user.employeeId,
     name: user.employeeName || 'Unknown User',
     position: user.employeeId,
     status,
-    activityName: user.activity?.name,
-    activityColor: user.activity?.color,
-    location: user.location || '--',
-    route: user.routeName || '--',
-    firstCall: formatApiTime(summary.firstCallTime),
-    firstPc: formatApiTime(summary.firstPcTime),
-    tc: `${summary.tc ?? 0}`,
-    pc: `${summary.pc ?? 0}`,
-    lpc: `${summary.lpc ?? 0}`,
+    activityName: isAbsent ? STATUS_LABELS.absent : user.activity?.name,
+    activityColor: isAbsent ? undefined : user.activity?.color,
+    location: isAbsent ? '--' : user.location || '--',
+    route: isAbsent ? '--' : user.routeName || '--',
+    firstCall: isAbsent ? '--' : formatApiTime(summary.firstCallTime),
+    firstPc: isAbsent ? '--' : formatApiTime(summary.firstPcTime),
+    tc: isAbsent ? '0' : `${summary.tc ?? 0}`,
+    pc: isAbsent ? '0' : `${summary.pc ?? 0}`,
+    lpc: isAbsent ? '0' : `${summary.lpc ?? 0}`,
     phone: user.mobile || '',
     activities: [],
   };
@@ -245,6 +258,26 @@ const dedupeTimelineActivities = (activities: TimelineActivity[]) =>
     (activity) =>
       `${activity.source || 'activity'}-${activity.id}-${activity.time}-${activity.outlet}`,
   );
+
+const getNormalizedPhoneNumber = (phoneNumber?: string) =>
+  phoneNumber?.replace(/[^\d+]/g, '').trim() || '';
+
+const getSearchableText = (fieldUser: FieldUser) =>
+  [
+    fieldUser.name,
+    fieldUser.position,
+    fieldUser.phone,
+    fieldUser.route,
+    fieldUser.location,
+    fieldUser.activityName,
+    STATUS_LABELS[fieldUser.status],
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+const canOpenUserDetails = (fieldUser?: Pick<FieldUser, 'status'>) =>
+  fieldUser?.status === 'retailing' || fieldUser?.status === 'official-work';
 
 function SummaryMetric({
   label,
@@ -315,7 +348,15 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const [timelinesByUser, setTimelinesByUser] = useState<
     Record<string, ManagerUserTimelineResponse>
   >({});
+  const [mtdSummaryByUser, setMtdSummaryByUser] = useState<
+    Record<string, ManagerUserMtdSummaryResponse>
+  >({});
+  const [routePlanByUser, setRoutePlanByUser] = useState<
+    Record<string, ManagerUserRoutePlanResponse>
+  >({});
   const [loadingTimeline, setLoadingTimeline] = useState(false);
+  const [loadingMtdSummary, setLoadingMtdSummary] = useState(false);
+  const [loadingRoutePlan, setLoadingRoutePlan] = useState(false);
   const [activeTab, setActiveTab] = useState<TimelineTab>('timeline');
 
   const status = getParam(params.status) as SummaryStatus | undefined;
@@ -357,8 +398,17 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         : 'summary';
   const view: DailyView = forcedView || routeView;
   const filteredUsers = useMemo(
-    () => fieldUsers.filter((user) => !status || user.status === status),
-    [fieldUsers, status],
+    () => {
+      const search = searchKey.trim().toLowerCase();
+
+      return fieldUsers.filter((fieldUser) => {
+        const matchesStatus = !status || fieldUser.status === status;
+        const matchesSearch = !search || getSearchableText(fieldUser).includes(search);
+
+        return matchesStatus && matchesSearch;
+      });
+    },
+    [fieldUsers, searchKey, status],
   );
   const summaryCounts: Record<SummaryStatus | 'total', number> = {
     total: managerStats.userSummary.total,
@@ -388,25 +438,37 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     };
   }, [managerStats.callSummary, summaryMetric]);
 
-  // Mock MTD data
-  const mtdStats: MTDStat[] = useMemo(() => [
-    { label: 'Total Calls', value: '1,247', change: '+12%', isPositive: true },
-    { label: 'Orders', value: '342', change: '+8%', isPositive: true },
-    { label: 'Revenue', value: 'ZMW 45,231', change: '+15%', isPositive: true },
-    { label: 'Cases Sold', value: '2,431', change: '-3%', isPositive: false },
-    { label: 'Coverage', value: '87%', change: '+5%', isPositive: true },
-    { label: 'Productivity', value: '92%', change: '+2%', isPositive: true },
-  ], []);
+  const selectedMtdSummary = userId ? mtdSummaryByUser[userId] : undefined;
+  const mtdStats: MTDStat[] = useMemo(
+    () => [
+      { label: 'UTC', value: formatNumber(selectedMtdSummary?.utc ?? 0) },
+      { label: 'UPC', value: formatNumber(selectedMtdSummary?.upc ?? 0) },
+      { label: 'Zero Order', value: formatNumber(selectedMtdSummary?.zeroOrder ?? 0) },
+      { label: 'Not Visited', value: formatNumber(selectedMtdSummary?.notVisited ?? 0) },
+      { label: 'Total', value: formatNumber(selectedMtdSummary?.total ?? 0) },
+    ],
+    [selectedMtdSummary],
+  );
 
-  // Mock Route stops data
-  const routeStops: RouteStop[] = useMemo(() => [
-    { id: '1', name: 'George Supermarket', time: '08:30 AM', status: 'completed', type: 'Outlet' },
-    { id: '2', name: 'Linda Store', time: '10:00 AM', status: 'completed', type: 'Outlet' },
-    { id: '3', name: 'Peter Mart', time: '11:30 AM', status: 'completed', type: 'Outlet' },
-    { id: '4', name: 'City Mall', time: '01:00 PM', status: 'pending', type: 'Outlet' },
-    { id: '5', name: 'Downtown Shop', time: '02:30 PM', status: 'pending', type: 'Outlet' },
-    { id: '6', name: 'Main Street Store', time: '04:00 PM', status: 'pending', type: 'Outlet' },
-  ], []);
+  const routeStops: RouteStop[] = useMemo(
+    () => (userId ? routePlanByUser[userId]?.stops ?? [] : []),
+    [routePlanByUser, userId],
+  );
+  const routeFallbackStops: RouteStop[] = useMemo(() => {
+    if (!selectedUser || selectedUser.status === 'absent' || selectedUser.route === '--') return [];
+    if (routeStops.length > 0) return routeStops;
+
+    return [
+      {
+        id: `${selectedUser.id}-today-route`,
+        name: selectedUser.route,
+        time: selectedRouteDate,
+        status: 'pending',
+        type: 'Route',
+      },
+    ];
+  }, [routeStops, selectedRouteDate, selectedUser]);
+  const dayStartImageUrl = userId ? timelinesByUser[userId]?.dayStartImageUrl : undefined;
 
   useFocusEffect(
     useCallback(() => {
@@ -482,6 +544,50 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     }
   }, []);
 
+  const fetchUserMtdSummary = useCallback(async (employeeId: string, date?: string) => {
+    setLoadingMtdSummary(true);
+
+    try {
+      const response = await homeService.getManagerUserMtdSummary({
+        employeeId,
+        date,
+      });
+
+      if ((response.success || response.statusCode === 200) && response.data) {
+        setMtdSummaryByUser((prev) => ({
+          ...prev,
+          [employeeId]: response.data,
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to load manager user MTD summary', error);
+    } finally {
+      setLoadingMtdSummary(false);
+    }
+  }, []);
+
+  const fetchUserRoutePlan = useCallback(async (employeeId: string, date?: string) => {
+    setLoadingRoutePlan(true);
+
+    try {
+      const response = await homeService.getManagerUserRoutePlan({
+        employeeId,
+        date,
+      });
+
+      if ((response.success || response.statusCode === 200) && response.data) {
+        setRoutePlanByUser((prev) => ({
+          ...prev,
+          [employeeId]: response.data,
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to load manager user route plan', error);
+    } finally {
+      setLoadingRoutePlan(false);
+    }
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
@@ -491,6 +597,12 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         : Promise.resolve(),
       userId && (view === 'timeline' || view === 'order')
         ? fetchUserTimeline(userId, selectedRouteDate)
+        : Promise.resolve(),
+      userId && (view === 'timeline' || view === 'order')
+        ? fetchUserMtdSummary(userId, selectedRouteDate)
+        : Promise.resolve(),
+      userId && (view === 'timeline' || view === 'order')
+        ? fetchUserRoutePlan(userId, selectedRouteDate)
         : Promise.resolve(),
     ]);
     setRefreshing(false);
@@ -515,8 +627,17 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   useEffect(() => {
     if (userId && (view === 'timeline' || view === 'order')) {
       fetchUserTimeline(userId, selectedRouteDate);
+      fetchUserMtdSummary(userId, selectedRouteDate);
+      fetchUserRoutePlan(userId, selectedRouteDate);
     }
-  }, [fetchUserTimeline, selectedRouteDate, userId, view]);
+  }, [
+    fetchUserMtdSummary,
+    fetchUserRoutePlan,
+    fetchUserTimeline,
+    selectedRouteDate,
+    userId,
+    view,
+  ]);
 
   const openDatePicker = () => {
     setShowDatePicker(true);
@@ -532,6 +653,11 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   };
 
   const openTimeline = (nextUser: FieldUser) => {
+    if (!canOpenUserDetails(nextUser)) {
+      toast.info(`Timeline is not available for ${STATUS_LABELS[nextUser.status]} users.`);
+      return;
+    }
+
     router.push({
       pathname: '/(drawer)/(tabs)/daily-summary/[userId]',
       params: { userId: nextUser.id, date: selectedRouteDate },
@@ -539,7 +665,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   };
 
   const openOrder = (nextActivity: TimelineActivity) => {
-    if (!nextActivity.order || !selectedUser) return;
+    if (!nextActivity.order || !selectedUser || !canOpenUserDetails(selectedUser)) return;
 
     router.push({
       pathname: '/(drawer)/(tabs)/daily-summary/[userId]/order/[activityId]',
@@ -562,12 +688,54 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     .join('')
     .toUpperCase();
 
-  const handleWhatsApp = (phoneNumber: string) => {
-    console.log('WhatsApp to:', phoneNumber);
+  const handleWhatsApp = async (phoneNumber: string) => {
+    const phone = getNormalizedPhoneNumber(phoneNumber);
+
+    if (!phone) {
+      toast.error('Phone number not available');
+      return;
+    }
+
+    const whatsappUrl = `whatsapp://send?phone=${encodeURIComponent(phone)}`;
+    const browserUrl = `https://wa.me/${phone.replace(/^\+/, '')}`;
+
+    try {
+      const canOpenWhatsApp = await Linking.canOpenURL(whatsappUrl);
+      await Linking.openURL(canOpenWhatsApp ? whatsappUrl : browserUrl);
+    } catch (error) {
+      console.warn('Failed to open WhatsApp', error);
+      Alert.alert('Error', 'Unable to open WhatsApp for this number.');
+    }
   };
 
-  const handleCall = (phoneNumber: string) => {
-    console.log('Call to:', phoneNumber);
+  const handleCall = async (phoneNumber: string) => {
+    const phone = getNormalizedPhoneNumber(phoneNumber);
+
+    if (!phone) {
+      toast.error('Phone number not available');
+      return;
+    }
+
+    try {
+      await Linking.openURL(`tel:${phone}`);
+    } catch (error) {
+      console.warn('Failed to open dialer', error);
+      Alert.alert('Error', 'Unable to start a phone call.');
+    }
+  };
+
+  const openDayStartSelfie = async () => {
+    if (!dayStartImageUrl) {
+      toast.info('Day start selfie not available');
+      return;
+    }
+
+    try {
+      await Linking.openURL(dayStartImageUrl);
+    } catch (error) {
+      console.warn('Failed to open day start selfie', error);
+      Alert.alert('Error', 'Unable to open day start selfie.');
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -772,11 +940,15 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 const meta = statusMeta[user.status];
                 const activityColor = user.activityColor || meta.color;
                 const activityLabel = user.activityName || meta.label;
+                const userDetailsEnabled = canOpenUserDetails(user);
                 return (
                   <TouchableOpacity
                     key={user.id}
-                    style={styles.userCard}
-                    activeOpacity={0.7}
+                    style={[
+                      styles.userCard,
+                      !userDetailsEnabled && styles.userCardDisabled,
+                    ]}
+                    activeOpacity={userDetailsEnabled ? 0.7 : 1}
                     onPress={() => openTimeline(user)}
                   >
                     <View style={styles.userHeader}>
@@ -801,14 +973,20 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         <TouchableOpacity 
                           style={styles.whatsappButton} 
                           activeOpacity={0.7}
-                          onPress={() => handleWhatsApp(user.phone)}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            handleWhatsApp(user.phone);
+                          }}
                         >
                           <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
                         </TouchableOpacity>
                         <TouchableOpacity 
                           style={styles.callButton} 
                           activeOpacity={0.7}
-                          onPress={() => handleCall(user.phone)}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            handleCall(user.phone);
+                          }}
                         >
                           <Ionicons name="call" size={14} color={colors.primary} />
                         </TouchableOpacity>
@@ -825,6 +1003,11 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                     <AppText style={styles.locationText} numberOfLines={1}>
                       {user.location}
                     </AppText>
+                    {!userDetailsEnabled && (
+                      <AppText style={styles.userUnavailableText}>
+                        Timeline not available for {meta.label}
+                      </AppText>
+                    )}
                     
                     <View style={styles.userStats}>
                       <UserStat label="FC" value={user.firstCall} styles={baseStyles} />
@@ -841,7 +1024,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         )}
 
         {/* Timeline Screen */}
-        {view === 'timeline' && selectedUser && (
+        {view === 'timeline' && selectedUser && canOpenUserDetails(selectedUser) && (
           <>
             <View style={styles.timelineHeader}>
               <View style={styles.timelineTitleRow}>
@@ -946,15 +1129,21 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         </AppText>
                       </View>
                       <View style={styles.selfieContainer}>
-                        <TouchableOpacity style={styles.selfieButton} activeOpacity={0.7}>
+                        <TouchableOpacity
+                          style={styles.selfieButton}
+                          activeOpacity={0.7}
+                          onPress={openDayStartSelfie}
+                        >
                           <MaterialCommunityIcons name="camera" size={14} color={colors.primaryContrast} />
                           <AppText style={styles.selfieButtonText}>SELFIE</AppText>
                         </TouchableOpacity>
-                        {userId && timelinesByUser[userId]?.dayStartImageUrl ? (
-                          <Image
-                            source={{ uri: timelinesByUser[userId].dayStartImageUrl }}
-                            style={styles.dayStartImage}
-                          />
+                        {dayStartImageUrl ? (
+                          <TouchableOpacity activeOpacity={0.8} onPress={openDayStartSelfie}>
+                            <Image
+                              source={{ uri: dayStartImageUrl }}
+                              style={styles.dayStartImage}
+                            />
+                          </TouchableOpacity>
                         ) : (
                           <View style={styles.dayStartImagePlaceholder}>
                             <MaterialCommunityIcons
@@ -1023,25 +1212,14 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   </AppText>
                 </View>
                 <View style={styles.mtdGrid}>
-                  {mtdStats.map((stat, index) => (
-                    <View key={index} style={styles.mtdCard}>
+                  {mtdStats.map((stat) => (
+                    <View key={stat.label} style={styles.mtdCard}>
                       <AppText style={styles.mtdCardLabel}>{stat.label}</AppText>
                       <AppText style={styles.mtdCardValue}>{stat.value}</AppText>
-                      {stat.change && (
-                        <View style={styles.mtdChangeContainer}>
-                          <Ionicons 
-                            name={stat.isPositive ? 'trending-up' : 'trending-down'} 
-                            size={10} 
-                            color={stat.isPositive ? colors.success : colors.error} 
-                          />
-                          <AppText style={[styles.mtdChange, { color: stat.isPositive ? colors.success : colors.error }]}>
-                            {stat.change}
-                          </AppText>
-                        </View>
-                      )}
                     </View>
                   ))}
                 </View>
+                {loadingMtdSummary && <AppText style={styles.emptyText}>Loading MTD summary...</AppText>}
               </View>
             )}
 
@@ -1055,43 +1233,56 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   </View>
                   <View style={styles.routeProgress}>
                     <AppText style={styles.routeProgressText}>
-                      {routeStops.filter(s => s.status === 'completed').length}/{routeStops.length} Completed
+                      {routeStops.filter((stop) => stop.status === 'completed').length}/
+                      {routeFallbackStops.length} Completed
                     </AppText>
                   </View>
                 </View>
                 
                 <View style={styles.routeTimeline}>
-                  {routeStops.map((stop, index) => (
-                    <View key={stop.id} style={styles.routeStopItem}>
-                      <View style={styles.routeStopLine}>
-                        {index === 0 && <View style={styles.routeLineTop} />}
-                        {getStatusIcon(stop.status)}
-                        {index < routeStops.length - 1 && <View style={styles.routeLineBottom} />}
+                  {loadingRoutePlan ? (
+                    <AppText style={styles.emptyText}>Loading route plan...</AppText>
+                  ) : routeFallbackStops.length === 0 ? (
+                    <AppText style={styles.emptyText}>No route plan found for this date.</AppText>
+                  ) : (
+                    routeFallbackStops.map((stop, index) => (
+                      <View key={stop.id} style={styles.routeStopItem}>
+                        <View style={styles.routeStopLine}>
+                          {index === 0 && <View style={styles.routeLineTop} />}
+                          {getStatusIcon(stop.status)}
+                          {index < routeFallbackStops.length - 1 && <View style={styles.routeLineBottom} />}
+                        </View>
+                        <View style={styles.routeStopContent}>
+                          <View style={styles.routeStopHeader}>
+                            <AppText style={styles.routeStopName}>{stop.name}</AppText>
+                            <AppText style={styles.routeStopType}>{stop.type}</AppText>
+                          </View>
+                          <View style={styles.routeStopTime}>
+                            <Ionicons name="time-outline" size={10} color={colors.textTertiary} />
+                            <AppText style={styles.routeStopTimeText}>{stop.time}</AppText>
+                          </View>
+                          <View style={styles.routeStopStatus}>
+                            <AppText style={[styles.routeStopStatusText, {
+                              color: stop.status === 'completed' ? colors.success :
+                                     stop.status === 'pending' ? colors.warning : colors.error
+                            }]}>
+                              {stop.status.toUpperCase()}
+                            </AppText>
+                          </View>
+                        </View>
                       </View>
-                      <View style={styles.routeStopContent}>
-                        <View style={styles.routeStopHeader}>
-                          <AppText style={styles.routeStopName}>{stop.name}</AppText>
-                          <AppText style={styles.routeStopType}>{stop.type}</AppText>
-                        </View>
-                        <View style={styles.routeStopTime}>
-                          <Ionicons name="time-outline" size={10} color={colors.textTertiary} />
-                          <AppText style={styles.routeStopTimeText}>{stop.time}</AppText>
-                        </View>
-                        <View style={styles.routeStopStatus}>
-                          <AppText style={[styles.routeStopStatusText, {
-                            color: stop.status === 'completed' ? colors.success : 
-                                   stop.status === 'pending' ? colors.warning : colors.error
-                          }]}>
-                            {stop.status.toUpperCase()}
-                          </AppText>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
+                    ))
+                  )}
                 </View>
               </View>
             )}
           </>
+        )}
+
+        {view === 'timeline' && selectedUser && !canOpenUserDetails(selectedUser) && (
+          <AppText style={styles.emptyText}>
+            Timeline is not available for {statusMeta[selectedUser.status].label} users.
+          </AppText>
         )}
 
         {view === 'timeline' && !selectedUser && (
@@ -1100,13 +1291,24 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
           </AppText>
         )}
 
-        {view === 'order' && !selectedActivity?.order && (
+        {view === 'order' && selectedUser && !canOpenUserDetails(selectedUser) && (
+          <AppText style={styles.emptyText}>
+            Order details are not available for {statusMeta[selectedUser.status].label} users.
+          </AppText>
+        )}
+
+        {view === 'order' &&
+          (!selectedUser || canOpenUserDetails(selectedUser)) &&
+          !selectedActivity?.order && (
           <AppText style={styles.emptyText}>
             {loadingTimeline ? 'Loading order...' : 'Order details not found for this activity.'}
           </AppText>
         )}
 
-        {view === 'order' && selectedActivity?.order && (
+        {view === 'order' &&
+          selectedUser &&
+          canOpenUserDetails(selectedUser) &&
+          selectedActivity?.order && (
           <View style={styles.orderScreen}>
             <View style={styles.orderHero}>
               <View>

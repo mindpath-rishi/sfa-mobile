@@ -144,4 +144,11 @@ export const createManagerBeatOMeterStyles = (colors: AppColors) =>
       fontSize: 11,
       textAlign: 'right',
     },
+    emptyText: {
+      paddingVertical: 14,
+      color: colors.textTertiary,
+      fontSize: 10,
+      fontWeight: '800',
+      textAlign: 'center',
+    },
   });

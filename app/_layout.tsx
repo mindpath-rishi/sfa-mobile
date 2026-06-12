@@ -23,6 +23,7 @@ import {
   addFirebaseNotificationListeners,
   addNotificationResponseListener,
   addPushTokenRefreshListener,
+  getPushNotificationTokenAsync,
   isPushNotificationsEnabledAsync,
   setupNotificationChannelAsync,
   setupBackgroundMessageHandler,
@@ -78,7 +79,27 @@ export default function RootLayout() {
   useEffect(() => {
     if (!token) return;
 
-    return addPushTokenRefreshListener(async (fcmToken) => {
+    let cancelled = false;
+
+    const syncPushToken = async () => {
+      try {
+        if (!(await isPushNotificationsEnabledAsync())) return;
+
+        const fcmToken = await getPushNotificationTokenAsync();
+        if (!fcmToken || cancelled) return;
+
+        await authService.updatePushToken({
+          deviceId: await getClientDeviceIdAsync(),
+          fcmToken,
+        });
+      } catch (error) {
+        console.warn('Push token sync failed:', error);
+      }
+    };
+
+    syncPushToken();
+
+    const unsubscribeTokenRefresh = addPushTokenRefreshListener(async (fcmToken) => {
       try {
         if (!(await isPushNotificationsEnabledAsync())) return;
 
@@ -90,6 +111,11 @@ export default function RootLayout() {
         console.warn('Push token refresh sync failed:', error);
       }
     });
+
+    return () => {
+      cancelled = true;
+      unsubscribeTokenRefresh();
+    };
   }, [token]);
 
   /* ======================================================

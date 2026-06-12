@@ -1037,9 +1037,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppButton, AppModal } from '@/core/components';
 import { outletService } from '@/features/outlet/services/outlet.service';
+import { homeService } from '@/features/home/services/home.service';
 import { router, useFocusEffect } from 'expo-router';
 import { useRouteStore } from '@/core/store/route.store';
 import { useOutletStore } from '@/core/store/outlet.store';
+import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { CustomerCreateModal } from '@/shared/components/models/CustomerCreateModal';
 import { useHeader } from '@/shared/contexts/HeaderContext';
@@ -1091,6 +1093,12 @@ if (Platform.OS !== 'web') {
 
 // ============= QUICK FILTER TYPES =============
 type QuickFilterType = 'all' | 'visited' | 'not_visited' | 'no_order';
+
+type RouteAccessMessage = {
+  icon: string;
+  title: string;
+  message: string;
+};
 
 // ============= LOADING STATES COMPONENTS =============
 const LoadingSkeleton = ({ colors, styles }: any) => (
@@ -1258,6 +1266,7 @@ export default function RouteScreen() {
   const { colors } = useTheme();
   const styles = useRouteScreenStyles();
   const activeRoute = useRouteStore((s) => s.selectedRoute);
+  const workSessionId = useAuthStore((s) => s.workSessionId);
 
   // ========== STATE ==========
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -1288,8 +1297,10 @@ export default function RouteScreen() {
     LPSC: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [isCheckingRouteAccess, setIsCheckingRouteAccess] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [routeAccessMessage, setRouteAccessMessage] = useState<RouteAccessMessage | null>(null);
 
   // Refs to prevent infinite loops
   const lastOsrmKeyRef = useRef<string>('');
@@ -1644,10 +1655,84 @@ export default function RouteScreen() {
     }, [handleRightPress2, handleRightPress, handleFilterPress, activeRoute?.routeName]),
   );
 
+  const checkRouteAccess = useCallback(async () => {
+    setIsCheckingRouteAccess(true);
+
+    const stopRouteLoading = (message: RouteAccessMessage) => {
+      setRouteAccessMessage(message);
+      setOutlets([]);
+      setFilteredOutlets([]);
+      setError(null);
+      setIsLoading(false);
+      setRefreshing(false);
+      setIsCheckingRouteAccess(false);
+    };
+
+    if (!workSessionId) {
+      stopRouteLoading({
+        icon: 'sunny-outline',
+        title: 'Work Day Not Started',
+        message: 'Please start your work day and choose Retailing to view your route.',
+      });
+      return false;
+    }
+
+    try {
+      const response: any = await homeService.getDayStatus(workSessionId);
+      const data = response?.data;
+      const activeActivityName = data?.activeActivity?.name || data?.currentActivity?.name || '';
+      const normalizedActivityName = activeActivityName.trim().toLowerCase();
+      const isDayActive = response?.statusCode === 200 && data?.status === 'ACTIVE';
+
+      if (!isDayActive) {
+        stopRouteLoading({
+          icon: 'sunny-outline',
+          title: 'Work Day Not Started',
+          message: 'Please start your work day and choose Retailing to view your route.',
+        });
+        return false;
+      }
+
+      if (normalizedActivityName !== 'retailing') {
+        stopRouteLoading({
+          icon: 'storefront-outline',
+          title: 'Retailing Not Active',
+          message: activeActivityName
+            ? `You are currently doing ${activeActivityName}. Switch to Retailing to view your route.`
+            : 'Switch to Retailing to view your route.',
+        });
+        return false;
+      }
+
+      if (!activeRoute?.routeId) {
+        stopRouteLoading({
+          icon: 'map-outline',
+          title: 'No Active Route',
+          message: 'Please select a route for your Retailing activity to view route outlets.',
+        });
+        return false;
+      }
+
+      setRouteAccessMessage(null);
+      setIsCheckingRouteAccess(false);
+      return true;
+    } catch (error) {
+      console.error('Error checking route access:', error);
+      stopRouteLoading({
+        icon: 'alert-circle-outline',
+        title: 'Unable to Check Route Status',
+        message: 'Please refresh and try again.',
+      });
+      return false;
+    }
+  }, [activeRoute?.routeId, workSessionId]);
+
   // ========== DATA LOADING - UPDATED FOR NEW RESPONSE ==========
   const getRouteOutlets = useCallback(async () => {
-    const currentRouteId = activeRoute?.routeId;
+    const canLoadRoute = await checkRouteAccess();
+    if (!canLoadRoute) return;
 
+    const currentRouteId = activeRoute?.routeId;
     // Prevent API call if no route ID or already loaded this route
     if (!currentRouteId) return;
     if (routeIdRef.current === currentRouteId && isDataLoadedRef.current) return;
@@ -1728,7 +1813,7 @@ export default function RouteScreen() {
         setRefreshing(false);
       }
     }
-  }, [activeRoute?.routeId, activeRoute?.routeSessionId]);
+  }, [activeRoute?.routeId, activeRoute?.routeSessionId, checkRouteAccess]);
 
   // Handle refresh
   const onRefresh = useCallback(async () => {
@@ -1741,12 +1826,12 @@ export default function RouteScreen() {
   // Use useFocusEffect with proper cleanup and prevent multiple calls
   useFocusEffect(
     useCallback(() => {
-      // Reset only when route changes
+      // Always validate day/activity access on focus; reload outlets only when route changes.
       if (activeRoute?.routeId !== routeIdRef.current) {
         isDataLoadedRef.current = false;
         routeIdRef.current = undefined;
-        getRouteOutlets();
       }
+      getRouteOutlets();
 
       return () => {
         // No cleanup needed
@@ -1905,10 +1990,24 @@ export default function RouteScreen() {
   ]);
 
   // Show loading state
-  if (isLoading && !refreshing) {
+  if ((isLoading || isCheckingRouteAccess) && !refreshing && !routeAccessMessage) {
     return (
       <SafeAreaView style={styles.container}>
         <LoadingSkeleton colors={colors} styles={styles} />
+      </SafeAreaView>
+    );
+  }
+
+  if (routeAccessMessage && !isCheckingRouteAccess) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <EmptyStateComponent
+          icon={routeAccessMessage.icon}
+          title={routeAccessMessage.title}
+          message={routeAccessMessage.message}
+          colors={colors}
+          styles={styles}
+        />
       </SafeAreaView>
     );
   }

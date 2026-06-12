@@ -10,6 +10,7 @@ export default ({ config }: any) => {
       'expo-secure-store',
       'expo-localization',
       'expo-mail-composer',
+      'expo-notifications',
       'expo-web-browser',
       'expo-sqlite',
       'expo-location',
@@ -35,16 +36,14 @@ export default ({ config }: any) => {
 
     android: {
       softwareKeyboardLayoutMode: 'resize',
-      package: 'com.anonymous.expojwttabstemplateultimate',
-      googleServicesFile:
-        process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
+      package: 'com.sfa.app',
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
       permissions: ['android.permission.POST_NOTIFICATIONS'],
     },
 
     ios: {
-      bundleIdentifier: 'com.anonymous.expojwttabstemplateultimate',
-      googleServicesFile:
-        process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
+      bundleIdentifier: 'com.sfa.app',
+      googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
     },
 
     extra: {

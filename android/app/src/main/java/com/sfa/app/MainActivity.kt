@@ -1,4 +1,4 @@
-package com.anonymous.expojwttabstemplateultimate
+package com.sfa.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

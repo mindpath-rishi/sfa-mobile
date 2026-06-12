@@ -30,15 +30,15 @@ export const createManagerTeamCoverageStyles = (colors: AppColors) =>
     },
     linkText: {
       color: colors.info,
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: '800',
       textTransform: 'uppercase',
     },
     card: {
       backgroundColor: colors.surface,
-      borderRadius: 8,
+      borderRadius: 10,
       borderWidth: 1,
-      borderColor: colors.borderLight,
+      borderColor: colors.border,
       padding: 14,
       shadowColor: colors.shadow,
       shadowOpacity: 1,
@@ -54,19 +54,20 @@ export const createManagerTeamCoverageStyles = (colors: AppColors) =>
     },
     position: {
       color: colors.textTertiary,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       textTransform: 'uppercase',
     },
     title: {
       color: colors.textPrimary,
-      fontSize: 16,
-      fontWeight: '800',
+      fontSize: 14,
+      fontWeight: '900',
       marginTop: 3,
     },
     subtitle: {
       color: colors.textTertiary,
-      fontSize: 12,
+      fontSize: 11,
+      fontWeight: '600',
       marginTop: 2,
     },
     badge: {
@@ -77,8 +78,8 @@ export const createManagerTeamCoverageStyles = (colors: AppColors) =>
     },
     badgeText: {
       color: colors.info,
-      fontSize: 11,
-      fontWeight: '800',
+      fontSize: 10,
+      fontWeight: '900',
     },
     grid: {
       flexDirection: 'row',
@@ -92,12 +93,13 @@ export const createManagerTeamCoverageStyles = (colors: AppColors) =>
     },
     statValue: {
       color: colors.textPrimary,
-      fontSize: 15,
-      fontWeight: '800',
+      fontSize: 17,
+      fontWeight: '900',
     },
     statLabel: {
       color: colors.textTertiary,
-      fontSize: 11,
+      fontSize: 10,
+      fontWeight: '700',
       textAlign: 'center',
     },
   });

@@ -212,28 +212,6 @@ const ProfileHeader = ({ user, onEditPress }: any) => {
             {user.territory}
           </Text>
         </View>
-        <View style={{ flexDirection: 'row', marginTop: 16, gap: 16 }}>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>
-              {user.stats.attendance}%
-            </Text>
-            <Text style={{ color: 'white', fontSize: 11, opacity: 0.9 }}>Attendance</Text>
-          </View>
-          <View style={{ width: 1, height: 30, backgroundColor: 'white', opacity: 0.3 }} />
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>
-              {user.stats.totalVisits}
-            </Text>
-            <Text style={{ color: 'white', fontSize: 11, opacity: 0.9 }}>Visits</Text>
-          </View>
-          <View style={{ width: 1, height: 30, backgroundColor: 'white', opacity: 0.3 }} />
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ color: 'white', fontSize: 18, fontWeight: '700' }}>
-              {user.stats.targetAchievement}%
-            </Text>
-            <Text style={{ color: 'white', fontSize: 11, opacity: 0.9 }}>Target</Text>
-          </View>
-        </View>
       </View>
     </LinearGradient>
   );
@@ -429,7 +407,7 @@ export default function ProfileScreen() {
     }),
     [profileData, settings],
   );
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'stats', 'settings', 'docs'
+  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'settings', 'docs'
   const logout = useAuthStore((s) => s.logout);
   const [notificationSyncing, setNotificationSyncing] = useState(false);
 
@@ -930,7 +908,6 @@ export default function ProfileScreen() {
         >
           {[
             { key: 'profile', label: 'Profile', icon: 'person' },
-            { key: 'stats', label: 'Stats', icon: 'stats-chart' },
             { key: 'settings', label: 'Settings', icon: 'settings' },
             // { key: 'docs', label: 'Documents', icon: 'document' },
           ].map((tab) => (
@@ -960,7 +937,6 @@ export default function ProfileScreen() {
 
         {/* Tab Content */}
         {activeTab === 'profile' && renderProfileTab()}
-        {activeTab === 'stats' && renderStatsTab()}
         {activeTab === 'settings' && renderSettingsTab()}
         {/* {activeTab === 'docs' && renderDocumentsTab()} */}
       </ScrollView>

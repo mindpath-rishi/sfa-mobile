@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStartDayModalStyles } from '../../styles/StartDayModel.styles';
 import { StartDayModalProps } from '../../types/startDay.types';
 
@@ -16,12 +17,14 @@ export const StartDayModal: React.FC<StartDayModalProps> = ({
   onBackToOptions,
 }) => {
   const styles = useStartDayModalStyles({ showOtherOptions });
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { paddingBottom: 16 + bottomInset }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.titleSmall}>
               {showOtherOptions ? 'SELECT WORK TYPE' : 'HOW WILL YOU START YOUR DAY?'}

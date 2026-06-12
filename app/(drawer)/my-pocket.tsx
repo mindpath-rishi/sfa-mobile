@@ -9,13 +9,14 @@ import {
   View,
   Text,
   ScrollView,
-  SafeAreaView,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   StatusBar,
   Modal,
   Dimensions,
   Animated,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons, Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -33,15 +34,15 @@ const { width } = Dimensions.get('window');
 // Typography scale - REDUCED SIZES for consistency
 const TYPOGRAPHY = {
   h1: { size: 24, weight: '800' as const, lineHeight: 30 },
-  h2: { size: 20, weight: '700' as const, lineHeight: 26 },
-  h3: { size: 16, weight: '700' as const, lineHeight: 22 },
+  h2: { size: 18, weight: '700' as const, lineHeight: 24 },
+  h3: { size: 15, weight: '700' as const, lineHeight: 21 },
   h4: { size: 14, weight: '600' as const, lineHeight: 20 },
   body: { size: 13, weight: '400' as const, lineHeight: 18 },
   bodySmall: { size: 12, weight: '400' as const, lineHeight: 16 },
   caption: { size: 10, weight: '400' as const, lineHeight: 14 },
   button: { size: 12, weight: '600' as const, lineHeight: 16 },
   stat: { size: 20, weight: '800' as const, lineHeight: 26 },
-  statSmall: { size: 18, weight: '700' as const, lineHeight: 24 },
+  statSmall: { size: 16, weight: '700' as const, lineHeight: 22 },
   time: { size: 12, weight: '500' as const, lineHeight: 16 },
 };
 
@@ -577,9 +578,39 @@ export default function PocketMISScreen() {
     </TouchableOpacity>
   );
 
+  const closeProductWiseModal = () => setShowProductWiseModal(false);
+  const closeDayWiseModal = () => setShowDayWiseModal(false);
+
+  const renderModalFrame = (onClose: () => void, children: React.ReactNode) => (
+    <TouchableWithoutFeedback onPress={onClose} accessible={false}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', padding: 10 }}>
+        <TouchableWithoutFeedback onPress={() => {}} accessible={false}>
+          <SafeAreaView
+            edges={['top', 'bottom']}
+            style={{
+              flex: 1,
+              backgroundColor: colors.background,
+              borderRadius: 20,
+              overflow: 'hidden',
+            }}
+          >
+            {children}
+          </SafeAreaView>
+        </TouchableWithoutFeedback>
+      </View>
+    </TouchableWithoutFeedback>
+  );
+
   const renderProductWiseModal = () => (
-    <Modal visible={showProductWiseModal} animationType="slide">
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <Modal
+      visible={showProductWiseModal}
+      transparent
+      animationType="slide"
+      onRequestClose={closeProductWiseModal}
+    >
+      {renderModalFrame(
+        closeProductWiseModal,
+        <>
         <StatusBar
           backgroundColor={colors.background}
           barStyle={isDark ? 'light-content' : 'dark-content'}
@@ -598,7 +629,7 @@ export default function PocketMISScreen() {
             style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity onPress={() => setShowProductWiseModal(false)}>
+              <TouchableOpacity onPress={closeProductWiseModal}>
                 <Ionicons name="arrow-back" size={22} color={colors.primaryContrast} />
               </TouchableOpacity>
               <Text
@@ -915,13 +946,21 @@ export default function PocketMISScreen() {
           onApply={() => {}}
           onApplyRange={(range) => setCustomRange(range)}
         />
-      </SafeAreaView>
+        </>,
+      )}
     </Modal>
   );
 
   const renderDayWiseModal = () => (
-    <Modal visible={showDayWiseModal} animationType="slide">
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <Modal
+      visible={showDayWiseModal}
+      transparent
+      animationType="slide"
+      onRequestClose={closeDayWiseModal}
+    >
+      {renderModalFrame(
+        closeDayWiseModal,
+        <>
         <LinearGradient
           colors={[colors.primary, colors.primaryDark]}
           style={{
@@ -932,7 +971,7 @@ export default function PocketMISScreen() {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => setShowDayWiseModal(false)}>
+            <TouchableOpacity onPress={closeDayWiseModal}>
               <Ionicons name="arrow-back" size={22} color={colors.primaryContrast} />
             </TouchableOpacity>
             <Text
@@ -1146,7 +1185,8 @@ export default function PocketMISScreen() {
             })
           )}
         </ScrollView>
-      </SafeAreaView>
+        </>,
+      )}
     </Modal>
   );
 

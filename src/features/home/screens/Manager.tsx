@@ -366,6 +366,7 @@ export default function ManagerHomeScreen() {
   const [uboTargetMetric, setUboTargetMetric] = useState<TargetMetric>('cases');
   const [categoryOrderMetric, setCategoryOrderMetric] = useState<TargetMetric>('cases');
   const [positionOrderMetric, setPositionOrderMetric] = useState<TargetMetric>('cases');
+  const [managerTarget, setManagerTarget] = useState<ManagerTargetResponse | null>(null);
   const categoryOrderColors = useMemo(
     () => [
       colors.success,
@@ -489,8 +490,34 @@ export default function ManagerHomeScreen() {
     managerOrderSummary,
     outletSummaryColors,
   ]);
-  const outletProductivity = managerOrderSummary?.outletSummary?.productivity;
-  const productivityPercentage = outletProductivity?.percentage;
+  const primaryTargetSnapshot = getManagerTargetMetric(managerTarget, primaryTargetMetric);
+  const managerInitials =
+    user?.name
+      ?.split(' ')
+      ?.map((word: string) => word[0])
+      ?.join('')
+      ?.toUpperCase()
+      ?.slice(0, 2) || 'FM';
+  const topMetrics = [
+    {
+      label: 'Team',
+      value: formatNumber(totalUsers),
+      icon: 'people-outline' as const,
+      color: colors.primary,
+    },
+    {
+      label: 'Productivity',
+      value: `${formatNumber(callSummary.productivity)}%`,
+      icon: 'trending-up-outline' as const,
+      color: colors.success,
+    },
+    {
+      label: 'Orders',
+      value: formatNumber(orderCases),
+      icon: 'receipt-outline' as const,
+      color: colors.secondary,
+    },
+  ];
 
   const TARGETS = [
     {
@@ -508,8 +535,6 @@ export default function ManagerHomeScreen() {
       hint: 'Target has not been configured for this period',
     },
   ];
-
-  const [managerTarget, setManagerTarget] = useState<ManagerTargetResponse | null>(null);
 
   const fetchManagerStats = async (range = summaryDateRange) => {
     try {
@@ -593,6 +618,16 @@ export default function ManagerHomeScreen() {
     </View>
   );
 
+  const renderSectionHeader = (title: string, subtitle: string, badge?: string) => (
+    <View style={styles.sectionHeader}>
+      <View style={styles.headerText}>
+        <AppText style={styles.sectionTitle}>{title}</AppText>
+        <AppText style={styles.sectionSubtitle}>{subtitle}</AppText>
+      </View>
+      {badge ? <AppText style={styles.sectionBadge}>{badge}</AppText> : null}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <ManagerDatePickerModal
@@ -612,36 +647,60 @@ export default function ManagerHomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        <View style={styles.header}>
-          <View>
-            <AppText style={styles.eyebrow}>Manager Dashboard</AppText>
-            <AppText style={styles.title}>{user?.name || 'Field Manager'}</AppText>
+        <View style={styles.headerPanel}>
+          <View style={styles.header}>
+            <View style={styles.headerIdentity}>
+              <View style={styles.headerAvatar}>
+                <AppText style={styles.headerAvatarText}>{managerInitials}</AppText>
+              </View>
+              <View style={styles.headerText}>
+                <AppText style={styles.eyebrow}>Executive Dashboard</AppText>
+                <AppText style={styles.title}>{user?.name || 'Field Manager'}</AppText>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={styles.headerRangeButton}
+              activeOpacity={0.82}
+              onPress={openSummaryDatePicker}
+            >
+              <Ionicons name="calendar-number-outline" size={16} color={colors.primary} />
+              <Ionicons name="chevron-down" size={14} color={colors.textQuaternary} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.filterButton} activeOpacity={0.8}>
-            <Ionicons name="options-outline" size={18} color={colors.primary} />
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.dateCard}>
           <TouchableOpacity
-            style={styles.dateHeader}
+            style={styles.dateCard}
             activeOpacity={0.82}
             onPress={openSummaryDatePicker}
           >
             <View style={styles.dateTitleRow}>
-              <Ionicons name="calendar-number-outline" size={16} color={colors.primary} />
+              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
               <View style={styles.headerText}>
-                <AppText style={styles.dateLabel}>User & Call Summary</AppText>
+                <AppText style={styles.dateLabel}>Reporting period</AppText>
                 <AppText style={styles.cardMeta}>{summaryDateRangeLabel}</AppText>
               </View>
             </View>
-            <View style={styles.dateAction}>
-              <AppText style={styles.refreshedText}>Change range</AppText>
-              <Ionicons name="chevron-down" size={14} color={colors.textQuaternary} />
-            </View>
+            <AppText style={styles.refreshedText}>Change</AppText>
           </TouchableOpacity>
+
+          <View style={styles.kpiStrip}>
+            {topMetrics.map((item) => (
+              <View key={item.label} style={styles.kpiTile}>
+                <View style={[styles.kpiIcon, { backgroundColor: `${item.color}14` }]}>
+                  <Ionicons name={item.icon} size={15} color={item.color} />
+                </View>
+                <AppText style={styles.kpiValue} numberOfLines={1}>
+                  {item.value}
+                </AppText>
+                <AppText style={styles.kpiLabel} numberOfLines={1}>
+                  {item.label}
+                </AppText>
+              </View>
+            ))}
+          </View>
         </View>
 
+        {renderSectionHeader('Workforce Summary', 'Today and selected-period team activity')}
         <View style={styles.summaryGrid}>
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -712,6 +771,11 @@ export default function ManagerHomeScreen() {
           </View>
         </View>
 
+        {renderSectionHeader(
+          'Target Performance',
+          `${formatNumber(primaryTargetSnapshot.percentage)}% achieved for selected metric`,
+          getMetricLabel(primaryTargetMetric),
+        )}
         {TARGETS.map((target, index) => {
           const sectionMetric = index === 0 ? primaryTargetMetric : uboTargetMetric;
           const sectionMetricUnit = getMetricLabel(sectionMetric);
@@ -791,6 +855,7 @@ export default function ManagerHomeScreen() {
           );
         })}
 
+        {renderSectionHeader('Order Analytics', 'Category and position-wise order movement', 'MTD')}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <AppText style={styles.cardTitle}>Primary Category Wise Order</AppText>
@@ -826,14 +891,7 @@ export default function ManagerHomeScreen() {
           {renderMetricToggle(positionOrderMetric, setPositionOrderMetric)}
           <View style={styles.routeInfo}>
             <View style={styles.avatar}>
-              <AppText style={styles.avatarText}>
-                {user?.name
-                  ?.split(' ')
-                  ?.map((word: string) => word[0])
-                  ?.join('')
-                  ?.toUpperCase()
-                  ?.slice(0, 2) || 'M'}
-              </AppText>
+              <AppText style={styles.avatarText}>{managerInitials}</AppText>
             </View>
             <View style={styles.headerText}>
               <AppText style={styles.routeName}>Manager</AppText>
@@ -871,6 +929,7 @@ export default function ManagerHomeScreen() {
           </View>
         </View>
 
+        {renderSectionHeader('Outlet Execution', 'Coverage and zero-order health')}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <AppText style={styles.cardTitle}>Outlets Summary</AppText>
@@ -897,19 +956,6 @@ export default function ManagerHomeScreen() {
               </View>
             </View>
           ))}
-          <View style={styles.productivityBox}>
-            <Ionicons name="trending-up-outline" size={16} color={colors.success} />
-            <View>
-              <AppText style={styles.productivityTitle}>Productivity</AppText>
-              <AppText style={styles.cardMeta}>
-                PC: {formatNumber(outletProductivity?.pc ?? 0)} | TC:{' '}
-                {formatNumber(outletProductivity?.tc ?? 0)}
-                {productivityPercentage !== undefined
-                  ? ` | ${formatNumber(productivityPercentage)}%`
-                  : ''}
-              </AppText>
-            </View>
-          </View>
         </View>
       </ScrollView>
     </View>

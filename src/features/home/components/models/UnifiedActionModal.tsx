@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Modal, FlatList, ScrollView, TextInput } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useUnifiedActionModalStyles } from '../../styles/UnifiedActionModal.styles';
@@ -91,6 +92,8 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
 }) => {
   const styles = useUnifiedActionModalStyles();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 16);
 
   const isVanSelectionValid = Boolean(selectedVan) && Boolean(vanChangeNote?.trim());
 
@@ -709,7 +712,12 @@ const renderRouteSelectionModal = () => (
     >
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />
-        <View style={[styles.bottomModalContent, { backgroundColor: colors.surface }]}>
+        <View
+          style={[
+            styles.bottomModalContent,
+            { backgroundColor: colors.surface, paddingBottom: 28 + bottomInset },
+          ]}
+        >
           <ScrollView 
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContentContainer}

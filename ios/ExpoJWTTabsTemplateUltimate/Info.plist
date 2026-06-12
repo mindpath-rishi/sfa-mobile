@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>expojwttabsultimate</string>
-          <string>com.anonymous.expojwttabstemplateultimate</string>
+          <string>com.sfa.app</string>
         </array>
       </dict>
     </array>

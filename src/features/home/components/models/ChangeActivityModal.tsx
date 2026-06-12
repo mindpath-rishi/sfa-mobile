@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChangeActivityModalStyles } from '../../styles/ChangeActivityModal.styles';
 import { ChangeActivityModalProps } from '../../types/activity.types';
 
@@ -17,12 +18,14 @@ export const ChangeActivityModal: React.FC<ChangeActivityModalProps> = ({
   onBackToOptions,
 }) => {
   const styles = useChangeActivityModalStyles({ showChangeOtherOptions });
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { paddingBottom: 16 + bottomInset }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.titleSmall}>
               {showChangeOtherOptions ? 'SELECT WORK TYPE' : 'CHANGE ACTIVITY'}

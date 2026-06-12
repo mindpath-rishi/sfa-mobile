@@ -2,10 +2,10 @@ import { StyleSheet } from 'react-native';
 import type { AppColors } from '@/shared/theme/colors';
 
 const managerFontSize = {
-  xs: 9,
-  sm: 11,
-  base: 13,
-  lg: 16,
+  xs: 10,
+  sm: 12,
+  base: 14,
+  lg: 17,
 };
 
 export const createBaseStyles = (colors: AppColors) =>
@@ -112,10 +112,10 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       minWidth: 0,
     },
     sectionTitle: {
-      fontSize: managerFontSize.xs,
-      fontWeight: '800',
-      color: colors.textQuaternary,
-      letterSpacing: 0.5,
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textTertiary,
+      letterSpacing: 0,
     },
     dailyTitle: {
       marginTop: 2,
@@ -240,7 +240,7 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       marginBottom: 4,
     },
     listHeaderTitle: {
-      fontSize: managerFontSize.sm,
+      fontSize: 15,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -257,6 +257,10 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       padding: 10,
       gap: 8,
       marginBottom: 8,
+    },
+    userCardDisabled: {
+      borderColor: colors.borderLight,
+      backgroundColor: colors.backgroundSecondary,
     },
     userHeader: {
       flexDirection: 'row',
@@ -280,7 +284,7 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       backgroundColor: colors.primaryLight,
     },
     userAvatarText: {
-      fontSize: managerFontSize.xs,
+      fontSize: 12,
       fontWeight: '900',
       color: colors.surface,
     },
@@ -289,14 +293,14 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       minWidth: 0,
     },
     userName: {
-      fontSize: managerFontSize.sm,
+      fontSize: 14,
       fontWeight: '900',
       color: colors.textPrimary,
     },
     userPosition: {
       marginTop: 1,
       fontSize: managerFontSize.xs,
-      fontWeight: '700',
+      fontWeight: '600',
       color: colors.textSecondary,
     },
     iconActions: {
@@ -355,6 +359,11 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
     locationText: {
       fontSize: managerFontSize.xs,
       fontWeight: '700',
+      color: colors.textTertiary,
+    },
+    userUnavailableText: {
+      fontSize: managerFontSize.xs,
+      fontWeight: '800',
       color: colors.textTertiary,
     },
     userStats: {
@@ -509,10 +518,10 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       flex: 1,
     },
     dayStartTitle: {
-      fontSize: managerFontSize.xs,
-      fontWeight: '900',
+      fontSize: 11,
+      fontWeight: '700',
       color: colors.textSecondary,
-      letterSpacing: 0.5,
+      letterSpacing: 0,
     },
     dayStartTime: {
       marginTop: 4,
@@ -678,7 +687,7 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       borderColor: colors.border,
     },
     orderHeroText: {
-      fontSize: managerFontSize.xs,
+      fontSize: managerFontSize.sm,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -699,7 +708,7 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
     },
     orderOutlet: {
       paddingHorizontal: 4,
-      fontSize: managerFontSize.xs,
+      fontSize: managerFontSize.sm,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -726,7 +735,7 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       backgroundColor: colors.backgroundSecondary,
     },
     orderCategoryName: {
-      fontSize: managerFontSize.xs,
+      fontSize: managerFontSize.sm,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -749,8 +758,8 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       backgroundColor: colors.surface,
     },
     orderLineName: {
-      fontSize: managerFontSize.xs,
-      lineHeight: 14,
+      fontSize: managerFontSize.sm,
+      lineHeight: 16,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -800,7 +809,7 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       backgroundColor: colors.primaryLight,
     },
     orderSummaryHeaderText: {
-      fontSize: managerFontSize.xs,
+      fontSize: managerFontSize.sm,
       fontWeight: '900',
       color: colors.primary,
     },
@@ -896,17 +905,6 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       fontWeight: '900',
       color: colors.textPrimary,
     },
-    mtdChangeContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 2,
-      marginTop: 6,
-    },
-    mtdChange: {
-      fontSize: managerFontSize.xs,
-      fontWeight: '800',
-    },
-
     // Route Tab Styles
     routeContainer: {
       gap: 12,

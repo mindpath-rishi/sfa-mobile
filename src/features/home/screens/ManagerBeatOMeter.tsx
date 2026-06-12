@@ -13,58 +13,20 @@ import { createManagerBeatOMeterStyles } from '../styles/ManagerBeatOMeter.style
 
 const BEATS = [
   { id: 'tk', title: 'TK Beatometer', subtitle: 'TK Beatometer' },
-  { id: 'test', title: 'Test Beato metter', subtitle: 'Outlet performance' },
 ];
 
 const INITIAL_BEAT_O_METER: ManagerBeatOMeterResponse = {
   employeeId: '',
   employeeName: 'Manager',
   designation: 'Manager',
-  totalOutlets: 16904,
+  totalOutlets: 0,
   summary: {
-    visitedOutlets: 11681,
-    orderedOutlets: 11126,
-    visitedPercentage: 69.1,
-    orderedPercentage: 65.8,
+    visitedOutlets: 0,
+    orderedOutlets: 0,
+    visitedPercentage: 0,
+    orderedPercentage: 0,
   },
-  outletTypes: [
-    {
-      type: 'New',
-      total: 1,
-      mtdVisited: { count: 1, percentage: 100 },
-      mtdOrder: { count: 0, percentage: 0 },
-    },
-    {
-      type: 'Active',
-      total: 13871,
-      mtdVisited: { count: 10864, percentage: 78.3 },
-      mtdOrder: { count: 10404, percentage: 75 },
-    },
-    {
-      type: 'To Be Dormant',
-      total: 1414,
-      mtdVisited: { count: 665, percentage: 47 },
-      mtdOrder: { count: 598, percentage: 42.3 },
-    },
-    {
-      type: 'Dormant',
-      total: 294,
-      mtdVisited: { count: 98, percentage: 33.3 },
-      mtdOrder: { count: 88, percentage: 29.9 },
-    },
-    {
-      type: 'No Order',
-      total: 83,
-      mtdVisited: { count: 25, percentage: 30.1 },
-      mtdOrder: { count: 12, percentage: 14.5 },
-    },
-    {
-      type: 'Never Visited',
-      total: 1241,
-      mtdVisited: { count: 28, percentage: 2.3 },
-      mtdOrder: { count: 24, percentage: 1.9 },
-    },
-  ],
+  outletTypes: [],
 };
 
 const toNumber = (value: unknown, fallback = 0) => {
@@ -107,25 +69,15 @@ export default function ManagerBeatOMeterScreen() {
   );
 
   const outletRows = useMemo(() => {
-    const fallbackOutletTypes = INITIAL_BEAT_O_METER.outletTypes ?? [];
-    const rows = beatOMeter.outletTypes?.length ? beatOMeter.outletTypes : fallbackOutletTypes;
+    const rows = beatOMeter.outletTypes ?? [];
 
-    return rows.map((row, index) => {
-      const fallback = fallbackOutletTypes[index];
-      return {
-        type: row.type || fallback?.type || 'Outlet',
-        color: row.color || fallback?.color || outletPalette[index % outletPalette.length],
-        total: formatNumber(row.total ?? fallback?.total),
-        visited: formatCountPercentage(
-          row.mtdVisited?.count ?? fallback?.mtdVisited?.count,
-          row.mtdVisited?.percentage ?? fallback?.mtdVisited?.percentage,
-        ),
-        order: formatCountPercentage(
-          row.mtdOrder?.count ?? fallback?.mtdOrder?.count,
-          row.mtdOrder?.percentage ?? fallback?.mtdOrder?.percentage,
-        ),
-      };
-    });
+    return rows.map((row, index) => ({
+      type: row.type || 'Outlet',
+      color: row.color || outletPalette[index % outletPalette.length],
+      total: formatNumber(row.total),
+      visited: formatCountPercentage(row.mtdVisited?.count, row.mtdVisited?.percentage),
+      order: formatCountPercentage(row.mtdOrder?.count, row.mtdOrder?.percentage),
+    }));
   }, [beatOMeter.outletTypes, outletPalette]);
   const visitedPercentage = clampPercentage(beatOMeter.summary?.visitedPercentage);
   const unvisitedPercentage = 100 - visitedPercentage;
@@ -157,7 +109,7 @@ export default function ManagerBeatOMeterScreen() {
           },
           outletTypes: response.data.outletTypes?.length
             ? response.data.outletTypes
-            : INITIAL_BEAT_O_METER.outletTypes,
+            : [],
         });
       }
     } catch (error) {
@@ -218,15 +170,19 @@ export default function ManagerBeatOMeterScreen() {
           <AppText style={styles.tableHeadText}>MTD Order</AppText>
         </View>
 
-        {outletRows.map((row) => (
-          <View key={row.type} style={styles.tableRow}>
-            <View style={[styles.colorBar, { backgroundColor: row.color }]} />
-            <AppText style={[styles.cellText, styles.typeColumn]}>{row.type}</AppText>
-            <AppText style={styles.cellText}>{row.total}</AppText>
-            <AppText style={styles.cellText}>{row.visited}</AppText>
-            <AppText style={styles.cellText}>{row.order}</AppText>
-          </View>
-        ))}
+        {outletRows.length === 0 ? (
+          <AppText style={styles.emptyText}>No beat-o-meter data found</AppText>
+        ) : (
+          outletRows.map((row) => (
+            <View key={row.type} style={styles.tableRow}>
+              <View style={[styles.colorBar, { backgroundColor: row.color }]} />
+              <AppText style={[styles.cellText, styles.typeColumn]}>{row.type}</AppText>
+              <AppText style={styles.cellText}>{row.total}</AppText>
+              <AppText style={styles.cellText}>{row.visited}</AppText>
+              <AppText style={styles.cellText}>{row.order}</AppText>
+            </View>
+          ))
+        )}
       </View>
     </ScrollView>
   );

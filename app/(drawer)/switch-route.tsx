@@ -426,17 +426,6 @@ export default function ChangeRoute() {
             title="Work Day Not Started"
             description="You need to start your work day before you can change routes. This helps us track your activities accurately and maintain proper records."
             icon="alert-circle-outline"
-            actionLabel="Start Work Day"
-            onAction={() => {
-              if (!isWeb) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              }
-              router.push('/work-session');
-            }}
-            secondaryActionLabel="Contact Support"
-            onSecondaryAction={() => {
-              toast.info('Contact Support', 'Please contact your supervisor for assistance');
-            }}
           />
         </ScrollView>
       </Animated.View>

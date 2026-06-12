@@ -17,7 +17,7 @@ const INITIAL_TEAM_COVERAGE: ManagerTeamCoverageResponse = {
   outlets: 16904,
   outletsPlanned: 65,
   upc: 11126,
-  uic: 11681,
+  uic: 11126,
 };
 
 const formatNumber = (value: number) => new Intl.NumberFormat('en-US').format(value);

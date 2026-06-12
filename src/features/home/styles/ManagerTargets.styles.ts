@@ -14,7 +14,7 @@ export const createManagerTargetsBaseStyles = (colors: AppColors) =>
     },
     metricLabel: {
       marginTop: 3,
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '700',
       color: colors.textTertiary,
     },
@@ -51,7 +51,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       backgroundColor: colors.infoLight,
     },
     heroTitle: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -70,14 +70,14 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       flex: 1,
     },
     parentTitle: {
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: '900',
       color: colors.textPrimary,
     },
     parentSubtitle: {
       marginTop: 2,
-      fontSize: 10,
-      fontWeight: '700',
+      fontSize: 11,
+      fontWeight: '600',
       color: colors.textTertiary,
     },
     drillButton: {
@@ -142,7 +142,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       backgroundColor: colors.primary + '18',
     },
     avatarText: {
-      fontSize: 11,
+      fontSize: 13,
       fontWeight: '900',
       color: colors.primary,
     },
@@ -151,18 +151,18 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       minWidth: 0,
     },
     userName: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '900',
       color: colors.textPrimary,
     },
     userPosition: {
       marginTop: 2,
-      fontSize: 9,
-      fontWeight: '700',
+      fontSize: 10,
+      fontWeight: '600',
       color: colors.textTertiary,
     },
     drillText: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '800',
       color: colors.textQuaternary,
     },
@@ -189,7 +189,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       gap: 8,
     },
     progressMetaText: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '800',
       color: colors.textTertiary,
     },
@@ -208,7 +208,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       borderColor: colors.borderLight,
     },
     rateLabel: {
-      fontSize: 8,
+      fontSize: 10,
       fontWeight: '800',
       color: colors.textTertiary,
     },
@@ -243,14 +243,14 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       gap: 8,
     },
     categoryPanelTitle: {
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: '900',
       color: colors.textPrimary,
     },
     categoryPanelSubtitle: {
       marginTop: 2,
-      fontSize: 9,
-      fontWeight: '700',
+      fontSize: 10,
+      fontWeight: '600',
       color: colors.textTertiary,
     },
     categoryPanelBadge: {
@@ -259,7 +259,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       paddingVertical: 4,
       backgroundColor: colors.infoLight,
       color: colors.primary,
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '900',
       overflow: 'hidden',
     },
@@ -278,7 +278,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
     },
     categoryName: {
       flex: 1,
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -295,7 +295,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
     emptyText: {
       paddingVertical: 6,
       textAlign: 'center',
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '800',
       color: colors.textSecondary,
     },

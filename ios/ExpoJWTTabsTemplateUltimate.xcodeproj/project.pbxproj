@@ -259,7 +259,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.expojwttabstemplateultimate";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sfa.app";
 				PRODUCT_NAME = "SFA";
 				SWIFT_OBJC_BRIDGING_HEADER = "ExpoJWTTabsTemplateUltimate/ExpoJWTTabsTemplateUltimate-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -288,7 +288,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.expojwttabstemplateultimate";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.sfa.app";
 				PRODUCT_NAME = "SFA";
 				SWIFT_OBJC_BRIDGING_HEADER = "ExpoJWTTabsTemplateUltimate/ExpoJWTTabsTemplateUltimate-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

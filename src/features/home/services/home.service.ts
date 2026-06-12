@@ -251,6 +251,31 @@ export interface ManagerUserTimelineResponse {
   }[];
 }
 
+export interface ManagerUserMtdSummaryResponse {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  utc: number;
+  upc: number;
+  zeroOrder: number;
+  notVisited: number;
+  total: number;
+}
+
+export interface ManagerUserRoutePlanResponse {
+  employeeId: string;
+  employeeName: string;
+  date: string;
+  stops: {
+    id: string;
+    outletId: string;
+    name: string;
+    time: string;
+    status: 'completed' | 'pending' | 'missed';
+    type: string;
+  }[];
+}
+
 export interface SalesmanDayWiseSummaryItem {
   date: string;
   label: string;
@@ -396,11 +421,20 @@ export interface HomeService {
   getManagerFieldUsers: (params?: {
     date?: string;
     searchKey?: string;
+    searchText?: string;
   }) => Promise<ApiResponse<ManagerFieldUserSummary[]>>;
   getManagerUserTimeline: (params: {
     employeeId: string;
     date?: string;
   }) => Promise<ApiResponse<ManagerUserTimelineResponse>>;
+  getManagerUserMtdSummary: (params: {
+    employeeId: string;
+    date?: string;
+  }) => Promise<ApiResponse<ManagerUserMtdSummaryResponse>>;
+  getManagerUserRoutePlan: (params: {
+    employeeId: string;
+    date?: string;
+  }) => Promise<ApiResponse<ManagerUserRoutePlanResponse>>;
 }
 
 /**
@@ -516,10 +550,20 @@ export const homeService: HomeService = {
       params: {
         ...(params?.date ? { date: params.date } : {}),
         ...(params?.searchKey ? { searchKey: params.searchKey } : {}),
+        ...(params?.searchKey ? { searchText: params.searchKey } : {}),
+        ...(params?.searchText ? { searchText: params.searchText } : {}),
       },
     }) as Promise<ApiResponse<ManagerFieldUserSummary[]>>,
   getManagerUserTimeline: (params) =>
     api.get<ManagerUserTimelineResponse>(`/employee/manager/user-timeline`, {
       params,
     }) as Promise<ApiResponse<ManagerUserTimelineResponse>>,
+  getManagerUserMtdSummary: (params) =>
+    api.get<ManagerUserMtdSummaryResponse>(`/employee/manager/user-mtd-summary`, {
+      params,
+    }) as Promise<ApiResponse<ManagerUserMtdSummaryResponse>>,
+  getManagerUserRoutePlan: (params) =>
+    api.get<ManagerUserRoutePlanResponse>(`/employee/manager/user-route-plan`, {
+      params,
+    }) as Promise<ApiResponse<ManagerUserRoutePlanResponse>>,
 };

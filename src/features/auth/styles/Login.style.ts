@@ -263,7 +263,7 @@ export const useLoginStyles = createStyles((utils, colors) => ({
     paddingTop: 32,
     paddingBottom: Platform.OS === 'ios' ? 40 : 32,
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
 
   welcomeContainer: {
