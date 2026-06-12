@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, TouchableOpacity, Dimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CurrentActivityCardProps } from '../../types/activity.types';
 import { useCurrentActivityCardStyles } from '../../styles/CurrentActivityCard.styles';
@@ -42,7 +41,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
   startTime,
   otherWorkStartTime,
   selectedRoute,
-  assignedVan,
 }) => {
   const styles = useCurrentActivityCardStyles({ selectedActivity });
   const { colors } = useTheme();
@@ -50,8 +48,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
   // Timer state
   const [elapsedFormatted, setElapsedFormatted] = useState<string>('00:00');
   const [elapsedHours, setElapsedHours] = useState<number>(0);
-  const [elapsedMinutes, setElapsedMinutes] = useState<number>(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
   // Memoized parsed times
   const parsedStartTime = useMemo(() => parseStartTime(startTime), [startTime]);
@@ -62,11 +58,9 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
 
   // Update timer function
   const updateTimer = useCallback(() => {
-    const { formatted, hours, minutes, seconds } = formatElapsedTime(parsedStartTime);
+    const { formatted, hours } = formatElapsedTime(parsedStartTime);
     setElapsedFormatted(formatted);
     setElapsedHours(hours);
-    setElapsedMinutes(minutes);
-    setElapsedSeconds(seconds);
   }, [parsedStartTime]);
 
   // Start timer interval
@@ -97,66 +91,71 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
 
   // Determine if activity is overdue (more than 4 hours)
   const isOverdue = elapsedHours >= 4;
-  const warningColor = isOverdue ? '#FF6B6B' : selectedActivityColor;
-
-  // Get status text and color
-  const statusConfig = {
-    text: 'ACTIVE',
-    color: '#4CAF50',
-    bgColor: '#4CAF5020',
-  };
-
-  // Render activity header section
   const renderActivityHeader = () => (
-    <View style={styles.activityHeader}>
-      <LinearGradient
-        colors={[selectedActivityColor, selectedActivityColor + 'DD']}
-        style={styles.activityIcon}
-      >
-        <Ionicons name={selectedActivityIcon as any} size={24} color="white" />
-      </LinearGradient>
+    <>
+      <View style={styles.sectionHeader}>
+        <View style={styles.headerLeft}>
+          <View style={[styles.headerIcon, { backgroundColor: selectedActivityColor + '18' }]}>
+            <Ionicons name="pulse-outline" size={14} color={selectedActivityColor} />
+          </View>
+          <AppText style={styles.sectionTitle}>Current Activity</AppText>
+        </View>
+        <View style={[styles.statusPill, { backgroundColor: colors.success + '12' }]}>
+          <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
+          <AppText style={[styles.statusPillText, { color: colors.success }]}>Active</AppText>
+        </View>
+      </View>
 
-      <View style={styles.activityInfo}>
-        <View style={styles.activityTitleRow}>
-          <AppText style={styles.activityTypeText}>{selectedActivity}</AppText>
-          <View style={[styles.statusBadge, { backgroundColor: statusConfig.bgColor }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
-            <AppText style={[styles.statusText, { color: statusConfig.color }]}>
-              {statusConfig.text}
+      <View style={styles.activityTimerCard}>
+        <View style={styles.activityPanel}>
+          <View
+            style={[styles.activityIconWrap, { backgroundColor: selectedActivityColor + '18' }]}
+          >
+            <Ionicons name={selectedActivityIcon as any} size={20} color={selectedActivityColor} />
+          </View>
+          <View style={styles.activityInfo}>
+            <AppText style={styles.activityTypeText}>{selectedActivity}</AppText>
+            <AppText style={styles.activityMeta}>
+              {selectedActivity === 'Retailing' && selectedRoute
+                ? `Route: ${selectedRoute.routeName || 'Assigned route'}${
+                    selectedRoute.totalShops ? ` · ${selectedRoute.totalShops} shops` : ''
+                  }`
+                : 'Active now'}
             </AppText>
           </View>
         </View>
 
-        <View style={styles.timerSection}>
-          <AppText style={[styles.timerText, { color: warningColor }]}>{elapsedFormatted}</AppText>
-          <AppText style={styles.startTimeText}>since {startTimeStr}</AppText>
-        </View>
-      </View>
-    </View>
-  );
+        <View style={styles.timerDivider} />
 
-  // Render route details
-  const renderRouteDetails = () => {
-    if (selectedActivity !== 'Retailing' || !selectedRoute) return null;
-
-    return (
-      <View style={styles.infoCard}>
-        <View style={styles.infoCardHeader}>
-          <Ionicons name="map-outline" size={14} color={colors.primary} />
-          <AppText style={[styles.infoCardTitle, { color: colors.primary }]}>Route Details</AppText>
-        </View>
-        <AppText style={styles.routeName} numberOfLines={1}>
-          {selectedRoute.routeName}
-        </AppText>
-        {selectedRoute.totalShops && (
-          <View style={styles.routeStats}>
-            <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
-            <AppText style={styles.routeStatsText}>{selectedRoute.totalShops} Outlets</AppText>
+        <View style={styles.timerRow}>
+          <View
+            style={[
+              styles.timerIconBubble,
+              { backgroundColor: isOverdue ? colors.error + '18' : colors.primary + '18' },
+            ]}
+          >
+            <Ionicons
+              name={isOverdue ? 'warning-outline' : 'timer-outline'}
+              size={20}
+              color={isOverdue ? colors.error : colors.primary}
+            />
           </View>
-        )}
+          <View style={styles.timerTextBlock}>
+            <AppText style={styles.timerLabel}>Current activity timer</AppText>
+            <AppText
+              style={[styles.timerValue, { color: isOverdue ? colors.error : colors.primary }]}
+            >
+              {elapsedFormatted}
+            </AppText>
+          </View>
+          <View style={styles.timerMeta}>
+            <AppText style={styles.timerMetaLabel}>Started</AppText>
+            <AppText style={styles.timerMetaValue}>{startTimeStr}</AppText>
+          </View>
+        </View>
       </View>
-    );
-  };
+    </>
+  );
 
   // Render other work info
   const renderOtherWorkInfo = () => {
@@ -178,30 +177,13 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
     );
   };
 
-  // Render van info
-  const renderVanInfo = () => {
-    if (!assignedVan) return null;
-
-    return (
-      <View style={styles.infoCard}>
-        <View style={styles.infoCardHeader}>
-          <Ionicons name="car-outline" size={14} color={colors.info} />
-          <AppText style={[styles.infoCardTitle, { color: colors.info }]}>Assigned Van</AppText>
-        </View>
-        <AppText style={styles.vanName} numberOfLines={1}>
-          {assignedVan.vanName || assignedVan.registrationNumber || 'N/A'}
-        </AppText>
-      </View>
-    );
-  };
-
   // Render warning for overdue activity
   const renderOverdueWarning = () => {
     if (!isOverdue) return null;
 
     return (
       <View style={styles.warningCard}>
-        <Ionicons name="alert-circle" size={18} color="#FF6B6B" />
+        <Ionicons name="alert-circle" size={18} color={colors.error} />
         <AppText style={styles.warningText}>
           Activity exceeds 4 hours. Consider taking a break or ending this activity.
         </AppText>
@@ -215,11 +197,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
       {renderActivityHeader()}
 
       {/* Info Grid */}
-      <View style={styles.infoGrid}>
-        {renderRouteDetails()}
-        {renderOtherWorkInfo()}
-        {/* {renderVanInfo()} */}
-      </View>
+      <View style={styles.infoGrid}>{renderOtherWorkInfo()}</View>
 
       {/* Warning Section */}
       {renderOverdueWarning()}

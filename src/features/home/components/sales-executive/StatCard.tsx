@@ -1,8 +1,16 @@
 // StatCard.tsx - Horizontal Scroll Version
 import React from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 160; // Fixed width for horizontal scrolling
@@ -29,11 +37,14 @@ export const StatCard: React.FC<StatCardProps> = ({
   loading = false,
   onPress,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   // Format large numbers
   const formatValue = (val: string | number): string => {
     const num = typeof val === 'string' ? parseFloat(val.replace(/,/g, '')) : val;
     if (isNaN(num)) return String(val);
-    
+
     if (num >= 1000000) {
       return (num / 1000000).toFixed(1) + 'M';
     }
@@ -44,13 +55,12 @@ export const StatCard: React.FC<StatCardProps> = ({
   };
 
   const getFontSize = (value: string): number => {
-    if (value.length > 10) return 16;
-    if (value.length > 7) return 18;
-    return 22;
+    if (value.length > 10) return 14;
+    return 16;
   };
 
   const CardContent = () => (
-    <View style={[styles.card, { backgroundColor: '#FFF' }]}>
+    <View style={styles.card}>
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="small" color={color} />
@@ -65,9 +75,9 @@ export const StatCard: React.FC<StatCardProps> = ({
         <AppText style={styles.title} numberOfLines={1}>
           {title}
         </AppText>
-        
+
         <View style={styles.valueSection}>
-          <AppText 
+          <AppText
             style={[styles.value, { fontSize: getFontSize(formatValue(value)) }]}
             numberOfLines={1}
             adjustsFontSizeToFit
@@ -75,21 +85,23 @@ export const StatCard: React.FC<StatCardProps> = ({
           >
             {formatValue(value)}
           </AppText>
-          
+
           {trend !== undefined && trend !== 0 && (
             <View style={styles.trendWrapper}>
               <MaterialCommunityIcons
                 name={trend > 0 ? 'arrow-up' : 'arrow-down'}
                 size={10}
-                color={trend > 0 ? '#10B981' : '#EF4444'}
+                color={trend > 0 ? colors.success : colors.error}
               />
-              <AppText style={[styles.trendText, { color: trend > 0 ? '#10B981' : '#EF4444' }]}>
+              <AppText
+                style={[styles.trendText, { color: trend > 0 ? colors.success : colors.error }]}
+              >
                 {Math.abs(trend)}%
               </AppText>
             </View>
           )}
         </View>
-        
+
         {subtitle && (
           <AppText style={styles.subtitle} numberOfLines={1}>
             {subtitle}
@@ -124,6 +136,9 @@ export const StatCardScroll: React.FC<StatCardScrollProps> = ({
   showsHorizontalScrollIndicator = false,
   contentContainerStyle,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <ScrollView
       horizontal
@@ -134,94 +149,92 @@ export const StatCardScroll: React.FC<StatCardScrollProps> = ({
       snapToAlignment="start"
     >
       {data.map((item) => (
-        <StatCard
-          key={item.id}
-          {...item}
-          onPress={() => onCardPress?.(item)}
-        />
+        <StatCard key={item.id} {...item} onPress={() => onCardPress?.(item)} />
       ))}
     </ScrollView>
   );
 };
 
-const styles = StyleSheet.create({
-  scrollContainer: {
-    paddingHorizontal: 16,
-    gap: 12,
-  },
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  iconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#6B7280',
-    marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  valueSection: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 2,
-  },
-  value: {
-    fontWeight: '700',
-    color: '#111827',
-  },
-  trendWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 2,
-  },
-  trendText: {
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  subtitle: {
-    fontSize: 9,
-    color: '#9CA3AF',
-  },
-});
+const createStyles = (colors: ReturnType<typeof useTheme>['colors']) =>
+  StyleSheet.create({
+    scrollContainer: {
+      paddingHorizontal: 16,
+      gap: 12,
+    },
+    card: {
+      width: CARD_WIDTH,
+      height: CARD_HEIGHT,
+      borderRadius: 12,
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    loadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.surface + 'E6',
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1,
+    },
+    iconContainer: {
+      width: 44,
+      height: 44,
+      borderRadius: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 10,
+    },
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    title: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: colors.textSecondary,
+      marginBottom: 4,
+      textTransform: 'uppercase',
+      letterSpacing: 0.3,
+    },
+    valueSection: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: 2,
+    },
+    value: {
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    trendWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.backgroundSecondary,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 8,
+      gap: 2,
+    },
+    trendText: {
+      fontSize: 9,
+      fontWeight: '600',
+    },
+    subtitle: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+  });

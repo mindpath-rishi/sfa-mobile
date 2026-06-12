@@ -1,18 +1,14 @@
-// StatsOverviewSection.tsx - Updated
-import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  ScrollView,
-  ActivityIndicator,
-  RefreshControl,
-  TouchableOpacity,
-  useWindowDimensions,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useStatsOverviewSectionStyles } from '../../styles/StatusOverviewSection.styles';
-import { StatCard } from './StatCard';
 import { AppText } from '@/core/components';
-import { homeService } from '@/features/home/services/home.service';
+import {
+  homeService,
+  type SalesmanDayWiseSummaryItem,
+} from '@/features/home/services/home.service';
+import { useTheme } from '@/shared/hooks/useTheme';
+import { formatLocalApiDate } from '@/shared/utils/date.utils';
+import { useStatsOverviewSectionStyles } from '../../styles/StatusOverviewSection.styles';
 
 type Props = {
   employeeId: string;
@@ -20,122 +16,68 @@ type Props = {
 };
 
 interface StatsData {
-  visits: {
-    completed: number;
-    total: number;
-    percentage: number;
-  };
-  orders: {
-    count: number;
-    value: number;
-    pending: number;
-  };
-  collections: {
-    count: number;
-    value: number;
-    target: number;
-    percentage: number;
-  };
-  incentives: {
-    earned: number;
-    target: number;
-    nextMilestone: number;
-  };
+  totalCalls: number;
+  productiveCalls: number;
+  unproductiveCalls: number;
+  salesValue: number;
+  cases: number;
 }
 
-export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh }) => {
-  const styles = useStatsOverviewSectionStyles();
-  const { width: screenWidth } = useWindowDimensions();
+const EMPTY_STATS: StatsData = {
+  totalCalls: 0,
+  productiveCalls: 0,
+  unproductiveCalls: 0,
+  salesValue: 0,
+  cases: 0,
+};
 
+const toNumber = (value: unknown) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const mapTodaySummaryToStats = (summary?: SalesmanDayWiseSummaryItem): StatsData => ({
+  totalCalls: toNumber(summary?.tc),
+  productiveCalls: toNumber(summary?.pc),
+  unproductiveCalls: toNumber(summary?.upc),
+  salesValue: toNumber(summary?.netValue),
+  cases: toNumber(summary?.cases),
+});
+
+export const StatsOverviewSection: React.FC<Props> = ({ employeeId: _employeeId, onRefresh }) => {
+  const { colors } = useTheme();
+  const styles = useStatsOverviewSectionStyles();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<StatsData>({
-    visits: {
-      completed: 0,
-      total: 0,
-      percentage: 0,
-    },
-    orders: {
-      count: 0,
-      value: 0,
-      pending: 0,
-    },
-    collections: {
-      count: 0,
-      value: 0,
-      target: 0,
-      percentage: 0,
-    },
-    incentives: {
-      earned: 0,
-      target: 0,
-      nextMilestone: 0,
-    },
-  });
+  const [stats, setStats] = useState<StatsData>(EMPTY_STATS);
 
-  const getCardWidth = useCallback(() => {
-    if (screenWidth < 360) return 260;
-    if (screenWidth < 768) return 280;
-    return 300;
-  }, [screenWidth]);
-
-  const fetchStats = useCallback(
-    async (isRefresh = false) => {
-      if (!employeeId) return;
-
-      try {
-        if (isRefresh) {
-          setRefreshing(true);
-        } else {
-          setLoading(true);
-        }
-        setError(null);
-
-        const res = await homeService.getEmployeeStats(employeeId);
-        const data = res?.data || {};
-
-        const visitsPercentage =
-          data?.totalVisits > 0 ? (data?.visits / data?.totalVisits) * 100 : 0;
-
-        const collectionsPercentage =
-          data?.collections?.target > 0
-            ? (data?.collections?.value / data?.collections?.target) * 100
-            : 0;
-
-        setStats({
-          visits: {
-            completed: data?.visits || 0,
-            total: data?.totalVisits || 0,
-            percentage: visitsPercentage,
-          },
-          orders: {
-            count: data?.orders?.count || 0,
-            value: data?.orders?.value || 0,
-            pending: data?.orders?.pending || 0,
-          },
-          collections: {
-            count: data?.collections?.count || 0,
-            value: data?.collections?.value || 0,
-            target: data?.collections?.target || 0,
-            percentage: collectionsPercentage,
-          },
-          incentives: {
-            earned: data?.incentives?.earned || 0,
-            target: data?.incentives?.target || 0,
-            nextMilestone: data?.incentives?.nextMilestone || 0,
-          },
-        });
-      } catch (error: any) {
-        console.log('Error fetching stats:', error);
-        setError(error?.message || 'Failed to load stats');
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
+  const fetchStats = useCallback(async (isRefresh = false) => {
+    try {
+      setError(null);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
-    },
-    [employeeId],
-  );
+
+      const today = formatLocalApiDate(new Date());
+      const res = await homeService.getSalesmanDayWiseSummary({
+        startDate: today,
+        endDate: today,
+      });
+      const summaries = Array.isArray(res?.data) ? res.data : [];
+      const todaySummary = summaries.find((item) => item.date === today) ?? summaries[0];
+
+      setStats(mapTodaySummaryToStats(todaySummary));
+    } catch (err: any) {
+      console.log('Error fetching today stats:', err);
+      setError(err?.message || 'Failed to load stats');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -143,28 +85,81 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
 
   const handleRefresh = useCallback(async () => {
     await fetchStats(true);
-    if (onRefresh) {
-      onRefresh();
-    }
+    onRefresh?.();
   }, [fetchStats, onRefresh]);
 
   const formatCurrency = useCallback((value: number) => {
-    return new Intl.NumberFormat('en-ZM', {
-      style: 'currency',
-      currency: 'ZMW',
+    return `K ${new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(value);
+    }).format(value)}`;
   }, []);
+
+  const statTiles = useMemo(() => {
+    const strikeRate =
+      stats.totalCalls > 0 ? Math.round((stats.productiveCalls / stats.totalCalls) * 100) : 0;
+
+    return [
+      {
+        title: 'Outlets visited',
+        value: stats.totalCalls.toString(),
+        subtitle: `${stats.unproductiveCalls} unproductive`,
+        positive: true,
+        icon: 'store-check-outline',
+        color: colors.success,
+      },
+      {
+        title: 'Sales value',
+        value: formatCurrency(stats.salesValue),
+        subtitle: `${stats.cases.toLocaleString('en-IN')} cases`,
+        positive: false,
+        icon: 'cash-multiple',
+        color: colors.primary,
+      },
+      {
+        title: 'Orders placed',
+        value: stats.productiveCalls.toString(),
+        subtitle: `${Math.max(stats.totalCalls - stats.productiveCalls, 0)} no order`,
+        positive: false,
+        icon: 'clipboard-text-outline',
+        color: colors.info,
+      },
+      {
+        title: 'Strike rate',
+        value: `${strikeRate}%`,
+        subtitle: strikeRate >= 70 ? 'Above average' : 'Needs focus',
+        positive: strikeRate >= 70,
+        icon: 'target',
+        color: strikeRate >= 70 ? colors.success : colors.warning,
+      },
+    ];
+  }, [colors.info, colors.primary, colors.success, colors.warning, formatCurrency, stats]);
+
+  const renderHeader = () => (
+    <View style={styles.headerContainer}>
+      <View style={styles.headerLeft}>
+        <View style={styles.headerIcon}>
+          <MaterialCommunityIcons name="chart-box-outline" size={15} color={colors.primary} />
+        </View>
+        <AppText style={styles.headerTitle}>Today's stats</AppText>
+      </View>
+      <TouchableOpacity
+        onPress={handleRefresh}
+        style={styles.refreshButton}
+        activeOpacity={0.7}
+        disabled={refreshing}
+      >
+        <MaterialCommunityIcons name="refresh" size={16} color={colors.primary} />
+      </TouchableOpacity>
+    </View>
+  );
 
   if (loading && !refreshing) {
     return (
       <View style={styles.container}>
-        <View style={styles.headerContainer}>
-          <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
-        </View>
+        {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4158D0" />
+          <ActivityIndicator size="small" color={colors.primary} />
           <AppText style={styles.loadingText}>Loading stats...</AppText>
         </View>
       </View>
@@ -174,15 +169,10 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
   if (error) {
     return (
       <View style={styles.container}>
-        <View style={styles.headerContainer}>
-          <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
-        </View>
+        {renderHeader()}
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#EF4444" />
+          <MaterialCommunityIcons name="alert-circle-outline" size={28} color={colors.error} />
           <AppText style={styles.errorText}>{error}</AppText>
-          <TouchableOpacity style={styles.retryButton} onPress={() => fetchStats()}>
-            <AppText style={styles.retryButtonText}>Retry</AppText>
-          </TouchableOpacity>
         </View>
       </View>
     );
@@ -190,70 +180,23 @@ export const StatsOverviewSection: React.FC<Props> = ({ employeeId, onRefresh })
 
   return (
     <View style={styles.container}>
-      <View style={styles.headerContainer}>
-        <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
-        <TouchableOpacity
-          onPress={handleRefresh}
-          style={styles.refreshButton}
-          activeOpacity={0.7}
-          disabled={refreshing}
-        >
-          <MaterialCommunityIcons name="refresh" size={18} color="#4158D0" />
-        </TouchableOpacity>
+      {renderHeader()}
+      <View style={styles.grid}>
+        {statTiles.map((tile) => (
+          <View key={tile.title} style={styles.tile}>
+            <View style={styles.tileHeader}>
+              <View style={[styles.tileIcon, { backgroundColor: tile.color + '14' }]}>
+                <MaterialCommunityIcons name={tile.icon as any} size={16} color={tile.color} />
+              </View>
+              <AppText style={styles.tileTitle}>{tile.title}</AppText>
+            </View>
+            <AppText style={styles.tileValue}>{tile.value}</AppText>
+            <AppText style={[styles.tileSubtitle, tile.positive && styles.tileSubtitlePositive]}>
+              {tile.subtitle}
+            </AppText>
+          </View>
+        ))}
       </View>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={['#4158D0']}
-            tintColor="#4158D0"
-          />
-        }
-        decelerationRate="fast"
-        showsHorizontalScrollIndicator={false}
-      >
-        <View style={[styles.cardWrapper]}>
-          <StatCard
-            title="Visits"
-            value={`${stats.visits.completed}/${stats.visits.total}`}
-            subtitle={`${stats.visits.percentage.toFixed(0)}% completed`}
-            icon="calendar-check"
-            color="#4158D0"
-            trend={stats.visits.percentage > 70 ? 12 : -5}
-            progress={stats.visits.percentage / 100}
-            compact={true}
-          />
-        </View>
-
-        <View style={[styles.cardWrapper]}>
-          <StatCard
-            title="Orders"
-            value={stats.orders.count.toString()}
-            subtitle={`Value: ${formatCurrency(stats.orders.value)}`}
-            badge={stats.orders.pending > 0 ? stats.orders.pending : undefined}
-            icon="cart"
-            color="#C850C0"
-            trend={stats.orders.count > 0 ? 8 : 0}
-            compact={true}
-          />
-        </View>
-
-        <View style={[styles.cardWrapper]}>
-          <StatCard
-            title="Collections"
-            value={formatCurrency(stats.collections.value)}
-            subtitle={`${stats.collections.count} transactions`}
-            icon="cash-multiple"
-            color="#11998e"
-            trend={stats.collections.percentage > 50 ? 15 : -3}
-          />
-        </View>
-      </ScrollView>
     </View>
   );
 };

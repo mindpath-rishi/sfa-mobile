@@ -1,133 +1,194 @@
 // CurrentActivityCard.styles.ts
-import { StyleSheet, ViewStyle, TextStyle, Dimensions, Platform } from 'react-native';
+import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
-
-const { width } = Dimensions.get('window');
 
 export const useCurrentActivityCardStyles = ({
   selectedActivity,
 }: {
-  selectedActivity: string;
+  selectedActivity: string | null;
 }) => {
   const { colors } = useTheme();
 
   return StyleSheet.create({
     container: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 16,
-      // marginHorizontal: 16,
-      // marginVertical: 8,
-      // shadowColor: '#000',
-      // shadowOffset: { width: 0, height: 2 },
-      // shadowOpacity: 0.05,
-      // shadowRadius: 8,
-      // elevation: 2,
-      // borderWidth: 1,
-      // borderColor: colors.divider,
+      paddingTop: 4,
+      paddingBottom: 4,
     } as ViewStyle,
 
-    // Activity Header
-    activityHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 16,
-    } as ViewStyle,
-
-    activityIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-    } as ViewStyle,
-
-    activityInfo: {
-      flex: 1,
-      marginLeft: 12,
-    } as ViewStyle,
-
-    activityTitleRow: {
+    sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 4,
+      marginBottom: 10,
     } as ViewStyle,
 
-    activityTypeText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    } as TextStyle,
-
-    statusBadge: {
+    headerLeft: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 12,
+      gap: 8,
+    } as ViewStyle,
+
+    headerIcon: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    sectionTitle: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '600',
+    } as TextStyle,
+
+    startTimeText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: '400',
+    } as TextStyle,
+
+    statusPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
     } as ViewStyle,
 
     statusDot: {
       width: 6,
       height: 6,
       borderRadius: 3,
-      marginRight: 4,
     } as ViewStyle,
 
-    statusText: {
-      fontSize: 10,
-      fontWeight: '600',
-      letterSpacing: 0.5,
-    } as TextStyle,
-
-    timerSection: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      marginTop: 4,
-    } as ViewStyle,
-
-    timerText: {
-      fontSize: 26,
+    statusPillText: {
+      fontSize: 11,
       fontWeight: '700',
-      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      textTransform: 'uppercase',
     } as TextStyle,
 
-    startTimeText: {
+    activityTimerCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+    } as ViewStyle,
+
+    activityPanel: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingBottom: 10,
+    } as ViewStyle,
+
+    activityIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    activityInfo: {
+      flex: 1,
+    } as ViewStyle,
+
+    activityTypeText: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    } as TextStyle,
+
+    activityMeta: {
       fontSize: 12,
       color: colors.textSecondary,
-      marginLeft: 8,
     } as TextStyle,
 
-    // Info Grid
+    timerDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginLeft: 50,
+    } as ViewStyle,
+
+    timerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingTop: 10,
+    } as ViewStyle,
+
+    timerIconBubble: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    timerTextBlock: {
+      flex: 1,
+    } as ViewStyle,
+
+    timerLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      fontWeight: '600',
+      marginBottom: 2,
+    } as TextStyle,
+
+    timerValue: {
+      fontSize: 16,
+      fontWeight: '700',
+    } as TextStyle,
+
+    timerMeta: {
+      alignItems: 'flex-end',
+    } as ViewStyle,
+
+    timerMetaLabel: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+    } as TextStyle,
+
+    timerMetaValue: {
+      fontSize: 14,
+      color: colors.textPrimary,
+      fontWeight: '500',
+      marginTop: 2,
+    } as TextStyle,
+
     infoGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 12,
-      marginBottom: 12,
     } as ViewStyle,
 
     infoCard: {
-      flex: 1,
-      minWidth: (width - 56) / 2 - 12,
-      backgroundColor: colors.background,
+      width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.backgroundSecondary,
       borderRadius: 10,
-      padding: 10,
-      borderWidth: 1,
-      borderColor: colors.divider,
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 10,
+      marginTop: 10,
     } as ViewStyle,
 
     otherWorkCard: {
-      backgroundColor: colors.warning + '08',
-      borderColor: colors.warning + '20',
+      backgroundColor: 'transparent',
     } as ViewStyle,
 
     infoCardHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 6,
       gap: 6,
     } as ViewStyle,
 
@@ -165,7 +226,6 @@ export const useCurrentActivityCardStyles = ({
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      marginTop: 2,
     } as ViewStyle,
 
     otherWorkDuration: {
@@ -177,19 +237,19 @@ export const useCurrentActivityCardStyles = ({
     warningCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#FF6B6B10',
+      backgroundColor: colors.error + '10',
       borderRadius: 10,
       padding: 10,
       marginTop: 4,
       gap: 8,
       borderWidth: 1,
-      borderColor: '#FF6B6B30',
+      borderColor: colors.error + '30',
     } as ViewStyle,
 
     warningText: {
       flex: 1,
       fontSize: 12,
-      color: '#FF6B6B',
+      color: colors.error,
       lineHeight: 16,
     } as TextStyle,
   });

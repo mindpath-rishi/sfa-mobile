@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, Text, View } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useSharedValue,
@@ -7,7 +7,6 @@ import Animated, {
   withSequence,
   withSpring,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { QuickActionProps } from '../../types/quickaction.types';
 import { AppText } from '@/core/components';
@@ -24,19 +23,8 @@ export const QuickAction: React.FC<QuickActionProps> = ({
   const { colors } = useTheme();
   const scale = useSharedValue(1);
 
-  // Get size values
-  const getSize = () => {
-    switch (size) {
-      case 'small':
-        return { container: 44, icon: 20, fontSize: 11 };
-      case 'large':
-        return { container: 68, icon: 28, fontSize: 12 };
-      default:
-        return { container: 56, icon: 24, fontSize: 12 };
-    }
-  };
-
-  const sizeValues = getSize();
+  const buttonSize = size === 'large' ? 62 : size === 'small' ? 48 : 56;
+  const iconSize = size === 'large' ? 26 : size === 'small' ? 18 : 23;
 
   const handlePress = () => {
     if (disabled) return;
@@ -49,24 +37,37 @@ export const QuickAction: React.FC<QuickActionProps> = ({
   }));
 
   return (
-    <TouchableOpacity onPress={handlePress} disabled={disabled} activeOpacity={1}>
+    <TouchableOpacity
+      onPress={handlePress}
+      disabled={disabled}
+      activeOpacity={1}
+      style={{ width: 76, alignItems: 'flex-start' }}
+    >
       <Animated.View
-        style={[animatedStyle, { alignItems: 'center', width: sizeValues.container + 16 }]}
+        style={[
+          animatedStyle,
+          {
+            width: '100%',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingVertical: 4,
+            opacity: disabled ? 0.5 : 1,
+          },
+        ]}
       >
-        <View>
-          <LinearGradient
-            colors={[color, color + 'CC']}
-            style={{
-              width: sizeValues.container,
-              height: sizeValues.container,
-              borderRadius: sizeValues.container / 2,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginBottom: 4,
-            }}
-          >
-            <Ionicons name={icon} size={sizeValues.icon} color="white" />
-          </LinearGradient>
+        <View
+          style={{
+            width: buttonSize,
+            height: buttonSize,
+            borderRadius: buttonSize / 2,
+            backgroundColor: color + '18',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: color + '28',
+          }}
+        >
+          <Ionicons name={icon} size={iconSize} color={color} />
 
           {badge !== undefined && badge > 0 && (
             <View
@@ -82,10 +83,10 @@ export const QuickAction: React.FC<QuickActionProps> = ({
                 alignItems: 'center',
                 paddingHorizontal: 4,
                 borderWidth: 1.5,
-                borderColor: 'white',
+                borderColor: colors.surface,
               }}
             >
-              <AppText style={{ color: 'white', fontSize: 11, fontWeight: 'bold' }}>
+              <AppText style={{ color: colors.textInverse, fontSize: 11, fontWeight: 'bold' }}>
                 {badge > 99 ? '99+' : badge}
               </AppText>
             </View>
@@ -94,10 +95,13 @@ export const QuickAction: React.FC<QuickActionProps> = ({
 
         <AppText
           style={{
-            color: disabled ? colors.textTertiary : colors.textSecondary,
-            fontSize: sizeValues.fontSize,
-            textAlign: 'center',
+            color: disabled ? colors.textTertiary : colors.textPrimary,
+            fontSize: 12,
+            fontWeight: '500',
+            textAlign: 'left',
+            marginTop: 7,
           }}
+          numberOfLines={2}
         >
           {label}
         </AppText>

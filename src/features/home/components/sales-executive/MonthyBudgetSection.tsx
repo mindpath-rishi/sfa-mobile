@@ -6,12 +6,14 @@ import { MonthlyBudgetSectionProps } from '../../types/monthlyBudgetSection.type
 import { useMonthlyBudgetSectionStyles } from '../../styles/MonthlyBudgetSection.styles';
 import { ProgressBar } from './ProgressBar';
 import { AppText, SectionHeader } from '@/core/components';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export const MonthlyBudgetSection: React.FC<MonthlyBudgetSectionProps> = ({
   targetAchieved,
   completedOrders,
   onViewDetails,
 }) => {
+  const { colors } = useTheme();
   const styles = useMonthlyBudgetSectionStyles();
 
   return (
@@ -32,7 +34,7 @@ export const MonthlyBudgetSection: React.FC<MonthlyBudgetSectionProps> = ({
             progress={targetAchieved}
             label=""
             value={`${targetAchieved}%`}
-            color="#10B981"
+            color={colors.success}
             showLabel
           />
         </View>

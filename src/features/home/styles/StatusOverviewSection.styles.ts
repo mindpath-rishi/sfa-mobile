@@ -1,82 +1,117 @@
-// StatusOverviewSection.styles.ts
 import { StyleSheet } from 'react-native';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export const useStatsOverviewSectionStyles = () => {
+  const { colors } = useTheme();
+
   return StyleSheet.create({
     container: {
-      marginBottom: 16,
       width: '100%',
+      paddingTop: 4,
+      paddingBottom: 4,
     },
     headerContainer: {
+      minHeight: 24,
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: 'transparent',
-      minHeight: 44,
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    headerIcon: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary + '12',
     },
     headerTitle: {
-      fontSize: 12,
+      fontSize: 16,
       fontWeight: '600',
-      color: '#6B7280',
-      letterSpacing: 0.5,
-      lineHeight: 18,
+      color: colors.textPrimary,
     },
     refreshButton: {
-      padding: 6,
-      marginLeft: 8,
-      minWidth: 32,
-      minHeight: 32,
-      justifyContent: 'center',
+      width: 30,
+      height: 30,
+      borderRadius: 15,
       alignItems: 'center',
-      borderRadius: 16,
-      backgroundColor: '#F3F4F6',
+      justifyContent: 'center',
+      backgroundColor: colors.backgroundSecondary,
     },
-    scrollContent: {
-      paddingLeft: 16,
-      paddingRight: 16, // Changed from 8 to 16 for equal padding
+    grid: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
     },
-    cardWrapper: {
-      marginRight: 16, // Remove margin between cards
-      // Add a small separator line or shadow if needed
+    tile: {
+      flexBasis: '48%',
+      flexGrow: 1,
+      minHeight: 104,
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    tileHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 10,
+      marginBottom: 10,
+    },
+    tileIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tileTitle: {
+      flex: 1,
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: '400',
+    },
+    tileValue: {
+      fontSize: 16,
+      color: colors.textPrimary,
+      fontWeight: '700',
+      marginBottom: 4,
+    },
+    tileSubtitle: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+    tileSubtitlePositive: {
+      color: colors.textSecondary,
     },
     loadingContainer: {
+      minHeight: 110,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 48,
-      minHeight: 180,
     },
     loadingText: {
-      fontSize: 14,
-      color: '#9CA3AF',
-      marginTop: 12,
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 8,
     },
     errorContainer: {
+      minHeight: 110,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 48,
-      minHeight: 180,
+      gap: 8,
     },
     errorText: {
-      fontSize: 14,
-      color: '#EF4444',
+      fontSize: 12,
+      color: colors.errorDark,
       textAlign: 'center',
-      paddingHorizontal: 24,
-      marginTop: 12,
-    },
-    retryButton: {
-      paddingHorizontal: 20,
-      paddingVertical: 8,
-      backgroundColor: '#4158D0',
-      borderRadius: 8,
-      marginTop: 16,
-    },
-    retryButtonText: {
-      color: '#FFFFFF',
-      fontSize: 14,
-      fontWeight: '600',
     },
   });
 };

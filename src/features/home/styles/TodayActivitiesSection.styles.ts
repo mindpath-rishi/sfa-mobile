@@ -1,120 +1,91 @@
-// TodayActivitiesSection.styles.ts
-import { ViewStyle, TextStyle } from 'react-native';
+import { TextStyle, ViewStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 export const useTodayActivitiesSectionStyles = () => {
   const { colors } = useTheme();
 
-  const styleGenerator = createStyles((utils) => ({
+  const styleGenerator = createStyles(() => ({
     container: {
-      paddingHorizontal: utils.spacing[4],
-      marginBottom: utils.spacing[5],
       width: '100%',
+      backgroundColor: colors.surface,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingTop: 14,
+      paddingBottom: 10,
     } as ViewStyle,
 
     headerContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: utils.spacing[3],
-      backgroundColor: colors.background,
+      gap: 8,
+      marginBottom: 8,
     } as ViewStyle,
 
-    headerLeft: {
-      flexDirection: 'row',
+    headerIcon: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       alignItems: 'center',
-      flex: 1,
+      justifyContent: 'center',
+      backgroundColor: colors.primary + '12',
     } as ViewStyle,
 
     headerTitle: {
-      fontSize: utils.fontSize.xs,
+      fontSize: 16,
       fontWeight: '600',
-      letterSpacing: 0.5,
+      color: colors.textPrimary,
     } as TextStyle,
 
-    badge: {
-      marginLeft: utils.spacing[2],
-      paddingHorizontal: utils.spacing[2],
-      paddingVertical: utils.spacing[0.5],
-      borderRadius: 12,
-    } as ViewStyle,
-
-    badgeText: {
-      fontSize: utils.fontSize.xs,
-      fontWeight: '700',
-    } as TextStyle,
-
-    statsContainer: {
-      flexDirection: 'row',
-      gap: utils.spacing[2],
-      marginBottom: utils.spacing[4],
-      flexWrap: 'wrap', // Allow wrapping on smaller screens
-    } as ViewStyle,
-
-    statCard: {
-      flex: 1,
-      minWidth: 100, // Minimum width for better layout
-      borderRadius: 10,
-      padding: utils.spacing[2.5],
-      borderWidth: 1,
-    } as ViewStyle,
-
-    statValue: {
-      fontSize: utils.fontSize.md,
-      fontWeight: '700',
-      marginTop: utils.spacing[1],
-    } as TextStyle,
-
-    statLabel: {
-      fontSize: utils.fontSize.xs,
-      marginTop: utils.spacing[0.5],
-    } as TextStyle,
-
-    // Remove ScrollView styles - no longer needed
     emptyState: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: utils.spacing[8],
+      paddingVertical: 28,
     } as ViewStyle,
 
     emptyStateIconContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: utils.spacing[3],
+      marginBottom: 10,
+      backgroundColor: colors.backgroundSecondary,
     } as ViewStyle,
 
     emptyStateTitle: {
-      fontSize: utils.fontSize.sm,
+      fontSize: 14,
       fontWeight: '500',
-      marginBottom: utils.spacing[1],
+      color: colors.textPrimary,
+      marginBottom: 4,
     } as TextStyle,
 
     emptyStateSubtitle: {
-      fontSize: utils.fontSize.xs,
+      fontSize: 12,
       textAlign: 'center',
+      color: colors.textSecondary,
     } as TextStyle,
 
     showMoreButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: utils.spacing[2.5],
-      marginTop: utils.spacing[3],
-      borderRadius: 8,
-      borderWidth: 1,
+      paddingVertical: 10,
+      marginTop: 8,
+      borderRadius: 7,
+      backgroundColor: colors.backgroundSecondary,
     } as ViewStyle,
 
     showMoreText: {
-      fontSize: utils.fontSize.xs,
+      fontSize: 12,
       fontWeight: '600',
+      color: colors.primary,
     } as TextStyle,
 
     showMoreIcon: {
-      marginLeft: utils.spacing[1],
+      marginLeft: 4,
     } as TextStyle,
   }));
 

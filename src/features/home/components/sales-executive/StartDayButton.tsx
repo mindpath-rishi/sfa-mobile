@@ -4,15 +4,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { StartDayButtonProps } from '../../types/startDay.types';
 import { useStartDayButtonStyles } from '../../styles/StartDayButton.styles';
 import { AppText } from '@/core/components';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export const StartDayButton: React.FC<StartDayButtonProps> = ({ onPress }) => {
+  const { colors } = useTheme();
   const styles = useStartDayButtonStyles();
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.button}>
       <View style={styles.contentContainer}>
         <View style={styles.iconCircle}>
-          <Ionicons name="sunny" size={24} color="#FFFFFF" />
+          <Ionicons name="sunny" size={24} color={colors.primaryContrast} />
         </View>
         <View style={styles.textContainer}>
           <AppText style={styles.title}>START YOUR DAY</AppText>

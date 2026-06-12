@@ -1,24 +1,28 @@
 import React from 'react';
-import { View, ScrollView } from 'react-native';
+import { View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { QuickAction as QuickActionComponent } from './QuickAction';
 import { useQuickActionsSectionStyles } from '../../styles/QuickActionSection.styles';
 import { QuickActionsSectionProps } from '../../types/quickaction.types';
-import { SectionHeader } from '@/core/components';
+import { AppText } from '@/core/components';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
   actions,
   onPressAction,
 }) => {
+  const { colors } = useTheme();
   const styles = useQuickActionsSectionStyles();
 
   return (
     <View style={styles.container}>
-      <SectionHeader title="QUICK ACTIONS" variant="small" />
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
+      <View style={styles.titleRow}>
+        <View style={styles.titleIcon}>
+          <Ionicons name="flash-outline" size={14} color={colors.primary} />
+        </View>
+        <AppText style={styles.title}>Quick Actions</AppText>
+      </View>
+      <View style={styles.actionsRow}>
         {actions.map((action: any, index) => (
           <QuickActionComponent
             key={index}
@@ -29,7 +33,7 @@ export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
             onPress={() => onPressAction(action.route)}
           />
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 };

@@ -1,10 +1,10 @@
-// SalesExecutiveScreen.tsx - Fixed Full Width Van Card
+// SalesExecutiveScreen.tsx - Improved UI Version (No Animations)
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 
 // Components
 import { Footer } from '../components/sales-executive/Footer';
@@ -48,6 +48,8 @@ import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { leaveService } from '@/features/leave/services/leave.service';
 import type { LeaveType } from '@/features/leave/types/leave.types';
+
+const { width } = Dimensions.get('window');
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
@@ -141,17 +143,23 @@ export default function SalesExecutiveScreen() {
     return 'Good Evening';
   })();
 
-  // Format van display info
   const vanDisplayInfo = useMemo(() => {
     if (!van) return null;
+    const vanInfo = van as typeof van & {
+      registrationNumber?: string;
+      type?: string;
+      capacity?: string | number;
+    };
+    const vanName = vanInfo.name || vanInfo.vanName || '';
+
     return {
-      fullName: van.name,
-      displayName: van.name?.length > 20 ? van.name.substring(0, 20) + '...' : van.name,
-      number: van.vanNumber,
-      registration: van.registrationNumber,
-      type: van.type || 'Standard',
-      capacity: van.capacity,
-      combinedLabel: van.vanNumber ? `${van.name} (${van.vanNumber})` : van.name,
+      fullName: vanName,
+      displayName: vanName.length > 20 ? vanName.substring(0, 20) + '...' : vanName,
+      number: vanInfo.vanNumber,
+      registration: vanInfo.registrationNumber,
+      type: vanInfo.type || 'Standard',
+      capacity: vanInfo.capacity,
+      combinedLabel: vanInfo.vanNumber ? `${vanName} (${vanInfo.vanNumber})` : vanName,
     };
   }, [van]);
 
@@ -500,7 +508,6 @@ export default function SalesExecutiveScreen() {
       vanChangeReason: isVanChangePending ? vanChangeNote.trim() : undefined,
       dayStartImageMediaId: dayStartImage?.mediaId,
       dayStartImageUrl: dayStartImage?.url,
-      // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
     };
 
     console.log('Day Start Payload:', payload);
@@ -649,7 +656,6 @@ export default function SalesExecutiveScreen() {
       console.log('Day Status Response:', response);
       setTodayActivities(data?.todayActivities || []);
 
-      // Check if today's activity is LEAVE
       if (data?.type === 'LEAVE') {
         setIsTodayLeave(true);
       } else {
@@ -819,98 +825,85 @@ export default function SalesExecutiveScreen() {
         }
       >
         <LinearGradient
-          colors={[colors.primary + '12', colors.background, colors.background]}
+          colors={[colors.primary + '08', colors.background, colors.background]}
           start={{ x: 0, y: 0 }}
           end={{ x: 0.9, y: 1 }}
           style={styles.heroSection}
         >
-          {/* Header Row with Greeting and Badge */}
-          <View style={styles.heroHeaderRow}>
-            <View style={styles.heroTextBlock}>
-              <AppText style={styles.heroEyebrow}>{greeting}</AppText>
-              <AppText style={styles.heroTitle}>{user?.name}</AppText>
-            </View>
-
-            <View
-              style={[
-                styles.heroBadge,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
-            >
-              <Ionicons
-                name={dayStarted ? 'play-circle-outline' : 'pause-circle-outline'}
-                size={16}
-                color={dayStarted ? colors.success : colors.warning}
-              />
-              <AppText
-                style={[
-                  styles.heroBadgeText,
-                  { color: dayStarted ? colors.success : colors.warning },
-                ]}
-              >
-                {dayStarted ? 'On Duty' : 'Idle'}
-              </AppText>
-            </View>
-          </View>
-
-          {/* Full Width Van Info Card - Moved outside heroTextBlock */}
-          <View style={styles.vanInfoCard}>
-            <View style={styles.vanInfoIconContainer}>
-              <MaterialCommunityIcons name="van-passenger" size={20} color={colors.primary} />
-            </View>
-            <View style={styles.vanInfoDetails}>
-              <View style={styles.vanInfoRow}>
-                <AppText style={styles.vanInfoLabel}>Assigned Vehicle</AppText>
-                {van?.type && (
-                  <View style={[styles.vanTypeBadge, { backgroundColor: colors.primary + '15' }]}>
-                    <AppText style={[styles.vanTypeText, { color: colors.primary }]}>
-                      {van.type}
-                    </AppText>
-                  </View>
-                )}
+          {/* Header Section */}
+          <View style={styles.headerSection}>
+            <View style={styles.greetingSection}>
+              <View>
+                <AppText style={styles.greetingText}>{greeting}</AppText>
+                <AppText style={styles.userName}>{user?.name}</AppText>
               </View>
-              <AppText style={styles.vanInfoName} numberOfLines={1}>
-                {vanDisplayInfo?.combinedLabel || 'No van assigned'}
-              </AppText>
-              {van?.registrationNumber && (
-                <View style={styles.vanRegistrationRow}>
-                  <Ionicons name="id-card-outline" size={12} color={colors.textSecondary} />
-                  <AppText style={styles.vanRegistrationText}>
-                    Reg: {van.registrationNumber}
-                  </AppText>
-                </View>
-              )}
-              {van?.capacity && (
-                <View style={styles.vanCapacityRow}>
-                  <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
-                  <AppText style={styles.vanCapacityText}>Capacity: {van.capacity} kg</AppText>
-                </View>
-              )}
+              <View style={[styles.statusBadge, dayStarted ? styles.activeBadge : styles.idleBadge]}>
+                <View style={[styles.statusDot, dayStarted ? styles.activeDot : styles.idleDot]} />
+                <AppText style={[styles.statusText, dayStarted ? styles.activeStatusText : styles.idleStatusText]}>
+                  {dayStarted ? 'On Duty' : 'Off Duty'}
+                </AppText>
+              </View>
             </View>
           </View>
 
+          {/* Van Change Pending Banner */}
           {vanChangePendingBanner && (
-            <View
-              style={[
-                styles.pendingBanner,
-                { backgroundColor: colors.warning + '08', borderColor: colors.warning + '30' },
-              ]}
-            >
-              <Ionicons name="time-outline" size={18} color={colors.warning} />
-              <View style={styles.pendingBannerContent}>
-                <AppText style={[styles.pendingBannerTitle, { color: colors.textPrimary }]}>
-                  Van Change Request Pending
-                </AppText>
-                <AppText style={[styles.pendingBannerSubtitle, { color: colors.textSecondary }]}>
-                  Your request to change vehicle is under review. You can continue working with your
-                  current vehicle.
+            <View style={styles.pendingBanner}>
+              <View style={styles.pendingIconContainer}>
+                <Ionicons name="time-outline" size={22} color={colors.warning} />
+              </View>
+              <View style={styles.pendingContent}>
+                <AppText style={styles.pendingTitle}>Van Change Request Pending</AppText>
+                <AppText style={styles.pendingMessage}>
+                  Your request to change vehicle is under review
                 </AppText>
               </View>
             </View>
           )}
 
-          <View style={styles.mainContent}>
-            {dayStarted && (
+          {/* Van Information Card - Enhanced */}
+          <View style={[styles.vanCard, dayStarted && styles.vanCardWithMargin]}>
+            <View style={styles.vanCardHeader}>
+              <View style={styles.vanIconWrapper}>
+                <MaterialCommunityIcons name="van-passenger" size={22} color={colors.primary} />
+              </View>
+              <View style={styles.vanBadge}>
+                <AppText style={styles.vanBadgeText}>
+                  {vanDisplayInfo?.type || 'Standard'}
+                </AppText>
+              </View>
+            </View>
+            
+            <View style={styles.vanDetails}>
+              <AppText style={styles.vanLabel}>Assigned Vehicle</AppText>
+              <AppText style={styles.vanName} numberOfLines={1}>
+                {vanDisplayInfo?.combinedLabel || 'No van assigned'}
+              </AppText>
+              
+              <View style={styles.vanMetaRow}>
+                {vanDisplayInfo?.registration && (
+                  <View style={styles.vanMetaItem}>
+                    <Ionicons name="card-outline" size={14} color={colors.textSecondary} />
+                    <AppText style={styles.vanMetaText}>
+                      {vanDisplayInfo.registration}
+                    </AppText>
+                  </View>
+                )}
+                {vanDisplayInfo?.capacity && (
+                  <View style={styles.vanMetaItem}>
+                    <Ionicons name="cube-outline" size={14} color={colors.textSecondary} />
+                    <AppText style={styles.vanMetaText}>
+                      {vanDisplayInfo.capacity} kg
+                    </AppText>
+                  </View>
+                )}
+              </View>
+            </View>
+          </View>
+
+          {/* Current Activity Section */}
+          {dayStarted && (
+            <View style={styles.currentActivityWrapper}>
               <CurrentActivityCard
                 selectedActivity={currentActivity}
                 selectedActivityColor={selectedActivityColor}
@@ -920,24 +913,20 @@ export default function SalesExecutiveScreen() {
                 selectedRoute={selectedRoute}
                 assignedVan={mappedVan}
               />
-            )}
-          </View>
+            </View>
+          )}
 
-          <View style={styles.sectionStack}>
+          {/* Main Content Sections */}
+          <View style={styles.contentStack}>
             {isTodayLeave ? (
-              <View
-                style={[
-                  styles.leaveMessageContainer,
-                  { backgroundColor: colors.success + '15', borderColor: colors.success + '30' },
-                ]}
-              >
-                <Ionicons name="checkmark-circle-outline" size={24} color={colors.success} />
-                <View style={styles.leaveMessageContent}>
-                  <AppText style={[styles.leaveMessageTitle, { color: colors.textPrimary }]}>
-                    You have marked leave
-                  </AppText>
-                  <AppText style={[styles.leaveMessageSubtitle, { color: colors.textSecondary }]}>
-                    Enjoy your time off. Quick actions are not available when on leave.
+              <View style={styles.leaveCard}>
+                <View style={styles.leaveIconContainer}>
+                  <Ionicons name="checkmark-circle" size={28} color={colors.success} />
+                </View>
+                <View style={styles.leaveContent}>
+                  <AppText style={styles.leaveTitle}>You're on Leave Today</AppText>
+                  <AppText style={styles.leaveSubtitle}>
+                    Enjoy your time off. Quick actions are not available.
                   </AppText>
                 </View>
               </View>
@@ -949,14 +938,13 @@ export default function SalesExecutiveScreen() {
             )}
 
             <StatsOverviewSection employeeId={user?.userId as any} />
-
             <TodayActivitiesSection activities={todayActivities} />
-
             <Footer lastUpdated={new Date().toLocaleTimeString()} />
           </View>
         </LinearGradient>
       </ScrollView>
 
+      {/* Modals */}
       <UnifiedActionModal
         visible={unifiedModalVisible}
         modalType={unifiedModalType}
@@ -1053,168 +1041,196 @@ const createStyles = (colors: any) =>
     },
     heroSection: {
       paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 20,
+      paddingTop: 20,
+      paddingBottom: 16,
     },
-    heroHeaderRow: {
+    headerSection: {
+      marginBottom: 20,
+    },
+    greetingSection: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
       justifyContent: 'space-between',
-      gap: 12,
-      marginBottom: 16,
+      alignItems: 'flex-start',
     },
-    heroTextBlock: {
-      flex: 1,
-    },
-    heroEyebrow: {
-      fontSize: 12,
+    greetingText: {
+      fontSize: 13,
       fontWeight: '600',
-      letterSpacing: 0.8,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
       color: colors.primary,
       marginBottom: 4,
     },
-    heroTitle: {
-      fontSize: 24,
+    userName: {
+      fontSize: 26,
       fontWeight: '700',
       color: colors.textPrimary,
-      marginBottom: 0,
     },
-    // Full Width Van Info Card Styles
-    vanInfoCard: {
+    statusBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      width: '100%',
-    },
-    vanInfoIconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.primary + '10',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    vanInfoDetails: {
-      flex: 1,
-    },
-    vanInfoRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 4,
-    },
-    vanInfoLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    vanTypeBadge: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 6,
-    },
-    vanTypeText: {
-      fontSize: 10,
-      fontWeight: '600',
-    },
-    vanInfoName: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginBottom: 4,
-    },
-    vanRegistrationRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      marginBottom: 2,
-    },
-    vanRegistrationText: {
-      fontSize: 11,
-      color: colors.textSecondary,
-    },
-    vanCapacityRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    vanCapacityText: {
-      fontSize: 11,
-      color: colors.textSecondary,
-    },
-    // Keep existing styles
-    heroBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 10,
+      paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 20,
-      borderWidth: 1,
+      gap: 6,
     },
-    heroBadgeText: {
-      fontSize: 11,
+    activeBadge: {
+      backgroundColor: colors.success + '12',
+    },
+    idleBadge: {
+      backgroundColor: colors.warning + '12',
+    },
+    statusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    activeDot: {
+      backgroundColor: colors.success,
+    },
+    idleDot: {
+      backgroundColor: colors.warning,
+    },
+    statusText: {
+      fontSize: 12,
       fontWeight: '600',
+    },
+    activeStatusText: {
+      color: colors.success,
+    },
+    idleStatusText: {
+      color: colors.warning,
     },
     pendingBanner: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      borderRadius: 14,
-      borderWidth: 1,
+      backgroundColor: colors.warning + '10',
+      borderRadius: 12,
+      padding: 12,
       marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.warning + '20',
     },
-    pendingBannerContent: {
+    pendingIconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.warning + '15',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    pendingContent: {
       flex: 1,
     },
-    pendingBannerTitle: {
-      fontSize: 13,
+    pendingTitle: {
+      fontSize: 14,
       fontWeight: '600',
+      color: colors.warning,
       marginBottom: 2,
     },
-    pendingBannerSubtitle: {
-      fontSize: 11,
-      lineHeight: 15,
-      opacity: 0.85,
+    pendingMessage: {
+      fontSize: 12,
+      color: colors.textSecondary,
     },
-    mainContent: {
+    vanCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 0,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    vanCardWithMargin: {
       marginBottom: 16,
     },
-    sectionStack: {
-      gap: 12,
+    vanCardHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
     },
-    leaveMessageContainer: {
+    vanIconWrapper: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.primary + '12',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    vanBadge: {
+      backgroundColor: colors.primary + '10',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    vanBadgeText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.primary,
+    },
+    vanDetails: {
+      gap: 4,
+    },
+    vanLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: '500',
+    },
+    vanName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    vanMetaRow: {
+      flexDirection: 'row',
+      gap: 16,
+      marginTop: 8,
+    },
+    vanMetaItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      borderRadius: 14,
-      borderWidth: 1,
-      marginBottom: 8,
+      gap: 6,
     },
-    leaveMessageContent: {
+    vanMetaText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    currentActivityWrapper: {
+      marginBottom: 16,
+    },
+    contentStack: {
+      gap: 16,
+    },
+    leaveCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.success + '08',
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.success + '15',
+      gap: 14,
+    },
+    leaveIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.success + '12',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    leaveContent: {
       flex: 1,
     },
-    leaveMessageTitle: {
-      fontSize: 13,
+    leaveTitle: {
+      fontSize: 16,
       fontWeight: '600',
-      marginBottom: 2,
+      color: colors.textPrimary,
+      marginBottom: 4,
     },
-    leaveMessageSubtitle: {
-      fontSize: 11,
-      lineHeight: 15,
-      opacity: 0.85,
+    leaveSubtitle: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      lineHeight: 18,
     },
   });
