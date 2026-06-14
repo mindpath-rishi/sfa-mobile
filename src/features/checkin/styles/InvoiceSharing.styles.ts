@@ -9,7 +9,6 @@ export const useInvoiceSharingStyles = () => {
 
     scrollContent: {
       padding: 16,
-      paddingBottom: 100,
       gap: 16,
     } as ViewStyle,
 
@@ -43,14 +42,21 @@ export const useInvoiceSharingStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 16,
+      flex: 1,
+      minWidth: 0,
     } as ViewStyle,
 
     optionIcon: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       justifyContent: 'center',
       alignItems: 'center',
+    } as ViewStyle,
+
+    optionTextBlock: {
+      flex: 1,
+      minWidth: 0,
     } as ViewStyle,
 
     optionTitle: {
@@ -110,18 +116,23 @@ export const useInvoiceSharingStyles = () => {
     previewRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: 12,
       marginBottom: 12,
     } as ViewStyle,
 
     previewLabel: {
       fontSize: 14,
       color: '#666',
+      flexShrink: 0,
     } as TextStyle,
 
     previewValue: {
       fontSize: 14,
       fontWeight: '500',
       color: '#333',
+      flex: 1,
+      textAlign: 'right',
     } as TextStyle,
 
     previewAmount: {
@@ -205,18 +216,24 @@ export const useInvoiceSharingStyles = () => {
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingBottom: 10,
       borderBottomWidth: 1,
     } as ViewStyle,
 
     backButton: {
-      padding: 8,
-      marginLeft: -8,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: -6,
     } as ViewStyle,
 
     headerTitle: {
       fontSize: 18,
       fontWeight: '600',
+      flex: 1,
+      textAlign: 'center',
     } as TextStyle,
     // Add to your InvoiceSharing.styles.ts
     shareActionButton: {

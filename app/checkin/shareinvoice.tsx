@@ -1,6 +1,5 @@
 import React from 'react';
 import { View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import InvoiceSharingScreen from '@/features/checkin/screens/InvoiceSharingScreen';
 

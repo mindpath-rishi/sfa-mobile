@@ -1,3 +1,5 @@
+import type { CapturedLocation } from '@/shared/services/location.service';
+
 export type DayStartPayload = {
   activityName: string;
   routeId?: string;
@@ -11,6 +13,7 @@ export type DayStartPayload = {
   requestedVanName?: string;
   dayStartImageMediaId?: string;
   dayStartImageUrl?: string;
+  dayStartLocation?: CapturedLocation;
 };
 
 export type DayStartResponse = {
@@ -28,4 +31,5 @@ export type CreateActivityPayload = {
   routeName?: string;
   vanId?: string;
   vanName?: string;
+  startLocation?: CapturedLocation;
 };

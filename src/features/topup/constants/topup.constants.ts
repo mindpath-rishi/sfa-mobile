@@ -4,6 +4,8 @@ export const TOPUP_STATUS = {
   DRAFT: 'DRAFT',
   SUBMITTED: 'SUBMITTED',
   APPROVED: 'APPROVED',
+  ACCEPTED: 'ACCEPTED',
+  DECLINED: 'DECLINED',
   REJECTED: 'REJECTED',
 } as const;
 
@@ -32,17 +34,31 @@ export const TOPUP_STATUS_CONFIG: Record<TopupStatusType, {
   },
   [TOPUP_STATUS.APPROVED]: {
     label: 'Approved',
-    color: '#10B981',
-    bg: '#10B98112',
+    color: '#F59E0B',
+    bg: '#F59E0B12',
     icon: 'checkmark-circle-outline',
     order: 3,
+  },
+  [TOPUP_STATUS.ACCEPTED]: {
+    label: 'Accepted',
+    color: '#10B981',
+    bg: '#10B98112',
+    icon: 'cube-outline',
+    order: 4,
+  },
+  [TOPUP_STATUS.DECLINED]: {
+    label: 'Declined',
+    color: '#EF4444',
+    bg: '#EF444412',
+    icon: 'close-circle-outline',
+    order: 5,
   },
   [TOPUP_STATUS.REJECTED]: {
     label: 'Rejected',
     color: '#EF4444',
     bg: '#EF444412',
     icon: 'close-circle-outline',
-    order: 4,
+    order: 6,
   },
 };
 
@@ -54,6 +70,8 @@ export const TOPUP_STATUS_OPTIONS: Array<{
   { id: TOPUP_STATUS.DRAFT, label: 'Draft', value: TOPUP_STATUS.DRAFT },
   { id: TOPUP_STATUS.SUBMITTED, label: 'Submitted', value: TOPUP_STATUS.SUBMITTED },
   { id: TOPUP_STATUS.APPROVED, label: 'Approved', value: TOPUP_STATUS.APPROVED },
+  { id: TOPUP_STATUS.ACCEPTED, label: 'Accepted', value: TOPUP_STATUS.ACCEPTED },
+  { id: TOPUP_STATUS.DECLINED, label: 'Declined', value: TOPUP_STATUS.DECLINED },
   { id: TOPUP_STATUS.REJECTED, label: 'Rejected', value: TOPUP_STATUS.REJECTED },
 ];
 
@@ -147,4 +165,3 @@ export const VALIDATION = {
   MIN_SEARCH_LENGTH: 2,
   MAX_SEARCH_LENGTH: 100,
 } as const;
-

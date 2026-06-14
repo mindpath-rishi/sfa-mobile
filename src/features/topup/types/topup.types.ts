@@ -62,9 +62,15 @@ export interface Topup {
   totalApprovedWeight: number;
   totalApprovedValue: number;
   remark?: string;
+  rejectedReason?: string;
   status: TopupStatusType;
   approvedByName?: string;
   approvedAt?: string;
+  acceptedAt?: string;
+  acceptedBy?: string;
+  declinedAt?: string;
+  declinedBy?: string;
+  declinedReason?: string;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;

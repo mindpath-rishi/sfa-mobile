@@ -1,27 +1,28 @@
-// StatusOverviewSection.styles.ts
 import { StyleSheet } from 'react-native';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export const useStatsOverviewSectionStyles = () => {
+  const { colors } = useTheme();
+
   return StyleSheet.create({
     container: {
-      marginBottom: 16,
+      marginBottom: 0,
       width: '100%',
     },
     headerContainer: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
       backgroundColor: 'transparent',
-      minHeight: 44,
+      minHeight: 32,
     },
     headerTitle: {
-      fontSize: 12,
+      fontSize: 16,
       fontWeight: '600',
-      color: '#6B7280',
-      letterSpacing: 0.5,
-      lineHeight: 18,
+      color: colors.textPrimary,
+      lineHeight: 22,
     },
     refreshButton: {
       padding: 6,
@@ -31,27 +32,94 @@ export const useStatsOverviewSectionStyles = () => {
       justifyContent: 'center',
       alignItems: 'center',
       borderRadius: 16,
-      backgroundColor: '#F3F4F6',
+      backgroundColor: colors.backgroundTertiary,
     },
-    scrollContent: {
-      paddingLeft: 16,
-      paddingRight: 16, // Changed from 8 to 16 for equal padding
+    cardsList: {
+      paddingTop: 10,
+      gap: 12,
+    },
+    statsRow: {
       flexDirection: 'row',
+      gap: 12,
+      width: '100%',
     },
     cardWrapper: {
-      marginRight: 16, // Remove margin between cards
-      // Add a small separator line or shadow if needed
+      width: '100%',
     },
-    loadingContainer: {
+    halfCardWrapper: {
+      flex: 1,
+      minWidth: 0,
+    },
+    metricGraphic: {
+      width: '100%',
+      minHeight: 104,
+      borderRadius: 8,
+      padding: 10,
+      overflow: 'hidden',
+      justifyContent: 'space-between',
+    },
+    metricHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    metricIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 48,
-      minHeight: 180,
+      backgroundColor: 'rgba(255,255,255,0.22)',
     },
-    loadingText: {
-      fontSize: 14,
-      color: '#9CA3AF',
-      marginTop: 12,
+    metricTitle: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+    metricValue: {
+      fontSize: 25,
+      lineHeight: 29,
+      fontWeight: '800',
+      color: '#FFFFFF',
+      marginTop: 6,
+    },
+    metricFooter: {
+      gap: 6,
+      marginTop: 6,
+    },
+    metricSubtitle: {
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: '600',
+      color: 'rgba(255,255,255,0.86)',
+    },
+    metricTrack: {
+      height: 4,
+      borderRadius: 999,
+      overflow: 'hidden',
+      backgroundColor: 'rgba(255,255,255,0.22)',
+    },
+    metricProgress: {
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: '#FFFFFF',
+    },
+    skeletonCard: {
+      width: '100%',
+      height: 104,
+      borderRadius: 8,
+      padding: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    skeletonCardContent: {
+      flex: 1,
+      gap: 8,
     },
     errorContainer: {
       alignItems: 'center',
@@ -61,7 +129,7 @@ export const useStatsOverviewSectionStyles = () => {
     },
     errorText: {
       fontSize: 14,
-      color: '#EF4444',
+      color: colors.error,
       textAlign: 'center',
       paddingHorizontal: 24,
       marginTop: 12,
@@ -69,7 +137,7 @@ export const useStatsOverviewSectionStyles = () => {
     retryButton: {
       paddingHorizontal: 20,
       paddingVertical: 8,
-      backgroundColor: '#4158D0',
+      backgroundColor: colors.primary,
       borderRadius: 8,
       marginTop: 16,
     },

@@ -143,7 +143,7 @@ export const ActivityItemComponent: React.FC<ActivityItemComponentProps> = ({
         {/* Main Content */}
         <View style={styles.mainContent}>
           <View style={styles.headerRow}>
-            <AppText style={[styles.activityName, { color: colors.primary }]}>
+            <AppText style={[styles.activityName, { color: colors.textPrimary }]}>
               {getDisplayText(item.name)}
             </AppText>
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   timeText: {
-    fontSize: 11,
+    fontSize: 12,
   },
   durationInfo: {
     flexDirection: 'row',
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   durationText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
   },
   additionalInfo: {
@@ -272,6 +272,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   additionalText: {
-    fontSize: 10,
+    fontSize: 12,
   },
 });

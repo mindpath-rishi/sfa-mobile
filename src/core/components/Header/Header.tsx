@@ -39,6 +39,7 @@ const Header: React.FC = () => {
 
     rightIcon: config?.rightIcon,
     rightIcon2: config?.rightIcon2,
+    badgeCount: config?.badgeCount ?? 0,
     onRightPress: config?.onRightPress,
     onRightPress2: config?.onRightPress2,
 
@@ -145,6 +146,18 @@ const Header: React.FC = () => {
     );
   };
 
+  const renderIconBadge = () => {
+    if (!safeConfig.badgeCount) return null;
+
+    const badgeText = safeConfig.badgeCount > 99 ? '99+' : safeConfig.badgeCount.toString();
+
+    return (
+      <View style={styles.badge}>
+        <Text style={styles.badgeText}>{badgeText}</Text>
+      </View>
+    );
+  };
+
   /* ============================
    * HEADER CONTENT
    * ============================ */
@@ -241,6 +254,7 @@ const Header: React.FC = () => {
             ]}
           >
             <Feather name={icon as any} size={22} color={useGradient ? '#fff' : colors.surface} />
+            {i === 0 && renderIconBadge()}
           </Pressable>
         ))}
       </View>

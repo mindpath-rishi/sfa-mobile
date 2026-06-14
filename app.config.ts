@@ -13,7 +13,19 @@ export default ({ config }: any) => {
       'expo-notifications',
       'expo-web-browser',
       'expo-sqlite',
-      'expo-location',
+      [
+        'expo-location',
+        {
+          locationAlwaysAndWhenInUsePermission:
+            'Allow SFA to capture salesman location while the work day is active.',
+          locationAlwaysPermission:
+            'Allow SFA to capture salesman location while the work day is active.',
+          locationWhenInUsePermission:
+            'Allow SFA to capture your location for day and visit tracking.',
+          isIosBackgroundLocationEnabled: true,
+          isAndroidBackgroundLocationEnabled: true,
+        },
+      ],
       '@react-native-firebase/app',
       '@react-native-firebase/messaging',
       //   {
@@ -38,12 +50,34 @@ export default ({ config }: any) => {
       softwareKeyboardLayoutMode: 'resize',
       package: 'com.sfa.app',
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
-      permissions: ['android.permission.POST_NOTIFICATIONS'],
+      config: {
+        googleMaps: {
+          apiKey:
+            process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
+            process.env.GOOGLE_MAPS_API_KEY,
+        },
+      },
+      permissions: [
+        'android.permission.POST_NOTIFICATIONS',
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.ACCESS_BACKGROUND_LOCATION',
+        'android.permission.FOREGROUND_SERVICE',
+        'android.permission.FOREGROUND_SERVICE_LOCATION',
+      ],
     },
 
     ios: {
       bundleIdentifier: 'com.sfa.app',
       googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
+      config: {
+        googleMapsApiKey:
+          process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
+          process.env.GOOGLE_MAPS_API_KEY,
+      },
+      infoPlist: {
+        UIBackgroundModes: ['location'],
+      },
     },
 
     extra: {

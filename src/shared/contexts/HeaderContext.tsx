@@ -27,6 +27,7 @@ export type HeaderConfig = {
 
   rightIcon?: string;
   rightIcon2?: string;
+  badgeCount?: number;
 
   onRightPress?: () => void;
   onRightPress2?: () => void;
@@ -89,6 +90,7 @@ export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
 
       rightIcon: undefined,
       rightIcon2: undefined,
+      badgeCount: 0,
 
       onRightPress: undefined,
       onRightPress2: undefined,

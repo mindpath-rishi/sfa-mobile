@@ -456,6 +456,31 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       fontWeight: '700',
       color: colors.textSecondary,
     },
+    locationAction: {
+      minHeight: 26,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 6,
+      backgroundColor: colors.infoLight,
+      borderWidth: 0.5,
+      borderColor: colors.info,
+    },
+    locationActionDisabled: {
+      backgroundColor: colors.backgroundSecondary,
+      borderColor: colors.border,
+    },
+    locationActionText: {
+      fontSize: managerFontSize.xs,
+      fontWeight: '900',
+      color: colors.info,
+    },
+    locationActionTextDisabled: {
+      color: colors.textTertiary,
+    },
     userStatsSummary: {
       flexDirection: 'row',
       backgroundColor: colors.surface,
@@ -643,6 +668,26 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       fontSize: managerFontSize.xs,
       fontWeight: '800',
       color: colors.textSecondary,
+    },
+    activityLocationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginBottom: 8,
+    },
+    activityLocationTextWrap: {
+      flex: 1,
+      minWidth: 96,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    activityLocationText: {
+      flex: 1,
+      fontSize: managerFontSize.xs,
+      fontWeight: '800',
+      color: colors.textTertiary,
     },
     metricGrid: {
       flexDirection: 'row',

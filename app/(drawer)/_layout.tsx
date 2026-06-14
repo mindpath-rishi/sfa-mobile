@@ -764,7 +764,7 @@ export default function DrawerLayout() {
       backgroundColor: colors.primary,
     },
     'my-pocket': {
-      title: 'My Pocket',
+      title: 'My Pocket MIS',
       showMenu: false,
       showFilter: false,
       showBack: true,
@@ -821,7 +821,7 @@ export default function DrawerLayout() {
    * ============================ */
 
    useEffect(() => {
-    if (isProfile) {
+    if (isProfile && !segments.includes('(tabs)')) {
       const routeName = getRouteName(segments);
       const config = HEADER_MAP[routeName];
 
@@ -829,7 +829,7 @@ export default function DrawerLayout() {
         setHeader(config);
       }
     }
-  }, [segments]);
+  }, [segments, isProfile, setHeader]);
 
   useEffect(() => {
     const routeName = getRouteName(segments);
@@ -1002,8 +1002,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="my-pocket"
         options={{
-          title: 'My Pcoket',
-          drawerLabel: 'My Pocket',
+          title: 'My Pocket MIS',
+          drawerLabel: 'My Pocket MIS',
         }}
       />
 

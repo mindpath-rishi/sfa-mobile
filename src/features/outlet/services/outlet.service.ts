@@ -1,5 +1,9 @@
 import { api } from '@/core/network';
 import type { ApiResponse } from '@/core/network/api.types';
+import {
+  captureCurrentLocation,
+  type CapturedLocation,
+} from '@/shared/services/location.service';
 
 /**
  * Query params for fetching route outlets
@@ -37,6 +41,7 @@ export interface StartVisitPayload {
   outletId: string;
   sequence?: number;
   visitType?: 'ON_SITE' | 'OFF_SITE';
+  checkInLocation?: CapturedLocation;
 }
 
 /**
@@ -109,17 +114,25 @@ export const outletService: OutletService = {
     return api.get<any>(`/customer/${customerId}`, {}) as Promise<ApiResponse<any>>;
   },
   startVisit: async (payload: StartVisitPayload) => {
-    return api.post<any>('shop-visit', payload) as Promise<ApiResponse<any>>;
+    const checkInLocation = payload.checkInLocation || (await captureCurrentLocation());
+
+    return api.post<any>('shop-visit', {
+      ...payload,
+      checkInLocation,
+    }) as Promise<ApiResponse<any>>;
   },
 
   visitStatus: async (params: VisitStatusParams) => {
     return api.get<any>(`shop-visit/status`, { params }) as Promise<ApiResponse<any>>;
   },
 
-  completeVisit: async (visitId: string) => {
+  completeVisit: async (visitId?: string) => {
+    const checkOutLocation = await captureCurrentLocation();
+
     return api.patch<any>(`shop-visit/${visitId}`, {
       status: 'COMPLETED',
       checkOutTime: new Date().toISOString(),
+      checkOutLocation,
     }) as Promise<ApiResponse<any>>;
   },
 

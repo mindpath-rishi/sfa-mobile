@@ -30,6 +30,7 @@ import {
 } from '@/shared/services/push-notification.service';
 import { authService } from '@/features/auth/services/auth.service';
 import { getClientDeviceIdAsync } from '@/shared/services/device.service';
+import '@/shared/services/location.service';
 
 setupBackgroundMessageHandler();
 

@@ -3,6 +3,7 @@ export interface LoadSummaryModalProps {
   data: LoadSummaryData;
   onClose: () => void;
   onProceed: () => void;
+  proceedLabel?: string;
 }
 
 export interface LoadSummarySKU {

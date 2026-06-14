@@ -3,6 +3,7 @@ import {
   Alert,
   Image,
   Linking,
+  Platform,
   RefreshControl,
   ScrollView,
   TextInput,
@@ -26,6 +27,7 @@ import type {
   ManagerUserRoutePlanResponse,
   ManagerUserTimelineResponse,
   TargetMetric,
+  TimelineLocation,
 } from '../services/home.service';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
 import {
@@ -70,6 +72,9 @@ type TimelineActivity = {
   duration: string;
   outlet: string;
   owner: string;
+  location?: TimelineLocation | null;
+  checkInLocation?: TimelineLocation | null;
+  checkOutLocation?: TimelineLocation | null;
   metrics: UserMetric[];
   order?: OrderDetail;
 };
@@ -468,7 +473,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       },
     ];
   }, [routeStops, selectedRouteDate, selectedUser]);
-  const dayStartImageUrl = userId ? timelinesByUser[userId]?.dayStartImageUrl : undefined;
+  const selectedTimeline = userId ? timelinesByUser[userId] : undefined;
+  const dayStartImageUrl = selectedTimeline?.dayStartImageUrl;
 
   useFocusEffect(
     useCallback(() => {
@@ -736,6 +742,91 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       console.warn('Failed to open day start selfie', error);
       Alert.alert('Error', 'Unable to open day start selfie.');
     }
+  };
+
+  const hasLocation = (location?: TimelineLocation | null) =>
+    Number.isFinite(Number(location?.latitude)) && Number.isFinite(Number(location?.longitude));
+
+  const formatLocationTime = (location?: TimelineLocation | null) => {
+    if (!location?.capturedAt) return '';
+    const locationDate = new Date(location.capturedAt);
+    if (Number.isNaN(locationDate.getTime())) return '';
+
+    return locationDate.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const openLocationNavigation = async (
+    location?: TimelineLocation | null,
+    label = 'Location',
+  ) => {
+    if (!hasLocation(location)) {
+      toast.info(`${label} not available`);
+      return;
+    }
+
+    const latitude = Number(location?.latitude);
+    const longitude = Number(location?.longitude);
+    const encodedLabel = encodeURIComponent(label);
+    const nativeUrl = Platform.select({
+      ios: `maps://?daddr=${latitude},${longitude}&q=${encodedLabel}`,
+      android: `google.navigation:q=${latitude},${longitude}`,
+      web: `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`,
+      default: `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&travelmode=driving`,
+    });
+    const fallbackUrl = Platform.select({
+      ios: `maps:${latitude},${longitude}?q=${encodedLabel}`,
+      android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${encodedLabel})`,
+      web: `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
+      default: `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
+    });
+
+    try {
+      await Linking.openURL(nativeUrl || fallbackUrl || '');
+    } catch (error) {
+      try {
+        await Linking.openURL(fallbackUrl || '');
+      } catch (fallbackError) {
+        console.warn('Failed to open map navigation', fallbackError);
+        Alert.alert('Error', 'Unable to open map navigation.');
+      }
+    }
+  };
+
+  const renderLocationAction = (
+    label: string,
+    location?: TimelineLocation | null,
+    buttonText = 'Navigate',
+    showUnavailable = true,
+  ) => {
+    const available = hasLocation(location);
+    if (!available && !showUnavailable) return null;
+
+    return (
+      <TouchableOpacity
+        style={[styles.locationAction, !available && styles.locationActionDisabled]}
+        activeOpacity={available ? 0.75 : 1}
+        disabled={!available}
+        onPress={(event) => {
+          event.stopPropagation?.();
+          openLocationNavigation(location, label);
+        }}
+      >
+        <Ionicons
+          name={available ? 'navigate-outline' : 'location-outline'}
+          size={12}
+          color={available ? colors.info : colors.textTertiary}
+        />
+        <AppText
+          style={[styles.locationActionText, !available && styles.locationActionTextDisabled]}
+        >
+          {available ? buttonText : 'No GPS'}
+        </AppText>
+      </TouchableOpacity>
+    );
   };
 
   const getStatusIcon = (status: string) => {
@@ -1078,6 +1169,16 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   {selectedUser.location}
                 </AppText>
               </View>
+              <View style={styles.routeInfoRow}>
+                <Ionicons name="navigate-circle-outline" size={12} color={colors.textTertiary} />
+                <AppText style={styles.routeInfoText} numberOfLines={1}>
+                  Current location
+                  {formatLocationTime(selectedTimeline?.currentLocation)
+                    ? ` • ${formatLocationTime(selectedTimeline?.currentLocation)}`
+                    : ''}
+                </AppText>
+                {renderLocationAction('Current location', selectedTimeline?.currentLocation)}
+              </View>
             </View>
             
             <View style={styles.userStatsSummary}>
@@ -1125,18 +1226,11 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                       <View style={styles.dayStartInfo}>
                         <AppText style={styles.dayStartTitle}>DAY START</AppText>
                         <AppText style={styles.dayStartTime}>
-                          {userId ? timelinesByUser[userId]?.dayStartTime || '--' : '--'}
+                          {selectedTimeline?.dayStartTime || '--'}
                         </AppText>
                       </View>
                       <View style={styles.selfieContainer}>
-                        <TouchableOpacity
-                          style={styles.selfieButton}
-                          activeOpacity={0.7}
-                          onPress={openDayStartSelfie}
-                        >
-                          <MaterialCommunityIcons name="camera" size={14} color={colors.primaryContrast} />
-                          <AppText style={styles.selfieButtonText}>SELFIE</AppText>
-                        </TouchableOpacity>
+                        {renderLocationAction('Day start location', selectedTimeline?.dayStartLocation)}
                         {dayStartImageUrl ? (
                           <TouchableOpacity activeOpacity={0.8} onPress={openDayStartSelfie}>
                             <Image
@@ -1187,6 +1281,34 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                             {activity.owner}
                           </AppText>
                         </View>
+                        {(hasLocation(activity.checkInLocation) ||
+                          hasLocation(activity.checkOutLocation) ||
+                          hasLocation(activity.location)) && (
+                          <View style={styles.activityLocationRow}>
+                            <View style={styles.activityLocationTextWrap}>
+                              <Ionicons
+                                name="location-outline"
+                                size={12}
+                                color={colors.textTertiary}
+                              />
+                              <AppText style={styles.activityLocationText} numberOfLines={1}>
+                                Visit location
+                              </AppText>
+                            </View>
+                            {renderLocationAction(
+                              'Visit check-in location',
+                              activity.checkInLocation || activity.location,
+                              'Check-in',
+                              false,
+                            )}
+                            {renderLocationAction(
+                              'Visit check-out location',
+                              activity.checkOutLocation,
+                              'Check-out',
+                              false,
+                            )}
+                          </View>
+                        )}
                         <View style={styles.metricGrid}>
                           {activity.metrics.map((metric) => (
                             <View key={`${activity.id}-${metric.label}`} style={styles.metricCell}>
@@ -1198,6 +1320,24 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                       </View>
                     </TouchableOpacity>
                   ))
+                )}
+                {(selectedTimeline?.dayEndTime || hasLocation(selectedTimeline?.dayEndLocation)) && (
+                  <View style={styles.dayStartContainer}>
+                    <View style={styles.timelineDot}>
+                      <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                    </View>
+                    <View style={styles.dayStartCard}>
+                      <View style={styles.dayStartContent}>
+                        <View style={styles.dayStartInfo}>
+                          <AppText style={styles.dayStartTitle}>DAY END</AppText>
+                          <AppText style={styles.dayStartTime}>
+                            {selectedTimeline.dayEndTime || '--'}
+                          </AppText>
+                          {renderLocationAction('Day end location', selectedTimeline.dayEndLocation)}
+                        </View>
+                      </View>
+                    </View>
+                  </View>
                 )}
               </View>
             )}

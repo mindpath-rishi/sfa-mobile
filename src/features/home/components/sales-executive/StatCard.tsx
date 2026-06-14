@@ -1,12 +1,20 @@
 // StatCard.tsx - Horizontal Scroll Version
 import React from 'react';
-import { View, TouchableOpacity, ActivityIndicator, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  ActivityIndicator,
+  StyleSheet,
+  Dimensions,
+  ScrollView,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = 160; // Fixed width for horizontal scrolling
-const CARD_HEIGHT = 110;
+const CARD_WIDTH = 220; // Fixed width for horizontal scrolling
+const CARD_HEIGHT = 118;
 
 interface StatCardProps {
   title: string;
@@ -15,6 +23,10 @@ interface StatCardProps {
   icon: string;
   color: string;
   trend?: number;
+  progress?: number;
+  badge?: number;
+  compact?: boolean;
+  fullWidth?: boolean;
   loading?: boolean;
   onPress?: () => void;
 }
@@ -26,31 +38,39 @@ export const StatCard: React.FC<StatCardProps> = ({
   icon,
   color,
   trend,
+  fullWidth = false,
   loading = false,
   onPress,
 }) => {
-  // Format large numbers
+  const { colors } = useTheme();
+
   const formatValue = (val: string | number): string => {
     const num = typeof val === 'string' ? parseFloat(val.replace(/,/g, '')) : val;
     if (isNaN(num)) return String(val);
-    
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
     return num.toLocaleString();
   };
 
   const getFontSize = (value: string): number => {
+    if (value.length > 14) return 14;
     if (value.length > 10) return 16;
-    if (value.length > 7) return 18;
-    return 22;
+    if (value.length > 7) return 20;
+    return 24;
   };
 
+  const subtitleParts = subtitle?.includes(':') ? subtitle.split(/:(.*)/s) : null;
+
   const CardContent = () => (
-    <View style={[styles.card, { backgroundColor: '#FFF' }]}>
+    <View
+      style={[
+        styles.card,
+        fullWidth && styles.fullWidthCard,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          shadowColor: colors.shadow,
+        },
+      ]}
+    >
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="small" color={color} />
@@ -62,20 +82,21 @@ export const StatCard: React.FC<StatCardProps> = ({
       </View>
 
       <View style={styles.content}>
-        <AppText style={styles.title} numberOfLines={1}>
+        <AppText style={[styles.title, { color: colors.textSecondary }]} numberOfLines={1}>
           {title}
         </AppText>
-        
+
         <View style={styles.valueSection}>
-          <AppText 
+          <AppText
             style={[styles.value, { fontSize: getFontSize(formatValue(value)) }]}
+            color={colors.textPrimary}
             numberOfLines={1}
             adjustsFontSizeToFit
             minimumFontScale={0.5}
           >
             {formatValue(value)}
           </AppText>
-          
+
           {trend !== undefined && trend !== 0 && (
             <View style={styles.trendWrapper}>
               <MaterialCommunityIcons
@@ -89,10 +110,19 @@ export const StatCard: React.FC<StatCardProps> = ({
             </View>
           )}
         </View>
-        
+
         {subtitle && (
-          <AppText style={styles.subtitle} numberOfLines={1}>
-            {subtitle}
+          <AppText style={[styles.subtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+            {subtitleParts ? (
+              <>
+                {subtitleParts[0]}:{' '}
+                <AppText style={[styles.subtitleValue, { color: colors.textPrimary }]}>
+                  {subtitleParts[1]?.trim() ?? ''}
+                </AppText>
+              </>
+            ) : (
+              subtitle
+            )}
           </AppText>
         )}
       </View>
@@ -134,11 +164,7 @@ export const StatCardScroll: React.FC<StatCardScrollProps> = ({
       snapToAlignment="start"
     >
       {data.map((item) => (
-        <StatCard
-          key={item.id}
-          {...item}
-          onPress={() => onCardPress?.(item)}
-        />
+        <StatCard key={item.id} {...item} onPress={() => onCardPress?.(item)} />
       ))}
     </ScrollView>
   );
@@ -152,17 +178,20 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
+    elevation: 0,
     borderWidth: 1,
     borderColor: '#F0F0F0',
+  },
+  fullWidthCard: {
+    width: '100%',
   },
   loadingOverlay: {
     position: 'absolute',
@@ -189,12 +218,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '400',
     marginBottom: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   valueSection: {
     flexDirection: 'row',
@@ -204,8 +230,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   value: {
+    flexBasis: '100%',
+    flexShrink: 1,
     fontWeight: '700',
-    color: '#111827',
   },
   trendWrapper: {
     flexDirection: 'row',
@@ -221,7 +248,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   subtitle: {
-    fontSize: 9,
-    color: '#9CA3AF',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  subtitleValue: {
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

@@ -42,4 +42,10 @@ export const notificationService = {
     api.patch<any>(`/work-session/van-change/${workSessionId}/reject`, {}) as Promise<
       ApiResponse<any>
     >,
+
+  acceptTopup: (topupId: string) =>
+    api.patch<any>(`/van-inventory-topup/${topupId}/accept`, {}) as Promise<ApiResponse<any>>,
+
+  rejectTopup: (topupId: string, payload: any = {}) =>
+    api.patch<any>(`/van-inventory-topup/${topupId}/reject`, payload) as Promise<ApiResponse<any>>,
 };

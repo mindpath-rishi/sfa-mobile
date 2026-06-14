@@ -1,6 +1,5 @@
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -8,9 +7,9 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
-import { AppText } from '@/core/components';
+import { AppText, Skeleton } from '@/core/components';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import {
@@ -18,13 +17,14 @@ import {
   type NotificationItem as ApiNotificationItem,
 } from '@/features/notification/services/notification.service';
 import { toast } from '@/core/utils';
+import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
 
 type NotificationItem = {
   id: string;
   title: string;
   message: string;
   time: string;
-  type: 'order' | 'route' | 'target' | 'system';
+  type: 'order' | 'route' | 'target' | 'topup' | 'system';
   unread?: boolean;
   data?: Record<string, any>;
 };
@@ -58,7 +58,7 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
     title: item.title,
     message: item.body || item.message || '',
     time: formatRelativeTime(item.createdAt || item.sentAt),
-    type: ['order', 'route', 'target'].includes(category)
+    type: ['order', 'route', 'target', 'topup'].includes(category)
       ? (category as NotificationItem['type'])
       : 'system',
     unread: !item.isRead,
@@ -74,10 +74,25 @@ const getNotificationIcon = (type: NotificationItem['type']) => {
       return 'map-outline';
     case 'target':
       return 'flag-outline';
+    case 'topup':
+      return 'cube-outline';
     case 'system':
     default:
       return 'checkmark-circle-outline';
   }
+};
+
+const isPendingTopupAcceptance = (item: NotificationItem) => {
+  const category = String(item.data?.category || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.status || '').toUpperCase();
+
+  return category === 'topup' && action === 'ACCEPTANCE_REQUIRED' && status === 'APPROVED';
+};
+
+const getTopupStatus = (item: NotificationItem) => {
+  const status = String(item.data?.status || '').toUpperCase();
+  return ['ACCEPTED', 'DECLINED'].includes(status) ? status : '';
 };
 
 const isPendingVanChangeApproval = (item: NotificationItem) => {
@@ -110,6 +125,10 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [confirmTopupAction, setConfirmTopupAction] = useState<{
+    item: NotificationItem;
+    action: 'accept' | 'reject';
+  } | null>(null);
 
   const loadNotifications = useCallback(async (showRefresh = false) => {
     if (showRefresh) {
@@ -143,9 +162,12 @@ export default function NotificationsScreen() {
     }, [colors.primary, loadNotifications, setHeader]),
   );
 
-  const unreadCount = notifications.filter((item) => item.unread).length;
-
   const handleNotificationPress = async (item: NotificationItem) => {
+    const target = item.data?.route || item.data?.url;
+    if (typeof target === 'string' && target.startsWith('/')) {
+      router.push(target as never);
+    }
+
     if (!item.unread) return;
 
     setNotifications((current) =>
@@ -158,6 +180,59 @@ export default function NotificationsScreen() {
       await notificationService.markAsRead(item.id);
     } catch (error) {
       console.warn('Failed to mark notification read:', error);
+    }
+  };
+
+  const handleTopupAction = async (item: NotificationItem, action: 'accept' | 'reject') => {
+    const topupId = item.data?.vanInventoryTopupId;
+    if (!topupId || processingId) return;
+    setConfirmTopupAction({ item, action });
+  };
+
+  const performTopupAction = async (item: NotificationItem, action: 'accept' | 'reject') => {
+    const topupId = item.data?.vanInventoryTopupId;
+    if (!topupId || processingId) return;
+
+    setProcessingId(item.id);
+    try {
+      const response =
+        action === 'accept'
+          ? await notificationService.acceptTopup(String(topupId))
+          : await notificationService.rejectTopup(String(topupId), {
+              reason: 'Rejected by salesman',
+            });
+
+      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+        toast.error(response?.message || `Failed to ${action} top-up`);
+        return;
+      }
+
+      toast.success(action === 'accept' ? 'Top-up accepted' : 'Top-up rejected');
+      setConfirmTopupAction(null);
+
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === item.id
+            ? {
+                ...notification,
+                unread: false,
+                data: {
+                  ...notification.data,
+                  action: action === 'accept' ? 'ACCEPTED' : 'DECLINED',
+                  status: action === 'accept' ? 'ACCEPTED' : 'DECLINED',
+                },
+              }
+            : notification,
+        ),
+      );
+
+      await notificationService.markAsRead(item.id);
+      await loadNotifications(true);
+    } catch (error: any) {
+      console.warn(`Failed to ${action} top-up:`, error);
+      toast.error(error?.response?.data?.message || `Failed to ${action} top-up`);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -209,38 +284,50 @@ export default function NotificationsScreen() {
     }
   };
 
-  return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} />
-      }
-    >
-      <View style={styles.summaryBand}>
-        <View>
-          <AppText style={styles.summaryLabel}>Unread</AppText>
-          <AppText style={styles.summaryValue}>{unreadCount}</AppText>
+  const renderNotificationSkeleton = () => (
+    <View style={styles.list}>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <View key={item} style={styles.skeletonCard}>
+          <Skeleton height={42} width={42} variant="circle" />
+          <View style={styles.skeletonBody}>
+            <View style={styles.skeletonHeader}>
+              <Skeleton height={16} width="68%" borderRadius={8} />
+              <Skeleton height={8} width={8} variant="circle" />
+            </View>
+            <Skeleton height={12} width="92%" borderRadius={6} style={{ marginTop: 10 }} />
+            <Skeleton height={12} width="74%" borderRadius={6} style={{ marginTop: 7 }} />
+            <Skeleton height={10} width={72} borderRadius={5} style={{ marginTop: 12 }} />
+          </View>
         </View>
-        <View style={styles.summaryIcon}>
-          <Ionicons name="notifications-outline" size={22} color={colors.primary} />
-        </View>
-      </View>
+      ))}
+    </View>
+  );
 
-      {loading ? (
-        <View style={styles.emptyState}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      ) : notifications.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="notifications-off-outline" size={28} color={colors.textTertiary} />
-          <AppText style={styles.emptyText}>No notifications yet</AppText>
-        </View>
-      ) : (
-        <View style={styles.list}>
-          {notifications.map((item) => {
+  return (
+    <>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => loadNotifications(true)} />
+        }
+      >
+        {loading ? (
+          renderNotificationSkeleton()
+        ) : notifications.length === 0 ? (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="notifications-off-outline" size={30} color={colors.textTertiary} />
+            </View>
+            <AppText style={styles.emptyText}>No notifications yet</AppText>
+            <AppText style={styles.emptySubtext}>New alerts and approvals will appear here.</AppText>
+          </View>
+        ) : (
+          <View style={styles.list}>
+            {notifications.map((item) => {
             const vanChangeReason = getVanChangeReason(item);
             const vanChangeStatus = getVanChangeStatus(item);
+            const topupStatus = getTopupStatus(item);
 
             return (
               <View key={item.id} style={[styles.card, item.unread && styles.unreadCard]}>
@@ -249,7 +336,7 @@ export default function NotificationsScreen() {
                   onPress={() => handleNotificationPress(item)}
                   style={styles.cardPressArea}
                 >
-                  <View style={styles.iconWrap}>
+                  <View style={[styles.iconWrap, item.unread && styles.unreadIconWrap]}>
                     <Ionicons
                       name={getNotificationIcon(item.type)}
                       size={18}
@@ -275,6 +362,18 @@ export default function NotificationsScreen() {
                         ]}
                       >
                         {vanChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                      </AppText>
+                    )}
+                    {topupStatus && (
+                      <AppText
+                        style={[
+                          styles.statusText,
+                          {
+                            color: topupStatus === 'ACCEPTED' ? colors.success : colors.error,
+                          },
+                        ]}
+                      >
+                        {topupStatus === 'ACCEPTED' ? 'Accepted' : 'Declined'}
                       </AppText>
                     )}
                     <AppText style={styles.time}>{item.time}</AppText>
@@ -303,12 +402,47 @@ export default function NotificationsScreen() {
                     </TouchableOpacity>
                   </View>
                 )}
+
+                {isPendingTopupAcceptance(item) && (
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      disabled={processingId === item.id}
+                      onPress={() => handleTopupAction(item, 'reject')}
+                      style={[styles.actionButton, styles.rejectButton]}
+                    >
+                      <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                        Reject
+                      </AppText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      disabled={processingId === item.id}
+                      onPress={() => handleTopupAction(item, 'accept')}
+                      style={[styles.actionButton, styles.approveButton]}
+                    >
+                      <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                        Accept Stock
+                      </AppText>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
-          })}
-        </View>
-      )}
-    </ScrollView>
+            })}
+          </View>
+        )}
+      </ScrollView>
+
+      <TopupActionConfirmSheet
+        visible={!!confirmTopupAction}
+        action={confirmTopupAction?.action || null}
+        loading={!!processingId}
+        onClose={() => setConfirmTopupAction(null)}
+        onConfirm={() => {
+          if (!confirmTopupAction) return;
+          void performTopupAction(confirmTopupAction.item, confirmTopupAction.action);
+        }}
+      />
+    </>
   );
 }
 
@@ -319,69 +453,81 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.backgroundSecondary,
     },
     content: {
-      padding: 14,
+      padding: 16,
       paddingBottom: 32,
       gap: 12,
     },
-    summaryBand: {
-      minHeight: 76,
-      borderRadius: 8,
-      padding: 14,
+    list: {
+      gap: 12,
+    },
+    emptyState: {
+      minHeight: 280,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+      gap: 10,
+    },
+    emptyIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.borderLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
+    },
+    emptyText: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    emptySubtext: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    skeletonCard: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      backgroundColor: colors.surface,
+      padding: 14,
+      flexDirection: 'row',
+      gap: 12,
+    },
+    skeletonBody: {
+      flex: 1,
+      minWidth: 0,
+    },
+    skeletonHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-    },
-    summaryLabel: {
-      color: colors.textTertiary,
-      fontSize: 11,
-      fontWeight: '800',
-      textTransform: 'uppercase',
-    },
-    summaryValue: {
-      marginTop: 3,
-      color: colors.textPrimary,
-      fontSize: 24,
-      fontWeight: '900',
-    },
-    summaryIcon: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      backgroundColor: colors.infoLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    list: {
-      gap: 10,
-    },
-    emptyState: {
-      minHeight: 160,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-    },
-    emptyText: {
-      color: colors.textTertiary,
-      fontSize: 12,
-      fontWeight: '700',
+      gap: 12,
     },
     card: {
-      borderRadius: 8,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.borderLight,
       backgroundColor: colors.surface,
-      padding: 12,
-      gap: 10,
+      padding: 14,
+      gap: 12,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 6,
+      elevation: 1,
     },
     cardPressArea: {
       flexDirection: 'row',
-      gap: 10,
+      gap: 12,
     },
     unreadCard: {
       borderColor: colors.primary,
+      backgroundColor: colors.primary + '06',
     },
     actionRow: {
       flexDirection: 'row',
@@ -411,12 +557,15 @@ const createStyles = (colors: any) =>
       fontWeight: '800',
     },
     iconWrap: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       backgroundColor: colors.infoLight,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    unreadIconWrap: {
+      backgroundColor: colors.primary + '14',
     },
     cardBody: {
       flex: 1,
@@ -430,8 +579,8 @@ const createStyles = (colors: any) =>
     title: {
       flex: 1,
       color: colors.textPrimary,
-      fontSize: 14,
-      fontWeight: '900',
+      fontSize: 15,
+      fontWeight: '800',
     },
     unreadDot: {
       width: 8,
@@ -440,13 +589,13 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.primary,
     },
     message: {
-      marginTop: 5,
+      marginTop: 6,
       color: colors.textSecondary,
-      fontSize: 12,
-      lineHeight: 17,
+      fontSize: 13,
+      lineHeight: 19,
     },
     reasonText: {
-      marginTop: 4,
+      marginTop: 8,
       color: colors.textSecondary,
       fontSize: 12,
       fontWeight: '700',
@@ -459,9 +608,9 @@ const createStyles = (colors: any) =>
       textTransform: 'uppercase',
     },
     time: {
-      marginTop: 8,
+      marginTop: 10,
       color: colors.textTertiary,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
     },
   });

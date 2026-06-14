@@ -21,6 +21,7 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
   data,
   onClose,
   onProceed,
+  proceedLabel = 'Proceed',
 }) => {
   const { colors } = useTheme();
   const styles = createLoadSummaryModalStyles(colors);
@@ -316,7 +317,7 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
           style={[styles.proceedButton, { backgroundColor: colors.primary }]}
           activeOpacity={0.85}
         >
-          <AppText style={styles.proceedButtonText}>Proceed</AppText>
+          <AppText style={styles.proceedButtonText}>{proceedLabel}</AppText>
         </TouchableOpacity>
       </View>
     </Animated.View>

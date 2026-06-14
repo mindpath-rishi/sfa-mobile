@@ -9,7 +9,15 @@ export const useTopupStyles = () => {
     container: {
       flex: 1,
       backgroundColor: colors.background,
-      paddingTop: utils.spacing[2],
+    } as ViewStyle,
+
+    fixedSearchContainer: {
+      paddingHorizontal: utils.spacing[3],
+      paddingTop: utils.spacing[2.5],
+      paddingBottom: utils.spacing[2],
+      backgroundColor: colors.background,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.divider,
     } as ViewStyle,
 
     fab: {

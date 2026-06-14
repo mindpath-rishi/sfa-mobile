@@ -13,9 +13,9 @@ export const useCurrentActivityCardStyles = ({
 
   return StyleSheet.create({
     container: {
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 16,
+      backgroundColor: 'transparent',
+      borderRadius: 0,
+      padding: 0,
       // marginHorizontal: 16,
       // marginVertical: 8,
       // shadowColor: '#000',
@@ -31,13 +31,13 @@ export const useCurrentActivityCardStyles = ({
     activityHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 16,
+      marginBottom: 12,
     } as ViewStyle,
 
     activityIcon: {
       width: 48,
       height: 48,
-      borderRadius: 12,
+      borderRadius: 10,
       justifyContent: 'center',
       alignItems: 'center',
     } as ViewStyle,
@@ -55,11 +55,9 @@ export const useCurrentActivityCardStyles = ({
     } as ViewStyle,
 
     activityTypeText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textPrimary,
     } as TextStyle,
 
     statusBadge: {
@@ -90,7 +88,7 @@ export const useCurrentActivityCardStyles = ({
     } as ViewStyle,
 
     timerText: {
-      fontSize: 26,
+      fontSize: 24,
       fontWeight: '700',
       fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     } as TextStyle,
@@ -106,14 +104,14 @@ export const useCurrentActivityCardStyles = ({
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 12,
-      marginBottom: 12,
+      marginBottom: 0,
     } as ViewStyle,
 
     infoCard: {
       flex: 1,
       minWidth: (width - 56) / 2 - 12,
       backgroundColor: colors.background,
-      borderRadius: 10,
+      borderRadius: 8,
       padding: 10,
       borderWidth: 1,
       borderColor: colors.divider,
@@ -132,14 +130,14 @@ export const useCurrentActivityCardStyles = ({
     } as ViewStyle,
 
     infoCardTitle: {
-      fontSize: 11,
-      fontWeight: '600',
-      letterSpacing: 0.5,
+      fontSize: 12,
+      fontWeight: '400',
+      color: colors.textSecondary,
     } as TextStyle,
 
     routeName: {
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 16,
+      fontWeight: '700',
       color: colors.textPrimary,
       marginBottom: 4,
     } as TextStyle,
@@ -151,13 +149,14 @@ export const useCurrentActivityCardStyles = ({
     } as ViewStyle,
 
     routeStatsText: {
-      fontSize: 11,
+      fontSize: 13,
+      fontWeight: '600',
       color: colors.textSecondary,
     } as TextStyle,
 
     vanName: {
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 16,
+      fontWeight: '700',
       color: colors.textPrimary,
     } as TextStyle,
 
@@ -169,8 +168,8 @@ export const useCurrentActivityCardStyles = ({
     } as ViewStyle,
 
     otherWorkDuration: {
-      fontSize: 16,
-      fontWeight: '600',
+      fontSize: 18,
+      fontWeight: '700',
     } as TextStyle,
 
     // Warning Section

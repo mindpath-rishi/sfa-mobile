@@ -1,5 +1,5 @@
 // InvoiceSharingScreen.tsx - Clean UI, Details only in PDF
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   BackHandler,
+  LayoutChangeEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -19,24 +20,29 @@ import { useInvoiceSharingStyles } from '../styles/InvoiceSharing.styles';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { ConfirmationModal } from '@/core/components';
+import { useInvoiceStore } from '@/core/store/invoice.store';
 
 export default function InvoiceSharingScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useInvoiceSharingStyles();
   const params = useLocalSearchParams();
+  const latestInvoice = useInvoiceStore((s) => s.latestInvoice);
   const [selectedOption, setSelectedOption] = useState<'print' | 'share' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [bottomBarHeight, setBottomBarHeight] = useState(0);
 
-  // Parse invoice data from params
-  let invoice;
-  try {
-    invoice = params.invoice ? JSON.parse(params.invoice as string) : null;
-  } catch (error) {
-    console.error('Failed to parse invoice data:', error);
-    invoice = null;
-  }
+  const invoice = useMemo(() => {
+    if (latestInvoice) return latestInvoice;
+
+    try {
+      return params.invoice ? JSON.parse(params.invoice as string) : null;
+    } catch (error) {
+      console.error('Failed to parse invoice data:', error);
+      return null;
+    }
+  }, [latestInvoice, params.invoice]);
 
   // Get customerId from params or invoice data
   const customerId = (params.customerId as string) || invoice?.customerId || 'CUST0001';
@@ -56,18 +62,23 @@ export default function InvoiceSharingScreen() {
     return () => backHandler.remove();
   }, [customerId]);
 
-  // If no invoice data, show error
   if (!invoice) {
     return (
       <View
         style={[
           styles.container,
-          { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
+          {
+            backgroundColor: colors.background,
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+          },
         ]}
       >
-        <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
-        <Text style={{ color: colors.error, marginTop: 16, textAlign: 'center' }}>
-          No invoice data available
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.textSecondary, marginTop: 16, textAlign: 'center' }}>
+          Preparing invoice...
         </Text>
         <TouchableOpacity onPress={handleBackNavigation} style={{ marginTop: 20 }}>
           <Text style={{ color: colors.primary }}>Go Back</Text>
@@ -471,23 +482,37 @@ export default function InvoiceSharingScreen() {
     handleBackNavigation();
   };
 
+  const handleBottomBarLayout = (event: LayoutChangeEvent) => {
+    setBottomBarHeight(event.nativeEvent.layout.height);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View
         style={[
           styles.header,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+            paddingTop: insets.top + 6,
+          },
         ]}
       >
         <TouchableOpacity onPress={handleBackNavigation} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Share Invoice</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40, height: 40 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(bottomBarHeight + 16, 104) },
+        ]}
+      >
         {/* Simple Instruction */}
         <Text style={styles.instruction}>
           Share your invoice with the customer or print a copy for your records.
@@ -507,9 +532,9 @@ export default function InvoiceSharingScreen() {
               <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
                 <Ionicons name="print" size={28} color={colors.primary} />
               </View>
-              <View>
+              <View style={styles.optionTextBlock}>
                 <Text style={styles.optionTitle}>Print Invoice</Text>
-                <Text style={styles.optionDescription}>Print a copy for your records</Text>
+                <Text style={styles.optionDescription} numberOfLines={2}>Print a copy for your records</Text>
               </View>
             </View>
             {selectedOption === 'print' && (
@@ -528,9 +553,9 @@ export default function InvoiceSharingScreen() {
               <View style={[styles.optionIcon, { backgroundColor: colors.success + '15' }]}>
                 <Ionicons name="share-social" size={28} color={colors.success} />
               </View>
-              <View>
+              <View style={styles.optionTextBlock}>
                 <Text style={styles.optionTitle}>Share Invoice</Text>
-                <Text style={styles.optionDescription}>Share PDF via WhatsApp, Email, etc.</Text>
+                <Text style={styles.optionDescription} numberOfLines={2}>Share PDF via WhatsApp, Email, etc.</Text>
               </View>
             </View>
             {selectedOption === 'share' && (
@@ -603,7 +628,7 @@ export default function InvoiceSharingScreen() {
           <View style={styles.previewRow}>
             <Text style={styles.previewLabel}>Total Amount:</Text>
             <Text style={[styles.previewValue, styles.previewAmount]}>
-              {invoice.currency} {invoice.amount.toFixed(2)}
+              {invoice.currency} {Number(invoice.amount || 0).toFixed(2)}
             </Text>
           </View>
 
@@ -622,7 +647,17 @@ export default function InvoiceSharingScreen() {
       </ScrollView>
 
       {/* Bottom Button - Return to Check In */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom || 16 }]}>
+      <View
+        onLayout={handleBottomBarLayout}
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            paddingBottom: Math.max(insets.bottom, 12),
+          },
+        ]}
+      >
         <TouchableOpacity
           style={[
             styles.proceedButton,
@@ -632,7 +667,7 @@ export default function InvoiceSharingScreen() {
           onPress={handleReturnToCheckIn}
           activeOpacity={0.9}
         >
-          <Text style={styles.proceedButtonText}>Return to Check In →</Text>
+          <Text style={styles.proceedButtonText}>Return to My Route</Text>
         </TouchableOpacity>
       </View>
 

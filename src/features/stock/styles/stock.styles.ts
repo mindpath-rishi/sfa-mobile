@@ -14,6 +14,15 @@ export const createStockStyles = (colors: any) =>
       paddingTop: Platform.OS === 'ios' ? 4 : 8,
     },
 
+    fixedSearchContainer: {
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 8,
+      backgroundColor: colors.background,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.divider,
+    },
+
     // Metrics Section - Horizontal Scroll (All devices)
     metricsWrapper: {
       marginVertical: 8,

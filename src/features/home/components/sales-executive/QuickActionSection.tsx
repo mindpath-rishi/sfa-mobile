@@ -13,7 +13,7 @@ export const QuickActionsSection: React.FC<QuickActionsSectionProps> = ({
 
   return (
     <View style={styles.container}>
-      <SectionHeader title="QUICK ACTIONS" variant="small" />
+      <SectionHeader title="QUICK ACTIONS" variant="small" titleStyle={styles.sectionTitle} />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

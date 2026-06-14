@@ -6,6 +6,8 @@ export interface VanService {
   fetchInventoryTopupRequests: (payload: any) => Promise<ApiResponse<any>>;
   fetchTodayStockSummary: (payload: any) => Promise<ApiResponse<any>>;
   fetchInventoryTopupRequest: (topupId: string) => Promise<ApiResponse<any>>;
+  acceptInventoryTopupRequest: (topupId: string) => Promise<ApiResponse<any>>;
+  rejectInventoryTopupRequest: (topupId: string, payload?: any) => Promise<ApiResponse<any>>;
 }
 
 export const vanService: VanService = {
@@ -20,6 +22,12 @@ export const vanService: VanService = {
 
   fetchInventoryTopupRequest: (topupId: string) =>
     api.get<any>(`/van-inventory-topup/${topupId}`) as Promise<ApiResponse<any>>,
+
+  acceptInventoryTopupRequest: (topupId: string) =>
+    api.patch<any>(`/van-inventory-topup/${topupId}/accept`, {}) as Promise<ApiResponse<any>>,
+
+  rejectInventoryTopupRequest: (topupId: string, payload: any = {}) =>
+    api.patch<any>(`/van-inventory-topup/${topupId}/reject`, payload) as Promise<ApiResponse<any>>,
 
   fetchTodayStockSummary: (params: any) =>
     api.get<any>('/van-daily-stock/summary', { params }) as Promise<ApiResponse<any>>,

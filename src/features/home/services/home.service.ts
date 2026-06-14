@@ -3,6 +3,11 @@ import type { ApiResponse } from '@/core/network/api.types';
 import { LoginRequest, LoginResponse } from '@/features/auth/types/login.types';
 import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
 import { Platform } from 'react-native';
+import {
+  captureCurrentLocation,
+  stopSalesmanBackgroundLocation,
+  type CapturedLocation,
+} from '@/shared/services/location.service';
 
 /**
  * Auth API contract used by the app.
@@ -203,13 +208,26 @@ export interface ManagerFieldUserSummary {
   } | null;
 }
 
+export interface TimelineLocation {
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  altitude?: number | null;
+  speed?: number | null;
+  capturedAt?: string | null;
+}
+
 export interface ManagerUserTimelineResponse {
   employeeId: string;
   employeeName: string;
   date: string;
   dayStartTime?: string | null;
+  dayEndTime?: string | null;
   dayStartImageUrl?: string | null;
   dayStartImageMediaId?: string | null;
+  dayStartLocation?: TimelineLocation | null;
+  dayEndLocation?: TimelineLocation | null;
+  currentLocation?: TimelineLocation | null;
   activities: {
     id: string;
     source?: string;
@@ -218,6 +236,9 @@ export interface ManagerUserTimelineResponse {
     duration: string;
     outlet: string;
     owner: string;
+    location?: TimelineLocation | null;
+    checkInLocation?: TimelineLocation | null;
+    checkOutLocation?: TimelineLocation | null;
     metrics: {
       label: string;
       value: string;
@@ -362,6 +383,39 @@ export interface SalesmanPocketTargetResponse {
     avgFirstCallTime?: string | null;
     avgFirstPcTime?: string | null;
   };
+  vanUtilization?: {
+    openingStockCases: number;
+    topupStockCases: number;
+    totalStockCases: number;
+    salesCases: number;
+    utilizationPercentage: number;
+  };
+}
+
+export interface SalesmanReportShareResponse {
+  message?: string;
+  shareText?: string;
+  text?: string;
+  url?: string;
+  reportUrl?: string;
+  fileUrl?: string;
+}
+
+export type SalesmanReportType = 'MST' | 'MSR' | 'DSR';
+
+export interface SalesmanDispatchStatusItem {
+  orderId?: string;
+  orderNo?: string;
+  outletName?: string;
+  outlet?: string;
+  invoiceNo?: string;
+  status?: string;
+  orderDate?: string;
+  dispatchDate?: string;
+  vehicleNo?: string;
+  cases?: number;
+  pieces?: number;
+  netValue?: number;
 }
 
 export type TargetMetric = 'cases' | 'tonnage' | 'value';
@@ -381,7 +435,23 @@ export interface HomeService {
   getVanMappedRoutes: () => Promise<ApiResponse<any>>;
   getVan: (userId: string) => Promise<ApiResponse<any>>;
   getVans: (params?: { limit?: number; page?: number }) => Promise<ApiResponse<any>>;
-  dayComplete(carryForwardStock: any): Promise<ApiResponse<any>>;
+  dayComplete(
+    carryForwardStock:
+      | any
+      | {
+          carryForwardStock?: any;
+          dayEndLocation?: CapturedLocation;
+        },
+  ): Promise<ApiResponse<any>>;
+  cancelVanChangeRequest(workSessionId: string): Promise<ApiResponse<any>>;
+  requestVanChange(
+    workSessionId: string,
+    payload: {
+      requestedVanId: string;
+      requestedVanName?: string;
+      vanChangeReason?: string;
+    },
+  ): Promise<ApiResponse<any>>;
   getEmployeeStats(employeeId: string): Promise<ApiResponse<any>>;
   getSalesmanPocketAndTarget: (params?: {
     date?: string;
@@ -400,6 +470,39 @@ export interface HomeService {
     endDate?: string;
     groupBy?: SalesmanProductSalesGroupBy;
   }) => Promise<ApiResponse<SalesmanProductSalesResponse>>;
+  shareSalesmanMSR: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<ApiResponse<SalesmanReportShareResponse>>;
+  shareSalesmanMST: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<ApiResponse<SalesmanReportShareResponse>>;
+  shareSalesmanDSR: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<ApiResponse<SalesmanReportShareResponse>>;
+  shareSalesmanReport: (
+    type: SalesmanReportType,
+    params?: {
+      date?: string;
+      startDate?: string;
+      endDate?: string;
+    },
+  ) => Promise<ApiResponse<SalesmanReportShareResponse>>;
+  getSalesmanDispatchOrders: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<ApiResponse<SalesmanDispatchStatusItem[]>>;
+  getSalesmanDispatchStatus: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<ApiResponse<SalesmanDispatchStatusItem[]>>;
   getManagerStats(
     params?:
       | string
@@ -498,8 +601,33 @@ export const homeService: HomeService = {
     api.get<any>(`/van`, { params: { limit: 50, page: 1, ...(params || {}) } }) as Promise<
       ApiResponse<any>
     >,
-  dayComplete: (carryForwardStock) =>
-    api.post('/work-session/complete', { carryForwardStock }) as Promise<ApiResponse<any>>,
+  dayComplete: async (carryForwardStock) => {
+    const payload =
+      carryForwardStock &&
+      typeof carryForwardStock === 'object' &&
+      'dayEndLocation' in carryForwardStock
+        ? carryForwardStock
+        : {
+            carryForwardStock,
+            dayEndLocation: await captureCurrentLocation(),
+          };
+
+    const response = (await api.post('/work-session/complete', payload)) as ApiResponse<any>;
+
+    if (response?.success) {
+      await stopSalesmanBackgroundLocation();
+    }
+
+    return response;
+  },
+  cancelVanChangeRequest: (workSessionId: string) =>
+    api.patch<any>(`/work-session/van-change/${workSessionId}/cancel`, {}) as Promise<
+      ApiResponse<any>
+    >,
+  requestVanChange: (workSessionId, payload) =>
+    api.patch<any>(`/work-session/van-change/${workSessionId}/request`, payload) as Promise<
+      ApiResponse<any>
+    >,
   getEmployeeStats: (employeeId: string) =>
     api.get<any>(`/employee/${employeeId}/stats`, {}) as Promise<ApiResponse<any>>,
   getSalesmanPocketAndTarget: (params) =>
@@ -514,6 +642,21 @@ export const homeService: HomeService = {
     api.get<SalesmanProductSalesResponse>(`/employee/salesman/product-sales`, {
       params,
     }) as Promise<ApiResponse<SalesmanProductSalesResponse>>,
+  shareSalesmanReport: (type, params) =>
+    api.post<SalesmanReportShareResponse, typeof params>(
+      `/employee/salesman/share-${type.toLowerCase()}`,
+      params,
+    ) as Promise<ApiResponse<SalesmanReportShareResponse>>,
+  shareSalesmanMSR: (params) => homeService.shareSalesmanReport('MSR', params),
+  shareSalesmanMST: (params) => homeService.shareSalesmanReport('MST', params),
+  shareSalesmanDSR: (params) =>
+    homeService.shareSalesmanReport('DSR', params),
+  getSalesmanDispatchOrders: (params) =>
+    api.get<SalesmanDispatchStatusItem[]>(`/employee/salesman/dispatch-order`, {
+      params,
+    }) as Promise<ApiResponse<SalesmanDispatchStatusItem[]>>,
+  getSalesmanDispatchStatus: (params) =>
+    homeService.getSalesmanDispatchOrders(params),
   getManagerStats: (params) => {
     const queryParams = typeof params === 'string' ? { date: params } : params;
 

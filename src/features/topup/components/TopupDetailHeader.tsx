@@ -5,6 +5,7 @@ import { View, TouchableOpacity } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText } from '@/core/components';
 import { HeaderProps } from '../types/topupDetail.types';
@@ -20,6 +21,7 @@ export const TopupDetailHeader: React.FC<HeaderProps> = ({
 }) => {
   const styles = createTopupDetailStyles(colors);
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
 
   // Get status configuration
   const statusLabel = getStatusLabel(detail.status as TopupStatusType);
@@ -32,7 +34,7 @@ export const TopupDetailHeader: React.FC<HeaderProps> = ({
         colors={[colors.primary, colors.primaryDark]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.heroHeader}
+        style={[styles.heroHeader, { paddingTop: insets.top + 16 }]}
       >
         {/* Single row with back button and content */}
         <View style={styles.heroContent}>

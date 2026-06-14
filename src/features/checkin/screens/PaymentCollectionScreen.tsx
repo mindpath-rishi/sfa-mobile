@@ -12,7 +12,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppCard } from '@/core/components/Card';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,6 +27,7 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { AppModal, ConfirmationModal } from '@/core/components';
 import { FlatList } from 'react-native-gesture-handler';
+import { useInvoiceStore } from '@/core/store/invoice.store';
 
 type PaymentMode = 'cash' | 'wallet' | 'card' | 'cheque' | 'credit' | 'split';
 
@@ -1083,12 +1084,23 @@ export default function PaymentCollectionScreen() {
       };
     }
 
-    const response = await saleService.createSale(payload);
+    let response: any;
+    try {
+      response = await saleService.createSale(payload);
+    } catch (error) {
+      console.error('Sale creation failed:', error);
+      toast.error('Error', 'Failed to create sale');
+      setIsSubmitting(false);
+      setShowConfirm(false);
+      return;
+    }
 
-    setIsSubmitting(false);
-    setShowConfirm(false);
-
-    if (!response?.success) return;
+    if (!response?.success) {
+      toast.error('Error', response?.message || 'Failed to create sale');
+      setIsSubmitting(false);
+      setShowConfirm(false);
+      return;
+    }
 
     let successMessage = 'Sale created successfully';
     if (isSplitPayment) {
@@ -1160,25 +1172,32 @@ export default function PaymentCollectionScreen() {
       status: pendingAmount > 0 ? (paidAmount > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
     };
 
-    clearCart();
+    useInvoiceStore.getState().setLatestInvoice(invoiceData);
+    setShowConfirm(false);
 
-    // Auto-close the visit after successful sale
-    if (activeVisit?.visitId) {
-      try {
-        await outletService.completeVisit(activeVisit.visitId);
-        const setActiveVisit = useOutletStore.getState().setActiveVisit;
-        setActiveVisit(null);
-      } catch (error) {
-        console.error('Error completing visit:', error);
-      }
-    }
-
-    router.push({
+    router.replace({
       pathname: '/checkin/shareinvoice',
       params: {
-        invoice: JSON.stringify(invoiceData),
+        invoiceId: saleId,
+        customerId: outlet?.customerId,
       },
     });
+
+    setTimeout(() => {
+      clearCart();
+
+      if (activeVisit?.visitId) {
+        outletService
+          .completeVisit(activeVisit.visitId)
+          .then(() => {
+            const setActiveVisit = useOutletStore.getState().setActiveVisit;
+            setActiveVisit(null);
+          })
+          .catch((error) => {
+            console.error('Error completing visit:', error);
+          });
+      }
+    }, 0);
   };
 
   const handleSetFullAmount = () => {

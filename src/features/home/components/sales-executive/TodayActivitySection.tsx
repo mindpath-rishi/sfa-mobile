@@ -145,7 +145,7 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
     <View style={styles.container}>
       <TouchableOpacity onPress={toggleExpand} activeOpacity={0.7} style={styles.headerContainer}>
         <View style={styles.headerLeft}>
-          <AppText style={[styles.headerTitle, { color: colors.textSecondary }]}>
+          <AppText style={[styles.headerTitle, { color: colors.textPrimary }]}>
             TODAY ACTIVITIES
           </AppText>
           {hasActivities && (
@@ -175,7 +175,7 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
                 ]}
               >
                 <Ionicons name="time-outline" size={14} color={colors.primary} />
-                <AppText style={[styles.statValue, { color: colors.primary }]}>
+                <AppText style={[styles.statValue, { color: colors.textPrimary }]}>
                   {stats.totalDuration}
                 </AppText>
                 <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>
@@ -194,10 +194,12 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
                   ]}
                 >
                   <Ionicons name="play-circle" size={14} color={colors.primary} />
-                  <AppText style={[styles.statValue, { color: colors.primary }]}>
+                  <AppText style={[styles.statValue, { color: colors.textPrimary }]}>
                     {stats.ongoing}
                   </AppText>
-                  <AppText style={[styles.statLabel, { color: colors.primary }]}>Active</AppText>
+                  <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>
+                    Active
+                  </AppText>
                 </View>
               )}
 
@@ -212,10 +214,12 @@ export const TodayActivitiesSection: React.FC<TodayActivitiesSectionProps> = ({
                   ]}
                 >
                   <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                  <AppText style={[styles.statValue, { color: colors.success }]}>
+                  <AppText style={[styles.statValue, { color: colors.textPrimary }]}>
                     {stats.completionRate}%
                   </AppText>
-                  <AppText style={[styles.statLabel, { color: colors.success }]}>Completed</AppText>
+                  <AppText style={[styles.statLabel, { color: colors.textSecondary }]}>
+                    Completed
+                  </AppText>
                 </View>
               )}
             </View>

@@ -12,9 +12,14 @@ import { formatWeight } from '@/shared/utils/weight.utils';
 
 export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors }) => {
   const styles = createTopupDetailStyles(colors);
+  const hasApprovedTotals = ['APPROVED', 'ACCEPTED', 'DECLINED', 'REJECTED'].includes(
+    detail.status,
+  );
   const isApproved = detail.status === 'APPROVED';
+  const isAccepted = detail.status === 'ACCEPTED';
+  const isDeclined = detail.status === 'DECLINED';
   const isRejected = detail.status === 'REJECTED';
-  const isPending = detail.status === 'PENDING';
+  const isPending = detail.status === 'SUBMITTED' || detail.status === 'DRAFT';
 
   // Requested totals
   const requestedCases = detail.totalRequestedCases || 0;
@@ -91,7 +96,7 @@ export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors })
                 <AppText style={styles.comparisonLabel}>Requested</AppText>
                 <AppText style={styles.comparisonValue}>{requestedCases} Cases</AppText>
               </View>
-              {isApproved && (
+              {hasApprovedTotals && (
                 <>
                   <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
                   <View style={styles.approvedBox}>
@@ -122,7 +127,7 @@ export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors })
                 <AppText style={styles.comparisonLabel}>Requested</AppText>
                 <AppText style={styles.comparisonValue}>{requestedPieces} Pieces</AppText>
               </View>
-              {isApproved && (
+              {hasApprovedTotals && (
                 <>
                   <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
                   <View style={styles.approvedBox}>
@@ -153,7 +158,7 @@ export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors })
                 <AppText style={styles.comparisonLabel}>Requested</AppText>
                 <AppText style={styles.comparisonValue}>{formatCurrency(requestedValue)}</AppText>
               </View>
-              {isApproved && (
+              {hasApprovedTotals && (
                 <>
                   <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
                   <View style={styles.approvedBox}>
@@ -188,7 +193,7 @@ export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors })
                 <AppText style={styles.comparisonLabel}>Requested</AppText>
                 <AppText style={styles.comparisonValue}>{formatWeight(requestedWeight)}</AppText>
               </View>
-              {isApproved && (
+              {hasApprovedTotals && (
                 <>
                   <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
                   <View style={styles.approvedBox}>
@@ -233,6 +238,48 @@ export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors })
         </View>
       )}
 
+      {isApproved && (
+        <View style={styles.pendingSection}>
+          <LinearGradient
+            colors={[colors.warning + '15', colors.warning + '05']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.pendingCard}
+          >
+            <Ionicons name="cube-outline" size={24} color={colors.warning} />
+            <View style={styles.pendingContent}>
+              <AppText style={styles.pendingTitle}>Approved</AppText>
+              <AppText style={styles.pendingText}>
+                This top-up is approved and waiting for salesman acceptance.
+              </AppText>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
+
+      {isAccepted && (
+        <View style={styles.approvedSection}>
+          <LinearGradient
+            colors={[colors.success + '15', colors.success + '05']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.approvedCard}
+          >
+            <View style={styles.approvedHeader}>
+              <View style={[styles.approvedIcon, { backgroundColor: colors.success + '15' }]}>
+                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              </View>
+              <View>
+                <AppText style={styles.approvedTitle}>Accepted</AppText>
+                <AppText style={styles.approvedDate}>
+                  {detail.acceptedAt ? formatDateTime(detail.acceptedAt) : formatDateTime(detail.updatedAt)}
+                </AppText>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
+
       {/* Rejected Indicator */}
       {isRejected && (
         <View style={styles.rejectedSection}>
@@ -247,6 +294,25 @@ export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors })
               <AppText style={styles.rejectedTitle}>Request Rejected</AppText>
               <AppText style={styles.rejectedText}>
                 {detail.rejectedReason || 'No reason provided'}
+              </AppText>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
+
+      {isDeclined && (
+        <View style={styles.rejectedSection}>
+          <LinearGradient
+            colors={[colors.error + '15', colors.error + '05']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.rejectedCard}
+          >
+            <Ionicons name="close-circle" size={24} color={colors.error} />
+            <View style={styles.rejectedContent}>
+              <AppText style={styles.rejectedTitle}>Declined</AppText>
+              <AppText style={styles.rejectedText}>
+                {detail.declinedReason || 'Declined by salesman'}
               </AppText>
             </View>
           </LinearGradient>

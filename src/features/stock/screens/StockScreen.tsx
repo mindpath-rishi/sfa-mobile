@@ -11,11 +11,10 @@ import {
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { vanService } from '@/shared/services/van.service';
 import { useRouteStore } from '@/core/store/route.store';
-import { AppText, Skeleton } from '@/core/components';
+import { AppText, SearchBar, Skeleton } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { createStockStyles } from '../styles/stock.styles';
 import { StockProductItem } from '../components/StockProductItem';
@@ -31,8 +30,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   const styles = createStockStyles(useTheme().colors);
   const { colors } = useTheme();
   const route = useRoute();
-  const van = useRouteStore.getState().van;
-  const insets = useSafeAreaInsets();
+  const van = useRouteStore((state) => state.van);
 
   const loadNumber = propLoadNumber || (route.params as any)?.loadNumber;
 
@@ -57,31 +55,22 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   const opacityAnim = useState(new Animated.Value(0))[0];
   const flatListRef = useRef<FlatList>(null);
   const { setHeader } = useHeader();
+  const vanName = van?.vanName || van?.name || van?.vanNumber || 'Van';
 
-  // Update header with search bar
+  // Update header title. Search stays fixed in the page content.
   useFocusEffect(
     useCallback(() => {
       setHeader({
-        title: 'Available Stock',
+        title: `${vanName} Stock`,
         showBack: true,
-        showSearchBar: true,
-        searchPlaceholder: 'Search products...',
-        searchValue: searchQuery,
-        onSearchChange: handleSearch,
-        onSearchClear: clearSearch,
-        onSearchPress: () => {
-          if (searchQuery.trim()) {
-            fetchStock(false, 1, searchQuery, true);
-          }
-        },
-        autoFocusSearch: false,
+        showSearchBar: false,
+        showSearch: false,
         showFilter: false,
         elevated: true,
-        centeredTitle: false,
-        size: 'sm',
         showBorder: false,
+        backgroundColor: colors.primary,
       });
-    }, [searchQuery]),
+    }, [colors.primary, setHeader, vanName]),
   );
 
   const fetchStock = useCallback(
@@ -198,6 +187,9 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
 
   const renderSkeleton = () => (
     <View style={styles.skeletonContainer}>
+      <View style={styles.fixedSearchContainer}>
+        <Skeleton height={48} width="100%" borderRadius={12} />
+      </View>
       <View style={styles.skeletonMetrics}>
         <View style={styles.skeletonMetricsRow}>
           <Skeleton height={48} width="23%" borderRadius={10} />
@@ -269,6 +261,16 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      <View style={styles.fixedSearchContainer}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={handleSearch}
+          placeholder="Search products..."
+          clearable
+          debounceDelay={0}
+          loading={isLoading && stock.length > 0}
+        />
+      </View>
       <FlatList
         ref={flatListRef}
         data={stock}

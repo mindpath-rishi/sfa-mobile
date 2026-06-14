@@ -1029,13 +1029,13 @@ import {
   UIManager,
   Linking,
   TextInput,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppButton, AppModal } from '@/core/components';
+import { AppButton, AppModal, Skeleton } from '@/core/components';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { homeService } from '@/features/home/services/home.service';
 import { router, useFocusEffect } from 'expo-router';
@@ -1056,6 +1056,7 @@ import {
 import { useRouteScreenStyles } from '@/features/routes/styles/RouteScreen.styles';
 import type { Outlet } from '@/features/routes/types/route.types';
 import { detectGeofenceEvents, getDistance, isInsideGeofence } from '@/shared/utils/geofence.utils';
+import { captureCurrentLocation } from '@/shared/services/location.service';
 
 // ============= UTILITY FUNCTIONS =============
 const formatCurrency = (amount: number): string => {
@@ -1064,6 +1065,14 @@ const formatCurrency = (amount: number): string => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
+};
+
+const getOutletCoordinate = (outlet: Outlet) => {
+  const latitude = Number(outlet.geoTag?.lat);
+  const longitude = Number(outlet.geoTag?.lng);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude, longitude };
 };
 
 // Enable LayoutAnimation for Android
@@ -1102,12 +1111,74 @@ type RouteAccessMessage = {
 
 // ============= LOADING STATES COMPONENTS =============
 const LoadingSkeleton = ({ colors, styles }: any) => (
-  <View style={styles.loadingContainer}>
-    <ActivityIndicator size="large" color={colors.primary} />
-    <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-      Loading route outlets...
-    </Text>
-  </View>
+  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+    <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.header}>
+      <View style={styles.progressContainer}>
+        <View style={styles.progressHeader}>
+          <Skeleton height={14} width={120} borderRadius={7} />
+          <Skeleton height={26} width={54} borderRadius={10} />
+        </View>
+        <Skeleton height={8} width="100%" borderRadius={4} />
+        <Skeleton height={12} width={168} borderRadius={6} style={{ marginTop: 12 }} />
+      </View>
+
+      <View style={styles.headerMetricsGrid}>
+        {[1, 2, 3, 4].map((item) => (
+          <React.Fragment key={item}>
+            <View style={styles.headerMetricItem}>
+              <Skeleton height={16} width={16} variant="circle" />
+              <Skeleton height={18} width={44} borderRadius={8} style={{ marginTop: 8 }} />
+              <Skeleton height={10} width={38} borderRadius={5} style={{ marginTop: 8 }} />
+            </View>
+            {item < 4 && <View style={styles.headerMetricDivider} />}
+          </React.Fragment>
+        ))}
+      </View>
+    </LinearGradient>
+
+    <View style={styles.searchBarContainer}>
+      <Skeleton height={44} width="83%" borderRadius={12} />
+      <Skeleton height={44} width={44} borderRadius={12} />
+    </View>
+
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
+    >
+      {[72, 90, 104, 96].map((item) => (
+        <Skeleton
+          key={item}
+          height={34}
+          width={item}
+          borderRadius={14}
+          style={{ marginRight: 12 }}
+        />
+      ))}
+    </ScrollView>
+
+    <View style={styles.outletList}>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <View key={item} style={styles.expandableCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.headerLeft}>
+              <Skeleton height={44} width={44} variant="circle" />
+              <View style={{ flex: 1 }}>
+                <View style={styles.nameRow}>
+                  <Skeleton height={16} width="64%" borderRadius={8} />
+                  <Skeleton height={24} width={64} borderRadius={8} />
+                </View>
+                <View style={styles.detailsRow}>
+                  <Skeleton height={12} width="58%" borderRadius={6} />
+                  <Skeleton height={22} width={72} borderRadius={11} />
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  </ScrollView>
 );
 
 const EmptyStateComponent = ({
@@ -1264,6 +1335,7 @@ const OutletCardComponent = React.memo(
 // ============= MAIN COMPONENT =============
 export default function RouteScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useRouteScreenStyles();
   const activeRoute = useRouteStore((s) => s.selectedRoute);
   const workSessionId = useAuthStore((s) => s.workSessionId);
@@ -1309,6 +1381,7 @@ export default function RouteScreen() {
   const routeIdRef = useRef<string | undefined>(undefined);
   const locationInterval = useRef<NodeJS.Timeout | null>(null);
   const isDataLoadedRef = useRef(false);
+  const mapRef = useRef<any>(null);
   const activeVisist = useOutletStore.getState().activeVisit;
   const { setActiveVisit } = useOutletStore();
   const { setHeader } = useHeader();
@@ -1550,11 +1623,13 @@ export default function RouteScreen() {
       const newStatus: Record<string, boolean> = {};
 
       outlets.forEach((outlet) => {
-        if (outlet.geoTag?.lat && outlet.geoTag?.lng) {
+        const coordinate = getOutletCoordinate(outlet);
+
+        if (coordinate) {
           const inside = isInsideGeofence(lat, lng, {
             id: outlet._id,
-            latitude: outlet.geoTag.lat,
-            longitude: outlet.geoTag.lng,
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
             radius: 100,
           });
           newStatus[outlet._id] = inside;
@@ -1571,7 +1646,7 @@ export default function RouteScreen() {
     [outlets, geofenceStatus],
   );
 
-  const getUserLocation = useCallback(() => {
+  const getUserLocation = useCallback(async () => {
     if (Platform.OS === 'web' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -1582,12 +1657,22 @@ export default function RouteScreen() {
         (error) => console.log('Error getting location:', error),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
       );
+      return;
+    }
+
+    const location = await captureCurrentLocation();
+    if (location) {
+      setCurrentLocation({
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+      checkAllGeofences(location.latitude, location.longitude);
     }
   }, [checkAllGeofences]);
 
   useEffect(() => {
-    if (activeRoute && outlets.length > 0 && Platform.OS === 'web') {
-      getUserLocation();
+    if (activeRoute && outlets.length > 0) {
+      void getUserLocation();
       const interval = setInterval(getUserLocation, 30000);
       return () => clearInterval(interval);
     }
@@ -1597,44 +1682,68 @@ export default function RouteScreen() {
   const outletsWithDistance = useMemo(() => {
     return [...filteredOutlets]
       .sort((a, b) => a.sequence - b.sequence)
-      .map((outlet) => ({
-        ...outlet,
-        distance:
-          outlet.geoTag?.lat && outlet.geoTag?.lng
+      .map((outlet) => {
+        const coordinate = getOutletCoordinate(outlet);
+
+        return {
+          ...outlet,
+          distance: coordinate
             ? getDistance(
                 currentLocation.latitude,
                 currentLocation.longitude,
-                outlet.geoTag.lat,
-                outlet.geoTag.lng,
+                coordinate.latitude,
+                coordinate.longitude,
               )
             : 0,
-        isInsideGeofence:
-          outlet.geoTag?.lat && outlet.geoTag?.lng
+          isInsideGeofence: coordinate
             ? isInsideGeofence(currentLocation.latitude, currentLocation.longitude, {
                 id: outlet._id,
-                latitude: outlet.geoTag.lat,
-                longitude: outlet.geoTag.lng,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
                 radius: 100,
               })
             : false,
-      }));
+        };
+      });
   }, [filteredOutlets, currentLocation]);
 
   const mapOutlets = useMemo(
-    () => outletsWithDistance.filter((outlet) => outlet.geoTag?.lat && outlet.geoTag?.lng),
+    () => outletsWithDistance.filter((outlet) => getOutletCoordinate(outlet)),
     [outletsWithDistance],
   );
 
   const mapCoordinates = useMemo(
-    () => [
-      currentLocation,
-      ...mapOutlets.map((outlet) => ({
-        latitude: outlet.geoTag.lat,
-        longitude: outlet.geoTag.lng,
-      })),
-    ],
+    () => {
+      const outletCoordinates = mapOutlets.reduce<Array<{ latitude: number; longitude: number }>>(
+        (coordinates, outlet) => {
+          const coordinate = getOutletCoordinate(outlet);
+          if (coordinate) coordinates.push(coordinate);
+          return coordinates;
+        },
+        [],
+      );
+
+      return [currentLocation, ...outletCoordinates];
+    },
     [currentLocation, mapOutlets],
   );
+
+  const fitMapToRoute = useCallback(() => {
+    if (!mapRef.current || !mapCoordinates.length) return;
+
+    requestAnimationFrame(() => {
+      mapRef.current?.fitToCoordinates(mapCoordinates, {
+        edgePadding: { top: 80, right: 60, bottom: 120, left: 60 },
+        animated: true,
+      });
+    });
+  }, [mapCoordinates]);
+
+  useEffect(() => {
+    if (showMapModal && mapsLoaded) {
+      fitMapToRoute();
+    }
+  }, [showMapModal, mapsLoaded, fitMapToRoute]);
 
   // ========== HEADER SETUP ==========
   const handleRightPress = useCallback(() => setShowMapModal(true), []);
@@ -2209,6 +2318,7 @@ export default function RouteScreen() {
         <View style={styles.fullScreenContainer}>
           {mapsLoaded && MapView ? (
             <MapView
+              ref={mapRef}
               provider={PROVIDER_GOOGLE}
               style={styles.fullScreenMap}
               initialRegion={{
@@ -2217,6 +2327,7 @@ export default function RouteScreen() {
                 latitudeDelta: 0.08,
                 longitudeDelta: 0.08,
               }}
+              onMapReady={fitMapToRoute}
             >
               <Marker coordinate={currentLocation} title="Current Location">
                 <View style={[styles.fullScreenMarker, styles.fullScreenMarkerCurrent]}>
@@ -2224,26 +2335,28 @@ export default function RouteScreen() {
                 </View>
               </Marker>
 
-              {mapOutlets.map((outlet, index) => (
-                <Marker
-                  key={outlet._id}
-                  coordinate={{
-                    latitude: outlet.geoTag.lat,
-                    longitude: outlet.geoTag.lng,
-                  }}
-                  title={outlet.name}
-                  description={outlet.address?.line1}
-                >
-                  <View
-                    style={[
-                      styles.fullScreenMarker,
-                      outlet.isVisited && styles.fullScreenMarkerCompleted,
-                    ]}
+              {mapOutlets.map((outlet, index) => {
+                const coordinate = getOutletCoordinate(outlet);
+                if (!coordinate) return null;
+
+                return (
+                  <Marker
+                    key={outlet._id}
+                    coordinate={coordinate}
+                    title={outlet.name}
+                    description={`${outlet.address?.line1 || ''}${outlet.distance ? ` · ${outlet.distance.toFixed(1)} km` : ''}`}
                   >
-                    <Text style={styles.fullScreenMarkerText}>{index + 1}</Text>
-                  </View>
-                </Marker>
-              ))}
+                    <View
+                      style={[
+                        styles.fullScreenMarker,
+                        outlet.isVisited && styles.fullScreenMarkerCompleted,
+                      ]}
+                    >
+                      <Text style={styles.fullScreenMarkerText}>{index + 1}</Text>
+                    </View>
+                  </Marker>
+                );
+              })}
 
               {mapCoordinates.length > 1 && (
                 <Polyline
@@ -2262,11 +2375,36 @@ export default function RouteScreen() {
             </View>
           )}
 
+          <View
+            style={{
+              position: 'absolute',
+              top: insets.top + 16,
+              left: 16,
+              right: 72,
+              backgroundColor: colors.surface,
+              borderRadius: 12,
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.18,
+              shadowRadius: 6,
+              elevation: 4,
+            }}
+          >
+            <Text style={{ color: colors.textPrimary, fontWeight: '700', fontSize: 14 }}>
+              {mapOutlets.length} shops on route
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+              Distances are from your current location
+            </Text>
+          </View>
+
           <TouchableOpacity
             onPress={() => setShowMapModal(false)}
             style={{
               position: 'absolute',
-              top: 48,
+              top: insets.top + 16,
               right: 16,
               width: 44,
               height: 44,

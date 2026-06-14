@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } fro
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AppText } from '@/core/components';
+import { AppText, Skeleton } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import {
   notificationService,
@@ -11,6 +11,7 @@ import {
 } from '@/features/notification/services/notification.service';
 import { toast } from '@/core/utils';
 import { useAuthStore } from '@/core/store/auth.store';
+import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ const isManagerRole = (role?: string) => !!role && MANAGER_ROLES.includes(role.t
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type NotificationType = 'order' | 'route' | 'target' | 'system' | 'van_change';
+type NotificationType = 'order' | 'route' | 'target' | 'system' | 'van_change' | 'topup';
 
 type NotificationItem = {
   id: string;
@@ -75,7 +76,7 @@ const formatFullDate = (value?: string) => {
 
 const mapNotification = (item: ApiNotificationItem): NotificationItem => {
   const category = String(item.category || item.data?.category || 'system').toLowerCase();
-  const type: NotificationType = ['order', 'route', 'target', 'van_change'].includes(category)
+  const type: NotificationType = ['order', 'route', 'target', 'van_change', 'topup'].includes(category)
     ? (category as NotificationType)
     : 'system';
 
@@ -97,6 +98,7 @@ const ICON_MAP: Record<NotificationType, string> = {
   route: 'map-outline',
   target: 'flag-outline',
   van_change: 'car-outline',
+  topup: 'cube-outline',
   system: 'checkmark-circle-outline',
 };
 
@@ -105,6 +107,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   route: 'Route',
   target: 'Target',
   van_change: 'Van Change',
+  topup: 'Top-up',
   system: 'System',
 };
 
@@ -138,9 +141,28 @@ const getVanChangeStatus = (item: NotificationItem) => {
   const action = String(item.data?.action || '').toUpperCase();
   const status = String(item.data?.vanChangeStatus || item.data?.status || '').toUpperCase();
 
-  if (['APPROVED', 'REJECTED'].includes(status)) return status;
-  if (['APPROVED', 'REJECTED'].includes(action)) return action;
+  if (['APPROVED', 'REJECTED', 'CANCELLED'].includes(status)) return status;
+  if (['APPROVED', 'REJECTED', 'CANCELLED'].includes(action)) return action;
   return '';
+};
+
+const getVanChangeStatusLabel = (status: string) => {
+  if (status === 'APPROVED') return 'Approved';
+  if (status === 'CANCELLED') return 'Cancelled';
+  return 'Rejected';
+};
+
+const isPendingTopupAcceptance = (item: NotificationItem) => {
+  const category = String(item.data?.category || item.category || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.status || '').toUpperCase();
+
+  return category === 'topup' && action === 'ACCEPTANCE_REQUIRED' && status === 'APPROVED';
+};
+
+const getTopupStatus = (item: NotificationItem) => {
+  const status = String(item.data?.status || '').toUpperCase();
+  return ['ACCEPTED', 'DECLINED'].includes(status) ? status : '';
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -212,9 +234,11 @@ function NotificationDetail({
   const { user } = useAuthStore();
   const isManager = isManagerRole(user?.role ?? user?.roleId);
   const isVanChange = isPendingVanChangeApproval(item);
+  const isTopupAcceptance = isPendingTopupAcceptance(item);
   const isApprovingThis = processing?.id === item.id && processing?.action === 'approve';
   const isRejectingThis = processing?.id === item.id && processing?.action === 'reject';
   const vanChangeStatus = getVanChangeStatus(item);
+  const topupStatus = getTopupStatus(item);
 
   // Metadata rows extracted from item.data
   const metaRows: { label: string; value: string }[] = [];
@@ -235,7 +259,16 @@ function NotificationDetail({
     if (vanChangeStatus) {
       metaRows.push({
         label: 'Status',
-        value: vanChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected',
+        value: getVanChangeStatusLabel(vanChangeStatus),
+      });
+    }
+    if (item.data.vanInventoryTopupId)
+      metaRows.push({ label: 'Top-up ID', value: String(item.data.vanInventoryTopupId) });
+    if (item.data.vanName) metaRows.push({ label: 'Van', value: String(item.data.vanName) });
+    if (topupStatus) {
+      metaRows.push({
+        label: 'Top-up Status',
+        value: topupStatus === 'ACCEPTED' ? 'Accepted' : 'Declined',
       });
     }
     if (item.data.workSessionId)
@@ -317,15 +350,16 @@ function NotificationDetail({
           </View>
         )}
 
-        {/* Approval actions — shown only to managers when approval is required */}
-        {isManager && isVanChange && (
+        {/* Approval/acceptance actions */}
+        {((isManager && isVanChange) || isTopupAcceptance) && (
           <View style={[styles.section, { backgroundColor: colors.surface }]}>
             <AppText style={[styles.sectionLabel, { color: colors.textTertiary }]}>
               Action Required
             </AppText>
             <AppText style={[styles.approvalNote, { color: colors.textSecondary }]}>
-              This van change request is pending your approval. Please review the details above
-              before taking action.
+              {isTopupAcceptance
+                ? 'This approved top-up is waiting for your acceptance. Accepting will add the approved quantity to your van stock.'
+                : 'This van change request is pending your approval. Please review the details above before taking action.'}
             </AppText>
             <View style={styles.approvalButtons}>
               <Pressable
@@ -343,7 +377,7 @@ function NotificationDetail({
                   <>
                     <Ionicons name="close-circle-outline" size={16} color={colors.error} />
                     <AppText style={[styles.approvalBtnText, { color: colors.error }]}>
-                      Reject Request
+                      {isTopupAcceptance ? 'Reject Top-up' : 'Reject Request'}
                     </AppText>
                   </>
                 )}
@@ -363,7 +397,7 @@ function NotificationDetail({
                   <>
                     <Ionicons name="checkmark-circle-outline" size={16} color={colors.surface} />
                     <AppText style={[styles.approvalBtnText, { color: colors.surface }]}>
-                      Approve Request
+                      {isTopupAcceptance ? 'Accept Stock' : 'Approve Request'}
                     </AppText>
                   </>
                 )}
@@ -519,7 +553,7 @@ const createDetailStyles = (colors: any, insets: { top: number; bottom: number }
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
-const FILTER_OPTIONS = ['All', 'Unread', 'Order', 'Route', 'Target', 'Van Change', 'System'];
+const FILTER_OPTIONS = ['All', 'Unread', 'Order', 'Route', 'Target', 'Van Change', 'Top-up', 'System'];
 
 export function NotificationsModal({ visible, onClose }: NotificationsModalProps) {
   const { colors } = useTheme();
@@ -529,15 +563,17 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const [screen, setScreen] = useState<Screen>('list');
   const [selectedItem, setSelectedItem] = useState<NotificationItem | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { user } = useAuthStore();
   const isManager = isManagerRole(user?.role ?? user?.roleId);
   const [processing, setProcessing] = useState<{ id: string; action: 'approve' | 'reject' } | null>(
     null,
   );
+  const [confirmTopupAction, setConfirmTopupAction] = useState<{
+    item: NotificationItem;
+    action: 'approve' | 'reject';
+  } | null>(null);
   const [activeFilter, setActiveFilter] = useState('All');
-
-  const unreadCount = notifications.filter((n) => n.unread).length;
 
   const filteredNotifications = notifications.filter((n) => {
     if (activeFilter === 'All') return true;
@@ -589,7 +625,63 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     setSelectedItem(null);
   };
 
-  const handleVanChangeAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
+  const handleNotificationAction = async (
+    item: NotificationItem,
+    action: 'approve' | 'reject',
+    confirmed = false,
+  ) => {
+    if (isPendingTopupAcceptance(item)) {
+      const topupId = item.data?.vanInventoryTopupId;
+      if (!topupId || processing) return;
+
+      if (!confirmed) {
+        setConfirmTopupAction({ item, action });
+        return;
+      }
+
+      setProcessing({ id: item.id, action });
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.acceptTopup(String(topupId))
+            : await notificationService.rejectTopup(String(topupId), {
+                reason: 'Rejected by salesman',
+              });
+
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`);
+          return;
+        }
+
+        toast.success(action === 'approve' ? 'Top-up accepted' : 'Top-up rejected');
+        setConfirmTopupAction(null);
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === item.id
+              ? {
+                  ...notification,
+                  unread: false,
+                  data: {
+                    ...notification.data,
+                    action: action === 'approve' ? 'ACCEPTED' : 'DECLINED',
+                    status: action === 'approve' ? 'ACCEPTED' : 'DECLINED',
+                  },
+                }
+              : notification,
+          ),
+        );
+        await notificationService.markAsRead(item.id);
+        navigateBack();
+        loadNotifications();
+      } catch (error: any) {
+        console.warn(`Failed to ${action} top-up:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`);
+      } finally {
+        setProcessing(null);
+      }
+      return;
+    }
+
     const workSessionId = item.data?.workSessionId;
     if (!workSessionId || processing) return;
 
@@ -632,6 +724,25 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     }
   };
 
+  const renderNotificationSkeleton = () => (
+    <View style={styles.list}>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <View key={item} style={styles.skeletonCard}>
+          <Skeleton height={40} width={40} variant="circle" />
+          <View style={styles.skeletonBody}>
+            <View style={styles.skeletonTop}>
+              <Skeleton height={16} width="62%" borderRadius={8} />
+              <Skeleton height={10} width={54} borderRadius={5} />
+            </View>
+            <Skeleton height={12} width="94%" borderRadius={6} style={{ marginTop: 10 }} />
+            <Skeleton height={12} width="72%" borderRadius={6} style={{ marginTop: 7 }} />
+            <Skeleton height={22} width={76} borderRadius={11} style={{ marginTop: 12 }} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -652,26 +763,6 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
             </View>
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-              {/* Summary band */}
-              <View style={styles.summaryBand}>
-                <View style={styles.summaryLeft}>
-                  <View style={styles.summaryStatBlock}>
-                    <AppText style={styles.summaryStatLabel}>Total</AppText>
-                    <AppText style={styles.summaryStatValue}>{notifications.length}</AppText>
-                  </View>
-                  <View style={[styles.summaryDivider, { backgroundColor: colors.borderLight }]} />
-                  <View style={styles.summaryStatBlock}>
-                    <AppText style={styles.summaryStatLabel}>Unread</AppText>
-                    <AppText style={[styles.summaryStatValue, { color: colors.primary }]}>
-                      {unreadCount}
-                    </AppText>
-                  </View>
-                </View>
-                <View style={[styles.summaryIconWrap, { backgroundColor: colors.infoLight }]}>
-                  <Ionicons name="notifications-outline" size={22} color={colors.primary} />
-                </View>
-              </View>
-
               {/* Filter chips */}
               <ScrollView
                 horizontal
@@ -691,9 +782,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
 
               {/* List */}
               {loading ? (
-                <View style={styles.emptyState}>
-                  <ActivityIndicator color={colors.primary} />
-                </View>
+                renderNotificationSkeleton()
               ) : filteredNotifications.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Ionicons
@@ -714,6 +803,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                 <View style={styles.list}>
                   {filteredNotifications.map((item) => {
                     const isVanChange = isPendingVanChangeApproval(item);
+                    const isTopupAcceptance = isPendingTopupAcceptance(item);
                     const vanChangeReason = getVanChangeReason(item);
                     const vanChangeStatus = getVanChangeStatus(item);
 
@@ -772,11 +862,15 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                                 styles.cardStatus,
                                 {
                                   color:
-                                    vanChangeStatus === 'APPROVED' ? colors.success : colors.error,
+                                    vanChangeStatus === 'APPROVED'
+                                      ? colors.success
+                                      : vanChangeStatus === 'CANCELLED'
+                                        ? colors.warning
+                                        : colors.error,
                                 },
                               ]}
                             >
-                              {vanChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                              {getVanChangeStatusLabel(vanChangeStatus)}
                             </AppText>
                           )}
 
@@ -794,7 +888,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                                   disabled={!!processing}
                                   onPress={(e) => {
                                     e.stopPropagation?.();
-                                    handleVanChangeAction(item, 'reject');
+                                    handleNotificationAction(item, 'reject');
                                   }}
                                   style={[
                                     styles.inlineBtn,
@@ -816,7 +910,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                                   disabled={!!processing}
                                   onPress={(e) => {
                                     e.stopPropagation?.();
-                                    handleVanChangeAction(item, 'approve');
+                                    handleNotificationAction(item, 'approve');
                                   }}
                                   style={[
                                     styles.inlineBtn,
@@ -832,6 +926,56 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                                       style={[styles.inlineBtnText, { color: colors.surface }]}
                                     >
                                       Approve
+                                    </AppText>
+                                  )}
+                                </Pressable>
+                              </View>
+                            )}
+
+                            {isTopupAcceptance && (
+                              <View style={styles.inlineActions}>
+                                <Pressable
+                                  disabled={!!processing}
+                                  onPress={(e) => {
+                                    e.stopPropagation?.();
+                                    handleNotificationAction(item, 'reject');
+                                  }}
+                                  style={[
+                                    styles.inlineBtn,
+                                    styles.inlineReject,
+                                    { borderColor: colors.error },
+                                  ]}
+                                >
+                                  {processing?.id === item.id && processing?.action === 'reject' ? (
+                                    <ActivityIndicator size="small" color={colors.error} />
+                                  ) : (
+                                    <AppText
+                                      style={[styles.inlineBtnText, { color: colors.error }]}
+                                    >
+                                      Reject
+                                    </AppText>
+                                  )}
+                                </Pressable>
+                                <Pressable
+                                  disabled={!!processing}
+                                  onPress={(e) => {
+                                    e.stopPropagation?.();
+                                    handleNotificationAction(item, 'approve');
+                                  }}
+                                  style={[
+                                    styles.inlineBtn,
+                                    styles.inlineApprove,
+                                    { backgroundColor: colors.success },
+                                  ]}
+                                >
+                                  {processing?.id === item.id &&
+                                  processing?.action === 'approve' ? (
+                                    <ActivityIndicator size="small" color={colors.surface} />
+                                  ) : (
+                                    <AppText
+                                      style={[styles.inlineBtnText, { color: colors.surface }]}
+                                    >
+                                      Accept
                                     </AppText>
                                   )}
                                 </Pressable>
@@ -859,13 +1003,33 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
               item={selectedItem}
               processing={processing}
               onBack={navigateBack}
-              onApprove={(item) => handleVanChangeAction(item, 'approve')}
-              onReject={(item) => handleVanChangeAction(item, 'reject')}
+              onApprove={(item) => handleNotificationAction(item, 'approve')}
+              onReject={(item) => handleNotificationAction(item, 'reject')}
               colors={colors}
               insets={insets}
             />
           )
         )}
+        <TopupActionConfirmSheet
+          visible={!!confirmTopupAction}
+          action={
+            confirmTopupAction
+              ? confirmTopupAction.action === 'approve'
+                ? 'accept'
+                : 'reject'
+              : null
+          }
+          loading={!!processing}
+          onClose={() => setConfirmTopupAction(null)}
+          onConfirm={() => {
+            if (!confirmTopupAction) return;
+            void handleNotificationAction(
+              confirmTopupAction.item,
+              confirmTopupAction.action,
+              true,
+            );
+          }}
+        />
       </View>
     </Modal>
   );
@@ -904,48 +1068,6 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       paddingBottom: Math.max(insets.bottom, 18) + 18,
       gap: 12,
     },
-    // Summary
-    summaryBand: {
-      borderRadius: 12,
-      padding: 16,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    summaryLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
-    },
-    summaryStatBlock: {
-      gap: 2,
-    },
-    summaryStatLabel: {
-      color: colors.textTertiary,
-      fontSize: 10,
-      fontWeight: '800',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    summaryStatValue: {
-      color: colors.textPrimary,
-      fontSize: 26,
-      fontWeight: '900',
-    },
-    summaryDivider: {
-      width: 1,
-      height: 36,
-    },
-    summaryIconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     // Filters
     filterRow: {
       flexDirection: 'row',
@@ -955,6 +1077,25 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
     // List
     list: {
       gap: 10,
+    },
+    skeletonCard: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      backgroundColor: colors.surface,
+      padding: 12,
+      flexDirection: 'row',
+      gap: 10,
+    },
+    skeletonBody: {
+      flex: 1,
+      minWidth: 0,
+    },
+    skeletonTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
     },
     emptyState: {
       minHeight: 180,

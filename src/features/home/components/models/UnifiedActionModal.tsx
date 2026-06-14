@@ -32,6 +32,7 @@ export interface UnifiedActionModalProps {
   onChangeVanChangeNote?: (note: string) => void;
   onVanSelectionSubmit?: () => void;
   onVanSelectionBack?: () => void;
+  vanSelectionSubmitLabel?: string;
   
   // Route Selection Modal Props
   routes?: any[];
@@ -73,6 +74,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
   onChangeVanChangeNote,
   onVanSelectionSubmit,
   onVanSelectionBack,
+  vanSelectionSubmitLabel,
   routes,
   assignedVan,
   onSelectRoute,
@@ -330,7 +332,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           activeOpacity={0.85}
           disabled={!isVanSelectionValid}
         >
-          <AppText style={styles.submitButtonText}>Start Day</AppText>
+          <AppText style={styles.submitButtonText}>{vanSelectionSubmitLabel || 'Start Day'}</AppText>
           <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
         </TouchableOpacity>
       </View>

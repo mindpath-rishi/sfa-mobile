@@ -44,7 +44,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
   selectedRoute,
   assignedVan,
 }) => {
-  const styles = useCurrentActivityCardStyles({ selectedActivity });
+  const styles = useCurrentActivityCardStyles({ selectedActivity: selectedActivity || '' });
   const { colors } = useTheme();
 
   // Timer state
@@ -143,7 +143,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
       <View style={styles.infoCard}>
         <View style={styles.infoCardHeader}>
           <Ionicons name="map-outline" size={14} color={colors.primary} />
-          <AppText style={[styles.infoCardTitle, { color: colors.primary }]}>Route Details</AppText>
+          <AppText style={styles.infoCardTitle}>Route Details</AppText>
         </View>
         <AppText style={styles.routeName} numberOfLines={1}>
           {selectedRoute.routeName}
@@ -166,7 +166,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
       <View style={[styles.infoCard, styles.otherWorkCard]}>
         <View style={styles.infoCardHeader}>
           <Ionicons name="briefcase-outline" size={14} color={colors.warning} />
-          <AppText style={[styles.infoCardTitle, { color: colors.warning }]}>Other Work</AppText>
+          <AppText style={styles.infoCardTitle}>Other Work</AppText>
         </View>
         <View style={styles.otherWorkDurationContainer}>
           <Ionicons name="time-outline" size={16} color={colors.warning} />
@@ -186,10 +186,10 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
       <View style={styles.infoCard}>
         <View style={styles.infoCardHeader}>
           <Ionicons name="car-outline" size={14} color={colors.info} />
-          <AppText style={[styles.infoCardTitle, { color: colors.info }]}>Assigned Van</AppText>
+          <AppText style={styles.infoCardTitle}>Assigned Van</AppText>
         </View>
         <AppText style={styles.vanName} numberOfLines={1}>
-          {assignedVan.vanName || assignedVan.registrationNumber || 'N/A'}
+          {(assignedVan as any).vanName || (assignedVan as any).registrationNumber || 'N/A'}
         </AppText>
       </View>
     );

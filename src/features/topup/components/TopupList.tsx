@@ -76,9 +76,11 @@ export const TopupList: React.FC<TopupListProps> = ({
 
   const renderItem = ({ item }: { item: Topup }) => {
     const statusConfig = getStatusConfig(item.status);
-    const isApproved = item.status === 'APPROVED';
+    const isAwaitingAcceptance = item.status === 'APPROVED';
+    const isAccepted = item.status === 'ACCEPTED';
     const isRejected = item.status === 'REJECTED';
-    const isPending = item.status === 'PENDING';
+    const isDeclined = item.status === 'DECLINED';
+    const isPending = item.status === 'SUBMITTED';
 
     const requestedValue = item.totalRequestedValue || 0;
     const approvedValue = item.totalApprovedValue || 0;
@@ -117,7 +119,7 @@ export const TopupList: React.FC<TopupListProps> = ({
             </AppText>
           </View>
 
-          {(isApproved || isRejected) && approvedValue > 0 && (
+          {(isAwaitingAcceptance || isAccepted || isRejected || isDeclined) && approvedValue > 0 && (
             <View style={styles.amountBlock}>
               <AppText style={styles.amountLabel}>Approved</AppText>
               <AppText style={[styles.amountValue, { color: colors.success }]}>
@@ -130,15 +132,21 @@ export const TopupList: React.FC<TopupListProps> = ({
           )}
         </View>
 
-        {isApproved && item.approvedByName && (
-          <View style={styles.infoRow}>
-            <AppText style={styles.infoText}>✓ Approved by {item.approvedByName}</AppText>
+        {isAwaitingAcceptance && (
+          <View style={[styles.infoRow, styles.pendingRow]}>
+            <AppText style={styles.pendingInfoText}>⏳ Waiting for salesman acceptance</AppText>
           </View>
         )}
 
-        {isRejected && item.rejectedReason && (
+        {isAccepted && (
+          <View style={styles.infoRow}>
+            <AppText style={styles.infoText}>✓ Accepted and added to stock</AppText>
+          </View>
+        )}
+
+        {(isRejected || isDeclined) && (item.rejectedReason || item.declinedReason) && (
           <View style={[styles.infoRow, styles.errorRow]}>
-            <AppText style={styles.errorText}>⚠ {item.rejectedReason}</AppText>
+            <AppText style={styles.errorText}>⚠ {item.rejectedReason || item.declinedReason}</AppText>
           </View>
         )}
 

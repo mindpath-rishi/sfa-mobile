@@ -3,7 +3,6 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   TextInput,
   RefreshControl,
   StyleSheet,
@@ -19,7 +18,7 @@ import { router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppText } from '@/core/components';
+import { AppText, Skeleton } from '@/core/components';
 import { EmptyState } from '@/core/components/EmptyState';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useRouteStore } from '@/core/store/route.store';
@@ -415,6 +414,45 @@ export default function ChangeRoute() {
 
   const styles = getStyles(colors, insets);
 
+  const renderRouteListSkeleton = () => (
+    <View style={styles.routesGrid}>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <View key={item} style={styles.routeCard}>
+          <View style={styles.routeCardInner}>
+            <View style={styles.routeIconSection}>
+              <Skeleton height={48} width={48} borderRadius={12} />
+            </View>
+            <View style={styles.routeContent}>
+              <Skeleton height={16} width="72%" borderRadius={8} />
+              <View style={styles.routeMetaRow}>
+                <Skeleton height={24} width={86} borderRadius={8} />
+                <Skeleton height={24} width={62} borderRadius={8} />
+              </View>
+            </View>
+            <Skeleton height={20} width={20} variant="circle" />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderOutletListSkeleton = () => (
+    <View style={styles.outletsListContainer}>
+      {[1, 2, 3, 4, 5, 6].map((item) => (
+        <View key={item} style={styles.outletListItem}>
+          <View style={styles.outletListLeft}>
+            <Skeleton height={28} width={28} variant="circle" />
+            <View style={styles.outletListInfo}>
+              <Skeleton height={14} width="68%" borderRadius={7} />
+              <Skeleton height={11} width="48%" borderRadius={6} style={{ marginTop: 6 }} />
+            </View>
+          </View>
+          <Skeleton height={24} width={76} borderRadius={8} />
+        </View>
+      ))}
+    </View>
+  );
+
   const renderNoSessionView = () => (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
@@ -522,10 +560,7 @@ export default function ChangeRoute() {
           </View>
 
           {isLoadingRoutes ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <AppText style={styles.loadingText}>Loading routes...</AppText>
-            </View>
+            renderRouteListSkeleton()
           ) : filteredRoutes.length === 0 ? (
             <EmptyState
               title={searchQuery ? 'No Routes Found' : 'No Routes Available'}
@@ -557,10 +592,7 @@ export default function ChangeRoute() {
         </View>
 
         {isLoadingOutlets ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <AppText style={styles.loadingText}>Loading outlets...</AppText>
-          </View>
+          renderOutletListSkeleton()
         ) : outlets.length === 0 ? (
           <EmptyState
             title="No Outlets Found"

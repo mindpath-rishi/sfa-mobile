@@ -8,8 +8,8 @@ export const useTodayActivitiesSectionStyles = () => {
 
   const styleGenerator = createStyles((utils) => ({
     container: {
-      paddingHorizontal: utils.spacing[4],
-      marginBottom: utils.spacing[5],
+      paddingHorizontal: 0,
+      marginBottom: 0,
       width: '100%',
     } as ViewStyle,
 
@@ -17,8 +17,8 @@ export const useTodayActivitiesSectionStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: utils.spacing[3],
-      backgroundColor: colors.background,
+      paddingVertical: 0,
+      backgroundColor: 'transparent',
     } as ViewStyle,
 
     headerLeft: {
@@ -28,9 +28,8 @@ export const useTodayActivitiesSectionStyles = () => {
     } as ViewStyle,
 
     headerTitle: {
-      fontSize: utils.fontSize.xs,
+      fontSize: utils.fontSize.md,
       fontWeight: '600',
-      letterSpacing: 0.5,
     } as TextStyle,
 
     badge: {
@@ -48,14 +47,15 @@ export const useTodayActivitiesSectionStyles = () => {
     statsContainer: {
       flexDirection: 'row',
       gap: utils.spacing[2],
-      marginBottom: utils.spacing[4],
+      marginTop: utils.spacing[3],
+      marginBottom: utils.spacing[3],
       flexWrap: 'wrap', // Allow wrapping on smaller screens
     } as ViewStyle,
 
     statCard: {
       flex: 1,
       minWidth: 100, // Minimum width for better layout
-      borderRadius: 10,
+      borderRadius: 8,
       padding: utils.spacing[2.5],
       borderWidth: 1,
     } as ViewStyle,
@@ -68,6 +68,7 @@ export const useTodayActivitiesSectionStyles = () => {
 
     statLabel: {
       fontSize: utils.fontSize.xs,
+      fontWeight: '400',
       marginTop: utils.spacing[0.5],
     } as TextStyle,
 
