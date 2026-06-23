@@ -17,6 +17,7 @@ import { toast } from '@/core/utils';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getRoleId } from '@/core/navigation/role.utils';
+import { useLoaderStore } from '@/core/loader/loader.store';
 
 /* ============================
  * HELPERS
@@ -401,6 +402,7 @@ const CustomDrawerContent = (props: any) => {
   const { workSessionId, setWorkSessionId } = useAuthStore();
   const roleId = getRoleId(user);
   const allowedRoutes = roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
+  const loader = useLoaderStore();
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
@@ -413,6 +415,8 @@ const CustomDrawerContent = (props: any) => {
 
   const fetchDayEndSummary = useCallback(async () => {
     try {
+      loader.show({ message: 'Loading van settlement summary...' });
+
       const vanIdToUse =
         useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
 
@@ -421,24 +425,36 @@ const CustomDrawerContent = (props: any) => {
         return;
       }
 
-      const res: any = await vanService.fetchTodayStockSummary({
-        vanId: vanIdToUse,
-        workSessionId,
-      });
+      const res: any = await vanService.fetchTodayStockSummary(
+        {
+          vanId: vanIdToUse,
+          workSessionId,
+        },
+        { showLoader: false },
+      );
       setDayEndSummary(res?.data);
       setShowDayEndSummary(true);
     } catch (error) {
       console.error('Error fetching day end summary:', error);
       toast.error('Failed to load day end summary. Please try again.');
+    } finally {
+      loader.hide();
     }
-  }, [user]);
+  }, [loader, user, workSessionId]);
 
   const submitSettlement = useCallback(async () => {
     if (settleInFlightRef.current) return;
     settleInFlightRef.current = true;
     try {
-      const response: any = await homeService.dayComplete(carryForwardStock as any);
+      setShowFinalConfirm(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      loader.show({ message: 'Completing van settlement...' });
+
+      const response: any = await homeService.dayComplete(carryForwardStock as any, {
+        showLoader: false,
+      });
       if (response?.success || response?.statusCode === 200) {
+        loader.show({ message: 'Finalizing settlement...' });
         toast.success('Your day successfully completed');
         setShowFinalConfirm(false);
         setShowSettlementOptions(false);
@@ -454,12 +470,17 @@ const CustomDrawerContent = (props: any) => {
       toast.error('Failed to complete day. Please try again.');
     } finally {
       settleInFlightRef.current = false;
+      loader.hide();
     }
-  }, [carryForwardStock]);
+  }, [bumpDashboardRefresh, carryForwardStock, loader, setWorkSessionId]);
 
   const handleVanSettlementPress = useCallback(async () => {
     try {
-      const statusRes: any = await homeService.getDayStatus('');
+      loader.show({ message: 'Checking today activity...' });
+
+      const statusRes: any = await homeService.getDayStatus('', {
+        showLoader: false,
+      });
       const status = statusRes?.data?.status;
       if (status !== 'ACTIVE') {
         toast.error('Day not started. Please start day before Van Settlement.');
@@ -471,8 +492,10 @@ const CustomDrawerContent = (props: any) => {
     } catch (error) {
       console.error('Error checking day status:', error);
       toast.error('Unable to check day status. Please try again.');
+    } finally {
+      loader.hide();
     }
-  }, []);
+  }, [loader]);
 
   const filteredRoutes = props.state.routes.filter((route: any) => allowedRoutes.has(route.name));
   const filteredRouteKeys = new Set(filteredRoutes.map((route: any) => route.key));
@@ -692,7 +715,7 @@ export default function DrawerLayout() {
   const { setHeader } = useHeader();
 
   const isDetail = isDetailScreen(segments);
-    const isProfile = isProfileScreen(segments);
+  const isProfile = isProfileScreen(segments);
   const user = useAuthStore((state) => state.user);
   const roleId = getRoleId(user);
   const drawerAllowedRoutes =
@@ -820,7 +843,7 @@ export default function DrawerLayout() {
    * HEADER CONFIG
    * ============================ */
 
-   useEffect(() => {
+  useEffect(() => {
     if (isProfile && !segments.includes('(tabs)')) {
       const routeName = getRouteName(segments);
       const config = HEADER_MAP[routeName];

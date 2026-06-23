@@ -8,10 +8,11 @@ import type { ApiResponse } from '@/core/network/api.types';
 export interface CreateSalePayload {
   vanId: string;
   vanName?: string;
+  compCode?: string;
+  categoryId?: string;
+  parentCategoryId?: string;
   customerId?: string;
   customerName?: string;
-  employeeId: string;
-  employeeName?: string;
   date: Date;
   totalCases: number;
   totalPieces: number;
@@ -26,6 +27,10 @@ export interface CreateSalePayload {
   items: Array<{
     productId: string;
     productName?: string;
+    compCode?: string;
+    categoryId?: string;
+    parentCategoryId?: string;
+    customerCategoryId: string;
     caseQty: number;
     pieceQty: number;
     quantity: number;

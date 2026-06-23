@@ -33,11 +33,11 @@ import { CameraModal } from '@/core/components/Camera/CameraModal';
 import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
 import { homeService } from '../services/home.service';
 import { AppText, ConfirmationModal, Skeleton } from '@/core/components';
-import { ApiResponse } from '@/core/network';
+import { ApiRequestConfig, ApiResponse } from '@/core/network';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { useVisitGuard } from '@/shared/hooks/useVisitGuard';
-import { Route, useRouteStore } from '@/core/store/route.store';
+import { getRouteCustomerCategoryId, Route, useRouteStore } from '@/core/store/route.store';
 import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '../components/models/DayEndSummaryModal';
 import { useAuthStore } from '@/core/store/auth.store';
@@ -48,6 +48,7 @@ import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { leaveService } from '@/features/leave/services/leave.service';
 import type { LeaveType } from '@/features/leave/types/leave.types';
+import { useLoaderStore } from '@/core/loader/loader.store';
 import {
   captureCurrentLocation,
   startSalesmanBackgroundLocation,
@@ -121,6 +122,7 @@ export default function SalesExecutiveScreen() {
   const { setHeader } = useHeader();
   const user = useAuthStore((state) => state.user);
   const { setWorkSessionId, workSessionId } = useAuthStore();
+  const loader = useLoaderStore();
 
   const { guard } = useVisitGuard();
   const dashboardRefreshTick = useAppEventsStore((s) => s.dashboardRefreshTick);
@@ -542,60 +544,79 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
-    let dayStartImage: { mediaId?: string; url?: string } | null = null;
-    let dayStartLocation = await captureCurrentLocation();
+    try {
+      loader.show({ message: 'Getting your start location...' });
 
-    if (userPhoto) {
-      const mediaResponse = await homeService.uploadDayStartImage({
-        uri: userPhoto,
-        ownerId: user?.employeeId || user?.id || 'day-start',
-        subOwnnerId: workSessionId as any,
+      let dayStartImage: { mediaId?: string; url?: string } | null = null;
+      let dayStartLocation = await captureCurrentLocation();
+
+      if (userPhoto) {
+        loader.show({ message: 'Uploading day start photo...' });
+
+        const mediaResponse = await homeService.uploadDayStartImage(
+          {
+            uri: userPhoto,
+            ownerId: user?.employeeId || user?.id || 'day-start',
+            subOwnnerId: workSessionId as any,
+          },
+          {
+            showLoader: false,
+          },
+        );
+
+        if (mediaResponse?.statusCode === 201 && mediaResponse.data) {
+          dayStartImage = {
+            mediaId: mediaResponse.data.mediaId,
+            url: mediaResponse.data.url,
+          };
+        }
+      }
+
+      if (!dayStartLocation) {
+        loader.show({ message: 'Confirming your start location...' });
+        dayStartLocation = await captureCurrentLocation();
+      }
+
+      const payload: DayStartPayload = {
+        activityName: selectedActivity,
+        routeId: selectedRoute?.routeId,
+        description: selectedRoute
+          ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${mappedVan?.name || ASSIGNED_VAN.name}`
+          : isVanChangePending
+            ? `Van change request pending. Requested Van: ${selectedVanForChange?.name || mappedVan?.name || ''}`
+            : selectedActivity === 'Leave'
+              ? `Leave: ${selectedLeaveType || 'Other'}`
+              : `Started ${pendingActivity?.name}`,
+        totalShops: selectedRoute?.totalShops,
+        routeName: selectedRoute?.name,
+        customerCategoryId: getRouteCustomerCategoryId(selectedRoute),
+        vanId: van?.vanId,
+        requestedVanId: isVanChangePending ? selectedVanForChange?.vanId : undefined,
+        requestedVanName: isVanChangePending
+          ? selectedVanForChange?.name || selectedVanForChange?.vanName
+          : undefined,
+        vanChangeReason: isVanChangePending ? vanChangeNote.trim() : undefined,
+        dayStartImageMediaId: dayStartImage?.mediaId,
+        dayStartImageUrl: dayStartImage?.url,
+        dayStartLocation,
+        // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
+      };
+
+      console.log('Day Start Payload:', payload);
+
+      loader.show({ message: 'Starting your day...' });
+
+      const response: ApiResponse<any> = await homeService.dayStart(payload, {
+        showLoader: false,
       });
 
-      if (mediaResponse?.statusCode === 201 && mediaResponse.data) {
-        dayStartImage = {
-          mediaId: mediaResponse.data.mediaId,
-          url: mediaResponse.data.url,
-        };
-      }
-    }
-
-    if (!dayStartLocation) {
-      dayStartLocation = await captureCurrentLocation();
-    }
-
-    const payload: DayStartPayload = {
-      activityName: selectedActivity,
-      routeId: selectedRoute?.routeId,
-      description: selectedRoute
-        ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${mappedVan?.name || ASSIGNED_VAN.name}`
-        : isVanChangePending
-          ? `Van change request pending. Requested Van: ${selectedVanForChange?.name || mappedVan?.name || ''}`
-          : selectedActivity === 'Leave'
-            ? `Leave: ${selectedLeaveType || 'Other'}`
-            : `Started ${pendingActivity?.name}`,
-      totalShops: selectedRoute?.totalShops,
-      routeName: selectedRoute?.name,
-      vanId: van?.vanId,
-      requestedVanId: isVanChangePending ? selectedVanForChange?.vanId : undefined,
-      requestedVanName: isVanChangePending
-        ? selectedVanForChange?.name || selectedVanForChange?.vanName
-        : undefined,
-      vanChangeReason: isVanChangePending ? vanChangeNote.trim() : undefined,
-      dayStartImageMediaId: dayStartImage?.mediaId,
-      dayStartImageUrl: dayStartImage?.url,
-      dayStartLocation,
-      // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
-    };
-
-    console.log('Day Start Payload:', payload);
-
-    try {
-      const response: ApiResponse<any> = await homeService.dayStart(payload);
-
       if (response?.statusCode === 201) {
-        getDayStatus();
+        loader.show({ message: 'Preparing today activity...' });
+        await getDayStatus({ showLoader: false });
+
+        loader.show({ message: 'Starting location tracking...' });
         await startSalesmanBackgroundLocation(user);
+
         if (isVanChangePending) {
           setVanChangeRequestPending(true);
           toast.success('Day started. Van change request pending approval.');
@@ -606,6 +627,8 @@ export default function SalesExecutiveScreen() {
     } catch (error) {
       console.error('Error starting day:', error);
       toast.error('Failed to start day. Please try again.');
+    } finally {
+      loader.hide();
     }
   };
 
@@ -639,6 +662,7 @@ export default function SalesExecutiveScreen() {
           : `Started ${activityValue?.name || activityName}`,
       totalShops: activityRoute?.totalShops,
       routeName: activityRoute?.name,
+      customerCategoryId: getRouteCustomerCategoryId(activityRoute),
       workSessionId,
       vanId: activityRoute?.vanId || van?.vanId,
       vanName: mappedVan?.name || van?.name,
@@ -780,9 +804,9 @@ export default function SalesExecutiveScreen() {
     }
   };
 
-  const getDayStatus = async () => {
+  const getDayStatus = async (config?: ApiRequestConfig) => {
     try {
-      const response: any = await homeService.getDayStatus(workSessionId);
+      const response: any = await homeService.getDayStatus(workSessionId, config);
       const data = response?.data;
 
       setDayStarted(data?.status === 'ACTIVE');
@@ -882,6 +906,11 @@ export default function SalesExecutiveScreen() {
               marketId: item.route.marketId,
               provinceId: item.route.provinceId,
               countryId: item.route.countryId,
+              customerCategoryId: getRouteCustomerCategoryId({
+                customerCategoryId: item.customerCategoryId,
+                customerCategory: item.customerCategory,
+                route: item.route,
+              }),
             })),
           );
         }

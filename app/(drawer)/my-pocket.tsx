@@ -3371,7 +3371,10 @@ export default function PocketMISScreen() {
                     {[
                       { label: 'Invoice', value: item.invoiceNo || '--' },
                       { label: 'Cases', value: formatNumber(Number(item.cases || 0), 2) },
-                      { label: 'Value', value: `ZMW ${formatNumber(Number(item.netValue || 0), 2)}` },
+                      {
+                        label: 'Value',
+                        value: `ZMW ${formatNumber(Number(item.netValue || 0), 2)}`,
+                      },
                       { label: 'Vehicle', value: item.vehicleNo || '--' },
                     ].map((stat) => (
                       <View key={stat.label} style={{ width: '50%' }}>
@@ -3691,6 +3694,91 @@ export default function PocketMISScreen() {
             </View>
           </Section>
 
+          {/* ── Performance Summary section ──────────────────────────────── */}
+          <Section
+            title="PERFORMANCE SUMMARY"
+            icon="stats-chart"
+            sectionKey="performance"
+            expanded={expandedSection === 'performance'}
+            onToggle={() =>
+              setExpandedSection(expandedSection === 'performance' ? null : 'performance')
+            }
+            colors={colors}
+          >
+            <SubBadge label="MTD" color={colors.primary} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              <StatCell
+                icon="call"
+                value={performanceData.tc}
+                label="Total Calls"
+                accent={colors.primary}
+                colors={colors}
+              />
+              <StatCell
+                icon="checkmark-circle"
+                value={performanceData.pc}
+                label="Productive"
+                accent={colors.success}
+                colors={colors}
+              />
+              <StatCell
+                icon="person"
+                value={performanceData.upc}
+                label="Unique PC"
+                accent={colors.info}
+                colors={colors}
+              />
+              <StatCell
+                icon="people"
+                value={performanceData.utc}
+                label="Unique TC"
+                accent={colors.primary}
+                colors={colors}
+              />
+              <StatCell
+                icon="location"
+                value={performanceData.lpc}
+                label="LPC"
+                accent={colors.warning}
+                colors={colors}
+              />
+            </View>
+
+            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 12 }} />
+
+            <SubBadge label="AVERAGE METRICS" color={colors.info} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              <StatCell
+                icon="alarm"
+                value={performanceData.avgFirstCall}
+                label="Avg First Call"
+                accent={colors.info}
+                colors={colors}
+              />
+              <StatCell
+                icon="timer"
+                value={performanceData.avgFirstPC}
+                label="Avg First PC"
+                accent={colors.info}
+                colors={colors}
+              />
+              <StatCell
+                icon="bar-chart"
+                value={performanceData.avgTC}
+                label="Avg TC / Day"
+                accent={colors.primary}
+                colors={colors}
+              />
+              <StatCell
+                icon="trending-up"
+                value={performanceData.avgPC}
+                label="Avg PC / Day"
+                accent={colors.success}
+                colors={colors}
+              />
+            </View>
+          </Section>
+
           {/* ── Van Utilization section ─────────────────────────────────── */}
           <Section
             title="VAN UTILIZATION"
@@ -3847,9 +3935,7 @@ export default function PocketMISScreen() {
                 <Text style={{ color: colors.textSecondary, fontSize: T.label.size }}>
                   Utilization
                 </Text>
-                <Text
-                  style={{ color: colors.success, fontSize: T.label.size, fontWeight: '800' }}
-                >
+                <Text style={{ color: colors.success, fontSize: T.label.size, fontWeight: '800' }}>
                   {formatNumber(vanUtilizationData.utilizationPercentage, 2)}%
                 </Text>
               </View>
@@ -3870,91 +3956,6 @@ export default function PocketMISScreen() {
                   }}
                 />
               </View>
-            </View>
-          </Section>
-
-          {/* ── Performance Summary section ──────────────────────────────── */}
-          <Section
-            title="PERFORMANCE SUMMARY"
-            icon="stats-chart"
-            sectionKey="performance"
-            expanded={expandedSection === 'performance'}
-            onToggle={() =>
-              setExpandedSection(expandedSection === 'performance' ? null : 'performance')
-            }
-            colors={colors}
-          >
-            <SubBadge label="MTD" color={colors.primary} />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              <StatCell
-                icon="call"
-                value={performanceData.tc}
-                label="Total Calls"
-                accent={colors.primary}
-                colors={colors}
-              />
-              <StatCell
-                icon="checkmark-circle"
-                value={performanceData.pc}
-                label="Productive"
-                accent={colors.success}
-                colors={colors}
-              />
-              <StatCell
-                icon="person"
-                value={performanceData.upc}
-                label="Unique PC"
-                accent={colors.info}
-                colors={colors}
-              />
-              <StatCell
-                icon="people"
-                value={performanceData.utc}
-                label="Unique TC"
-                accent={colors.primary}
-                colors={colors}
-              />
-              <StatCell
-                icon="location"
-                value={performanceData.lpc}
-                label="LPC"
-                accent={colors.warning}
-                colors={colors}
-              />
-            </View>
-
-            <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 12 }} />
-
-            <SubBadge label="AVERAGE METRICS" color={colors.info} />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              <StatCell
-                icon="alarm"
-                value={performanceData.avgFirstCall}
-                label="Avg First Call"
-                accent={colors.info}
-                colors={colors}
-              />
-              <StatCell
-                icon="timer"
-                value={performanceData.avgFirstPC}
-                label="Avg First PC"
-                accent={colors.info}
-                colors={colors}
-              />
-              <StatCell
-                icon="bar-chart"
-                value={performanceData.avgTC}
-                label="Avg TC / Day"
-                accent={colors.primary}
-                colors={colors}
-              />
-              <StatCell
-                icon="trending-up"
-                value={performanceData.avgPC}
-                label="Avg PC / Day"
-                accent={colors.success}
-                colors={colors}
-              />
             </View>
           </Section>
 

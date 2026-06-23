@@ -1,10 +1,10 @@
-import { api, ApiResponse } from '@/core/network';
+import { api, ApiRequestConfig, ApiResponse } from '@/core/network';
 
 export interface VanService {
   fetchVanStocks: (vanId: string | undefined, params: any) => Promise<ApiResponse<any>>;
   createInventoryTopupRequest: (payload: any) => Promise<ApiResponse<any>>;
   fetchInventoryTopupRequests: (payload: any) => Promise<ApiResponse<any>>;
-  fetchTodayStockSummary: (payload: any) => Promise<ApiResponse<any>>;
+  fetchTodayStockSummary: (payload: any, config?: ApiRequestConfig) => Promise<ApiResponse<any>>;
   fetchInventoryTopupRequest: (topupId: string) => Promise<ApiResponse<any>>;
   acceptInventoryTopupRequest: (topupId: string) => Promise<ApiResponse<any>>;
   rejectInventoryTopupRequest: (topupId: string, payload?: any) => Promise<ApiResponse<any>>;
@@ -29,6 +29,6 @@ export const vanService: VanService = {
   rejectInventoryTopupRequest: (topupId: string, payload: any = {}) =>
     api.patch<any>(`/van-inventory-topup/${topupId}/reject`, payload) as Promise<ApiResponse<any>>,
 
-  fetchTodayStockSummary: (params: any) =>
-    api.get<any>('/van-daily-stock/summary', { params }) as Promise<ApiResponse<any>>,
+  fetchTodayStockSummary: (params: any, config?: ApiRequestConfig) =>
+    api.get<any>('/van-daily-stock/summary', { params, ...config }) as Promise<ApiResponse<any>>,
 };

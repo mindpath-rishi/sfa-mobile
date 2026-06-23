@@ -25,6 +25,43 @@ export type Route = {
   marketId?: string;
   provinceId?: string;
   countryId?: string;
+  customerCategoryId?: string;
+  customerCategory?: {
+    id?: string;
+    _id?: string;
+    categoryId?: string;
+    customerCategoryId?: string;
+  };
+  route?: {
+    customerCategoryId?: string;
+    customerCategory?: {
+      id?: string;
+      _id?: string;
+      categoryId?: string;
+      customerCategoryId?: string;
+    };
+  };
+};
+
+export const getRouteCustomerCategoryId = (route?: Partial<Route> | null): string | undefined => {
+  if (!route) return undefined;
+
+  const customerCategory = route.customerCategory;
+  const nestedRoute = route.route;
+  const nestedRouteCustomerCategory = nestedRoute?.customerCategory;
+
+  return (
+    route.customerCategoryId ||
+    customerCategory?.customerCategoryId ||
+    customerCategory?.categoryId ||
+    customerCategory?.id ||
+    customerCategory?._id ||
+    nestedRoute?.customerCategoryId ||
+    nestedRouteCustomerCategory?.customerCategoryId ||
+    nestedRouteCustomerCategory?.categoryId ||
+    nestedRouteCustomerCategory?.id ||
+    nestedRouteCustomerCategory?._id
+  );
 };
 
 type RouteStore = {
@@ -83,7 +120,14 @@ export const useRouteStore = create<RouteStore>((set) => {
     /* ================= ROUTE ================= */
 
     setSelectedRoute: (route) => {
-      set({ selectedRoute: route });
+      set({
+        selectedRoute: route
+          ? {
+              ...route,
+              customerCategoryId: getRouteCustomerCategoryId(route),
+            }
+          : null,
+      });
     },
   };
 });

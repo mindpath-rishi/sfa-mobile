@@ -29,6 +29,8 @@ import { ProductCard } from '../components/product';
 import { FilterModal } from '@/shared/components/models/Filter.modal';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
 import { useCartStore } from '@/core/store/cart.store';
+import { useOutletStore } from '@/core/store/outlet.store';
+import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { categoryService } from '@/shared/services/category.service';
 import { productService } from '@/shared/services/product.service';
@@ -56,7 +58,7 @@ const mapFiltersToParams = (
   limit,
   searchText: filters.searchText?.trim() || undefined,
   categoryIds: filters.categoryIds?.length ? filters.categoryIds.join(',') : undefined,
-  brandIds: filters.brands?.length ? filters.brands.join(',') : undefined,
+  brandIds: filters.brandIds?.length ? filters.brandIds.join(',') : undefined,
 });
 
 const getInitials = (name: string) => {
@@ -72,6 +74,14 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   const { setHeader } = useHeader();
   const { setOpenProductFilterHandler, resetProductsFilterCount } = useFilterContext();
   const { items, addItems, clearCart } = useCartStore();
+  const customerCategoryId = useRouteStore((state) =>
+    getRouteCustomerCategoryId(state.selectedRoute),
+  );
+  const outletCustomerCategoryId = useOutletStore(
+    (state) =>
+      state.activeVisit?.outlet?.customerCategoryId ||
+      state.selectedOutlet?.customerCategoryId,
+  );
   const insets = useSafeAreaInsets();
 
   const { mode = 'sales', onCartUpdate, onSubmit } = props;
@@ -183,6 +193,25 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           params['isFocusedPack'] = 'Y';
         }
 
+        const latestRoute = useRouteStore.getState().selectedRoute;
+        const outletState = useOutletStore.getState();
+        const resolvedCustomerCategoryId =
+          getRouteCustomerCategoryId(latestRoute) ||
+          outletState.activeVisit?.outlet?.customerCategoryId ||
+          outletState.selectedOutlet?.customerCategoryId ||
+          customerCategoryId ||
+          outletCustomerCategoryId;
+
+        if (resolvedCustomerCategoryId) {
+          params.customerCategoryId = resolvedCustomerCategoryId;
+        } else if (__DEV__) {
+          console.log('Missing customerCategoryId for product fetch', {
+            selectedRoute: latestRoute,
+            activeVisitOutlet: outletState.activeVisit?.outlet,
+            selectedOutlet: outletState.selectedOutlet,
+          });
+        }
+
         const response = await productService.fetchProducts(params);
 
         if (response?.success) {
@@ -202,7 +231,14 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         if (shouldAppend) setIsLoadingMore(false);
       }
     },
-    [searchQuery, filters, selectedCategory, quickFilter],
+    [
+      searchQuery,
+      filters,
+      selectedCategory,
+      quickFilter,
+      customerCategoryId,
+      outletCustomerCategoryId,
+    ],
   );
 
   const fetchCategories = useCallback(async () => {
@@ -275,6 +311,9 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           stock: product.stock,
           caseNetWeight: product.caseNetWeight,
           pieceNetWeight: product.pieceNetWeight,
+          compCode: product.compCode,
+          categoryId: product.categoryId,
+          parentCategoryId: product.parentCategoryId,
         },
       ]);
     },

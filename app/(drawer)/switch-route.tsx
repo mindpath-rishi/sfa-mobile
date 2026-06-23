@@ -21,7 +21,7 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText, Skeleton } from '@/core/components';
 import { EmptyState } from '@/core/components/EmptyState';
 import { useHeader } from '@/shared/contexts/HeaderContext';
-import { useRouteStore } from '@/core/store/route.store';
+import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { homeService } from '@/features/home/services/home.service';
 import { outletService } from '@/features/outlet/services/outlet.service';
@@ -49,6 +49,7 @@ interface VanRoute {
   totalShops: number;
   distance: string;
   stops: number;
+  customerCategoryId?: string;
 }
 
 interface RouteOutlet {
@@ -180,6 +181,11 @@ export default function ChangeRoute() {
           totalShops: item.route?.outletCount || 0,
           distance: item.route.distance || 'N/A',
           stops: item.route?.outletCount || 0,
+          customerCategoryId: getRouteCustomerCategoryId({
+            customerCategoryId: item.customerCategoryId,
+            customerCategory: item.customerCategory,
+            route: item.route,
+          }),
         }));
 
         const filteredRoutes = transformedRoutes.filter(
@@ -326,6 +332,9 @@ export default function ChangeRoute() {
           marketId: selectedRoute?.marketId,
           provinceId: selectedRoute?.provinceId,
           countryId: selectedRoute?.countryId,
+          customerCategoryId:
+            selectedVanRoute.customerCategoryId ||
+            selectedRoute?.customerCategoryId,
         });
 
         if (!isWeb) {

@@ -9,6 +9,8 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { isSalesman } from '@/core/navigation/role.utils';
 import { NotificationsModal } from '@/features/home/components/NotificationsModal';
 import { notificationService } from '@/features/notification/services/notification.service';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 export default function TabsLayout() {
   const { colors } = useTheme();
@@ -66,6 +68,85 @@ export default function TabsLayout() {
   );
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      return;
+    }
+
+    let isMounted = true;
+    let handledNotificationId: string | null = null;
+
+    const openNotificationModal = async (data: any) => {
+      if (!isMounted || !data) return;
+
+      const shouldOpen = data.openAsModal === true || data.openAsModal === 'true';
+
+      if (!shouldOpen) return;
+
+      const notificationId = data.notificationId || data.messageId || JSON.stringify(data);
+
+      if (handledNotificationId === notificationId) {
+        return;
+      }
+
+      handledNotificationId = notificationId;
+
+      // Give Expo Router time to mount
+      setTimeout(async () => {
+        if (!isMounted) return;
+
+        setNotificationsVisible(true);
+
+        try {
+          await loadUnreadCount();
+        } catch (error) {
+          console.warn('Failed to refresh notification count', error);
+        }
+      }, 1000);
+    };
+
+    const checkInitialNotification = async () => {
+      try {
+        const response = await Notifications.getLastNotificationResponseAsync();
+
+        if (!response) return;
+
+        const data = response.notification.request.content.data;
+
+        await openNotificationModal(data);
+
+        // Clear handled response
+        await Notifications.clearLastNotificationResponseAsync?.();
+      } catch (error) {
+        console.warn('Failed to process launch notification', error);
+      }
+    };
+
+    void checkInitialNotification();
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
+      async (response) => {
+        const data = response.notification.request.content.data;
+
+        await openNotificationModal(data);
+      },
+    );
+
+    const receivedSubscription = Notifications.addNotificationReceivedListener(
+      async (notification) => {
+        const data = notification.request.content.data;
+
+        await openNotificationModal(data);
+      },
+    );
+
+    return () => {
+      isMounted = false;
+      responseSubscription.remove();
+      receivedSubscription.remove();
+    };
+  }, [loadUnreadCount]);
+
+  useEffect(() => {
     configureTabHeader();
   }, [configureTabHeader]);
 
@@ -92,41 +173,41 @@ export default function TabsLayout() {
           }}
         />
 
-      <Tabs.Screen
-        name="daily-summary"
-        options={{
-          title: 'Daily Summary',
-          href: salesman ? null : undefined,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'pulse' : 'pulse-outline'} size={size} color={color} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="daily-summary"
+          options={{
+            title: 'Daily Summary',
+            href: salesman ? null : undefined,
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons name={focused ? 'pulse' : 'pulse-outline'} size={size} color={color} />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="quick-viz"
-        options={{
-          title: 'Quick Viz',
-          href: salesman ? null : undefined,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons
-              name={focused ? 'analytics' : 'analytics-outline'}
-              size={size}
-              color={color}
-            />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="quick-viz"
+          options={{
+            title: 'Quick Viz',
+            href: salesman ? null : undefined,
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons
+                name={focused ? 'analytics' : 'analytics-outline'}
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color, size, focused }) => (
+              <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+            ),
+          }}
+        />
       </Tabs>
       <NotificationsModal
         visible={notificationsVisible}

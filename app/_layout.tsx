@@ -17,6 +17,7 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { useGlobalErrorStore } from '@/core/store/error.store';
 
 import AppErrorScreen from '@/core/screens/error/Error';
+import LoaderOverlay from '@/core/screens/LoaderOverlay';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { HeaderProvider } from '@/shared/contexts/HeaderContext';
 import {
@@ -214,6 +215,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(drawer)" />
               </Stack>
             </HeaderProvider>
+            <LoaderOverlay />
             <Toast position="top" />
           </FilterProvider>
         </AppProviders>

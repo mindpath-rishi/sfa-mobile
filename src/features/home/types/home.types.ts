@@ -6,6 +6,7 @@ export type DayStartPayload = {
   description?: string;
   totalShops?: number;
   routeName?: string;
+  customerCategoryId?: string;
   vanId?: string;
   vanChangeReason?: string;
   vanChangeNote?: string;
@@ -29,6 +30,7 @@ export type CreateActivityPayload = {
   totalShops?: number;
   workSessionId?: string;
   routeName?: string;
+  customerCategoryId?: string;
   vanId?: string;
   vanName?: string;
   startLocation?: CapturedLocation;

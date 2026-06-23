@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
@@ -12,6 +12,8 @@ import type { ManagerTeamCoverageResponse } from '../services/home.service';
 import { createManagerTeamCoverageStyles } from '../styles/ManagerTeamCoverage.styles';
 
 const INITIAL_TEAM_COVERAGE: ManagerTeamCoverageResponse = {
+  users: 0,
+  vans: 0,
   warehouse: 12,
   routes: 463,
   outlets: 16904,
@@ -29,6 +31,15 @@ export default function ManagerTeamCoverageScreen() {
   const user = useAuthStore((state) => state.user);
   const [teamCoverage, setTeamCoverage] =
     useState<ManagerTeamCoverageResponse>(INITIAL_TEAM_COVERAGE);
+  const userName = user?.name || user?.employeeName || 'Manager';
+  const userRole = user?.designation || user?.role || 'Area Manager';
+  const userInitials = userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((item) => item[0])
+    .join('')
+    .toUpperCase();
 
   const coverageStats = useMemo(
     () => [
@@ -76,30 +87,47 @@ export default function ManagerTeamCoverageScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.toolbar}>
-        <AppText style={styles.toolbarLabel}>Reporting to you</AppText>
-        <TouchableOpacity style={styles.linkButton} activeOpacity={0.8}>
-          <AppText style={styles.linkText}>All field user</AppText>
-          <Ionicons name="chevron-forward" size={14} color={colors.info} />
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <View>
-            <AppText style={styles.position}>L6Position</AppText>
-            <AppText style={styles.title}>Manager</AppText>
-            <AppText style={styles.subtitle}>{user?.name || 'Manager'}</AppText>
+          <View style={styles.managerInfo}>
+            <View style={styles.managerAvatar}>
+              <AppText style={styles.managerAvatarText}>{userInitials || 'M'}</AppText>
+            </View>
+            <View style={styles.managerTextBlock}>
+              <AppText style={styles.title}>{userName}</AppText>
+              <AppText style={styles.position}>{userRole}</AppText>
+            </View>
           </View>
-          <View style={styles.badge}>
-            <AppText style={styles.badgeText}>MTD</AppText>
+        </View>
+
+        <View style={styles.infoRow}>
+          <View style={styles.infoCard}>
+            <View style={styles.infoIcon}>
+              <Ionicons name="person-outline" size={15} color={colors.primary} />
+            </View>
+            <View style={styles.infoTextBlock}>
+              <AppText style={styles.infoLabel}>User</AppText>
+              <AppText style={styles.infoValue}>{formatNumber(teamCoverage.users ?? 0)}</AppText>
+            </View>
+          </View>
+
+          <View style={styles.infoCard}>
+            <View style={styles.infoIcon}>
+              <MaterialCommunityIcons name="van-passenger" size={15} color={colors.primary} />
+            </View>
+            <View style={styles.infoTextBlock}>
+              <AppText style={styles.infoLabel}>Van</AppText>
+              <AppText style={styles.infoValue}>{formatNumber(teamCoverage.vans ?? 0)}</AppText>
+            </View>
           </View>
         </View>
 
         <View style={styles.grid}>
           {coverageStats.map((item) => (
             <View key={item.label} style={styles.stat}>
-              <MaterialCommunityIcons name={item.icon as any} size={18} color={colors.primary} />
+              <View style={styles.statIcon}>
+                <MaterialCommunityIcons name={item.icon as any} size={16} color={colors.primary} />
+              </View>
               <AppText style={styles.statValue}>{item.value}</AppText>
               <AppText style={styles.statLabel}>{item.label}</AppText>
             </View>

@@ -8,7 +8,8 @@ export interface FetchProductParams {
   page: number;
   searchText?: string;
   categoryIds?: string;
-  brandId?: string;
+  brandIds?: string;
+  customerCategoryId?: string;
 }
 
 /* ================= SERVICE ================= */

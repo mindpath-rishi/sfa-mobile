@@ -1,5 +1,5 @@
 import { api } from '@/core/network';
-import type { ApiResponse } from '@/core/network/api.types';
+import type { ApiRequestConfig, ApiResponse } from '@/core/network/api.types';
 import { LoginRequest, LoginResponse } from '@/features/auth/types/login.types';
 import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
 import { Platform } from 'react-native';
@@ -155,6 +155,8 @@ export interface ManagerOrderSummaryResponse {
 }
 
 export interface ManagerTeamCoverageResponse {
+  users: number;
+  vans: number;
   warehouse: number;
   routes: number;
   outlets: number;
@@ -422,13 +424,16 @@ export type TargetMetric = 'cases' | 'tonnage' | 'value';
 
 export interface HomeService {
   /** Authenticates user and returns token/user payload from backend */
-  dayStart(payload: DayStartPayload): Promise<ApiResponse<any>>;
-  uploadDayStartImage: (params: {
-    uri: string;
-    ownerId: string;
-    subOwnnerId: string;
-  }) => Promise<ApiResponse<{ mediaId: string; url: string }>>;
-  getDayStatus(workSessionId: string): Promise<ApiResponse<any>>;
+  dayStart(payload: DayStartPayload, config?: ApiRequestConfig): Promise<ApiResponse<any>>;
+  uploadDayStartImage: (
+    params: {
+      uri: string;
+      ownerId: string;
+      subOwnnerId: string;
+    },
+    config?: ApiRequestConfig,
+  ) => Promise<ApiResponse<{ mediaId: string; url: string }>>;
+  getDayStatus(workSessionId: string, config?: ApiRequestConfig): Promise<ApiResponse<any>>;
   getTodayActivities(workSessionId: string): Promise<ApiResponse<any>>;
   createActivity(payload: CreateActivityPayload): Promise<ApiResponse<any>>;
   getRoutes: (vanId: string) => Promise<ApiResponse<any>>;
@@ -442,6 +447,7 @@ export interface HomeService {
           carryForwardStock?: any;
           dayEndLocation?: CapturedLocation;
         },
+    config?: ApiRequestConfig,
   ): Promise<ApiResponse<any>>;
   cancelVanChangeRequest(workSessionId: string): Promise<ApiResponse<any>>;
   requestVanChange(
@@ -545,14 +551,12 @@ export interface HomeService {
  * No UI logic here — only network calls + typing.
  */
 export const homeService: HomeService = {
-  dayStart: (payload) =>
-    api.post<any, DayStartPayload>('/work-session', payload) as Promise<ApiResponse<any>>,
-  uploadDayStartImage: async ({ uri, ownerId, subOwnnerId }) => {
+  dayStart: (payload, config) =>
+    api.post<any, DayStartPayload>('/work-session', payload, config) as Promise<ApiResponse<any>>,
+  uploadDayStartImage: async ({ uri, ownerId, subOwnnerId }, config) => {
     const formData = new FormData();
     const cleanUri = uri.split('?')[0];
-    const extension = cleanUri.includes('.')
-      ? cleanUri.split('.').pop() || 'jpg'
-      : 'jpg';
+    const extension = cleanUri.includes('.') ? cleanUri.split('.').pop() || 'jpg' : 'jpg';
     const mimeType = extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
     const fileName = `day-start-${Date.now()}.${extension}`;
 
@@ -584,9 +588,11 @@ export const homeService: HomeService = {
     return api.post<{ mediaId: string; url: string }, FormData>(
       '/media/upload',
       formData,
+      config,
     ) as Promise<ApiResponse<{ mediaId: string; url: string }>>;
   },
-  getDayStatus: () => api.get<any>(`/work-session/today-activity`, {}) as Promise<ApiResponse<any>>,
+  getDayStatus: (_workSessionId, config) =>
+    api.get<any>(`/work-session/today-activity`, config) as Promise<ApiResponse<any>>,
   getTodayActivities: (workSessionId) =>
     api.get<any>(`/activity`, {
       params: { workSessionId },
@@ -601,7 +607,7 @@ export const homeService: HomeService = {
     api.get<any>(`/van`, { params: { limit: 50, page: 1, ...(params || {}) } }) as Promise<
       ApiResponse<any>
     >,
-  dayComplete: async (carryForwardStock) => {
+  dayComplete: async (carryForwardStock, config) => {
     const payload =
       carryForwardStock &&
       typeof carryForwardStock === 'object' &&
@@ -612,7 +618,11 @@ export const homeService: HomeService = {
             dayEndLocation: await captureCurrentLocation(),
           };
 
-    const response = (await api.post('/work-session/complete', payload)) as ApiResponse<any>;
+    const response = (await api.post(
+      '/work-session/complete',
+      payload,
+      config,
+    )) as ApiResponse<any>;
 
     if (response?.success) {
       await stopSalesmanBackgroundLocation();
@@ -649,14 +659,12 @@ export const homeService: HomeService = {
     ) as Promise<ApiResponse<SalesmanReportShareResponse>>,
   shareSalesmanMSR: (params) => homeService.shareSalesmanReport('MSR', params),
   shareSalesmanMST: (params) => homeService.shareSalesmanReport('MST', params),
-  shareSalesmanDSR: (params) =>
-    homeService.shareSalesmanReport('DSR', params),
+  shareSalesmanDSR: (params) => homeService.shareSalesmanReport('DSR', params),
   getSalesmanDispatchOrders: (params) =>
     api.get<SalesmanDispatchStatusItem[]>(`/employee/salesman/dispatch-order`, {
       params,
     }) as Promise<ApiResponse<SalesmanDispatchStatusItem[]>>,
-  getSalesmanDispatchStatus: (params) =>
-    homeService.getSalesmanDispatchOrders(params),
+  getSalesmanDispatchStatus: (params) => homeService.getSalesmanDispatchOrders(params),
   getManagerStats: (params) => {
     const queryParams = typeof params === 'string' ? { date: params } : params;
 

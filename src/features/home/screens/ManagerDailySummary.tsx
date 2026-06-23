@@ -26,7 +26,6 @@ import type {
   ManagerUserMtdSummaryResponse,
   ManagerUserRoutePlanResponse,
   ManagerUserTimelineResponse,
-  TargetMetric,
   TimelineLocation,
 } from '../services/home.service';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
@@ -44,14 +43,11 @@ type UserMetric = {
   value: string;
 };
 
-const METRIC_OPTIONS: { value: TargetMetric; label: string; unit: string }[] = [
-  { value: 'cases', label: 'Cases', unit: 'Cases' },
-  { value: 'tonnage', label: 'Tonnage', unit: 'Tonnage' },
-  { value: 'value', label: 'Value', unit: 'Value' },
-];
-
 const formatNumber = (value: number) =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(Number(value || 0));
+
+const formatPercent = (value: number, total: number) =>
+  total > 0 ? Math.round((value / total) * 100) : 0;
 
 const uniqueBy = <T,>(items: T[], getKey: (item: T) => string) => {
   const seen = new Set<string>();
@@ -186,7 +182,7 @@ const parseRouteDate = (value?: string) => {
 };
 
 const formatSelectedDate = (date: Date) =>
-  new Intl.DateTimeFormat('en-US', {
+  new Intl.DateTimeFormat('en-GB', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -284,30 +280,57 @@ const getSearchableText = (fieldUser: FieldUser) =>
 const canOpenUserDetails = (fieldUser?: Pick<FieldUser, 'status'>) =>
   fieldUser?.status === 'retailing' || fieldUser?.status === 'official-work';
 
-function SummaryMetric({
+function AttendanceRow({
   label,
   value,
+  subLabel,
   color,
-  mutedColor,
+  badgeLabel,
+  badgeBackgroundColor,
   styles,
+  mutedColor,
   onPress,
 }: {
   label: string;
   value: number;
+  subLabel: string;
   color: string;
+  badgeLabel: string;
+  badgeBackgroundColor: string;
+  styles: ReturnType<typeof createManagerDailySummaryStyles>;
   mutedColor: string;
-  styles: ReturnType<typeof createBaseStyles>;
   onPress?: () => void;
 }) {
   return (
-    <TouchableOpacity style={styles.summaryMetric} activeOpacity={0.7} onPress={onPress}>
-      <View style={styles.summaryMetricTop}>
-        <View style={[styles.summaryMarker, { backgroundColor: color }]} />
-        <Ionicons name="chevron-forward" size={10} color={mutedColor} />
+    <TouchableOpacity style={styles.attendanceRow} activeOpacity={0.75} onPress={onPress}>
+      <View style={[styles.attendanceAccent, { backgroundColor: color }]} />
+      <AppText style={styles.attendanceValue}>{formatNumber(value)}</AppText>
+      <View style={styles.attendanceTextBlock}>
+        <AppText style={styles.attendanceLabel}>{label}</AppText>
+        <AppText style={styles.attendanceSubLabel}>{subLabel}</AppText>
       </View>
-      <AppText style={styles.summaryLabel}>{label}</AppText>
-      <AppText style={styles.summaryValue}>{formatNumber(value)}</AppText>
+      <View style={[styles.attendanceBadge, { backgroundColor: badgeBackgroundColor }]}>
+        <AppText style={[styles.attendanceBadgeText, { color }]}>{badgeLabel}</AppText>
+      </View>
+      <Ionicons name="chevron-forward" size={12} color={mutedColor} />
     </TouchableOpacity>
+  );
+}
+
+function CallSummaryCard({
+  label,
+  value,
+  styles,
+}: {
+  label: string;
+  value: number;
+  styles: ReturnType<typeof createManagerDailySummaryStyles>;
+}) {
+  return (
+    <View style={styles.callSummaryCard}>
+      <AppText style={styles.callSummaryValue}>{formatNumber(value)}</AppText>
+      <AppText style={styles.callSummaryLabel}>{label}</AppText>
+    </View>
   );
 }
 
@@ -349,7 +372,6 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const [searchKey, setSearchKey] = useState('');
   const [debouncedSearchKey, setDebouncedSearchKey] = useState('');
   const [loadingFieldUsers, setLoadingFieldUsers] = useState(false);
-  const [summaryMetric, setSummaryMetric] = useState<TargetMetric>('cases');
   const [timelinesByUser, setTimelinesByUser] = useState<
     Record<string, ManagerUserTimelineResponse>
   >({});
@@ -402,19 +424,16 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         ? 'users'
         : 'summary';
   const view: DailyView = forcedView || routeView;
-  const filteredUsers = useMemo(
-    () => {
-      const search = searchKey.trim().toLowerCase();
+  const filteredUsers = useMemo(() => {
+    const search = searchKey.trim().toLowerCase();
 
-      return fieldUsers.filter((fieldUser) => {
-        const matchesStatus = !status || fieldUser.status === status;
-        const matchesSearch = !search || getSearchableText(fieldUser).includes(search);
+    return fieldUsers.filter((fieldUser) => {
+      const matchesStatus = !status || fieldUser.status === status;
+      const matchesSearch = !search || getSearchableText(fieldUser).includes(search);
 
-        return matchesStatus && matchesSearch;
-      });
-    },
-    [fieldUsers, searchKey, status],
-  );
+      return matchesStatus && matchesSearch;
+    });
+  }, [fieldUsers, searchKey, status]);
   const summaryCounts: Record<SummaryStatus | 'total', number> = {
     total: managerStats.userSummary.total,
     retailing: managerStats.userSummary.retailing,
@@ -422,26 +441,6 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     leave: managerStats.userSummary.leave,
     absent: managerStats.userSummary.absent,
   };
-  const selectedSummaryMetric = useMemo(() => {
-    if (summaryMetric === 'tonnage') {
-      return {
-        value: managerStats.callSummary.qtyTonnage ?? 0,
-        unit: 'Tonnage',
-      };
-    }
-
-    if (summaryMetric === 'value') {
-      return {
-        value: managerStats.callSummary.qtyValue ?? managerStats.callSummary.sc ?? 0,
-        unit: 'Value',
-      };
-    }
-
-    return {
-      value: managerStats.callSummary.qtyCases ?? 0,
-      unit: 'Cases',
-    };
-  }, [managerStats.callSummary, summaryMetric]);
 
   const selectedMtdSummary = userId ? mtdSummaryByUser[userId] : undefined;
   const mtdStats: MTDStat[] = useMemo(
@@ -456,7 +455,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   );
 
   const routeStops: RouteStop[] = useMemo(
-    () => (userId ? routePlanByUser[userId]?.stops ?? [] : []),
+    () => (userId ? (routePlanByUser[userId]?.stops ?? []) : []),
     [routePlanByUser, userId],
   );
   const routeFallbackStops: RouteStop[] = useMemo(() => {
@@ -636,14 +635,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       fetchUserMtdSummary(userId, selectedRouteDate);
       fetchUserRoutePlan(userId, selectedRouteDate);
     }
-  }, [
-    fetchUserMtdSummary,
-    fetchUserRoutePlan,
-    fetchUserTimeline,
-    selectedRouteDate,
-    userId,
-    view,
-  ]);
+  }, [fetchUserMtdSummary, fetchUserRoutePlan, fetchUserTimeline, selectedRouteDate, userId, view]);
 
   const openDatePicker = () => {
     setShowDatePicker(true);
@@ -657,6 +649,58 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         : { date: selectedRouteDate },
     });
   };
+  const attendanceRows = [
+    {
+      key: 'total',
+      label: 'All users',
+      value: summaryCounts.total,
+      subLabel: '100%',
+      color: colors.primary,
+      badgeLabel: 'Total',
+      badgeBackgroundColor: `${colors.primary}15`,
+      onPress: () => openUsers(),
+    },
+    {
+      key: 'retailing',
+      label: STATUS_LABELS.retailing,
+      value: summaryCounts.retailing,
+      subLabel: `${formatPercent(summaryCounts.retailing, summaryCounts.total)}% of total`,
+      color: statusMeta.retailing.color,
+      badgeLabel: 'Active',
+      badgeBackgroundColor: colors.successLight,
+      onPress: () => openUsers('retailing'),
+    },
+    {
+      key: 'official-work',
+      label: STATUS_LABELS['official-work'],
+      value: summaryCounts['official-work'],
+      subLabel: `${formatPercent(summaryCounts['official-work'], summaryCounts.total)}% of total`,
+      color: statusMeta['official-work'].color,
+      badgeLabel: 'Office',
+      badgeBackgroundColor: colors.infoLight,
+      onPress: () => openUsers('official-work'),
+    },
+    {
+      key: 'leave',
+      label: 'On leave',
+      value: summaryCounts.leave,
+      subLabel: `${formatPercent(summaryCounts.leave, summaryCounts.total)}% of total`,
+      color: statusMeta.leave.color,
+      badgeLabel: 'Leave',
+      badgeBackgroundColor: colors.warningLight,
+      onPress: () => openUsers('leave'),
+    },
+    {
+      key: 'absent',
+      label: STATUS_LABELS.absent,
+      value: summaryCounts.absent,
+      subLabel: `${formatPercent(summaryCounts.absent, summaryCounts.total)}% of total`,
+      color: statusMeta.absent.color,
+      badgeLabel: 'Absent',
+      badgeBackgroundColor: colors.errorLight,
+      onPress: () => openUsers('absent'),
+    },
+  ];
 
   const openTimeline = (nextUser: FieldUser) => {
     if (!canOpenUserDetails(nextUser)) {
@@ -759,10 +803,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     });
   };
 
-  const openLocationNavigation = async (
-    location?: TimelineLocation | null,
-    label = 'Location',
-  ) => {
+  const openLocationNavigation = async (location?: TimelineLocation | null, label = 'Location') => {
     if (!hasLocation(location)) {
       toast.info(`${label} not available`);
       return;
@@ -830,7 +871,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   };
 
   const getStatusIcon = (status: string) => {
-    switch(status) {
+    switch (status) {
       case 'completed':
         return <Ionicons name="checkmark-circle" size={16} color={colors.success} />;
       case 'pending':
@@ -858,22 +899,6 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
       >
-        {/* Date selection - Only show on summary screen */}
-        {view === 'summary' && (
-          <TouchableOpacity style={styles.dailyHeader} activeOpacity={0.7} onPress={openDatePicker}>
-            <View style={styles.dailyHeaderMain}>
-              <View style={styles.dailyIcon}>
-                <Ionicons name="calendar-clear-outline" size={16} color={colors.primary} />
-              </View>
-              <View style={styles.dailyHeaderText}>
-                <AppText style={styles.sectionTitle}>DAILY SUMMARY</AppText>
-                <AppText style={styles.dailyTitle}>{formatSelectedDate(selectedDate)}</AppText>
-              </View>
-            </View>
-            <Ionicons name="chevron-down" size={14} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-
         {/* Summary Card - Only on summary screen */}
         {view === 'summary' && (
           <View style={styles.summaryCard}>
@@ -883,111 +908,89 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   <AppText style={styles.managerAvatarText}>{userInitials || 'M'}</AppText>
                 </View>
                 <View style={styles.managerTextBlock}>
-                  <AppText style={styles.sectionTitle}>REPORTING TO YOU</AppText>
                   <AppText style={styles.cardTitle}>{user?.name || 'Manager'}</AppText>
+                  <AppText style={styles.sectionTitle}>Area Manager</AppText>
                 </View>
               </View>
               <TouchableOpacity
-                style={styles.linkButton}
+                style={styles.dateButton}
                 activeOpacity={0.7}
-                onPress={() => openUsers()}
+                onPress={openDatePicker}
               >
-                <AppText style={styles.linkText}>All Users</AppText>
+                <Ionicons name="calendar-clear-outline" size={12} color={colors.primary} />
+                <AppText style={styles.dateButtonText}>{formatSelectedDate(selectedDate)}</AppText>
+                <Ionicons name="chevron-down" size={10} color={colors.primary} />
               </TouchableOpacity>
             </View>
-            
-            <View style={styles.metricToggle}>
-              {METRIC_OPTIONS.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  activeOpacity={0.7}
-                  onPress={() => setSummaryMetric(option.value)}
-                  style={[
-                    styles.metricToggleItem,
-                    summaryMetric === option.value && styles.metricToggleItemActive,
-                  ]}
-                >
-                  <AppText
-                    style={[
-                      styles.metricToggleText,
-                      summaryMetric === option.value && styles.metricToggleTextActive,
-                    ]}
-                  >
-                    {option.label}
-                  </AppText>
-                </TouchableOpacity>
-              ))}
+
+            <View style={styles.summaryKpiRow}>
+              <View style={styles.summaryKpiCard}>
+                <AppText style={styles.summaryKpiValue}>
+                  {formatNumber(managerStats.callSummary.tc)}
+                </AppText>
+                <AppText style={styles.summaryKpiLabel}>TC</AppText>
+              </View>
+              <View style={styles.summaryKpiCard}>
+                <AppText style={styles.summaryKpiValue}>
+                  {formatNumber(managerStats.callSummary.pc)}
+                </AppText>
+                <AppText style={styles.summaryKpiLabel}>PC</AppText>
+              </View>
+              <View style={styles.summaryKpiCard}>
+                <AppText style={styles.summaryKpiValue}>
+                  {formatNumber(managerStats.callSummary.sc)}
+                </AppText>
+                <AppText style={styles.summaryKpiLabel}>SC</AppText>
+              </View>
+              <View style={styles.summaryKpiCard}>
+                <AppText style={styles.summaryKpiValue}>
+                  {formatNumber(managerStats.callSummary.productivity)}%
+                </AppText>
+                <AppText style={styles.summaryKpiLabel}>Productivity</AppText>
+              </View>
             </View>
-            
-            <View style={styles.summaryGrid}>
-              <SummaryMetric
-                label="Total"
-                value={summaryCounts.total}
-                color={colors.info}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-                onPress={() => openUsers()}
-              />
-              <SummaryMetric
-                label="Retailing"
-                value={summaryCounts.retailing}
-                color={statusMeta.retailing.color}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-                onPress={() => openUsers('retailing')}
-              />
-              <SummaryMetric
-                label="Office Work"
-                value={summaryCounts['official-work']}
-                color={statusMeta['official-work'].color}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-                onPress={() => openUsers('official-work')}
-              />
-              <SummaryMetric
-                label="Leave"
-                value={summaryCounts.leave}
-                color={statusMeta.leave.color}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-                onPress={() => openUsers('leave')}
-              />
-              <SummaryMetric
-                label="Absent"
-                value={summaryCounts.absent}
-                color={statusMeta.absent.color}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-                onPress={() => openUsers('absent')}
-              />
-              <SummaryMetric
-                label="SC"
-                value={managerStats.callSummary.sc}
-                color={colors.textSecondary}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-              />
-              <SummaryMetric
-                label="TC"
-                value={managerStats.callSummary.tc}
-                color={colors.info}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-              />
-              <SummaryMetric
-                label="PC"
-                value={managerStats.callSummary.pc}
-                color={statusMeta.retailing.color}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-              />
-              <SummaryMetric
-                label={selectedSummaryMetric.unit}
-                value={selectedSummaryMetric.value}
-                color={colors.primary}
-                mutedColor={colors.textQuaternary}
-                styles={baseStyles}
-              />
+
+            <View style={styles.attendancePanel}>
+              <View style={styles.attendanceHeader}>
+                <AppText style={styles.attendanceTitle}>Attendance</AppText>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => openUsers()}>
+                  <AppText style={styles.viewAllText}>View all</AppText>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.attendanceList}>
+                {attendanceRows.map((item) => (
+                  <AttendanceRow
+                    key={item.key}
+                    label={item.label}
+                    value={item.value}
+                    subLabel={item.subLabel}
+                    color={item.color}
+                    badgeLabel={item.badgeLabel}
+                    badgeBackgroundColor={item.badgeBackgroundColor}
+                    mutedColor={colors.textQuaternary}
+                    styles={styles}
+                    onPress={item.onPress}
+                  />
+                ))}
+              </View>
+              <AppText style={styles.callSummaryTitle}>Call summary</AppText>
+              <View style={styles.callSummaryGrid}>
+                <CallSummaryCard
+                  label="Cases"
+                  value={managerStats.callSummary.qtyCases ?? 0}
+                  styles={styles}
+                />
+                <CallSummaryCard
+                  label="Value"
+                  value={managerStats.callSummary.qtyValue ?? managerStats.callSummary.sc}
+                  styles={styles}
+                />
+                <CallSummaryCard
+                  label="Tonnage"
+                  value={managerStats.callSummary.qtyTonnage ?? 0}
+                  styles={styles}
+                />
+              </View>
             </View>
           </View>
         )}
@@ -1012,14 +1015,14 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 <Ionicons name="filter" size={14} color={colors.info} />
               )}
             </View>
-            
+
             <View style={styles.listHeaderRow}>
               <AppText style={styles.listHeaderTitle}>Field Users</AppText>
               <AppText style={styles.listHeaderMeta}>
                 {filteredUsers.length}/{fieldUsers.length}
               </AppText>
             </View>
-            
+
             {filteredUsers.length === 0 ? (
               <AppText style={styles.emptyText}>
                 {loadingFieldUsers
@@ -1035,10 +1038,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 return (
                   <TouchableOpacity
                     key={user.id}
-                    style={[
-                      styles.userCard,
-                      !userDetailsEnabled && styles.userCardDisabled,
-                    ]}
+                    style={[styles.userCard, !userDetailsEnabled && styles.userCardDisabled]}
                     activeOpacity={userDetailsEnabled ? 0.7 : 1}
                     onPress={() => openTimeline(user)}
                   >
@@ -1061,8 +1061,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         </View>
                       </View>
                       <View style={styles.iconActions}>
-                        <TouchableOpacity 
-                          style={styles.whatsappButton} 
+                        <TouchableOpacity
+                          style={styles.whatsappButton}
                           activeOpacity={0.7}
                           onPress={(event) => {
                             event.stopPropagation();
@@ -1071,8 +1071,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         >
                           <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
                         </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.callButton} 
+                        <TouchableOpacity
+                          style={styles.callButton}
                           activeOpacity={0.7}
                           onPress={(event) => {
                             event.stopPropagation();
@@ -1083,14 +1083,14 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         </TouchableOpacity>
                       </View>
                     </View>
-                    
+
                     <View style={[styles.routeBadge, { borderColor: activityColor }]}>
                       <AppText style={[styles.routeBadgeText, { color: activityColor }]}>
                         {activityLabel}
                       </AppText>
                       <AppText style={styles.routeText}>{user.route}</AppText>
                     </View>
-                    
+
                     <AppText style={styles.locationText} numberOfLines={1}>
                       {user.location}
                     </AppText>
@@ -1099,7 +1099,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         Timeline not available for {meta.label}
                       </AppText>
                     )}
-                    
+
                     <View style={styles.userStats}>
                       <UserStat label="FC" value={user.firstCall} styles={baseStyles} />
                       <UserStat label="FPC" value={user.firstPc} styles={baseStyles} />
@@ -1136,7 +1136,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 </View>
               </View>
             </View>
-            
+
             <View style={styles.tabsRow}>
               {(['timeline', 'mtd', 'route'] as TimelineTab[]).map((tab) => (
                 <TouchableOpacity
@@ -1151,11 +1151,23 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 </TouchableOpacity>
               ))}
             </View>
-            
+
             <View style={styles.routeInfoCard}>
-              <View style={[styles.statusBadge, { backgroundColor: statusMeta[selectedUser.status].color + '15' }]}>
-                <View style={[styles.statusDot, { backgroundColor: statusMeta[selectedUser.status].color }]} />
-                <AppText style={[styles.statusText, { color: statusMeta[selectedUser.status].color }]}>
+              <View
+                style={[
+                  styles.statusBadge,
+                  { backgroundColor: statusMeta[selectedUser.status].color + '15' },
+                ]}
+              >
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: statusMeta[selectedUser.status].color },
+                  ]}
+                />
+                <AppText
+                  style={[styles.statusText, { color: statusMeta[selectedUser.status].color }]}
+                >
                   {statusMeta[selectedUser.status].label}
                 </AppText>
               </View>
@@ -1180,7 +1192,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 {renderLocationAction('Current location', selectedTimeline?.currentLocation)}
               </View>
             </View>
-            
+
             <View style={styles.userStatsSummary}>
               <View style={styles.userStatItem}>
                 <AppText style={styles.userStatItemValue}>{selectedUser.firstCall || '--'}</AppText>
@@ -1212,7 +1224,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
             {activeTab === 'timeline' && (
               <View style={styles.timeline}>
                 <View style={styles.timelineLine} />
-                
+
                 <View style={styles.dayStartContainer}>
                   <View style={styles.timelineDot}>
                     <Ionicons
@@ -1230,7 +1242,10 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         </AppText>
                       </View>
                       <View style={styles.selfieContainer}>
-                        {renderLocationAction('Day start location', selectedTimeline?.dayStartLocation)}
+                        {renderLocationAction(
+                          'Day start location',
+                          selectedTimeline?.dayStartLocation,
+                        )}
                         {dayStartImageUrl ? (
                           <TouchableOpacity activeOpacity={0.8} onPress={openDayStartSelfie}>
                             <Image
@@ -1251,7 +1266,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                     </View>
                   </View>
                 </View>
-                
+
                 {loadingTimeline && selectedUser.activities.length === 0 ? (
                   <AppText style={styles.emptyText}>Loading timeline...</AppText>
                 ) : selectedUser.activities.length === 0 ? (
@@ -1321,7 +1336,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                     </TouchableOpacity>
                   ))
                 )}
-                {(selectedTimeline?.dayEndTime || hasLocation(selectedTimeline?.dayEndLocation)) && (
+                {(selectedTimeline?.dayEndTime ||
+                  hasLocation(selectedTimeline?.dayEndLocation)) && (
                   <View style={styles.dayStartContainer}>
                     <View style={styles.timelineDot}>
                       <Ionicons name="checkmark-circle" size={14} color={colors.success} />
@@ -1331,9 +1347,12 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         <View style={styles.dayStartInfo}>
                           <AppText style={styles.dayStartTitle}>DAY END</AppText>
                           <AppText style={styles.dayStartTime}>
-                            {selectedTimeline.dayEndTime || '--'}
+                            {selectedTimeline?.dayEndTime || '--'}
                           </AppText>
-                          {renderLocationAction('Day end location', selectedTimeline.dayEndLocation)}
+                          {renderLocationAction(
+                            'Day end location',
+                            selectedTimeline?.dayEndLocation,
+                          )}
                         </View>
                       </View>
                     </View>
@@ -1348,7 +1367,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 <View style={styles.mtdHeader}>
                   <AppText style={styles.mtdHeaderTitle}>Month-to-Date Performance</AppText>
                   <AppText style={styles.mtdHeaderSubtitle}>
-                    {new Date().toLocaleString('default', { month: 'long' })} {new Date().getFullYear()}
+                    {new Date().toLocaleString('default', { month: 'long' })}{' '}
+                    {new Date().getFullYear()}
                   </AppText>
                 </View>
                 <View style={styles.mtdGrid}>
@@ -1359,7 +1379,9 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                     </View>
                   ))}
                 </View>
-                {loadingMtdSummary && <AppText style={styles.emptyText}>Loading MTD summary...</AppText>}
+                {loadingMtdSummary && (
+                  <AppText style={styles.emptyText}>Loading MTD summary...</AppText>
+                )}
               </View>
             )}
 
@@ -1368,7 +1390,11 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
               <View style={styles.routeContainer}>
                 <View style={styles.routeHeader}>
                   <View style={styles.routeHeaderLeft}>
-                    <MaterialCommunityIcons name="map-marker-path" size={18} color={colors.primary} />
+                    <MaterialCommunityIcons
+                      name="map-marker-path"
+                      size={18}
+                      color={colors.primary}
+                    />
                     <AppText style={styles.routeHeaderTitle}>Today's Route Plan</AppText>
                   </View>
                   <View style={styles.routeProgress}>
@@ -1378,7 +1404,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                     </AppText>
                   </View>
                 </View>
-                
+
                 <View style={styles.routeTimeline}>
                   {loadingRoutePlan ? (
                     <AppText style={styles.emptyText}>Loading route plan...</AppText>
@@ -1390,7 +1416,9 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                         <View style={styles.routeStopLine}>
                           {index === 0 && <View style={styles.routeLineTop} />}
                           {getStatusIcon(stop.status)}
-                          {index < routeFallbackStops.length - 1 && <View style={styles.routeLineBottom} />}
+                          {index < routeFallbackStops.length - 1 && (
+                            <View style={styles.routeLineBottom} />
+                          )}
                         </View>
                         <View style={styles.routeStopContent}>
                           <View style={styles.routeStopHeader}>
@@ -1402,10 +1430,19 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                             <AppText style={styles.routeStopTimeText}>{stop.time}</AppText>
                           </View>
                           <View style={styles.routeStopStatus}>
-                            <AppText style={[styles.routeStopStatusText, {
-                              color: stop.status === 'completed' ? colors.success :
-                                     stop.status === 'pending' ? colors.warning : colors.error
-                            }]}>
+                            <AppText
+                              style={[
+                                styles.routeStopStatusText,
+                                {
+                                  color:
+                                    stop.status === 'completed'
+                                      ? colors.success
+                                      : stop.status === 'pending'
+                                        ? colors.warning
+                                        : colors.error,
+                                },
+                              ]}
+                            >
                               {stop.status.toUpperCase()}
                             </AppText>
                           </View>
@@ -1440,116 +1477,118 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         {view === 'order' &&
           (!selectedUser || canOpenUserDetails(selectedUser)) &&
           !selectedActivity?.order && (
-          <AppText style={styles.emptyText}>
-            {loadingTimeline ? 'Loading order...' : 'Order details not found for this activity.'}
-          </AppText>
-        )}
+            <AppText style={styles.emptyText}>
+              {loadingTimeline ? 'Loading order...' : 'Order details not found for this activity.'}
+            </AppText>
+          )}
 
         {view === 'order' &&
           selectedUser &&
           canOpenUserDetails(selectedUser) &&
           selectedActivity?.order && (
-          <View style={styles.orderScreen}>
-            <View style={styles.orderHero}>
-              <View>
-                <AppText style={styles.orderHeroText}>
-                  Cases: {selectedActivity.order.quantityCases}
-                </AppText>
-                <AppText style={styles.orderHeroText}>
-                  SuperUnit: {selectedActivity.order.quantitySuperUnit}
-                </AppText>
-                <AppText style={styles.orderHeroSub}>
-                  Pieces: {selectedActivity.order.totalPieces}
-                </AppText>
-              </View>
-              <View style={styles.orderHeroRight}>
-                <AppText style={styles.orderHeroValue}>
-                  ZMW {selectedActivity.order.netValue}
-                </AppText>
-                <AppText style={styles.orderHeroSub}>Net Value</AppText>
-              </View>
-            </View>
-
-            <AppText style={styles.orderOutlet} numberOfLines={1}>
-              {selectedActivity.order.outlet}
-            </AppText>
-
-            {selectedActivity.order.categories.map((category, index) => (
-              <View key={category.id} style={styles.orderCategory}>
-                <View
-                  style={[
-                    styles.orderCategoryHeader,
-                    index % 2 === 0
-                      ? styles.orderCategoryHeaderBlue
-                      : styles.orderCategoryHeaderMuted,
-                  ]}
-                >
-                  <View>
-                    <AppText style={styles.orderCategoryName}>{category.name}</AppText>
-                    <AppText style={styles.orderCategoryMeta}>{category.meta}</AppText>
-                  </View>
-                  <AppText style={styles.orderCategoryValue}>ZMW {category.value}</AppText>
+            <View style={styles.orderScreen}>
+              <View style={styles.orderHero}>
+                <View>
+                  <AppText style={styles.orderHeroText}>
+                    Cases: {selectedActivity.order.quantityCases}
+                  </AppText>
+                  <AppText style={styles.orderHeroText}>
+                    SuperUnit: {selectedActivity.order.quantitySuperUnit}
+                  </AppText>
+                  <AppText style={styles.orderHeroSub}>
+                    Pieces: {selectedActivity.order.totalPieces}
+                  </AppText>
                 </View>
+                <View style={styles.orderHeroRight}>
+                  <AppText style={styles.orderHeroValue}>
+                    ZMW {selectedActivity.order.netValue}
+                  </AppText>
+                  <AppText style={styles.orderHeroSub}>Net Value</AppText>
+                </View>
+              </View>
 
-                {category.lines.map((line) => (
-                  <View key={line.id} style={styles.orderLine}>
-                    <AppText style={styles.orderLineName}>{line.name}</AppText>
-                    <View style={styles.orderLineMeta}>
-                      <AppText style={styles.orderLineMetaText}>PTR {line.ptr}</AppText>
-                      <AppText style={styles.orderLineMetaText}>×{line.qty}</AppText>
-                      <View style={styles.orderUnitPill}>
-                        <AppText style={styles.orderUnitPillText}>{line.unit}</AppText>
-                      </View>
-                      <AppText style={styles.orderLineValue}>{line.value}</AppText>
+              <AppText style={styles.orderOutlet} numberOfLines={1}>
+                {selectedActivity.order.outlet}
+              </AppText>
+
+              {selectedActivity.order.categories.map((category, index) => (
+                <View key={category.id} style={styles.orderCategory}>
+                  <View
+                    style={[
+                      styles.orderCategoryHeader,
+                      index % 2 === 0
+                        ? styles.orderCategoryHeaderBlue
+                        : styles.orderCategoryHeaderMuted,
+                    ]}
+                  >
+                    <View>
+                      <AppText style={styles.orderCategoryName}>{category.name}</AppText>
+                      <AppText style={styles.orderCategoryMeta}>{category.meta}</AppText>
                     </View>
+                    <AppText style={styles.orderCategoryValue}>ZMW {category.value}</AppText>
                   </View>
-                ))}
-              </View>
-            ))}
 
-            <View style={styles.orderSummary}>
-              <View style={styles.orderSummaryHeader}>
-                <AppText style={styles.orderSummaryHeaderText}>Order Summary</AppText>
-              </View>
-              <View style={styles.orderSummaryRow}>
-                <AppText style={styles.orderSummaryLabel}>Total</AppText>
-                <AppText style={styles.orderSummaryValue}>
-                  ZMW {selectedActivity.order.netValue}
-                </AppText>
-              </View>
-              <View style={styles.orderSummaryRow}>
-                <AppText style={styles.orderDiscountLabel}>Scheme Discount:</AppText>
-                <AppText style={styles.orderDiscountValue}>
-                  ZMW {selectedActivity.order.schemeDiscount}
-                </AppText>
-              </View>
-              <View style={styles.orderSummaryRow}>
-                <AppText style={styles.orderDiscountLabel}>Cash Discount</AppText>
-                <AppText style={styles.orderDiscountValue}>
-                  ZMW {selectedActivity.order.cashDiscount}
-                </AppText>
-              </View>
-              <View style={styles.orderDivider} />
-              <View style={styles.orderSummaryRow}>
-                <AppText style={styles.orderSummaryLabel}>Net Amount</AppText>
-                <AppText style={styles.orderSummaryValue}>
-                  ZMW {selectedActivity.order.netValue}
-                </AppText>
-              </View>
-              <View style={styles.orderSummaryRow}>
-                <AppText style={styles.orderSummaryLabel}>Tax</AppText>
-                <AppText style={styles.orderSummaryValue}>ZMW {selectedActivity.order.tax}</AppText>
-              </View>
-              <View style={styles.orderDivider} />
-              <View style={styles.orderSummaryRow}>
-                <AppText style={styles.orderPayableLabel}>Payable Amount</AppText>
-                <AppText style={styles.orderPayableValue}>
-                  ZMW {selectedActivity.order.payableAmount}
-                </AppText>
+                  {category.lines.map((line) => (
+                    <View key={line.id} style={styles.orderLine}>
+                      <AppText style={styles.orderLineName}>{line.name}</AppText>
+                      <View style={styles.orderLineMeta}>
+                        <AppText style={styles.orderLineMetaText}>PTR {line.ptr}</AppText>
+                        <AppText style={styles.orderLineMetaText}>×{line.qty}</AppText>
+                        <View style={styles.orderUnitPill}>
+                          <AppText style={styles.orderUnitPillText}>{line.unit}</AppText>
+                        </View>
+                        <AppText style={styles.orderLineValue}>{line.value}</AppText>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ))}
+
+              <View style={styles.orderSummary}>
+                <View style={styles.orderSummaryHeader}>
+                  <AppText style={styles.orderSummaryHeaderText}>Order Summary</AppText>
+                </View>
+                <View style={styles.orderSummaryRow}>
+                  <AppText style={styles.orderSummaryLabel}>Total</AppText>
+                  <AppText style={styles.orderSummaryValue}>
+                    ZMW {selectedActivity.order.netValue}
+                  </AppText>
+                </View>
+                <View style={styles.orderSummaryRow}>
+                  <AppText style={styles.orderDiscountLabel}>Scheme Discount:</AppText>
+                  <AppText style={styles.orderDiscountValue}>
+                    ZMW {selectedActivity.order.schemeDiscount}
+                  </AppText>
+                </View>
+                <View style={styles.orderSummaryRow}>
+                  <AppText style={styles.orderDiscountLabel}>Cash Discount</AppText>
+                  <AppText style={styles.orderDiscountValue}>
+                    ZMW {selectedActivity.order.cashDiscount}
+                  </AppText>
+                </View>
+                <View style={styles.orderDivider} />
+                <View style={styles.orderSummaryRow}>
+                  <AppText style={styles.orderSummaryLabel}>Net Amount</AppText>
+                  <AppText style={styles.orderSummaryValue}>
+                    ZMW {selectedActivity.order.netValue}
+                  </AppText>
+                </View>
+                <View style={styles.orderSummaryRow}>
+                  <AppText style={styles.orderSummaryLabel}>Tax</AppText>
+                  <AppText style={styles.orderSummaryValue}>
+                    ZMW {selectedActivity.order.tax}
+                  </AppText>
+                </View>
+                <View style={styles.orderDivider} />
+                <View style={styles.orderSummaryRow}>
+                  <AppText style={styles.orderPayableLabel}>Payable Amount</AppText>
+                  <AppText style={styles.orderPayableValue}>
+                    ZMW {selectedActivity.order.payableAmount}
+                  </AppText>
+                </View>
               </View>
             </View>
-          </View>
-        )}
+          )}
       </ScrollView>
     </View>
   );

@@ -712,15 +712,15 @@ export default function ManagerHomeScreen() {
                 key={item.label}
                 style={styles.summaryRow}
                 activeOpacity={0.75}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(drawer)/(tabs)/daily-summary/users',
-                    params: {
-                      status: item.label.toLowerCase().replace(/\s+/g, '-'),
-                      date: selectedRouteDate,
-                    },
-                  })
-                }
+                // onPress={() =>
+                //   router.push({
+                //     pathname: '/(drawer)/(tabs)/daily-summary/users',
+                //     params: {
+                //       status: item.label.toLowerCase().replace(/\s+/g, '-'),
+                //       date: selectedRouteDate,
+                //     },
+                //   })
+                // }
               >
                 <View style={styles.summaryLabelWrap}>
                   <View style={[styles.statusDot, { backgroundColor: item.color }]} />

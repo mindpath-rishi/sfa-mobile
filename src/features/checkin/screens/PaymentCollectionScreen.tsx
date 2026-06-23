@@ -829,6 +829,7 @@ export default function PaymentCollectionScreen() {
   const outlet = useOutletStore((s) => s.selectedOutlet);
   const { items, getCartSummary, clearCart } = useCartStore();
   const van = useRouteStore.getState().van;
+  const selectedRoute = useRouteStore((s) => s.selectedRoute);
   const user = useAuthStore((s) => s.user);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1019,10 +1020,15 @@ export default function PaymentCollectionScreen() {
       const caseQty = item.caseQty || 0;
       const pieceQty = item.pieceQty || 0;
       const unitQtyInCase = item.unitQtyInCase || 1;
+      const customerCategoryId = selectedRoute?.customerCategoryId || '';
 
       return {
         productId: item.productId,
         productName: item.productName,
+        compCode: item.compCode,
+        categoryId: item.categoryId,
+        parentCategoryId: item.parentCategoryId,
+        customerCategoryId,
         caseQty,
         pieceQty,
         quantity: caseQty * unitQtyInCase + pieceQty,
@@ -1031,8 +1037,16 @@ export default function PaymentCollectionScreen() {
         caseNetWeight: item.caseNetWeight,
         pieceNetWeight: item.pieceNetWeight,
         piecePrice: item.piecePrice,
+        totalNetWeight:
+          caseQty * (item.caseNetWeight || 0) +
+          pieceQty * (item.pieceNetWeight || 0),
+        totalValue:
+          caseQty * (item.casePrice || 0) +
+          pieceQty * (item.piecePrice || 0),
       };
     });
+
+    const firstSaleItem = saleItems[0];
 
     const totalQty = items.reduce((sum, item) => {
       const caseQty = item.caseQty || 0;
@@ -1057,15 +1071,16 @@ export default function PaymentCollectionScreen() {
     const payload: any = {
       vanId: van?.vanId,
       vanName: van?.vanNumber || 'Van',
+      compCode: firstSaleItem?.compCode,
+      categoryId: firstSaleItem?.categoryId,
+      parentCategoryId: firstSaleItem?.parentCategoryId,
       customerId: outlet?.customerId,
       customerName: outlet?.name || 'test',
-      employeeId: user?.userId,
-      employeeName: user?.name,
       date: new Date().toISOString(),
       totalCases: caseDetails.totalCases,
       totalPieces: pieceDetails.totalPieces,
       totalQty,
-      totalNetWeight: toFixed4(totalNetWeight),
+      totalWeight: toFixed4(totalNetWeight),
       totalValue,
       type: saleType,
       paymentMode,

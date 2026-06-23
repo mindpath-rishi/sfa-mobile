@@ -23,6 +23,7 @@ import { homeService } from '@/features/home/services/home.service';
 import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSummaryModal';
 import { ConfirmationModal } from '@/core/components';
+import { useLoaderStore } from '@/core/loader/loader.store';
 
 const LIMIT = 15;
 
@@ -92,6 +93,7 @@ export default function StockCountScreen({
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
   const [carryForwardStock, setCarryForwardStock] = useState(true);
   const hasPromptedSettlementRef = useRef(false);
+  const loader = useLoaderStore();
 
   const { user } = useAuthStore();
   const { selectedRoute: route } = useRouteStore();
@@ -112,25 +114,39 @@ export default function StockCountScreen({
 
   const handleEndDayFromSettlement = useCallback(async () => {
     try {
+      loader.show({ message: 'Loading van settlement summary...' });
+
       const vanIdToUse = vanId || user?.vanId || useRouteStore.getState().van?.vanId;
       if (!vanIdToUse) {
         toast.error('Van not found. Please start your day first.' as any);
         return;
       }
 
-      const res: any = await vanService.fetchTodayStockSummary({ vanId: vanIdToUse });
+      const res: any = await vanService.fetchTodayStockSummary(
+        { vanId: vanIdToUse },
+        { showLoader: false },
+      );
       setDayEndSummary(res?.data);
       setShowDayEndSummary(true);
     } catch (error) {
       console.error('Error fetching day end summary:', error);
       toast.error('Failed to load day end summary. Please try again.' as any);
+    } finally {
+      loader.hide();
     }
-  }, [user?.vanId, vanId]);
+  }, [loader, user?.vanId, vanId]);
 
   const submitDayEnd = useCallback(async () => {
     try {
-      const response: any = await homeService.dayComplete(carryForwardStock as any);
+      setShowFinalConfirm(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      loader.show({ message: 'Completing van settlement...' });
+
+      const response: any = await homeService.dayComplete(carryForwardStock as any, {
+        showLoader: false,
+      });
       if (response?.success || response?.statusCode === 200) {
+        loader.show({ message: 'Finalizing settlement...' });
         toast.success('Your day successfully completed' as any);
         setShowFinalConfirm(false);
         setShowSettlementOptions(false);
@@ -142,8 +158,10 @@ export default function StockCountScreen({
     } catch (error) {
       console.error('Error completing day:', error);
       toast.error('Failed to complete day. Please try again.' as any);
+    } finally {
+      loader.hide();
     }
-  }, [carryForwardStock]);
+  }, [carryForwardStock, loader]);
 
   const handleCreateStockCount = useCallback(() => {
     router.push('/stock-count/create');

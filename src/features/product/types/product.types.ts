@@ -40,6 +40,9 @@ export interface CartItemWithDetails {
   caseNetWeight?: number; // Weight per case (calculated as unitQtyInCase * netWeightPerUnit)
   pieceNetWeight?: number; // Weight per piece (same as netWeightPerUnit)
   stock: number;
+  categoryId?: string
+  parentCategoryId?: string,
+  compCode?: string
 }
 
 /* ======================================================
@@ -95,6 +98,9 @@ export interface Product {
   reorderPoint?: number;
   caseNetWeight?: number;
   pieceNetWeight?: number;
+  categoryId?: string;
+  parentCategoryId?: string;
+  compCode?: string;
 }
 
 /* ======================================================

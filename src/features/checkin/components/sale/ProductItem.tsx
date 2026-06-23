@@ -57,6 +57,9 @@ export const ProductItem: React.FC<ProductItemProps> = ({
           caseNetWeight: product.caseNetWeight,
           pieceNetWeight: product.pieceNetWeight,
           stock: product.stock,
+          compCode: product.compCode,
+          categoryId: product.categoryId,
+          parentCategoryId: product.parentCategoryId,
         },
       ]);
 

@@ -540,6 +540,9 @@ export const useCartStore = create<CartStore>((set, get) => {
               pieceNetWeight: newItem.pieceNetWeight ?? updated[index].pieceNetWeight,
               casePrice: newItem.casePrice ?? updated[index].casePrice ?? 0,
               piecePrice: newItem.piecePrice ?? updated[index].piecePrice ?? 0,
+              compCode: newItem.compCode ?? updated[index].compCode,
+              categoryId: newItem.categoryId ?? updated[index].categoryId,
+              parentCategoryId: newItem.parentCategoryId ?? updated[index].parentCategoryId,
             };
           } else {
             updated.push({

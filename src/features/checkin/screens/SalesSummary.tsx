@@ -146,6 +146,9 @@ export default function OrderSummary() {
 
       pieceNetWeight: item.pieceNetWeight || 0,
       caseNetWeight: item.caseNetWeight || 0,
+      compCode: item.compCode,
+      categoryId: item.categoryId,
+      parentCategoryId: item.parentCategoryId,
 
       requestedWeight:
         (item.caseQty || 0) * (item.caseNetWeight || 0) +
