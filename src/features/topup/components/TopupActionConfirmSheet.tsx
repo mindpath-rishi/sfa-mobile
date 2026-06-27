@@ -126,11 +126,15 @@ export const TopupActionConfirmSheet: React.FC<TopupActionConfirmSheetProps> = (
             }}
           >
             {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.primaryContrast} />
             ) : (
-              <Ionicons name={isAccept ? 'checkmark-circle-outline' : 'trash-outline'} size={17} color="#fff" />
+              <Ionicons
+                name={isAccept ? 'checkmark-circle-outline' : 'trash-outline'}
+                size={17}
+                color={colors.primaryContrast}
+              />
             )}
-            <AppText style={{ color: '#fff', fontSize: 14, fontWeight: '900' }}>
+            <AppText style={{ color: colors.primaryContrast, fontSize: 14, fontWeight: '900' }}>
               {isAccept ? 'Accept Stock' : 'Reject'}
             </AppText>
           </TouchableOpacity>

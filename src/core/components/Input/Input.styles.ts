@@ -72,9 +72,9 @@ export const useInputStyles = (props: InputStyleProps = {}) => {
 
     function getBackgroundColor(): string {
       if (disabled) return colors.divider;
-      if (variant === 'filled') return colors.surface + '20';
+      if (variant === 'filled') return colors.surfaceElevated;
       if (variant === 'ghost') return 'transparent';
-      return colors.background;
+      return colors.surface;
     }
 
     function getBorderColor(): string {

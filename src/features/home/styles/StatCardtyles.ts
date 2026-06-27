@@ -1,9 +1,11 @@
 // StatCardStyles.ts
 import { StyleSheet, Dimensions } from 'react-native';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const useStatCardStyles = ({ color, trend, compact }: any) => {
+  const { colors } = useTheme();
   // Fixed card dimensions
   const cardWidth = compact ? SCREEN_WIDTH * 0.42 : SCREEN_WIDTH * 0.44;
   const cardHeight = compact ? 100 : 110;
@@ -12,18 +14,18 @@ export const useStatCardStyles = ({ color, trend, compact }: any) => {
     card: {
       width: cardWidth,
       height: cardHeight,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.card,
       borderRadius: 12,
       padding: compact ? 10 : 12,
       flexDirection: 'row',
       alignItems: 'center',
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.08,
       shadowRadius: 4,
       elevation: 2,
       borderWidth: 1,
-      borderColor: '#F0F0F0',
+      borderColor: colors.border,
       overflow: 'hidden',
     },
     loadingOverlay: {
@@ -32,7 +34,7 @@ export const useStatCardStyles = ({ color, trend, compact }: any) => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(255,255,255,0.9)',
+      backgroundColor: colors.surface + 'E6',
       borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
@@ -55,7 +57,7 @@ export const useStatCardStyles = ({ color, trend, compact }: any) => {
     title: {
       fontSize: compact ? 10 : 11,
       fontWeight: '500',
-      color: '#6B7280',
+      color: colors.textSecondary,
       marginBottom: 4,
       letterSpacing: 0.3,
       textTransform: 'uppercase',
@@ -69,18 +71,18 @@ export const useStatCardStyles = ({ color, trend, compact }: any) => {
     value: {
       fontSize: compact ? 20 : 24,
       fontWeight: '700',
-      color: '#111827',
+      color: colors.textPrimary,
       flexShrink: 1,
     },
     subtitle: {
       fontSize: 9,
-      color: '#9CA3AF',
+      color: colors.textTertiary,
       marginTop: 2,
     },
     trendContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: trend && trend > 0 ? '#10B98112' : '#EF444412',
+      backgroundColor: trend && trend > 0 ? colors.successLight : colors.errorLight,
       paddingHorizontal: 5,
       paddingVertical: 2,
       borderRadius: 10,
@@ -89,7 +91,7 @@ export const useStatCardStyles = ({ color, trend, compact }: any) => {
     trendText: {
       fontSize: 9,
       fontWeight: '600',
-      color: trend && trend > 0 ? '#10B981' : '#EF4444',
+      color: trend && trend > 0 ? colors.success : colors.error,
     },
   });
 

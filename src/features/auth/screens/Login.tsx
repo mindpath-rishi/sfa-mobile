@@ -181,7 +181,7 @@
 //         userId: resData.user.profileId,
 //         name: resData.user.profile?.name,
 //         role: resData.user.profile?.role,
-//         vanId: resData.user.profile?.associatedVans?.[0] ?? null,
+//         vanId: resData.user.vanId ?? null,
 //       };
 //       await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
 //       toast.success(t('auth.login.welcomeBack'));
@@ -658,7 +658,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
         territory: profile?.territory,
         manager: profile?.manager,
         managerName: profile?.managerName,
-        vanId: profile?.associatedVans?.[0] ?? null,
+        vanId: resData.user.vanId ?? null,
         avatar: profile?.avatar || profile?.profileImage || profile?.profileImageUrl || null,
       };
       await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
@@ -855,6 +855,8 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                           returnKeyType="next"
                           onSubmitEditing={focusPassword}
                           icon="person-outline"
+                          iconColor="#FFFFFF"
+                          placeholderTextColor="#000000"
                           editable={!loading}
                           touched={touchedFields.userId}
                           containerStyle={styles.inputContainer}
@@ -920,6 +922,8 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                           returnKeyType="done"
                           onSubmitEditing={handleSubmit(onSubmit)}
                           icon="lock-closed-outline"
+                          iconColor="#FFFFFF"
+                          placeholderTextColor="#000000"
                           rightIcon={secureTextEntry ? 'eye-off-outline' : 'eye-outline'}
                           onRightIconPress={toggleSecureEntry}
                           editable={!loading}
@@ -1010,7 +1014,11 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                       style={styles.loginButtonGradient}
                     >
                       {loading ? (
-                        <ActivityIndicator size="small" color="#fff" accessibilityLabel="Loading" />
+                        <ActivityIndicator
+                          size="small"
+                          color={colors.textInverse}
+                          accessibilityLabel="Loading"
+                        />
                       ) : (
                         <View
                           style={{
@@ -1019,7 +1027,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                             justifyContent: 'center',
                           }}
                         >
-                          <Ionicons name="log-in-outline" size={18} color="#fff" />
+                          <Ionicons name="log-in-outline" size={18} color={colors.textInverse} />
                           <AppText style={[styles.loginButtonText, { marginLeft: 8 }]}>
                             Sign In
                           </AppText>

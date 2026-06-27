@@ -43,7 +43,7 @@ export const TopupDetailHeader: React.FC<HeaderProps> = ({
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
-            <Feather name="chevron-left" size={24} color="#FFF" />
+            <Feather name="chevron-left" size={24} color={colors.primaryContrast} />
           </TouchableOpacity>
 
           <View>

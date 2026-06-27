@@ -141,7 +141,7 @@ export const VanChangeModal: React.FC<VanChangeModalProps> = ({
               disabled={!vanChangeReason}
             >
               <AppText style={styles.submitButtonText}>Continue</AppText>
-              <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
+              <MaterialCommunityIcons name="arrow-right" size={18} color={colors.primaryContrast} />
             </TouchableOpacity>
           </View>
         </View>

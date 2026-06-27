@@ -191,7 +191,7 @@ export const useLoginStyles = createStyles((utils, colors) => ({
     width: 80,
     height: 80,
     borderRadius: 20,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -219,7 +219,7 @@ export const useLoginStyles = createStyles((utils, colors) => ({
   appTitle: {
     fontSize: 28,
     fontWeight: '800',
-    color: '#fff',
+    color: colors.textInverse,
     marginBottom: 6,
     textAlign: 'center',
     letterSpacing: -0.5,
@@ -356,7 +356,7 @@ export const useLoginStyles = createStyles((utils, colors) => ({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.5,
-    color: '#fff',
+    color: colors.textInverse,
   },
 
   forgotPasswordContainer: {

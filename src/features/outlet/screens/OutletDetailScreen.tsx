@@ -2361,13 +2361,13 @@ export default function CustomerDetailScreen() {
                     alignItems: 'center',
                   }}
                 >
-                  <Ionicons name="cart-outline" size={20} color="#FFF" />
+                  <Ionicons name="cart-outline" size={20} color={colors.primaryContrast} />
                 </View>
                 <View>
-                  <AppText style={{ color: '#FFF', fontSize: 15, fontWeight: '700' }}>
+                  <AppText style={{ color: colors.primaryContrast, fontSize: 15, fontWeight: '700' }}>
                     Proceed to Sale
                   </AppText>
-                  <AppText style={{ color: 'rgba(255,255,255,0.72)', fontSize: 11, marginTop: 1 }}>
+                  <AppText style={{ color: colors.primaryContrast + 'B8', fontSize: 11, marginTop: 1 }}>
                     {hasActiveVisit ? 'Visit active' : 'Tap to start'}
                   </AppText>
                 </View>
@@ -2382,7 +2382,7 @@ export default function CustomerDetailScreen() {
                   alignItems: 'center',
                 }}
               >
-                <Ionicons name="arrow-forward" size={17} color="#FFF" />
+                <Ionicons name="arrow-forward" size={17} color={colors.primaryContrast} />
               </View>
             </TouchableOpacity>
           </Animated.View>
@@ -2445,38 +2445,48 @@ const LoadingState = () => (
   </View>
 );
 
-const DetailListSkeleton = ({ rows = 3 }: { rows?: number }) => (
-  <View style={{ gap: 10 }}>
-    {Array.from({ length: rows }).map((_, i) => (
-      <View key={i} style={{ backgroundColor: '#FFF', borderRadius: 12, overflow: 'hidden' }}>
-        <View style={{ height: 3, backgroundColor: '#E5E5E5' }} />
-        <View style={{ padding: 14, gap: 10 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <View style={{ gap: 7 }}>
-              <Skeleton height={11} width={88} borderRadius={6} />
-              <Skeleton height={14} width={128} borderRadius={7} />
-            </View>
-            <View style={{ alignItems: 'flex-end', gap: 5 }}>
-              <Skeleton height={17} width={76} borderRadius={8} />
-              <Skeleton height={10} width={70} borderRadius={5} />
-            </View>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 6 }}>
-            {[1, 2, 3].map((j) => (
-              <View
-                key={j}
-                style={{ flex: 1, backgroundColor: '#F5F5F5', borderRadius: 8, padding: 8, gap: 5 }}
-              >
-                <Skeleton height={10} width={36} borderRadius={5} />
-                <Skeleton height={13} width="80%" borderRadius={6} />
+const DetailListSkeleton = ({ rows = 3 }: { rows?: number }) => {
+  const { colors } = useTheme();
+
+  return (
+    <View style={{ gap: 10 }}>
+      {Array.from({ length: rows }).map((_, i) => (
+        <View key={i} style={{ backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' }}>
+          <View style={{ height: 3, backgroundColor: colors.divider }} />
+          <View style={{ padding: 14, gap: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <View style={{ gap: 7 }}>
+                <Skeleton height={11} width={88} borderRadius={6} />
+                <Skeleton height={14} width={128} borderRadius={7} />
               </View>
-            ))}
+              <View style={{ alignItems: 'flex-end', gap: 5 }}>
+                <Skeleton height={17} width={76} borderRadius={8} />
+                <Skeleton height={10} width={70} borderRadius={5} />
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              {[1, 2, 3].map((j) => (
+                <View
+                  key={j}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.backgroundSecondary,
+                    borderRadius: 8,
+                    padding: 8,
+                    gap: 5,
+                  }}
+                >
+                  <Skeleton height={10} width={36} borderRadius={5} />
+                  <Skeleton height={13} width="80%" borderRadius={6} />
+                </View>
+              ))}
+            </View>
           </View>
         </View>
-      </View>
-    ))}
-  </View>
-);
+      ))}
+    </View>
+  );
+};
 
 const EmptyState = ({ colors }: { colors: any }) => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>

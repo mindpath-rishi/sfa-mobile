@@ -222,7 +222,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           disabled={!vanChangeReason}
         >
           <AppText style={styles.submitButtonText}>Continue</AppText>
-          <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
+          <MaterialCommunityIcons name="arrow-right" size={18} color={colors.primaryContrast} />
         </TouchableOpacity>
       </View>
     </>
@@ -333,7 +333,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           disabled={!isVanSelectionValid}
         >
           <AppText style={styles.submitButtonText}>{vanSelectionSubmitLabel || 'Start Day'}</AppText>
-          <MaterialCommunityIcons name="arrow-right" size={18} color="#FFFFFF" />
+          <MaterialCommunityIcons name="arrow-right" size={18} color={colors.primaryContrast} />
         </TouchableOpacity>
       </View>
     </>

@@ -75,13 +75,13 @@ export const useStatsOverviewSectionStyles = () => {
       flex: 1,
       fontSize: 13,
       fontWeight: '700',
-      color: '#FFFFFF',
+      color: colors.primaryContrast,
     },
     metricValue: {
       fontSize: 25,
       lineHeight: 29,
       fontWeight: '800',
-      color: '#FFFFFF',
+      color: colors.primaryContrast,
       marginTop: 6,
     },
     metricFooter: {
@@ -92,7 +92,7 @@ export const useStatsOverviewSectionStyles = () => {
       fontSize: 11,
       lineHeight: 14,
       fontWeight: '600',
-      color: 'rgba(255,255,255,0.86)',
+      color: colors.primaryContrast + 'CC',
     },
     metricTrack: {
       height: 4,
@@ -103,7 +103,7 @@ export const useStatsOverviewSectionStyles = () => {
     metricProgress: {
       height: '100%',
       borderRadius: 999,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.primaryContrast,
     },
     skeletonCard: {
       width: '100%',
@@ -142,7 +142,7 @@ export const useStatsOverviewSectionStyles = () => {
       marginTop: 16,
     },
     retryButtonText: {
-      color: '#FFFFFF',
+      color: colors.primaryContrast,
       fontSize: 14,
       fontWeight: '600',
     },

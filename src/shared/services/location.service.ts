@@ -20,6 +20,12 @@ type LocationTaskData = {
   locations?: Location.LocationObject[];
 };
 
+let webLocationWatchId: number | null = null;
+let lastWebLocation: CapturedLocation | null = null;
+
+const WEB_LOCATION_INTERVAL_MS = 60_000;
+const WEB_LOCATION_DISTANCE_METERS = 100;
+
 const getApiBaseUrl = () => {
   const extra = Constants.expoConfig?.extra as { api?: { baseURL?: string } } | undefined;
   return extra?.api?.baseURL || 'https://order.tradekings.app:4001/api/v1';
@@ -68,6 +74,70 @@ const postBackgroundLocation = async (location: CapturedLocation, workSessionId?
   });
 };
 
+const distanceInMeters = (from: CapturedLocation, to: CapturedLocation) => {
+  const earthRadius = 6_371_000;
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const latitudeDelta = toRadians(to.latitude - from.latitude);
+  const longitudeDelta = toRadians(to.longitude - from.longitude);
+  const fromLatitude = toRadians(from.latitude);
+  const toLatitude = toRadians(to.latitude);
+
+  const haversine =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(fromLatitude) * Math.cos(toLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+
+  return earthRadius * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+};
+
+const startWebLocationTracking = () => {
+  if (webLocationWatchId !== null || typeof navigator === 'undefined' || !navigator.geolocation) {
+    return;
+  }
+
+  webLocationWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const location: CapturedLocation = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        altitude: position.coords.altitude,
+        speed: position.coords.speed,
+        capturedAt: new Date(position.timestamp).toISOString(),
+      };
+
+      const lastCapturedAt = lastWebLocation
+        ? new Date(lastWebLocation.capturedAt).getTime()
+        : Number.NEGATIVE_INFINITY;
+      const intervalReached = position.timestamp - lastCapturedAt >= WEB_LOCATION_INTERVAL_MS;
+      const distanceReached =
+        !!lastWebLocation &&
+        distanceInMeters(lastWebLocation, location) >= WEB_LOCATION_DISTANCE_METERS;
+
+      if (!lastWebLocation || intervalReached || distanceReached) {
+        lastWebLocation = location;
+        void postBackgroundLocation(location).catch((error) =>
+          console.warn('Unable to send browser location:', error),
+        );
+      }
+    },
+    (error) => console.warn('Browser location tracking error:', error.message),
+    {
+      enableHighAccuracy: true,
+      maximumAge: 15_000,
+      timeout: 30_000,
+    },
+  );
+};
+
+const stopWebLocationTracking = () => {
+  if (webLocationWatchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+    navigator.geolocation.clearWatch(webLocationWatchId);
+  }
+
+  webLocationWatchId = null;
+  lastWebLocation = null;
+};
+
 if (!TaskManager.isTaskDefined(SALESMAN_BACKGROUND_LOCATION_TASK)) {
   TaskManager.defineTask<LocationTaskData>(
     SALESMAN_BACKGROUND_LOCATION_TASK,
@@ -104,7 +174,12 @@ export const captureCurrentLocation = async (): Promise<CapturedLocation | undef
 export const startSalesmanBackgroundLocation = async (
   user: Parameters<typeof isSalesmanUser>[0],
 ) => {
-  if (Platform.OS === 'web' || !isSalesmanUser(user)) return;
+  if (!isSalesmanUser(user)) return;
+
+  if (Platform.OS === 'web') {
+    startWebLocationTracking();
+    return;
+  }
 
   try {
     const foreground = await Location.requestForegroundPermissionsAsync();
@@ -136,7 +211,10 @@ export const startSalesmanBackgroundLocation = async (
 };
 
 export const stopSalesmanBackgroundLocation = async () => {
-  if (Platform.OS === 'web') return;
+  if (Platform.OS === 'web') {
+    stopWebLocationTracking();
+    return;
+  }
 
   try {
     const started = await Location.hasStartedLocationUpdatesAsync(SALESMAN_BACKGROUND_LOCATION_TASK);

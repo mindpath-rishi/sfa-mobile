@@ -165,9 +165,9 @@ export const VanInventoryTopupDetail: React.FC = () => {
             style={{ flex: 1, height: 48, borderRadius: 10, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, opacity: actionLoading ? 0.7 : 1 }}
           >
             {actionLoading === 'accept' ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.primaryContrast} />
             ) : (
-              <AppText style={{ color: '#fff', fontWeight: '700' }}>Accept Stock</AppText>
+              <AppText style={{ color: colors.primaryContrast, fontWeight: '700' }}>Accept Stock</AppText>
             )}
           </TouchableOpacity>
         </View>

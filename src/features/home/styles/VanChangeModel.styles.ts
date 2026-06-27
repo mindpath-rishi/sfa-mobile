@@ -1,8 +1,10 @@
 // VanChangeModel.styles.ts
 import { StyleSheet } from 'react-native';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}) => {
   const { vanChangeReason } = props;
+  const { colors } = useTheme();
 
   return StyleSheet.create({
     modalOverlay: {
@@ -12,12 +14,13 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
     },
 
     bottomModalContent: {
+      backgroundColor: colors.surface,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       paddingHorizontal: 20,
       paddingTop: 12,
       paddingBottom: 24,
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: -2 },
       shadowOpacity: 0.1,
       shadowRadius: 8,
@@ -33,6 +36,7 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
       width: 40,
       height: 4,
       borderRadius: 2,
+      backgroundColor: colors.border,
     },
 
     // Icon
@@ -52,6 +56,7 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
       fontWeight: '700',
       textAlign: 'center',
       marginBottom: 8,
+      color: colors.textPrimary,
     },
 
     questionText: {
@@ -60,6 +65,7 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
       marginBottom: 24,
       lineHeight: 20,
       paddingHorizontal: 16,
+      color: colors.textSecondary,
     },
 
     // Options Container
@@ -71,14 +77,14 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
     optionItem: {
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: '#E5E7EB',
+      borderColor: colors.border,
       padding: 16,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.card,
     },
 
     optionItemSelected: {
-      borderColor: '#3B82F6',
-      backgroundColor: '#EFF6FF',
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '18',
     },
 
     optionContent: {
@@ -102,16 +108,17 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
     optionTitle: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#1F2937',
+      color: colors.textPrimary,
       marginBottom: 2,
     },
 
     optionDescription: {
       fontSize: 12,
+      color: colors.textSecondary,
     },
 
     optionTextSelected: {
-      color: '#3B82F6',
+      color: colors.primary,
     },
 
     // Error
@@ -122,13 +129,14 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
       gap: 6,
       marginBottom: 20,
       paddingVertical: 8,
-      backgroundColor: '#FEF2F2',
+      backgroundColor: colors.errorLight,
       borderRadius: 8,
     },
 
     errorText: {
       fontSize: 12,
       fontWeight: '500',
+      color: colors.error,
     },
 
     // Buttons
@@ -142,6 +150,7 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
       paddingVertical: 14,
       borderRadius: 12,
       borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -149,6 +158,7 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
     cancelButtonText: {
       fontSize: 14,
       fontWeight: '600',
+      color: colors.textPrimary,
     },
 
     submitButton: {
@@ -168,7 +178,7 @@ export const useVanChangeModalStyles = (props: { vanChangeReason?: string } = {}
     submitButtonText: {
       fontSize: 14,
       fontWeight: '600',
-      color: '#FFFFFF',
+      color: colors.primaryContrast,
     },
   });
 };

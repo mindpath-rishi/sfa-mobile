@@ -414,7 +414,7 @@ export const useRouteScreenStyles = () => {
       padding: utils.spacing[3],
       borderTopWidth: 1,
       borderTopColor: colors.divider,
-      backgroundColor: colors.primaryContrast,
+      backgroundColor: colors.card,
       gap: utils.spacing[3],
     } as ViewStyle,
 
@@ -629,7 +629,7 @@ export const useRouteScreenStyles = () => {
     detailInfoItem: {
       flex: 1,
       alignItems: 'center',
-      backgroundColor: colors.primaryContrast,
+      backgroundColor: colors.backgroundSecondary,
       padding: utils.spacing[4],
       borderRadius: utils.borderRadius.lg,
       gap: utils.spacing[2],
