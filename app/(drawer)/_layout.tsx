@@ -18,6 +18,7 @@ import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getRoleId } from '@/core/navigation/role.utils';
 import { useLoaderStore } from '@/core/loader/loader.store';
+import { useOfflineStore } from '@/core/offline/offline.store';
 
 /* ============================
  * HELPERS
@@ -403,6 +404,9 @@ const CustomDrawerContent = (props: any) => {
   const roleId = getRoleId(user);
   const allowedRoutes = roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
   const loader = useLoaderStore();
+  const offline = useOfflineStore(
+    (state) => !state.isConnected || !state.isInternetReachable,
+  );
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
@@ -475,6 +479,10 @@ const CustomDrawerContent = (props: any) => {
   }, [bumpDashboardRefresh, carryForwardStock, loader, setWorkSessionId]);
 
   const handleVanSettlementPress = useCallback(async () => {
+    if (offline) {
+      toast.error('Van Settlement is unavailable offline. Please reconnect and try again.');
+      return;
+    }
     try {
       loader.show({ message: 'Checking today activity...' });
 
@@ -495,7 +503,7 @@ const CustomDrawerContent = (props: any) => {
     } finally {
       loader.hide();
     }
-  }, [loader]);
+  }, [loader, offline]);
 
   const filteredRoutes = props.state.routes.filter((route: any) => allowedRoutes.has(route.name));
   const filteredRouteKeys = new Set(filteredRoutes.map((route: any) => route.key));
@@ -541,8 +549,14 @@ const CustomDrawerContent = (props: any) => {
           <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
             <DrawerItem
               label="Van Settlement"
-              labelStyle={{ fontWeight: '500', color: 'red' }}
-              icon={({ size }) => <MaterialCommunityIcons name="power" size={size} color="red" />}
+              labelStyle={{ fontWeight: '500', color: offline ? colors.textSecondary : 'red' }}
+              icon={({ size }) => (
+                <MaterialCommunityIcons
+                  name="power"
+                  size={size}
+                  color={offline ? colors.textSecondary : 'red'}
+                />
+              )}
               onPress={() => {
                 props.navigation?.closeDrawer?.();
                 void handleVanSettlementPress();
@@ -551,6 +565,7 @@ const CustomDrawerContent = (props: any) => {
                 borderRadius: 12,
                 marginHorizontal: 8,
                 marginTop: 8,
+                opacity: offline ? 0.5 : 1,
               }}
             />
           </View>

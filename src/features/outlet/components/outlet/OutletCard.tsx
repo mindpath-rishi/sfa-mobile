@@ -57,6 +57,10 @@ export const OutletCard: React.FC<Props> = ({ outlet, index, onPress }) => {
         return { color: colors.success, label: 'Active' };
       case 'INACTIVE':
         return { color: colors.error, label: 'Inactive' };
+      case 'VERIFICATION_PENDING':
+        return { color: '#F59E0B', label: 'Verification Pending' };
+      case 'REJECTED':
+        return { color: colors.error, label: 'Rejected' };
       default:
         return { color: colors.textSecondary, label: outlet.status };
     }

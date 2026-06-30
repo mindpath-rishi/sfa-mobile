@@ -10,6 +10,9 @@ import Constants from 'expo-constants';
 import { errorHandler } from '@/core/errors/error.handler';
 import { logger } from '@/core/logger/logger';
 import { useAuthStore } from '@/core/store/auth.store';
+import { isSalesman } from '@/core/navigation/role.utils';
+import { useOfflineStore } from '@/core/offline/offline.store';
+import { getCachedApiResponse, setCachedApiResponse } from '@/database';
 import { getAccessToken } from '@/shared/services/tokenStorage';
 import { isTokenExpired } from '@/shared/utils/auth-token.utils';
 import { useLoaderStore } from '../loader/loader.store';
@@ -101,6 +104,7 @@ httpClient.interceptors.request.use(
 
         const headers = AxiosHeaders.from(config.headers ?? {});
         headers.set(AUTH_HEADER_KEY, `${TOKEN_PREFIX} ${token}`);
+        headers.set('x-client-platform', 'mobile');
         config.headers = headers;
       }
 
@@ -176,6 +180,26 @@ export const apiRequest = async <TResponse, TBody = unknown>(
   body?: TBody,
   config?: ApiRequestConfig,
 ): Promise<ApiResponse<TResponse>> => {
+  const user = useAuthStore.getState().user;
+  const network = useOfflineStore.getState();
+  const salesmanOffline =
+    isSalesman(user) && (!network.isConnected || !network.isInternetReachable);
+
+  if (salesmanOffline && method === 'GET') {
+    const cached = await getCachedApiResponse<TResponse>(user?.userId ?? '', url, config?.params);
+    if (cached) return cached;
+  }
+
+  if (salesmanOffline) {
+    return {
+      success: false,
+      statusCode: 503,
+      message: 'This action is not available offline',
+      data: null as TResponse,
+      offline: true,
+    };
+  }
+
   const res = await httpClient.request<ApiResponse<TResponse>>({
     method,
     url,
@@ -185,7 +209,29 @@ export const apiRequest = async <TResponse, TBody = unknown>(
     showLoader: config?.showLoader !== false,
   } as CustomAxiosRequestConfig);
 
-  return res.data;
+  const response = res.data;
+  if (method === 'GET' && isSalesman(user) && response?.success && !url.startsWith('/sync/')) {
+    try {
+      await setCachedApiResponse(user?.userId ?? '', url, config?.params, response);
+    } catch (error) {
+      logger.warn('API response cache write failed', { url, error });
+    }
+  }
+
+  if (
+    method !== 'GET' &&
+    isSalesman(user) &&
+    response?.success &&
+    !url.startsWith('/sync/')
+  ) {
+    // Keep the offline database current after successful online mutations.
+    // Dynamic import avoids a static cycle: syncApi uses this HTTP client.
+    void import('@/sync/sync.service')
+      .then(({ syncService }) => syncService.sync())
+      .catch((error) => logger.warn('Post-mutation offline sync failed', { url, error }));
+  }
+
+  return response;
 };
 
 /* ======================================================

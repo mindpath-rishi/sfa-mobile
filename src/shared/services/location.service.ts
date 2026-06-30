@@ -3,6 +3,10 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { Platform } from 'react-native';
 
+import { isOfflineMode } from '@/core/offline/offline.store';
+import { useAuthStore } from '@/core/store/auth.store';
+import { repositories } from '@/repositories';
+
 import { getAccessToken } from './tokenStorage';
 
 export const SALESMAN_BACKGROUND_LOCATION_TASK = 'salesman-background-location';
@@ -56,22 +60,68 @@ const isSalesmanUser = (user?: {
   return label.includes('salesman') || label.includes('sales executive');
 };
 
-const postBackgroundLocation = async (location: CapturedLocation, workSessionId?: string) => {
-  const token = await getAccessToken();
-  if (!token) return;
+const saveBackgroundLocationOffline = async (
+  location: CapturedLocation,
+  workSessionId?: string,
+) => {
+  const { user, workSessionId: storedWorkSessionId } = useAuthStore.getState();
+  const sessionId = workSessionId || storedWorkSessionId || undefined;
+  const ownerId = user?.userId ?? '';
+  if (!ownerId || !sessionId) return;
 
-  await fetch(`${getApiBaseUrl()}/work-session/location`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      workSessionId,
-      source: 'BACKGROUND',
-      location,
-    }),
+  const existing = await repositories.attendance.findById(ownerId, sessionId);
+  const previousLocations = Array.isArray(existing?.backgroundLocations)
+    ? existing.backgroundLocations
+    : [];
+  const backgroundLocations = [...previousLocations, location].slice(-1000);
+
+  if (existing) {
+    await repositories.attendance.update(ownerId, existing.uuid, {
+      backgroundLocations,
+    });
+    return;
+  }
+
+  await repositories.attendance.create(ownerId, {
+    uuid: sessionId,
+    workSessionId: sessionId,
+    userId: ownerId,
+    vanId: user?.vanId,
+    status: 'ACTIVE',
+    backgroundLocations,
   });
+};
+
+const postBackgroundLocation = async (location: CapturedLocation, workSessionId?: string) => {
+  if (isOfflineMode()) {
+    await saveBackgroundLocationOffline(location, workSessionId);
+    return;
+  }
+
+  const token = await getAccessToken();
+  if (!token) {
+    await saveBackgroundLocationOffline(location, workSessionId);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/work-session/location`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        workSessionId: workSessionId || useAuthStore.getState().workSessionId,
+        source: 'BACKGROUND',
+        location,
+      }),
+    });
+
+    if (!response.ok) throw new Error(`Location upload failed (${response.status})`);
+  } catch {
+    await saveBackgroundLocationOffline(location, workSessionId);
+  }
 };
 
 const distanceInMeters = (from: CapturedLocation, to: CapturedLocation) => {

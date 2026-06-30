@@ -21,7 +21,11 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText, Skeleton } from '@/core/components';
 import { EmptyState } from '@/core/components/EmptyState';
 import { useHeader } from '@/shared/contexts/HeaderContext';
-import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
+import {
+  getRouteCustomerCategoryId,
+  getRouteLocationIds,
+  useRouteStore,
+} from '@/core/store/route.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { homeService } from '@/features/home/services/home.service';
 import { outletService } from '@/features/outlet/services/outlet.service';
@@ -50,6 +54,9 @@ interface VanRoute {
   distance: string;
   stops: number;
   customerCategoryId?: string;
+  marketId?: string;
+  provinceId?: string;
+  countryId?: string;
 }
 
 interface RouteOutlet {
@@ -128,6 +135,7 @@ export default function ChangeRoute() {
 
   useFocusEffect(
     React.useCallback(() => {
+      isMountedRef.current = true;
       setHeader({
         title: 'Change Route',
         showBack: true,
@@ -139,15 +147,6 @@ export default function ChangeRoute() {
       return () => {
         isMountedRef.current = false;
       };
-    }, []),
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      if (validateWorkSession()) {
-        setCurrentStep('routes');
-        fetchRoutes();
-      }
     }, []),
   );
 
@@ -181,6 +180,7 @@ export default function ChangeRoute() {
           totalShops: item.route?.outletCount || 0,
           distance: item.route.distance || 'N/A',
           stops: item.route?.outletCount || 0,
+          ...getRouteLocationIds({ ...item, route: item.route }),
           customerCategoryId: getRouteCustomerCategoryId({
             customerCategoryId: item.customerCategoryId,
             customerCategory: item.customerCategory,
@@ -204,6 +204,18 @@ export default function ChangeRoute() {
       setIsLoadingRoutes(false);
     }
   }, [selectedRoute?.routeId, workSessionId, validateWorkSession]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (validateWorkSession()) {
+        setCurrentStep('routes');
+        setSelectedVanRoute(null);
+        setOutlets([]);
+        setSearchQuery('');
+        void fetchRoutes();
+      }
+    }, [fetchRoutes, validateWorkSession]),
+  );
 
   const fetchRouteOutlets = useCallback(
     async (route: VanRoute) => {
@@ -318,23 +330,22 @@ export default function ChangeRoute() {
 
       const response: any = await outletService.changeRoute(payload);
 
-      if (response.statusCode === 200 || response.statusCode === 201) {
+      if ([200, 201, 202].includes(Number(response.statusCode))) {
         setSelectedRoute({
           routeId: selectedVanRoute.routeId,
-          name: selectedRoute?.name,
+          name: selectedVanRoute.routeName,
           routeName: selectedVanRoute.routeName,
           routeCode: selectedVanRoute.routeCode,
           routeSessionId: response.data?.routeSessionId || selectedVanRoute.routeSessionId,
           workSessionId: workSessionId || '',
           totalShops: selectedVanRoute.totalShops,
-          distance: selectedRoute?.distance || '',
-          vanId: selectedRoute?.vanId,
-          marketId: selectedRoute?.marketId,
-          provinceId: selectedRoute?.provinceId,
-          countryId: selectedRoute?.countryId,
+          distance: selectedVanRoute.distance || '',
+          vanId: selectedVanRoute.vanId || selectedRoute?.vanId,
+          marketId: selectedVanRoute.marketId || selectedRoute?.marketId,
+          provinceId: selectedVanRoute.provinceId || selectedRoute?.provinceId,
+          countryId: selectedVanRoute.countryId || selectedRoute?.countryId,
           customerCategoryId:
-            selectedVanRoute.customerCategoryId ||
-            selectedRoute?.customerCategoryId,
+            selectedVanRoute.customerCategoryId || selectedRoute?.customerCategoryId,
         });
 
         if (!isWeb) {

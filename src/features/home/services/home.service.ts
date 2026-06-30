@@ -8,6 +8,11 @@ import {
   stopSalesmanBackgroundLocation,
   type CapturedLocation,
 } from '@/shared/services/location.service';
+import { isSalesman } from '@/core/navigation/role.utils';
+import { useAuthStore } from '@/core/store/auth.store';
+import { isOfflineMode, useOfflineStore } from '@/core/offline/offline.store';
+import { repositories } from '@/repositories';
+import { syncService } from '@/sync/sync.service';
 
 /**
  * Auth API contract used by the app.
@@ -551,8 +556,54 @@ export interface HomeService {
  * No UI logic here — only network calls + typing.
  */
 export const homeService: HomeService = {
-  dayStart: (payload, config) =>
-    api.post<any, DayStartPayload>('/work-session', payload, config) as Promise<ApiResponse<any>>,
+  dayStart: async (payload, config) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user) || !isOfflineMode()) {
+      return api.post<any, DayStartPayload>('/work-session', payload, config);
+    }
+    const record = await repositories.attendance.create(user?.userId ?? '', {
+      ...payload,
+      userId: user?.userId,
+      userName: user?.name,
+      dayStartTime: new Date().toISOString(),
+      startTime: new Date().toISOString(),
+      status: 'ACTIVE',
+    } as unknown as Record<string, unknown>);
+    const now = new Date().toISOString();
+    await repositories.activities.create(user?.userId ?? '', {
+      workSessionId: record.uuid,
+      userId: user?.userId,
+      userName: user?.name,
+      vanId: payload.vanId ?? user?.vanId,
+      name: payload.activityName,
+      description: payload.description,
+      startTime: now,
+      status: 'ACTIVE',
+    });
+    if (payload.routeId) {
+      await repositories.routeSessions.create(user?.userId ?? '', {
+        workSessionId: record.uuid,
+        userId: user?.userId,
+        userName: user?.name,
+        vanId: payload.vanId ?? user?.vanId,
+        routeId: payload.routeId,
+        routeName: payload.routeName,
+        customerCategoryId: payload.customerCategoryId,
+        totalShops: payload.totalShops ?? 0,
+        startTime: now,
+        sessionDate: now,
+        status: 'ACTIVE',
+        isActive: true,
+      });
+    }
+    useAuthStore.getState().setWorkSessionId(record.uuid);
+    return {
+      success: true,
+      statusCode: 202,
+      message: 'Day start saved locally',
+      data: { ...record, workSessionId: record.uuid },
+    } as ApiResponse<any>;
+  },
   uploadDayStartImage: async ({ uri, ownerId, subOwnnerId }, config) => {
     const formData = new FormData();
     const cleanUri = uri.split('?')[0];
@@ -591,22 +642,294 @@ export const homeService: HomeService = {
       config,
     ) as Promise<ApiResponse<{ mediaId: string; url: string }>>;
   },
-  getDayStatus: (_workSessionId, config) =>
-    api.get<any>(`/work-session/today-activity`, config) as Promise<ApiResponse<any>>,
-  getTodayActivities: (workSessionId) =>
-    api.get<any>(`/activity`, {
-      params: { workSessionId },
-    }) as Promise<ApiResponse<any>>,
-  createActivity: (payload) =>
-    api.post<any, CreateActivityPayload>('/activity', payload) as Promise<ApiResponse<any>>,
-  getRoutes: (vanId) => api.get<any>('/route', { params: { vanId } }) as Promise<ApiResponse<any>>,
-  getVanMappedRoutes: () => api.get<any>(`/van/mapped-routes`, {}) as Promise<ApiResponse<any>>,
-  getVan: (userId: string) =>
-    api.get<any>(`/van`, { params: { limit: 1, page: 1, userId } }) as Promise<ApiResponse<any>>,
-  getVans: (params) =>
-    api.get<any>(`/van`, { params: { limit: 50, page: 1, ...(params || {}) } }) as Promise<
-      ApiResponse<any>
-    >,
+  getDayStatus: async (_workSessionId, config) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user) || !isOfflineMode()) {
+      return api.get<any>(`/work-session/today-activity`, config);
+    }
+    const isToday = (value: unknown) => {
+      if (!value) return false;
+      const date = new Date(String(value));
+      const today = new Date();
+      return (
+        !Number.isNaN(date.getTime()) &&
+        date.getFullYear() === today.getFullYear() &&
+        date.getMonth() === today.getMonth() &&
+        date.getDate() === today.getDate()
+      );
+    };
+    const records = await repositories.attendance.findAll(user?.userId ?? '', { limit: 10 });
+    const todayRecords = records.filter((item) =>
+      isToday(item.dayStartTime ?? item.startTime ?? item.createdAt),
+    );
+    const record =
+      todayRecords.find((item) => String(item.status ?? '').toUpperCase() === 'ACTIVE') ??
+      todayRecords[0] ??
+      null;
+    const activityRecords = await repositories.activities.findAll(user?.userId ?? '', {
+      limit: 200,
+    });
+    const activities = activityRecords
+      .filter((item) => isToday(item.startTime ?? item.createdAt))
+      .map((item) => ({
+        ...item,
+        _id: item._id ?? item.activityId ?? item.uuid,
+        activityId: item.activityId ?? item.uuid,
+        name: item.name ?? item.activityName ?? 'Activity',
+        startTime: item.startTime ?? item.createdAt,
+        status: String(item.status ?? '').toUpperCase() === 'ACTIVE' ? 'ongoing' : 'completed',
+      }));
+    const routeSessions = await repositories.routeSessions.findAll(user?.userId ?? '', {
+      limit: 200,
+    });
+    const activeRouteSession = routeSessions.find(
+      (item) =>
+        String(item.status ?? '').toUpperCase() === 'ACTIVE' &&
+        Boolean(record) &&
+        [record?.uuid, record?.workSessionId]
+          .filter(Boolean)
+          .map(String)
+          .includes(String(item.workSessionId ?? '')),
+    );
+    const legacyRetailingRouteId =
+      routeSessions.length === 0 && record?.activityName === 'Retailing'
+        ? record?.routeId
+        : undefined;
+    const routeId = String(activeRouteSession?.routeId ?? legacyRetailingRouteId ?? '');
+    const routeRecord = routeId
+      ? await repositories.routes.findById(user?.userId ?? '', routeId)
+      : null;
+    const selectedRoute = routeId
+      ? {
+          ...routeRecord,
+          routeId,
+          name: activeRouteSession?.routeName ?? routeRecord?.name,
+          routeName: activeRouteSession?.routeName ?? routeRecord?.name,
+          routeSessionId: activeRouteSession?.routeSessionId ?? activeRouteSession?.uuid ?? '',
+          workSessionId: activeRouteSession?.workSessionId ?? record?.uuid,
+          totalShops: activeRouteSession?.totalShops ?? routeRecord?.outletCount ?? 0,
+          vanId: activeRouteSession?.vanId ?? record?.vanId ?? user?.vanId,
+        }
+      : null;
+    const currentActivity = activities.find((item) => item.status === 'ongoing' && !item.endTime);
+    const activeActivity = currentActivity
+      ? {
+          ...currentActivity,
+          name: currentActivity.name,
+          startTime: currentActivity.startTime ?? currentActivity.createdAt,
+        }
+      : record &&
+          activities.length === 0 &&
+          String(record.status ?? '').toUpperCase() === 'ACTIVE' &&
+          record.activityName
+        ? {
+            _id: `work-session-${record.uuid}`,
+            name: record.activityName,
+            startTime: record.startTime,
+            status: 'ongoing',
+          }
+        : null;
+    return {
+      success: true,
+      statusCode: 200,
+      data: record
+        ? {
+            ...record,
+            workSessionId: record.uuid,
+            activeActivity,
+            selectedRoute,
+            todayActivities: activities.length
+              ? activities
+              : activeActivity
+                ? [activeActivity]
+                : [],
+          }
+        : null,
+      offline: true,
+    } as ApiResponse<any>;
+  },
+  getTodayActivities: async (workSessionId) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user) || !isOfflineMode()) {
+      return api.get<any>(`/activity`, {
+        params: { workSessionId },
+      }) as Promise<ApiResponse<any>>;
+    }
+    const records = await repositories.activities.findAll(user?.userId ?? '', { limit: 200 });
+    const data = records
+      .filter((item) => !workSessionId || item.workSessionId === workSessionId)
+      .map((item) => ({
+        ...item,
+        _id: item._id ?? item.activityId ?? item.uuid,
+        activityId: item.activityId ?? item.uuid,
+        name: item.name ?? item.activityName ?? 'Activity',
+        startTime: item.startTime ?? item.createdAt,
+        status: String(item.status ?? '').toUpperCase() === 'ACTIVE' ? 'ongoing' : 'completed',
+      }));
+    return { success: true, statusCode: 200, data, offline: true } as ApiResponse<any>;
+  },
+  createActivity: async (payload) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user)) {
+      return api.post<any, CreateActivityPayload>('/activity', payload);
+    }
+    if (!isOfflineMode()) {
+      const response = await api.post<any, CreateActivityPayload>('/activity', payload);
+      if (response?.success) return response;
+      // Network reachability can change before the listener updates Zustand.
+      // Fall through to SQLite so the user's activity change is not lost.
+      useOfflineStore.getState().setConnection(false, false);
+    }
+    const ownerId = user?.userId ?? '';
+    const existingActivities = await repositories.activities.findAll(ownerId, { limit: 200 });
+    await Promise.all(
+      existingActivities
+        .filter(
+          (item) =>
+            item.workSessionId === payload.workSessionId &&
+            String(item.status ?? '').toUpperCase() === 'ACTIVE',
+        )
+        .map((item) =>
+          repositories.activities.update(ownerId, item.uuid, {
+            status: 'COMPLETED',
+            endTime: new Date().toISOString(),
+          }),
+        ),
+    );
+    const existingRouteSessions = await repositories.routeSessions.findAll(ownerId, {
+      limit: 200,
+    });
+    await Promise.all(
+      existingRouteSessions
+        .filter(
+          (item) =>
+            item.workSessionId === payload.workSessionId &&
+            String(item.status ?? '').toUpperCase() === 'ACTIVE',
+        )
+        .map((item) =>
+          repositories.routeSessions.update(ownerId, item.uuid, {
+            status: 'COMPLETED',
+            isActive: false,
+            endTime: new Date().toISOString(),
+          }),
+        ),
+    );
+    const record = await repositories.activities.create(ownerId, {
+      ...payload,
+      userId: user?.userId,
+      userName: user?.name,
+      startTime: new Date().toISOString(),
+      status: 'ACTIVE',
+    } as unknown as Record<string, unknown>);
+    if (payload.routeId) {
+      const now = new Date().toISOString();
+      await repositories.routeSessions.create(ownerId, {
+        workSessionId: payload.workSessionId,
+        userId: user?.userId,
+        userName: user?.name,
+        vanId: payload.vanId ?? user?.vanId,
+        vanName: payload.vanName,
+        routeId: payload.routeId,
+        routeName: payload.routeName,
+        customerCategoryId: payload.customerCategoryId,
+        totalShops: payload.totalShops ?? 0,
+        startTime: now,
+        sessionDate: now,
+        status: 'ACTIVE',
+        isActive: true,
+      });
+    }
+    return {
+      success: true,
+      statusCode: 202,
+      message: 'Activity saved locally',
+      data: { ...record, activityId: record.uuid },
+      offline: true,
+    } as ApiResponse<any>;
+  },
+  getRoutes: async (vanId) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user)) {
+      return api.get<any>('/route');
+    }
+    if (!isOfflineMode()) {
+      // Route-to-van assignments live on the van document. The generic route
+      // listing does not accept vanId and rejects it as a non-whitelisted query.
+      return api.get<any>('/van/mapped-routes');
+    }
+    const data = await repositories.routes.findAll(user?.userId ?? '', { limit: 200 });
+    return {
+      success: true,
+      statusCode: 200,
+      data: {
+        vanId,
+        routes: data.map((record) => ({
+          routeId: record.routeId ?? record.uuid,
+          ...(record.assignment && typeof record.assignment === 'object'
+            ? (record.assignment as Record<string, unknown>)
+            : {}),
+          route: record,
+        })),
+      },
+    } as ApiResponse<any>;
+  },
+  getVanMappedRoutes: async () => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user) || !isOfflineMode()) {
+      return api.get<any>(`/van/mapped-routes`, {}) as Promise<ApiResponse<any>>;
+    }
+
+    const records = await repositories.routes.findAll(user?.userId ?? '', { limit: 200 });
+    if (!records.length) {
+      // The HTTP layer restores the login-prefetched snapshot while offline.
+      return api.get<any>(`/van/mapped-routes`, {}) as Promise<ApiResponse<any>>;
+    }
+    const routes = records.map((record) => {
+      const assignment =
+        record.assignment && typeof record.assignment === 'object'
+          ? (record.assignment as Record<string, unknown>)
+          : {};
+      return {
+        routeId: record.routeId ?? record.uuid,
+        ...assignment,
+        route: record,
+      };
+    });
+
+    return {
+      success: true,
+      statusCode: 200,
+      data: { vanId: user?.vanId, routes },
+      offline: true,
+    } as ApiResponse<any>;
+  },
+  getVan: async (userId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user) || !isOfflineMode()) {
+      return api.get<any>(`/van`, { params: { limit: 1, page: 1, userId } });
+    }
+    const data = await repositories.vans.findAll(user?.userId ?? '', { limit: 1 });
+    return {
+      success: true,
+      statusCode: 200,
+      data,
+      offline: true,
+    } as ApiResponse<any>;
+  },
+  getVans: async (params) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user) || !isOfflineMode()) {
+      return api.get<any>(`/van`, { params: { limit: 50, page: 1, ...(params || {}) } });
+    }
+    const data = await repositories.vans.findAll(user?.userId ?? '', { limit: 50 });
+    return {
+      success: true,
+      statusCode: 200,
+      data,
+      meta: { total: data.length, page: 1, limit: 50 },
+      offline: true,
+    } as ApiResponse<any>;
+  },
   dayComplete: async (carryForwardStock, config) => {
     const payload =
       carryForwardStock &&
@@ -618,6 +941,63 @@ export const homeService: HomeService = {
             dayEndLocation: await captureCurrentLocation(),
           };
 
+    const user = useAuthStore.getState().user;
+    if (isSalesman(user) && isOfflineMode()) {
+      const workSessionId = useAuthStore.getState().workSessionId;
+      if (!workSessionId)
+        return {
+          success: false,
+          statusCode: 404,
+          message: 'No active work session',
+          data: null,
+        } as ApiResponse<any>;
+      const ownerId = user?.userId ?? '';
+      const endedAt = new Date().toISOString();
+      const [activities, routeSessions] = await Promise.all([
+        repositories.activities.findAll(ownerId, { limit: 200 }),
+        repositories.routeSessions.findAll(ownerId, { limit: 200 }),
+      ]);
+      await Promise.all([
+        ...activities
+          .filter(
+            (item) =>
+              item.workSessionId === workSessionId &&
+              String(item.status ?? '').toUpperCase() === 'ACTIVE',
+          )
+          .map((item) =>
+            repositories.activities.update(ownerId, item.uuid, {
+              status: 'COMPLETED',
+              endTime: endedAt,
+            }),
+          ),
+        ...routeSessions
+          .filter(
+            (item) =>
+              item.workSessionId === workSessionId &&
+              String(item.status ?? '').toUpperCase() === 'ACTIVE',
+          )
+          .map((item) =>
+            repositories.routeSessions.update(ownerId, item.uuid, {
+              status: 'COMPLETED',
+              isActive: false,
+              endTime: endedAt,
+            }),
+          ),
+      ]);
+      const record = await repositories.attendance.update(ownerId, workSessionId, {
+        ...payload,
+        status: 'COMPLETED',
+        dayEndTime: endedAt,
+        endTime: endedAt,
+      });
+      await stopSalesmanBackgroundLocation();
+      return {
+        success: true,
+        statusCode: 202,
+        message: 'Day completion saved locally',
+        data: record,
+      } as ApiResponse<any>;
+    }
     const response = (await api.post(
       '/work-session/complete',
       payload,
@@ -626,6 +1006,10 @@ export const homeService: HomeService = {
 
     if (response?.success) {
       await stopSalesmanBackgroundLocation();
+      // Pull the completed work session/activity immediately. Otherwise the
+      // local database still contains the pre-settlement ACTIVE records and
+      // shows an ongoing activity after switching offline.
+      await syncService.sync().catch(() => undefined);
     }
 
     return response;
@@ -638,8 +1022,58 @@ export const homeService: HomeService = {
     api.patch<any>(`/work-session/van-change/${workSessionId}/request`, payload) as Promise<
       ApiResponse<any>
     >,
-  getEmployeeStats: (employeeId: string) =>
-    api.get<any>(`/employee/${employeeId}/stats`, {}) as Promise<ApiResponse<any>>,
+  getEmployeeStats: async (employeeId: string) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user) || !isOfflineMode()) {
+      return api.get<any>(`/employee/${employeeId}/stats`, {}) as Promise<ApiResponse<any>>;
+    }
+
+    const ownerId = user?.userId ?? employeeId;
+    const [visits, orders] = await Promise.all([
+      repositories.visits.findAll(ownerId, { limit: 200 }),
+      repositories.orders.findAll(ownerId, { limit: 200 }),
+    ]);
+    const today = new Date();
+    const isToday = (value: unknown) => {
+      if (!value) return false;
+      const date = new Date(String(value));
+      return (
+        !Number.isNaN(date.getTime()) &&
+        date.getFullYear() === today.getFullYear() &&
+        date.getMonth() === today.getMonth() &&
+        date.getDate() === today.getDate()
+      );
+    };
+    const todayVisits = visits.filter((item) => isToday(item.checkInTime ?? item.createdAt));
+    const completedVisits = todayVisits.filter(
+      (item) => String(item.status ?? '').toUpperCase() === 'COMPLETED',
+    );
+    const todayOrders = orders.filter((item) => isToday(item.date ?? item.createdAt));
+    const sum = (key: string) =>
+      todayOrders.reduce((total, order) => total + Number(order[key] ?? 0), 0);
+
+    return {
+      success: true,
+      statusCode: 200,
+      data: {
+        visits: completedVisits.length,
+        totalVisits: todayVisits.length,
+        tc: completedVisits.length,
+        pc: todayOrders.length,
+        orders: {
+          count: todayOrders.length,
+          value: sum('totalValue'),
+          cases: sum('totalCases'),
+          weight: sum('totalWeight'),
+          pending: todayOrders.filter(
+            (item) => String(item.status ?? '').toUpperCase() === 'PENDING',
+          ).length,
+        },
+        incentives: { earned: 0, target: 0, nextMilestone: 0 },
+      },
+      offline: true,
+    } as ApiResponse<any>;
+  },
   getSalesmanPocketAndTarget: (params) =>
     api.get<SalesmanPocketTargetResponse>(`/employee/salesman/my-pocket-target`, {
       params,

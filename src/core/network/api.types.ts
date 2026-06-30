@@ -14,4 +14,6 @@ export type ApiResponse<T> = {
   data: T;
   statusCode: number;
   meta?: { total: number; page: number; limit: number };
+  /** True when the response was restored from the salesman's device cache. */
+  offline?: boolean;
 };

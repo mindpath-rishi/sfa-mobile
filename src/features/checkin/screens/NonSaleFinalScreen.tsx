@@ -9,6 +9,10 @@ import { ReasonCard } from '../components/nonsale/ReasonCard';
 import { EmptyState } from '@/core/components/EmptyState';
 import { nonSaleService } from '@/features/outlet/services/non-sale.service';
 import { useOutletStore } from '@/core/store/outlet.store';
+import { useRouteStore } from '@/core/store/route.store';
+import { useAuthStore } from '@/core/store/auth.store';
+import { outletService } from '@/features/outlet/services/outlet.service';
+import { toast } from '@/core/utils';
 
 export const FURTHER_REASONS: Record<string, Array<{ id: string; label: string }>> = {
   product: [
@@ -62,6 +66,8 @@ export const NonSaleFinalScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const activeVisit = useOutletStore((s) => s.activeVisit);
   const clearVisit = useOutletStore((s) => s.clearVisit);
+  const van = useRouteStore((s) => s.van);
+  const user = useAuthStore((s) => s.user);
 
   // Extract data from params
   const customer = {
@@ -104,20 +110,37 @@ export const NonSaleFinalScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    console.log('==============active visit===========', activeVisit);
-    const payload: any = {
-      visitId: activeVisit?.visitId,
-      vanId: activeVisit?.visitId,
-      outletId: activeVisit?.outlet?.customerId,
-      reasonId: reasonId,
-      reasonCategoryId: categoryId,
-      // routeSessionId: activeVisit?.routeSessionId,
-      remark: '',
-    };
-    const response = await nonSaleService.markNonSale(payload);
-    if (response.success) {
+    if (!activeVisit?.visitId || !activeVisit?.outlet?.customerId) {
+      toast.error('No active visit', 'Start an outlet visit before marking No Sale.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload: any = {
+        visitId: activeVisit.visitId,
+        vanId: van?.vanId ?? user?.vanId,
+        outletId: activeVisit.outlet.customerId,
+        reasonId: selectedReason || reasonId,
+        reasonCategoryId: categoryId,
+        remark: reasonLabel || '',
+      };
+      const response = await nonSaleService.markNonSale(payload);
+      if (!response.success) {
+        toast.error('No Sale failed', response.message || 'Unable to save No Sale data.');
+        return;
+      }
+
+      await outletService.completeVisit(activeVisit.visitId);
       clearVisit();
       router.replace('/route');
+    } catch (error) {
+      toast.error(
+        'No Sale failed',
+        error instanceof Error ? error.message : 'Unable to save No Sale data.',
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

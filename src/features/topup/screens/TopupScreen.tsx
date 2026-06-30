@@ -26,6 +26,7 @@ import {
 import { useTopupStyles } from '../styles/topupScreen.styles';
 import { Topup } from '../types/topup.types';
 import { TopupList } from '../components/TopupList';
+import { useOfflineStore } from '@/core/offline/offline.store';
 
 interface TopupScreenProps {
   vanId?: string;
@@ -44,6 +45,9 @@ export default function TopupScreen({
   const { user } = useAuthStore();
   const van = useRouteStore((state) => state.van);
   const styles = useTopupStyles();
+  const offline = useOfflineStore(
+    (state) => !state.isConnected || !state.isInternetReachable,
+  );
 
   const { setHeader } = useHeader();
   const { updateTopupFilterCount, resetTopupFilterCount, setOpenTopupFilterHandler } =
@@ -248,6 +252,10 @@ export default function TopupScreen({
 
   /* -------------------- Create Topup -------------------- */
   const handleCreateTopup = () => {
+    if (offline) {
+      toast.error('Top-up requests are unavailable offline. Please reconnect and try again.');
+      return;
+    }
     router.push('/topup/create');
   };
 
@@ -289,8 +297,8 @@ export default function TopupScreen({
         filterCount: activeFilterCount,
         filterActive: activeFilterCount > 0,
         onFilterPress: () => setShowFilters(true),
-        rightIcon: HEADER.RIGHT_ICON,
-        onRightPress: handleCreateTopup,
+        rightIcon: offline ? undefined : HEADER.RIGHT_ICON,
+        onRightPress: offline ? undefined : handleCreateTopup,
         elevated: true,
         showBorder: false,
         backgroundColor: colors.primary,
@@ -300,7 +308,7 @@ export default function TopupScreen({
       } else {
         hasFocusedOnce.current = true;
       }
-    }, [activeFilterCount, colors.primary, setHeader, vanName]),
+    }, [activeFilterCount, colors.primary, offline, setHeader, vanName]),
   );
 
   return (

@@ -159,6 +159,8 @@ import { clearTokens, getAccessToken, setTokens } from '@/shared/services/tokenS
 import { isTokenExpired } from '@/shared/utils/auth-token.utils';
 import { resetAllStores } from './reset.store';
 import { storage } from '../storage';
+import * as Network from 'expo-network';
+import { isSalesman } from '../navigation/role.utils';
 
 /* ======================================================
  * TYPES
@@ -274,7 +276,24 @@ export const useAuthStore = create<AuthStore>((set) => ({
         return;
       }
 
-      if (isTokenExpired(token)) {
+      let storedUser: AuthUser | null = null;
+      try {
+        const value = await storage.getItem(AUTH_USER_KEY);
+        storedUser = value ? (JSON.parse(value) as AuthUser) : null;
+      } catch {
+        storedUser = null;
+      }
+
+      // A salesman must still be able to use previously downloaded data when a
+      // token expires in the field. It is invalidated as usual as soon as the
+      // device is online; no other role receives this exception.
+      const network = isTokenExpired(token) ? await Network.getNetworkStateAsync() : null;
+      const allowExpiredOfflineSalesman =
+        isTokenExpired(token) &&
+        isSalesman(storedUser) &&
+        (network?.isConnected === false || network?.isInternetReachable === false);
+
+      if (isTokenExpired(token) && !allowExpiredOfflineSalesman) {
         await clearTokens();
         await storage.removeItem(AUTH_USER_KEY);
         resetAllStores();
@@ -288,17 +307,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
         return;
       }
 
-      let user: AuthUser | null = null;
-
-      try {
-        const storedUser = await storage.getItem(AUTH_USER_KEY);
-
-        if (storedUser) {
-          user = JSON.parse(storedUser);
-        }
-      } catch (error) {
-        console.warn('Failed to parse stored user:', error);
-      }
+      let user: AuthUser | null = storedUser;
 
       if (!user) {
         user = decodeToken(token);

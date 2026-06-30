@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-router';
-import { ActivityIndicator, View, Platform } from 'react-native';
+import { ActivityIndicator, AppState, View, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as NavigationBar from 'expo-navigation-bar';
@@ -32,6 +32,13 @@ import {
 import { authService } from '@/features/auth/services/auth.service';
 import { getClientDeviceIdAsync } from '@/shared/services/device.service';
 import '@/shared/services/location.service';
+import {
+  initialiseOffline,
+  OfflineSyncGate,
+  OfflineStatusBanner,
+  subscribeToOfflineSync,
+  syncOfflineQueue,
+} from '@/core/offline';
 
 setupBackgroundMessageHandler();
 
@@ -63,6 +70,27 @@ export default function RootLayout() {
     hydrateLanguage();
     hydrateAuth();
   }, [hydrateTheme, hydrateLanguage, hydrateAuth]);
+
+  useEffect(() => {
+    void initialiseOffline();
+    const subscription = subscribeToOfflineSync();
+    return () => subscription.remove();
+  }, []);
+
+  // Auth hydration can finish after the network listener is registered. Re-check
+  // the salesman queue once a persisted or newly-created session becomes active.
+  useEffect(() => {
+    if (!token) return;
+    void syncOfflineQueue();
+    const timer = setInterval(() => void syncOfflineQueue(), 5 * 60_000);
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void syncOfflineQueue();
+    });
+    return () => {
+      clearInterval(timer);
+      appState.remove();
+    };
+  }, [token]);
 
   useEffect(() => {
     setupNotificationChannelAsync().catch((error) =>
@@ -215,6 +243,8 @@ export default function RootLayout() {
                 <Stack.Screen name="(drawer)" />
               </Stack>
             </HeaderProvider>
+            <OfflineStatusBanner />
+            <OfflineSyncGate />
             <LoaderOverlay />
             <Toast position="top" />
           </FilterProvider>

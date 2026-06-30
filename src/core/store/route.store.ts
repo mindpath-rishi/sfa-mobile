@@ -22,9 +22,12 @@ export type Route = {
   vanId?: string;
   routeName?: string;
   routeCode?: string;
-  marketId?: string;
-  provinceId?: string;
-  countryId?: string;
+  marketId?: unknown;
+  provinceId?: unknown;
+  countryId?: unknown;
+  market?: unknown;
+  province?: unknown;
+  country?: unknown;
   customerCategoryId?: string;
   customerCategory?: {
     id?: string;
@@ -33,6 +36,12 @@ export type Route = {
     customerCategoryId?: string;
   };
   route?: {
+    marketId?: unknown;
+    provinceId?: unknown;
+    countryId?: unknown;
+    market?: unknown;
+    province?: unknown;
+    country?: unknown;
     customerCategoryId?: string;
     customerCategory?: {
       id?: string;
@@ -40,6 +49,57 @@ export type Route = {
       categoryId?: string;
       customerCategoryId?: string;
     };
+  };
+};
+
+const resolveEntityId = (value: unknown, idKeys: string[]): string | undefined => {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const id = String(value).trim();
+    return id || undefined;
+  }
+  if (!value || typeof value !== 'object') return undefined;
+
+  const entity = value as Record<string, unknown>;
+  for (const key of [...idKeys, 'id', '_id', 'value']) {
+    const candidate = entity[key];
+    if (typeof candidate === 'string' || typeof candidate === 'number') {
+      const id = String(candidate).trim();
+      if (id) return id;
+    }
+  }
+  return undefined;
+};
+
+const resolveRelatedId = (value: unknown, key: string): string | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const candidate = (value as Record<string, unknown>)[key];
+  return resolveEntityId(candidate, [key]);
+};
+
+export const getRouteLocationIds = (route?: Partial<Route> | null) => {
+  const nestedRoute = route?.route;
+  return {
+    marketId:
+      resolveEntityId(route?.marketId, ['marketId']) ||
+      resolveEntityId(route?.market, ['marketId']) ||
+      resolveEntityId(nestedRoute?.marketId, ['marketId']) ||
+      resolveEntityId(nestedRoute?.market, ['marketId']),
+    provinceId:
+      resolveEntityId(route?.provinceId, ['provinceId']) ||
+      resolveEntityId(route?.province, ['provinceId']) ||
+      resolveRelatedId(route?.market, 'provinceId') ||
+      resolveEntityId(nestedRoute?.provinceId, ['provinceId']) ||
+      resolveEntityId(nestedRoute?.province, ['provinceId']) ||
+      resolveRelatedId(nestedRoute?.market, 'provinceId'),
+    countryId:
+      resolveEntityId(route?.countryId, ['countryId']) ||
+      resolveEntityId(route?.country, ['countryId']) ||
+      resolveRelatedId(route?.province, 'countryId') ||
+      resolveRelatedId(route?.market, 'countryId') ||
+      resolveEntityId(nestedRoute?.countryId, ['countryId']) ||
+      resolveEntityId(nestedRoute?.country, ['countryId']) ||
+      resolveRelatedId(nestedRoute?.province, 'countryId') ||
+      resolveRelatedId(nestedRoute?.market, 'countryId'),
   };
 };
 
@@ -92,7 +152,7 @@ const initialState = {
  * STORE
  * ====================================================== */
 
-export const useRouteStore = create<RouteStore>((set) => {
+export const useRouteStore = create<RouteStore>((set, get) => {
   // 🔥 AUTO REGISTER FOR GLOBAL RESET
   registerStoreReset('route', () => {
     set(initialState);
@@ -120,11 +180,21 @@ export const useRouteStore = create<RouteStore>((set) => {
     /* ================= ROUTE ================= */
 
     setSelectedRoute: (route) => {
+      const currentRoute = get().selectedRoute;
+      const isSameRoute = Boolean(
+        route?.routeId && currentRoute?.routeId && route.routeId === currentRoute.routeId,
+      );
+      const mergedRoute = route
+        ? ({ ...(isSameRoute ? currentRoute : {}), ...route } as Route)
+        : null;
+      const locationIds = getRouteLocationIds(mergedRoute);
       set({
-        selectedRoute: route
+        selectedRoute: mergedRoute
           ? {
-              ...route,
-              customerCategoryId: getRouteCustomerCategoryId(route),
+              ...mergedRoute,
+              ...locationIds,
+              customerCategoryId:
+                getRouteCustomerCategoryId(mergedRoute) || currentRoute?.customerCategoryId,
             }
           : null,
       });

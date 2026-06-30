@@ -194,7 +194,7 @@ export interface GalleryPickerProps {
 
 // Default props
 export const DEFAULT_CAMERA_PROPS: Partial<CameraProps> = {
-  facing: 'front',
+  facing: 'back',
   flash: 'off',
   ratio: '16:9',
   quality: 0.8,

@@ -26,6 +26,7 @@ api.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
+    config.headers['x-client-platform'] = 'mobile';
   }
   return config;
 });

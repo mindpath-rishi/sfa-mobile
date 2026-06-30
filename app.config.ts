@@ -7,6 +7,14 @@ export default ({ config }: any) => {
 
     plugins: [
       'expo-router',
+      [
+        'expo-splash-screen',
+        {
+          image: './assets/images/sfa-splash.png',
+          resizeMode: 'cover',
+          backgroundColor: '#FFFFFF',
+        },
+      ],
       'expo-secure-store',
       'expo-localization',
       'expo-mail-composer',
@@ -38,8 +46,14 @@ export default ({ config }: any) => {
     slug: 'expo-jwt-tabs-template-ultimate',
     scheme: 'expojwttabsultimate',
     version: '2.0.0',
+    icon: './assets/images/sfa-icon.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
+    splash: {
+      image: './assets/images/sfa-splash.png',
+      resizeMode: 'cover',
+      backgroundColor: '#FFFFFF',
+    },
 
     jsEngine: 'hermes', // ✅ FIX: prevents Hermes web transform issues
     // web: {
@@ -49,6 +63,10 @@ export default ({ config }: any) => {
     android: {
       softwareKeyboardLayoutMode: 'resize',
       package: 'com.sfa.app',
+      adaptiveIcon: {
+        foregroundImage: './assets/images/sfa-icon.png',
+        backgroundColor: '#FFFFFF',
+      },
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
       config: {
         googleMaps: {
@@ -69,6 +87,7 @@ export default ({ config }: any) => {
 
     ios: {
       bundleIdentifier: 'com.sfa.app',
+      icon: './assets/images/sfa-icon.png',
       googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
       config: {
         googleMapsApiKey:

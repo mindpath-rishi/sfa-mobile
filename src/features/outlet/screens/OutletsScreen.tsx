@@ -72,6 +72,8 @@ export default function OutletsScreen() {
         options: [
           { id: 'ACTIVE', label: 'Active' },
           { id: 'INACTIVE', label: 'Inactive' },
+          { id: 'VERIFICATION_PENDING', label: 'Verification Pending' },
+          { id: 'REJECTED', label: 'Rejected' },
         ],
         selectedIds: filters.status,
       },
@@ -131,7 +133,7 @@ export default function OutletsScreen() {
       const response: ApiResponse<any> = await outletService.getRouteOutlets(payload);
 
       if (response.statusCode === 200) {
-        const newData = response.data || [];
+        const newData = Array.isArray(response.data) ? response.data : response.data?.data || [];
 
         setRouteOutlets((prev) => (isRefresh ? newData : [...prev, ...newData]));
 

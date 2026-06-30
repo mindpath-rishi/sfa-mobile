@@ -8,6 +8,8 @@ import { useCreateTopupStyles } from '@/shared/styles/TopupCreate.styles';
 import ProductsScreen, { ProductsScreenRef } from '@/features/product/screens/ProductsScreen';
 import { CartItem } from '../types/createTopup.types';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { useOfflineStore } from '@/core/offline/offline.store';
+import { toast } from '@/shared/utils/toast';
 
 export default function CreateTopupScreen() {
   const styles = useCreateTopupStyles();
@@ -17,6 +19,9 @@ export default function CreateTopupScreen() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartSummary, setCartSummary] = useState<any | null>(null);
   const { setHeader } = useHeader();
+  const offline = useOfflineStore(
+    (state) => !state.isConnected || !state.isInternetReachable,
+  );
 
   /* -------------------- Header -------------------- */
   // useFocusEffect(
@@ -34,13 +39,17 @@ export default function CreateTopupScreen() {
   }, []);
 
   const handleSubmitTopup = useCallback(() => {
+    if (offline) {
+      toast.error('Top-up requests are unavailable offline. Please reconnect and try again.');
+      return;
+    }
     router.push({
       pathname: '/checkin/sale',
       params: {
         mode: 'topup',
       },
     });
-  }, [cartItems, cartSummary, van]);
+  }, [cartItems, cartSummary, offline, van]);
 
   return (
     <View style={styles.container}>

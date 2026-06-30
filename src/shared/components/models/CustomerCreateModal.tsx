@@ -1,5 +1,5 @@
 // components/customer/CustomerCreateModal.tsx
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   TextInput,
@@ -10,18 +10,28 @@ import {
   Image,
   Keyboard,
   FlatList,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCustomerCreateStyles } from '@/shared/styles/CustomerCreateModal.styles';
 import CameraModal from '@/core/components/Camera/CameraModal';
-import { useRouteStore } from '@/core/store/route.store';
+import {
+  getRouteCustomerCategoryId,
+  getRouteLocationIds,
+  useRouteStore,
+} from '@/core/store/route.store';
+import {
+  customerMasterService,
+  CustomerDropdownOption,
+} from '@/shared/services/customer-master.service';
 
 interface CustomerCreateModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: CustomerData, photo?: string) => void;
+  onSubmit: (data: CustomerData, photos?: string[]) => void;
   loading?: boolean;
 }
 
@@ -260,7 +270,7 @@ const FORM_SECTIONS: FormSection[] = [
   // },
 ];
 
-const dropdownOptions = {
+const fallbackDropdownOptions = {
   customerCategoryId: [
     { id: 'CAT001', name: 'Retail' },
     { id: 'CAT002', name: 'Wholesale' },
@@ -313,16 +323,19 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
   const selectedRoute = useRouteStore((state) => state.selectedRoute);
+  const routeLocationIds = getRouteLocationIds(selectedRoute);
+  const [dropdownOptions, setDropdownOptions] =
+    useState<Record<string, CustomerDropdownOption[]>>(fallbackDropdownOptions);
 
   // Dropdown state
   const [activeDropdown, setActiveDropdown] = useState<{
     visible: boolean;
     field: string | null;
-    options: DropdownOption[];
+    options: CustomerDropdownOption[];
     title: string;
   }>({
     visible: false,
@@ -336,25 +349,42 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     ownerName: '',
     phoneNumber: '',
     address: { line1: '', line2: '' },
-    customerCategoryId: 'CAT001',
-    channelId: 'CH001',
-    customerTypeId: 'TYPE001',
-    marketId: selectedRoute?.marketId || 'TJJJJJJ',
-    provinceId: selectedRoute?.provinceId || 'TESTPRO',
+    customerCategoryId: getRouteCustomerCategoryId(selectedRoute) || '',
+    channelId: '',
+    customerTypeId: '',
+    marketId: routeLocationIds.marketId || '',
+    provinceId: routeLocationIds.provinceId || '',
     segmentation: '',
     creditLimit: 0,
     creditDays: 0,
-    countryId: 'ZAMBIA',
+    countryId: routeLocationIds.countryId || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!visible) return;
+
+    setFormData((previous) => ({
+      ...previous,
+      customerCategoryId: getRouteCustomerCategoryId(selectedRoute) || '',
+      marketId: getRouteLocationIds(selectedRoute).marketId || '',
+      provinceId: getRouteLocationIds(selectedRoute).provinceId || '',
+      countryId: getRouteLocationIds(selectedRoute).countryId || '',
+    }));
+
+    customerMasterService
+      .getCreateCustomerDropdowns()
+      .then((options) => setDropdownOptions(options))
+      .catch((error) => console.warn('Failed to load customer dropdowns:', error));
+  }, [selectedRoute, visible]);
 
   const currentSection = useMemo(() => FORM_SECTIONS[currentStep], [currentStep]);
   const totalSteps = FORM_SECTIONS.length;
   const isLastStep = currentStep === totalSteps - 1;
 
   const validateField = useCallback((field: FormField, value: any): string => {
-    if (field.required && !value) {
+    if (field.required && (value === undefined || value === null || String(value).trim() === '')) {
       return `${field.label} is required`;
     }
     if (field.key === 'phoneNumber' && value) {
@@ -368,6 +398,12 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
   const validateCurrentSection = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
+
+    setTouchedFields((previous) => {
+      const touched = new Set(previous);
+      currentSection.fields.forEach((field) => touched.add(field.key));
+      return touched;
+    });
 
     for (const field of currentSection.fields) {
       let value: any;
@@ -402,10 +438,13 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   };
 
   const handleSubmit = () => {
-    // if (validateCurrentSection()) {
+    if (!validateCurrentSection()) return;
+
     Keyboard.dismiss();
-    onSubmit(formData, capturedPhoto || undefined);
-    // }
+    onSubmit(
+      { ...formData, segmentation: formData.segmentation.trim() },
+      capturedPhotos.length ? capturedPhotos : undefined,
+    );
   };
 
   const updateField = (key: string, value: any) => {
@@ -457,34 +496,59 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   };
 
   const handlePhotoCapture = (photoUri: string) => {
-    setCapturedPhoto(photoUri);
+    setCapturedPhotos((previous) => [...previous, photoUri]);
     setShowCamera(false);
   };
 
-  const handleRemovePhoto = () => {
+  const handleRemovePhoto = (photoUri: string) => {
     Alert.alert('Remove Photo', 'Are you sure you want to remove this photo?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => setCapturedPhoto(null) },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => setCapturedPhotos((previous) => previous.filter((uri) => uri !== photoUri)),
+      },
     ]);
+  };
+
+  const handleChoosePhotos = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission required', 'Please allow photo library access to select photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setCapturedPhotos((previous) => [
+        ...previous,
+        ...result.assets.map((asset) => asset.uri).filter((uri) => !previous.includes(uri)),
+      ]);
+    }
   };
 
   const resetForm = () => {
     setCurrentStep(0);
-    setCapturedPhoto(null);
+    setCapturedPhotos([]);
     setFormData({
       name: '',
       ownerName: '',
       phoneNumber: '',
       address: { line1: '', line2: '' },
-      customerCategoryId: '',
-      channelId: 'CH002',
+      customerCategoryId: getRouteCustomerCategoryId(selectedRoute) || '',
+      channelId: '',
       customerTypeId: '',
-      marketId: '',
-      provinceId: 'PROV001',
+      marketId: getRouteLocationIds(selectedRoute).marketId || '',
+      provinceId: getRouteLocationIds(selectedRoute).provinceId || '',
       segmentation: '',
       creditLimit: 0,
       creditDays: 0,
-      countryId: selectedRoute?.countryId || 'ZAMBIA',
+      countryId: getRouteLocationIds(selectedRoute).countryId || '',
     });
     setErrors({});
     setTouchedFields(new Set());
@@ -516,6 +580,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     if (field.type === 'dropdown') {
       const options = dropdownOptions[field.key as keyof typeof dropdownOptions];
       const selectedOption = options?.find((opt) => opt.id === value);
+      const isRouteCategory = field.key === 'customerCategoryId' && Boolean(value);
 
       return (
         <View key={field.key} style={styles.fieldContainer}>
@@ -531,13 +596,20 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
               isFocused && styles.fieldFocused,
               error && isTouched && styles.fieldError,
             ]}
-            onPress={() => openDropdown(field.key, options, `Select ${field.label}`)}
+            onPress={() =>
+              !isRouteCategory && openDropdown(field.key, options, `Select ${field.label}`)
+            }
+            disabled={isRouteCategory || loading}
           >
             <Ionicons name={field.icon} size={18} color={colors.textSecondary} />
             <AppText style={[styles.dropdownFieldText, !value && styles.placeholderText]}>
-              {selectedOption?.name || field.placeholder}
+              {selectedOption?.name || (isRouteCategory ? value : field.placeholder)}
             </AppText>
-            <Ionicons name="chevron-down" size={16} color={colors.textTertiary} />
+            <Ionicons
+              name={isRouteCategory ? 'lock-closed-outline' : 'chevron-down'}
+              size={16}
+              color={colors.textTertiary}
+            />
           </TouchableOpacity>
           {error && isTouched && <AppText style={styles.errorMessage}>{error}</AppText>}
         </View>
@@ -600,44 +672,50 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       <View style={styles.photoSectionHeader}>
         <Ionicons name="camera" size={20} color={colors.primary} />
         <View style={styles.photoSectionTitleContainer}>
-          <AppText style={styles.photoSectionTitle}>Customer Photo</AppText>
-          <AppText style={styles.photoSectionDescription}>Optional profile picture</AppText>
+          <AppText style={styles.photoSectionTitle}>Customer Photos</AppText>
+          <AppText style={styles.photoSectionDescription}>Add one or more optional photos</AppText>
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.photoCard, capturedPhoto && styles.photoCardFilled]}
-        onPress={() => setShowCamera(true)}
-        activeOpacity={0.9}
-      >
-        {capturedPhoto ? (
-          <View style={styles.photoPreviewContainer}>
-            <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
-            <View style={styles.photoActions}>
-              <TouchableOpacity
-                style={[styles.photoActionButton, styles.photoRetakeButton]}
-                onPress={() => setShowCamera(true)}
-              >
-                <Ionicons name="camera-reverse-outline" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.photoActionButton, styles.photoRemoveButton]}
-                onPress={handleRemovePhoto}
-              >
-                <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
+      <View style={styles.photoSourceActions}>
+        <TouchableOpacity style={styles.photoSourceButton} onPress={() => setShowCamera(true)}>
+          <Ionicons name="camera-outline" size={20} color={colors.primary} />
+          <AppText style={styles.photoSourceButtonText}>Take photo</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.photoSourceButton} onPress={handleChoosePhotos}>
+          <Ionicons name="images-outline" size={20} color={colors.primary} />
+          <AppText style={styles.photoSourceButtonText}>Choose photos</AppText>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.photoGrid}>
+        {capturedPhotos.map((photoUri, index) => (
+          <View key={`${photoUri}-${index}`} style={[styles.photoCard, styles.photoCardFilled]}>
+            <View style={styles.photoPreviewContainer}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+              <View style={styles.photoActions}>
+                <TouchableOpacity
+                  style={[styles.photoActionButton, styles.photoRemoveButton]}
+                  onPress={() => handleRemovePhoto(photoUri)}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <View style={styles.photoPlaceholderIcon}>
-              <Ionicons name="camera-outline" size={32} color={colors.primary} />
+        ))}
+        {capturedPhotos.length === 0 && (
+          <View style={styles.photoCard}>
+            <View style={styles.photoPlaceholder}>
+              <View style={styles.photoPlaceholderIcon}>
+                <Ionicons name="images-outline" size={32} color={colors.primary} />
+              </View>
+              <AppText style={styles.photoPlaceholderTitle}>No photos yet</AppText>
+              <AppText style={styles.photoPlaceholderText}>Use either option above</AppText>
             </View>
-            <AppText style={styles.photoPlaceholderTitle}>Take Photo</AppText>
-            <AppText style={styles.photoPlaceholderText}>Tap to add customer photo</AppText>
           </View>
         )}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -666,8 +744,10 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
         <View style={styles.summaryItem}>
           <AppText style={styles.summaryLabel}>Category</AppText>
           <AppText style={styles.summaryValue} numberOfLines={1}>
-            {dropdownOptions.customerCategoryId.find((c) => c.id === formData.customerCategoryId)
-              ?.name || '—'}
+            {dropdownOptions.customerCategoryId?.find((c) => c.id === formData.customerCategoryId)
+              ?.name ||
+              formData.customerCategoryId ||
+              '—'}
           </AppText>
         </View>
       </View>
@@ -799,6 +879,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
         onClose={() => setShowCamera(false)}
         onCapture={(photo) => handlePhotoCapture(photo.uri)}
         title="CAPTURE CUSTOMER PHOTO"
+        cameraProps={{ facing: 'back' }}
       />
     </>
   );

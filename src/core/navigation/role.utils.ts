@@ -5,10 +5,18 @@ type RoleUser = {
 
 export type AppRoleId = 'MANAGER' | 'SALESMAN';
 
-export const getRoleId = (user?: RoleUser | null): AppRoleId => {
-  const rawRole = String(user?.roleId || user?.role || '').trim().toUpperCase();
+const SALESMAN_ROLES = new Set(['SALESMAN', 'SALES', 'SALES_EXECUTIVE']);
 
-  if (rawRole === 'SALESMAN' || rawRole === 'SALES' || rawRole === 'SALES_EXECUTIVE') {
+export const getRoleId = (user?: RoleUser | null): AppRoleId => {
+  // roleId can be a database identifier (for example, RID-001), while role is
+  // the authorization name. Check both instead of allowing roleId to mask role.
+  const roles = [user?.role, user?.roleId].map((role) =>
+    String(role ?? '')
+      .trim()
+      .toUpperCase(),
+  );
+
+  if (roles.some((role) => SALESMAN_ROLES.has(role))) {
     return 'SALESMAN';
   }
 

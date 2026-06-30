@@ -29,7 +29,6 @@ import { ProductCard } from '../components/product';
 import { FilterModal } from '@/shared/components/models/Filter.modal';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
 import { useCartStore } from '@/core/store/cart.store';
-import { useOutletStore } from '@/core/store/outlet.store';
 import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { categoryService } from '@/shared/services/category.service';
@@ -76,11 +75,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   const { items, addItems, clearCart } = useCartStore();
   const customerCategoryId = useRouteStore((state) =>
     getRouteCustomerCategoryId(state.selectedRoute),
-  );
-  const outletCustomerCategoryId = useOutletStore(
-    (state) =>
-      state.activeVisit?.outlet?.customerCategoryId ||
-      state.selectedOutlet?.customerCategoryId,
   );
   const insets = useSafeAreaInsets();
 
@@ -194,23 +188,15 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         }
 
         const latestRoute = useRouteStore.getState().selectedRoute;
-        const outletState = useOutletStore.getState();
-        const resolvedCustomerCategoryId =
-          getRouteCustomerCategoryId(latestRoute) ||
-          outletState.activeVisit?.outlet?.customerCategoryId ||
-          outletState.selectedOutlet?.customerCategoryId ||
-          customerCategoryId ||
-          outletCustomerCategoryId;
+        const resolvedCustomerCategoryId = getRouteCustomerCategoryId(latestRoute);
 
-        if (resolvedCustomerCategoryId) {
-          params.customerCategoryId = resolvedCustomerCategoryId;
-        } else if (__DEV__) {
-          console.log('Missing customerCategoryId for product fetch', {
-            selectedRoute: latestRoute,
-            activeVisitOutlet: outletState.activeVisit?.outlet,
-            selectedOutlet: outletState.selectedOutlet,
-          });
+        if (!resolvedCustomerCategoryId) {
+          setProducts([]);
+          setTotalCount(0);
+          setHasMore(false);
+          throw new Error('Customer category is required to fetch products');
         }
+        params.customerCategoryId = resolvedCustomerCategoryId;
 
         const response = await productService.fetchProducts(params);
 
@@ -237,7 +223,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
       selectedCategory,
       quickFilter,
       customerCategoryId,
-      outletCustomerCategoryId,
     ],
   );
 
@@ -246,9 +231,14 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
       const response = await categoryService.fetchCategory({
         page: 1,
         limit: 100,
+        type: 'PARENT',
+        status: 'ACTIVE',
       });
       if (response?.success) {
-        setCategoriesList(response.data);
+        // Keep the check-in selector parent-only even with legacy cached data.
+        setCategoriesList(
+          (response.data ?? []).filter((category: any) => category.type === 'PARENT'),
+        );
       }
     } catch (error) {
       console.error('Error fetching categories:', error);

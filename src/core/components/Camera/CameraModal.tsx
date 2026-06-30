@@ -75,6 +75,15 @@ export const CameraModal: React.FC<CameraModalProps> = ({
           </TouchableOpacity>
         )}
 
+        <TouchableOpacity
+          style={styles.flipButton}
+          onPress={() => cameraRef.current?.switchCamera()}
+          activeOpacity={0.7}
+          accessibilityLabel="Switch camera"
+        >
+          <Ionicons name="camera-reverse-outline" size={24} color="white" />
+        </TouchableOpacity>
+
         {/* Title */}
         {showHeader && title && (
           <View style={styles.cameraInstruction}>
@@ -118,7 +127,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         <Camera
           key={cameraKey}
           ref={cameraRef}
-          facing="front"
+          facing="back"
           autofocus={true}
           ratio="16:9"
           showControls={false}

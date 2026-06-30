@@ -1039,7 +1039,11 @@ import { AppButton, AppModal, Skeleton } from '@/core/components';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { homeService } from '@/features/home/services/home.service';
 import { router, useFocusEffect } from 'expo-router';
-import { useRouteStore } from '@/core/store/route.store';
+import {
+  getRouteCustomerCategoryId,
+  getRouteLocationIds,
+  useRouteStore,
+} from '@/core/store/route.store';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
@@ -1226,12 +1230,28 @@ const OutletCardComponent = React.memo(
     const isActive = visitStatus === 'ACTIVE';
     const isCompleted = visitStatus === 'COMPLETED';
     const isInside = outlet.isInsideGeofence;
+    const isVerificationPending = outlet.status === 'VERIFICATION_PENDING';
+    const isRejected = outlet.status === 'REJECTED';
 
-    const statusColors = isCompleted
-      ? { bg: colors.success + '15', text: colors.success }
-      : isActive
-        ? { bg: colors.primary + '15', text: colors.primary }
-        : { bg: colors.warning + '15', text: colors.warning };
+    const statusColors = isRejected
+      ? { bg: colors.error + '15', text: colors.error }
+      : isVerificationPending
+        ? { bg: colors.warning + '15', text: colors.warning }
+        : isCompleted
+          ? { bg: colors.success + '15', text: colors.success }
+          : isActive
+            ? { bg: colors.primary + '15', text: colors.primary }
+            : { bg: colors.warning + '15', text: colors.warning };
+
+    const statusLabel = isRejected
+      ? 'Rejected'
+      : isVerificationPending
+        ? 'Verification Pending'
+        : isCompleted
+          ? 'Done'
+          : isActive
+            ? 'Active'
+            : 'Pending';
 
     const handleComplete = useCallback(() => {
       setShowCompleteConfirm(false);
@@ -1322,7 +1342,7 @@ const OutletCardComponent = React.memo(
           <View style={styles.headerRight}>
             <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
               <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-                {isCompleted ? 'Done' : isActive ? 'Active' : 'Pending'}
+                {statusLabel}
               </Text>
             </View>
           </View>
@@ -1338,7 +1358,9 @@ export default function RouteScreen() {
   const insets = useSafeAreaInsets();
   const styles = useRouteScreenStyles();
   const activeRoute = useRouteStore((s) => s.selectedRoute);
+  const setSelectedRoute = useRouteStore((s) => s.setSelectedRoute);
   const workSessionId = useAuthStore((s) => s.workSessionId);
+  const setWorkSessionId = useAuthStore((s) => s.setWorkSessionId);
 
   // ========== STATE ==========
   const [outlets, setOutlets] = useState<Outlet[]>([]);
@@ -1466,9 +1488,14 @@ export default function RouteScreen() {
         count: outlets.filter((o) => o.status === 'INACTIVE').length,
       },
       {
-        id: 'PENDING',
-        label: 'Pending',
-        count: outlets.filter((o) => o.status === 'PENDING').length,
+        id: 'VERIFICATION_PENDING',
+        label: 'Verification Pending',
+        count: outlets.filter((o) => o.status === 'VERIFICATION_PENDING').length,
+      },
+      {
+        id: 'REJECTED',
+        label: 'Rejected',
+        count: outlets.filter((o) => o.status === 'REJECTED').length,
       },
     ].filter((opt) => opt.count > 0);
 
@@ -1712,21 +1739,18 @@ export default function RouteScreen() {
     [outletsWithDistance],
   );
 
-  const mapCoordinates = useMemo(
-    () => {
-      const outletCoordinates = mapOutlets.reduce<Array<{ latitude: number; longitude: number }>>(
-        (coordinates, outlet) => {
-          const coordinate = getOutletCoordinate(outlet);
-          if (coordinate) coordinates.push(coordinate);
-          return coordinates;
-        },
-        [],
-      );
+  const mapCoordinates = useMemo(() => {
+    const outletCoordinates = mapOutlets.reduce<Array<{ latitude: number; longitude: number }>>(
+      (coordinates, outlet) => {
+        const coordinate = getOutletCoordinate(outlet);
+        if (coordinate) coordinates.push(coordinate);
+        return coordinates;
+      },
+      [],
+    );
 
-      return [currentLocation, ...outletCoordinates];
-    },
-    [currentLocation, mapOutlets],
-  );
+    return [currentLocation, ...outletCoordinates];
+  }, [currentLocation, mapOutlets]);
 
   const fitMapToRoute = useCallback(() => {
     if (!mapRef.current || !mapCoordinates.length) return;
@@ -1777,21 +1801,23 @@ export default function RouteScreen() {
       setIsCheckingRouteAccess(false);
     };
 
-    if (!workSessionId) {
-      stopRouteLoading({
-        icon: 'sunny-outline',
-        title: 'Work Day Not Started',
-        message: 'Please start your work day and choose Retailing to view your route.',
-      });
-      return false;
-    }
-
     try {
-      const response: any = await homeService.getDayStatus(workSessionId);
+      // A page/app refresh clears the in-memory route/session stores. Resolve
+      // both from Today Activity instead of requiring a dashboard visit first.
+      const response: any = await homeService.getDayStatus(workSessionId ?? '');
       const data = response?.data;
       const activeActivityName = data?.activeActivity?.name || data?.currentActivity?.name || '';
       const normalizedActivityName = activeActivityName.trim().toLowerCase();
       const isDayActive = response?.statusCode === 200 && data?.status === 'ACTIVE';
+      const resolvedRoute = activeRoute ?? data?.selectedRoute ?? null;
+
+      if (data?.workSessionId && data.status === 'ACTIVE') {
+        setWorkSessionId(data.workSessionId);
+      }
+
+      if (!activeRoute?.routeId && resolvedRoute?.routeId) {
+        setSelectedRoute(resolvedRoute);
+      }
 
       if (!isDayActive) {
         stopRouteLoading({
@@ -1799,7 +1825,7 @@ export default function RouteScreen() {
           title: 'Work Day Not Started',
           message: 'Please start your work day and choose Retailing to view your route.',
         });
-        return false;
+        return null;
       }
 
       if (normalizedActivityName !== 'retailing') {
@@ -1810,21 +1836,21 @@ export default function RouteScreen() {
             ? `You are currently doing ${activeActivityName}. Switch to Retailing to view your route.`
             : 'Switch to Retailing to view your route.',
         });
-        return false;
+        return null;
       }
 
-      if (!activeRoute?.routeId) {
+      if (!resolvedRoute?.routeId) {
         stopRouteLoading({
           icon: 'map-outline',
           title: 'No Active Route',
           message: 'Please select a route for your Retailing activity to view route outlets.',
         });
-        return false;
+        return null;
       }
 
       setRouteAccessMessage(null);
       setIsCheckingRouteAccess(false);
-      return true;
+      return resolvedRoute;
     } catch (error) {
       console.error('Error checking route access:', error);
       stopRouteLoading({
@@ -1832,115 +1858,117 @@ export default function RouteScreen() {
         title: 'Unable to Check Route Status',
         message: 'Please refresh and try again.',
       });
-      return false;
+      return null;
     }
-  }, [activeRoute?.routeId, workSessionId]);
+  }, [activeRoute, setSelectedRoute, setWorkSessionId, workSessionId]);
 
   // ========== DATA LOADING - UPDATED FOR NEW RESPONSE ==========
-  const getRouteOutlets = useCallback(async () => {
-    const canLoadRoute = await checkRouteAccess();
-    if (!canLoadRoute) return;
+  const getRouteOutlets = useCallback(
+    async (forceRefresh = false) => {
+      const resolvedRoute = await checkRouteAccess();
+      if (!resolvedRoute) return;
 
-    const currentRouteId = activeRoute?.routeId;
-    // Prevent API call if no route ID or already loaded this route
-    if (!currentRouteId) return;
-    if (routeIdRef.current === currentRouteId && isDataLoadedRef.current) return;
+      const currentRouteId = resolvedRoute.routeId;
+      // Prevent API call if no route ID or already loaded this route
+      if (!currentRouteId) return;
+      if (!forceRefresh && routeIdRef.current === currentRouteId && isDataLoadedRef.current) return;
 
-    routeIdRef.current = currentRouteId;
-    isDataLoadedRef.current = false;
-    setIsLoading(true);
-    setError(null);
+      routeIdRef.current = currentRouteId;
+      isDataLoadedRef.current = false;
+      setIsLoading(true);
+      setError(null);
 
-    const payload: any = {
-      routeId: currentRouteId,
-      page: 1,
-      limit: ROUTE_OUTLETS_LIMIT,
-      filters: [],
-      searchText: '',
-      routeSessionId: activeRoute?.routeSessionId,
-    };
+      const payload: any = {
+        routeId: currentRouteId,
+        page: 1,
+        limit: ROUTE_OUTLETS_LIMIT,
+        filters: [],
+        searchText: '',
+        routeSessionId: resolvedRoute.routeSessionId,
+      };
 
-    try {
-      const response = await outletService.getRouteOutlets(payload);
-      if (!isMountedRef.current) return;
+      try {
+        const response = await outletService.getRouteOutlets(payload);
+        if (!isMountedRef.current) return;
 
-      if (response.statusCode === 200) {
-        const outletsData = response.data?.data || [];
-        const summary = response.data?.summary || {};
+        if (response.statusCode === 200) {
+          const outletsData = response.data?.data || [];
+          const summary = response.data?.summary || {};
 
-        // Update route summary from API response
-        setRouteSummary({
-          totalOrderValue: summary.totalOrderValue || 0,
-          totalCases: summary.totalCases || 0,
-          totalVisitedShop: summary.totalVisitedShop || 0,
-          totalProductiveCall: summary.totalProductiveCall || 0,
-          LPSC: summary.LPSC || 0,
-        });
+          // Update route summary from API response
+          setRouteSummary({
+            totalOrderValue: summary.totalOrderValue || 0,
+            totalCases: summary.totalCases || 0,
+            totalVisitedShop: summary.totalVisitedShop || 0,
+            totalProductiveCall: summary.totalProductiveCall || 0,
+            LPSC: summary.LPSC || 0,
+          });
 
-        const transformedOutlets: Outlet[] = outletsData.map((outlet: any, index: number) => ({
-          ...outlet,
-          _id: outlet._id,
-          customerId: outlet.customerId,
-          name: outlet.name,
-          ownerName: outlet.ownerName,
-          phoneNumber: outlet.phoneNumber,
-          address: outlet.address,
-          geoTag: outlet.geoTag,
-          status: outlet.status,
-          sequence: outlet.sequence || index + 1,
-          visitStatus: outlet.isVisited ? 'COMPLETED' : 'NOT_VISITED',
-          isVisited: outlet.isVisited || false,
-          hasSale: outlet.hasSale || false,
-          hasNonSale: outlet.hasNonSale || false,
-          isNonSale: outlet.isNonSale || false,
-          sale: outlet.sale,
-          saleItems: outlet.saleItems || [],
-          outstanding: outlet.outstanding || 0,
-          creditLimit: outlet.creditLimit || 0,
-          creditDays: outlet.creditDays || 0,
-          lastVisitedAt: outlet.lastVisitedAt,
-          priority:
-            outlet.priority || (index % 3 === 0 ? 'high' : index % 2 === 0 ? 'medium' : 'low'),
-          geofenceRadius: 100,
-        }));
+          const transformedOutlets: Outlet[] = outletsData.map((outlet: any, index: number) => ({
+            ...outlet,
+            _id: outlet._id,
+            customerId: outlet.customerId,
+            name: outlet.name,
+            ownerName: outlet.ownerName,
+            phoneNumber: outlet.phoneNumber,
+            address: outlet.address,
+            geoTag: outlet.geoTag,
+            status: outlet.status,
+            sequence: outlet.sequence || index + 1,
+            visitStatus: outlet.isVisited ? 'COMPLETED' : 'NOT_VISITED',
+            isVisited: outlet.isVisited || false,
+            hasSale: outlet.hasSale || false,
+            hasNonSale: outlet.hasNonSale || false,
+            isNonSale: outlet.isNonSale || false,
+            sale: outlet.sale,
+            saleItems: outlet.saleItems || [],
+            outstanding: outlet.outstanding || 0,
+            creditLimit: outlet.creditLimit || 0,
+            creditDays: outlet.creditDays || 0,
+            lastVisitedAt: outlet.lastVisitedAt,
+            priority:
+              outlet.priority || (index % 3 === 0 ? 'high' : index % 2 === 0 ? 'medium' : 'low'),
+            geofenceRadius: 100,
+          }));
 
-        setOutlets(transformedOutlets);
-        setFilteredOutlets(transformedOutlets);
-        isDataLoadedRef.current = true;
-        setError(null);
-      } else {
-        setError(response.message || 'Failed to load outlets');
+          setOutlets(transformedOutlets);
+          setFilteredOutlets(transformedOutlets);
+          isDataLoadedRef.current = true;
+          setError(null);
+        } else {
+          setError(response.message || 'Failed to load outlets');
+        }
+      } catch (error) {
+        console.error('Error fetching route outlets:', error);
+        if (isMountedRef.current) {
+          setError('Failed to load outlets. Please check your connection and try again.');
+        }
+      } finally {
+        if (isMountedRef.current) {
+          setIsLoading(false);
+          setRefreshing(false);
+        }
       }
-    } catch (error) {
-      console.error('Error fetching route outlets:', error);
-      if (isMountedRef.current) {
-        setError('Failed to load outlets. Please check your connection and try again.');
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, [activeRoute?.routeId, activeRoute?.routeSessionId, checkRouteAccess]);
+    },
+    [activeRoute?.routeId, activeRoute?.routeSessionId, checkRouteAccess],
+  );
 
   // Handle refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     isDataLoadedRef.current = false;
     routeIdRef.current = undefined;
-    await getRouteOutlets();
+    await getRouteOutlets(true);
   }, [getRouteOutlets]);
 
   // Use useFocusEffect with proper cleanup and prevent multiple calls
   useFocusEffect(
     useCallback(() => {
-      // Always validate day/activity access on focus; reload outlets only when route changes.
-      if (activeRoute?.routeId !== routeIdRef.current) {
-        isDataLoadedRef.current = false;
-        routeIdRef.current = undefined;
-      }
-      getRouteOutlets();
+      // Visits and sales may change while another screen is open, so refresh
+      // route flags and summary on every navigation back to My Route.
+      isDataLoadedRef.current = false;
+      routeIdRef.current = undefined;
+      getRouteOutlets(true);
 
       return () => {
         // No cleanup needed
@@ -1950,17 +1978,99 @@ export default function RouteScreen() {
 
   // ========== ACTIONS ==========
   const handleCardPress = useCallback((outlet: Outlet) => {
+    if (outlet.status === 'VERIFICATION_PENDING') {
+      Alert.alert(
+        'Verification Pending',
+        'This outlet is awaiting verification. You can open and visit it after it has been approved.',
+      );
+      return;
+    }
+    if (outlet.status === 'REJECTED') {
+      Alert.alert(
+        'Outlet Rejected',
+        'This outlet was rejected during verification and cannot be opened. Please contact your supervisor for help.',
+      );
+      return;
+    }
     router.push(`/route/${outlet.customerId}`);
   }, []);
 
   const handleCreateCustomer = useCallback(
-    async (formValue: any) => {
-      formValue.routeId = activeRoute?.routeId;
-      if (!formValue.countryId) {
-        formValue.countryId = activeRoute?.countryId || 'ZAMBIA';
+    async (formValue: any, photos?: string[]) => {
+      let resolvedRoute = activeRoute;
+      let routeLocationIds = getRouteLocationIds(resolvedRoute);
+
+      if (
+        activeRoute?.routeId &&
+        (!routeLocationIds.marketId || !routeLocationIds.provinceId || !routeLocationIds.countryId)
+      ) {
+        try {
+          const mappedRoutesResponse: any = await homeService.getVanMappedRoutes();
+          const mappedRoute = mappedRoutesResponse?.data?.routes?.find(
+            (item: any) =>
+              item?.routeId === activeRoute.routeId || item?.route?.routeId === activeRoute.routeId,
+          );
+          if (mappedRoute) {
+            resolvedRoute = { ...activeRoute, ...mappedRoute, route: mappedRoute.route };
+            routeLocationIds = getRouteLocationIds(resolvedRoute);
+            useRouteStore.getState().setSelectedRoute(resolvedRoute);
+          }
+        } catch (error) {
+          console.warn('Failed to resolve route location IDs before customer creation:', error);
+        }
       }
-      const response = await outletService?.createCustomer(formValue);
-      if (response?.success || response?.statusCode === 200 || response?.statusCode === 201) {
+
+      if (
+        !routeLocationIds.marketId ||
+        !routeLocationIds.provinceId ||
+        !routeLocationIds.countryId
+      ) {
+        toast.error(
+          'Route location missing',
+          'The selected route does not contain country, province, and market IDs. Please reselect the route.',
+        );
+        return;
+      }
+
+      formValue.routeId = activeRoute?.routeId;
+      formValue.marketId = routeLocationIds.marketId || formValue.marketId;
+      formValue.provinceId = routeLocationIds.provinceId || formValue.provinceId;
+      formValue.countryId = routeLocationIds.countryId || formValue.countryId;
+      formValue.customerCategoryId =
+        getRouteCustomerCategoryId(resolvedRoute) || formValue.customerCategoryId;
+      const location = await captureCurrentLocation();
+      if (location) {
+        formValue.geoTag = { lat: location.latitude, lng: location.longitude };
+      }
+      let response;
+      try {
+        response = await outletService.createCustomer(formValue);
+      } catch (error: any) {
+        console.error('Failed to create customer:', error);
+        toast.error(
+          'Error',
+          error?.response?.data?.message || error?.message || 'Failed to create customer',
+        );
+        return;
+      }
+
+      const isCustomerCreated =
+        response?.success === true && [200, 201, 202].includes(Number(response?.statusCode));
+
+      if (isCustomerCreated) {
+        const customerId = response.data?.customerId;
+        if (photos?.length && customerId) {
+          try {
+            await Promise.all(
+              photos.map((photo, index) =>
+                outletService.uploadCustomerImage(customerId, photo, index === 0),
+              ),
+            );
+          } catch (error) {
+            console.error('Outlet created but photo upload failed:', error);
+            toast.error('Photo upload', 'Outlet was created, but its photo could not be uploaded.');
+          }
+        }
         toast.success(response.message as any);
         setShowCustomerCreateModal(false);
         // Reset data loaded flag to allow reload
@@ -1971,10 +2081,19 @@ export default function RouteScreen() {
         toast.error('Error', response?.message || 'Failed to create customer');
       }
     },
-    [activeRoute?.countryId, activeRoute?.routeId, getRouteOutlets],
+    [activeRoute, getRouteOutlets],
   );
 
   const handleNavigation = useCallback((outlet: Outlet) => {
+    if (outlet.status === 'VERIFICATION_PENDING' || outlet.status === 'REJECTED') {
+      Alert.alert(
+        outlet.status === 'REJECTED' ? 'Outlet Rejected' : 'Verification Pending',
+        outlet.status === 'REJECTED'
+          ? 'Navigation is unavailable because this outlet was rejected during verification.'
+          : 'Navigation will be available after this outlet has been verified and approved.',
+      );
+      return;
+    }
     if (!outlet.geoTag?.lat || !outlet.geoTag?.lng) {
       Alert.alert('Error', 'Location not available for this outlet');
       return;

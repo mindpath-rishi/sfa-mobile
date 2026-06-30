@@ -1037,12 +1037,8 @@ export default function PaymentCollectionScreen() {
         caseNetWeight: item.caseNetWeight,
         pieceNetWeight: item.pieceNetWeight,
         piecePrice: item.piecePrice,
-        totalNetWeight:
-          caseQty * (item.caseNetWeight || 0) +
-          pieceQty * (item.pieceNetWeight || 0),
-        totalValue:
-          caseQty * (item.casePrice || 0) +
-          pieceQty * (item.piecePrice || 0),
+        totalNetWeight: caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0),
+        totalValue: caseQty * (item.casePrice || 0) + pieceQty * (item.piecePrice || 0),
       };
     });
 
@@ -1104,7 +1100,7 @@ export default function PaymentCollectionScreen() {
       response = await saleService.createSale(payload);
     } catch (error) {
       console.error('Sale creation failed:', error);
-      toast.error('Error', 'Failed to create sale');
+      toast.error('Error', error instanceof Error ? error.message : 'Failed to create sale');
       setIsSubmitting(false);
       setShowConfirm(false);
       return;
@@ -1190,6 +1186,19 @@ export default function PaymentCollectionScreen() {
     useInvoiceStore.getState().setLatestInvoice(invoiceData);
     setShowConfirm(false);
 
+    // Finish the visit before leaving this screen. In offline mode this writes
+    // COMPLETED to SQLite, allowing My Route's focus refresh to immediately
+    // recalculate visited/not-visited and summary metrics.
+    clearCart();
+    if (activeVisit?.visitId) {
+      try {
+        await outletService.completeVisit(activeVisit.visitId);
+        useOutletStore.getState().setActiveVisit(null);
+      } catch (error) {
+        console.error('Error completing visit:', error);
+      }
+    }
+
     router.replace({
       pathname: '/checkin/shareinvoice',
       params: {
@@ -1197,22 +1206,6 @@ export default function PaymentCollectionScreen() {
         customerId: outlet?.customerId,
       },
     });
-
-    setTimeout(() => {
-      clearCart();
-
-      if (activeVisit?.visitId) {
-        outletService
-          .completeVisit(activeVisit.visitId)
-          .then(() => {
-            const setActiveVisit = useOutletStore.getState().setActiveVisit;
-            setActiveVisit(null);
-          })
-          .catch((error) => {
-            console.error('Error completing visit:', error);
-          });
-      }
-    }, 0);
   };
 
   const handleSetFullAmount = () => {

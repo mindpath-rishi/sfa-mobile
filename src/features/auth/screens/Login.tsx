@@ -431,6 +431,7 @@ import { t } from '@/shared/locales/engine/t';
 import { authService } from '../services/auth.service';
 import { LoginFormData, LoginScreenProps } from '../types/login.types';
 import { useAuthStore } from '@/core/store/auth.store';
+import { syncService } from '@/sync';
 import { useLoginStyles } from '../styles/Login.style';
 import {
   getPushNotificationTokenAsync,
@@ -457,6 +458,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
 
   // State
   const [loading, setLoading] = useState(false);
+  const [loginStage, setLoginStage] = useState<'signing-in' | 'syncing'>('signing-in');
   const [secureTextEntry, setSecureTextEntry] = useState(true);
   const [focusedInput, setFocusedInput] = useState<string | null>(null);
   const [logoError, setLogoError] = useState(false);
@@ -629,6 +631,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
       Keyboard.dismiss();
     }
     setLoading(true);
+    setLoginStage('signing-in');
     try {
       const payload = {
         loginId: data.userId.trim(),
@@ -662,6 +665,9 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
         avatar: profile?.avatar || profile?.profileImage || profile?.profileImageUrl || null,
       };
       await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
+      setLoginStage('syncing');
+      await syncService.initialise();
+      await syncService.sync();
       toast.success(t('auth.login.welcomeBack'));
       router.replace('/(drawer)/(tabs)/home');
     } catch (error: any) {
@@ -675,6 +681,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
       setFocus('password');
     } finally {
       setLoading(false);
+      setLoginStage('signing-in');
     }
   };
 
@@ -1014,11 +1021,24 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                       style={styles.loginButtonGradient}
                     >
                       {loading ? (
-                        <ActivityIndicator
-                          size="small"
-                          color={colors.textInverse}
-                          accessibilityLabel="Loading"
-                        />
+                        <View
+                          style={{ flexDirection: 'row', alignItems: 'center' }}
+                        >
+                          <ActivityIndicator
+                            size="small"
+                            color={colors.textInverse}
+                            accessibilityLabel={
+                              loginStage === 'syncing'
+                                ? 'Preparing offline data'
+                                : 'Signing in'
+                            }
+                          />
+                          <AppText style={[styles.loginButtonText, { marginLeft: 8 }]}>
+                            {loginStage === 'syncing'
+                              ? 'Preparing offline data…'
+                              : 'Signing in…'}
+                          </AppText>
+                        </View>
                       ) : (
                         <View
                           style={{

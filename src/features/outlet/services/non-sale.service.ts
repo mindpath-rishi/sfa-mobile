@@ -1,5 +1,9 @@
 import { api } from '@/core/network';
 import type { ApiResponse } from '@/core/network/api.types';
+import { isSalesman } from '@/core/navigation/role.utils';
+import { isOfflineMode } from '@/core/offline/offline.store';
+import { useAuthStore } from '@/core/store/auth.store';
+import { repositories } from '@/repositories';
 
 /**
  * Query params for fetching route outlets
@@ -11,7 +15,6 @@ export interface NonSalePayload {
   reasonCategoryId: string;
   reasonId: string;
   remark?: string;
-  routeSessionId?: string;
 }
 
 /**
@@ -46,6 +49,21 @@ const cleanParams = (params: Record<string, any>) => {
  */
 export const nonSaleService: NonSaleService = {
   markNonSale: async (payload: NonSalePayload) => {
+    const user = useAuthStore.getState().user;
+    if (isSalesman(user) && isOfflineMode()) {
+      const record = await repositories.nonSales.create(user?.userId ?? '', {
+        ...cleanParams(payload),
+        employeeId: user?.userId,
+        status: 'COMPLETED',
+      });
+      return {
+        success: true,
+        statusCode: 202,
+        message: 'Non-sale visit saved locally',
+        data: { ...record, nonSaleId: record.uuid },
+        offline: true,
+      } as ApiResponse<any>;
+    }
     return api.post<any>('non-sale', payload) as Promise<ApiResponse<any>>;
   },
 };

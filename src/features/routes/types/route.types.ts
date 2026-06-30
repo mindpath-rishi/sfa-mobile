@@ -19,7 +19,7 @@ export interface Outlet {
   address: Address;
   geoTag: GeoTag;
   segmentation: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'PENDING';
+  status: 'ACTIVE' | 'INACTIVE' | 'VERIFICATION_PENDING' | 'REJECTED';
   lastVisitedAt: string;
   sequence: number;
   visitStatus?: 'ACTIVE' | 'COMPLETED' | 'NOT_VISITED';

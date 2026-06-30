@@ -1603,6 +1603,9 @@ import {
   AppState,
   StatusBar,
   Modal,
+  Image,
+  Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -1923,7 +1926,9 @@ export default function CustomerDetailScreen() {
   }, [customer?.customerId]);
 
   useEffect(() => {
-    if (!activeVisit && customer && !hasTriggeredRef.current) autoStartVisit();
+    if (!activeVisit && customer?.status === 'ACTIVE' && !hasTriggeredRef.current) {
+      autoStartVisit();
+    }
   }, [customer]);
 
   useEffect(() => {
@@ -2081,12 +2086,28 @@ export default function CustomerDetailScreen() {
 
   const loadCustomerData = async () => {
     setIsLoading(true);
-    const res = await outletService.getOutletDetail(id);
-    if (res?.data) {
-      setCustomer(res.data);
-      setSelectedOutlet(res?.data);
-    } else setCustomer(null);
-    setIsLoading(false);
+    try {
+      const [detailResult, mediaResult] = await Promise.allSettled([
+        outletService.getOutletDetail(id),
+        outletService.getOutletMedia(id),
+      ]);
+      const detail = detailResult.status === 'fulfilled' ? detailResult.value?.data : null;
+      const images =
+        mediaResult.status === 'fulfilled' && Array.isArray(mediaResult.value?.data)
+          ? mediaResult.value.data.filter((item: any) => item?.url)
+          : [];
+
+      if (detail) {
+        const outlet = { ...detail, images };
+        setCustomer(outlet);
+        setSelectedOutlet(outlet);
+      } else setCustomer(null);
+    } catch (error) {
+      console.error('Failed to load outlet details:', error);
+      setCustomer(null);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const loadSalesHistory = async () => {
@@ -2364,10 +2385,14 @@ export default function CustomerDetailScreen() {
                   <Ionicons name="cart-outline" size={20} color={colors.primaryContrast} />
                 </View>
                 <View>
-                  <AppText style={{ color: colors.primaryContrast, fontSize: 15, fontWeight: '700' }}>
+                  <AppText
+                    style={{ color: colors.primaryContrast, fontSize: 15, fontWeight: '700' }}
+                  >
                     Proceed to Sale
                   </AppText>
-                  <AppText style={{ color: colors.primaryContrast + 'B8', fontSize: 11, marginTop: 1 }}>
+                  <AppText
+                    style={{ color: colors.primaryContrast + 'B8', fontSize: 11, marginTop: 1 }}
+                  >
                     {hasActiveVisit ? 'Visit active' : 'Tap to start'}
                   </AppText>
                 </View>
@@ -2451,7 +2476,10 @@ const DetailListSkeleton = ({ rows = 3 }: { rows?: number }) => {
   return (
     <View style={{ gap: 10 }}>
       {Array.from({ length: rows }).map((_, i) => (
-        <View key={i} style={{ backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' }}>
+        <View
+          key={i}
+          style={{ backgroundColor: colors.card, borderRadius: 12, overflow: 'hidden' }}
+        >
           <View style={{ height: 3, backgroundColor: colors.divider }} />
           <View style={{ padding: 14, gap: 10 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -2695,9 +2723,133 @@ const SummaryTab = ({ customer, colors: c }: any) => {
       : avgLPC > 5
         ? { label: 'Average', color: c.warning }
         : { label: 'Low', color: c.error };
+  const images = Array.isArray(customer?.images) ? customer.images : [];
+  const latitude = Number(customer?.geoTag?.lat);
+  const longitude = Number(customer?.geoTag?.lng);
+  const hasGeoTag = Number.isFinite(latitude) && Number.isFinite(longitude);
+  const outletTags = Array.isArray(customer?.tags) ? customer.tags.filter(Boolean) : [];
+
+  const openOutletMap = async () => {
+    const label = [customer?.name, ...outletTags].filter(Boolean).join(' · ');
+    const encodedLabel = encodeURIComponent(label || 'Outlet');
+    const url = Platform.select({
+      ios: `maps:${latitude},${longitude}?q=${encodedLabel}`,
+      android: `geo:${latitude},${longitude}?q=${latitude},${longitude}(${encodedLabel})`,
+      default: `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`,
+    });
+
+    if (!url) return;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Map unavailable', 'Unable to open this outlet location.');
+    }
+  };
 
   return (
     <View style={{ gap: 12 }}>
+      {images.length > 0 && (
+        <View
+          style={{
+            backgroundColor: c.surface,
+            borderRadius: 16,
+            paddingVertical: 14,
+            borderWidth: 1,
+            borderColor: c.border,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 14,
+              marginBottom: 10,
+            }}
+          >
+            <AppText style={{ ...T.title, color: c.textPrimary }}>Outlet photos</AppText>
+            <AppText style={{ ...T.label, color: c.textSecondary }}>{images.length}</AppText>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 14, gap: 10 }}
+          >
+            {images.map((image: any, index: number) => {
+              const uri = image.urls?.medium || image.urls?.small || image.url;
+              return (
+                <Image
+                  key={image.mediaId || `${uri}-${index}`}
+                  source={{ uri }}
+                  accessibilityLabel={image.altText || image.title || `Outlet photo ${index + 1}`}
+                  resizeMode="cover"
+                  style={{
+                    width: 180,
+                    height: 120,
+                    borderRadius: 12,
+                    backgroundColor: c.background,
+                  }}
+                />
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {hasGeoTag && (
+        <TouchableOpacity
+          onPress={openOutletMap}
+          activeOpacity={0.75}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            backgroundColor: c.surface,
+            borderRadius: 16,
+            padding: 14,
+            borderWidth: 1,
+            borderColor: c.border,
+          }}
+        >
+          <View
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: c.primary + '14',
+            }}
+          >
+            <Ionicons name="map-outline" size={21} color={c.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText style={{ ...T.bodyM, color: c.textPrimary }}>View geotag on map</AppText>
+            <AppText style={{ ...T.label, color: c.textSecondary, marginTop: 3 }}>
+              {latitude.toFixed(6)}, {longitude.toFixed(6)}
+            </AppText>
+            {outletTags.length > 0 && (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 7 }}>
+                {outletTags.map((tag: string) => (
+                  <View
+                    key={tag}
+                    style={{
+                      backgroundColor: c.primary + '10',
+                      borderRadius: 10,
+                      paddingHorizontal: 7,
+                      paddingVertical: 3,
+                    }}
+                  >
+                    <AppText style={{ ...T.micro, color: c.primary }}>{tag}</AppText>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+          <Ionicons name="open-outline" size={17} color={c.primary} />
+        </TouchableOpacity>
+      )}
+
       {/* MTD card */}
       <View
         style={{

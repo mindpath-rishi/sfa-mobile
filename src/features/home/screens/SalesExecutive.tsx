@@ -37,7 +37,12 @@ import { ApiRequestConfig, ApiResponse } from '@/core/network';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { useVisitGuard } from '@/shared/hooks/useVisitGuard';
-import { getRouteCustomerCategoryId, Route, useRouteStore } from '@/core/store/route.store';
+import {
+  getRouteCustomerCategoryId,
+  getRouteLocationIds,
+  Route,
+  useRouteStore,
+} from '@/core/store/route.store';
 import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '../components/models/DayEndSummaryModal';
 import { useAuthStore } from '@/core/store/auth.store';
@@ -610,7 +615,7 @@ export default function SalesExecutiveScreen() {
         showLoader: false,
       });
 
-      if (response?.statusCode === 201) {
+      if ([201, 202].includes(Number(response?.statusCode))) {
         loader.show({ message: 'Preparing today activity...' });
         await getDayStatus({ showLoader: false });
 
@@ -672,10 +677,12 @@ export default function SalesExecutiveScreen() {
     try {
       const response: any = await homeService.createActivity(payload);
 
-      if (response.statusCode === 201) {
+      if ([201, 202].includes(Number(response.statusCode))) {
         setIsChangingActivity(false);
         setVanChangeApprovedRoutePrompt(false);
-        getDayStatus();
+        setCurrentActivity(activityName);
+        setStartTime(new Date().toISOString());
+        await getDayStatus();
         toast.success(`Activity changed to ${activityName}`);
       }
     } catch (error) {
@@ -903,9 +910,7 @@ export default function SalesExecutiveScreen() {
               totalShops: item.route?.outletCount,
               distance: item.route.distance || 'N/A',
               stops: item.route?.outletCount || 0,
-              marketId: item.route.marketId,
-              provinceId: item.route.provinceId,
-              countryId: item.route.countryId,
+              ...getRouteLocationIds({ ...item, route: item.route }),
               customerCategoryId: getRouteCustomerCategoryId({
                 customerCategoryId: item.customerCategoryId,
                 customerCategory: item.customerCategory,
