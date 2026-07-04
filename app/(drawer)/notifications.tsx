@@ -27,7 +27,7 @@ type NotificationItem = {
   title: string;
   message: string;
   time: string;
-  type: 'order' | 'route' | 'target' | 'topup' | 'outlet_approval' | 'system';
+  type: 'order' | 'route' | 'target' | 'van_change' | 'topup' | 'outlet_approval' | 'system';
   unread?: boolean;
   data?: Record<string, any>;
 };
@@ -62,7 +62,7 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
     title: item.title,
     message: item.body || item.message || '',
     time: formatRelativeTime(item.createdAt || item.sentAt),
-    type: ['order', 'route', 'target', 'topup', 'outlet_approval'].includes(category)
+    type: ['order', 'route', 'target', 'van_change', 'topup', 'outlet_approval'].includes(category)
       ? (category as NotificationItem['type'])
       : 'system',
     unread: !item.isRead,
@@ -78,6 +78,8 @@ const getNotificationIcon = (type: NotificationItem['type']) => {
       return 'map-outline';
     case 'target':
       return 'flag-outline';
+    case 'van_change':
+      return 'car-outline';
     case 'topup':
       return 'cube-outline';
     case 'outlet_approval':
@@ -269,15 +271,18 @@ export default function NotificationsScreen() {
   };
 
   const handleVanChangeAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
-    const workSessionId = item.data?.workSessionId;
-    if (!workSessionId || processingId) return;
+    const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
+    if (!vanChangeRequestId || processingId) {
+      toast.error('Van change request ID not found');
+      return;
+    }
 
     setProcessingId(item.id);
     try {
       const response =
         action === 'approve'
-          ? await notificationService.approveVanChange(String(workSessionId))
-          : await notificationService.rejectVanChange(String(workSessionId));
+          ? await notificationService.approveVanChange(String(vanChangeRequestId))
+          : await notificationService.rejectVanChange(String(vanChangeRequestId));
 
       if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
         toast.error(response?.message || `Failed to ${action} request`);
@@ -318,19 +323,43 @@ export default function NotificationsScreen() {
 
   const handleOutletAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
     const customerId = String(item.data?.customerId || '');
+    const outletVerificationId = String(item.data?.outletVerificationId || '') || undefined;
     if (!customerId || processingId) return;
     setProcessingId(item.id);
     try {
       const response =
         action === 'approve'
-          ? await notificationService.approveOutlet(customerId)
-          : await notificationService.rejectOutlet(customerId);
+          ? await notificationService.approveOutlet(customerId, outletVerificationId)
+          : await notificationService.rejectOutlet(
+              customerId,
+              'Rejected by reporting manager',
+              outletVerificationId,
+            );
       if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
         toast.error(response?.message || `Failed to ${action} outlet`);
         return;
       }
       toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === item.id
+            ? {
+                ...notification,
+                unread: false,
+                data: {
+                  ...notification.data,
+                  action: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                  status: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                },
+              }
+            : notification,
+        ),
+      );
+      await notificationService.markAsRead(item.id);
       await loadNotifications(true);
+    } catch (error: any) {
+      console.warn(`Failed to ${action} outlet:`, error);
+      toast.error(error?.response?.data?.message || `Failed to ${action} outlet`);
     } finally {
       setProcessingId(null);
     }

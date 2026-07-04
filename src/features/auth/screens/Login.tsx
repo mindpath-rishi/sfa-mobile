@@ -260,6 +260,8 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
         vanId: resData.user.vanId ?? null,
         offlineAccessAllowed: profile?.offlineAccessAllowed === true,
         avatar: profile?.avatar || profile?.profileImage || profile?.profileImageUrl || null,
+        profileImageMediaId: profile?.profileImageMediaId || null,
+        profileImageUrl: profile?.profileImageUrl || null,
       };
       await useAuthStore.getState().setAuth(resData.accessToken, resData.refreshToken, user);
       setLoginStage('syncing');

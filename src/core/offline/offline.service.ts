@@ -26,9 +26,12 @@ export const subscribeToOfflineSync = () =>
     const wasOffline = !wasOnline;
     const hasInternet = online(state);
     useOfflineStore.getState().setConnection(state.isConnected === true, hasInternet);
-    if (hasInternet) {
+    // Expo can emit repeated network events while the device remains online.
+    // Starting a full sync for each event repeatedly force-refreshes all
+    // snapshots, including /van/mapped-routes. Sync only after reconnection.
+    if (hasInternet && wasOffline) {
       void syncService.retryFailed().then(() => {
-        if (wasOffline) useAppEventsStore.getState().bumpDashboardRefresh();
+        useAppEventsStore.getState().bumpDashboardRefresh();
       });
     } else if (wasOnline) {
       // Re-run active salesman dashboard loaders after the network state has

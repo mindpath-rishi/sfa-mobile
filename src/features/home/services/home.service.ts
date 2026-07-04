@@ -14,6 +14,7 @@ import { isOfflineMode, useOfflineStore } from '@/core/offline/offline.store';
 import { repositories } from '@/repositories';
 import { syncService } from '@/sync/sync.service';
 import { createSchemaId } from '@/utils/uuid';
+import { useLoaderStore } from '@/core/loader/loader.store';
 
 /**
  * Auth API contract used by the app.
@@ -1019,6 +1020,17 @@ export const homeService: HomeService = {
     } as ApiResponse<any>;
   },
   dayComplete: async (carryForwardStock, config) => {
+    const pendingEntries = await syncService.getPendingCount();
+    if (pendingEntries > 0) {
+      useLoaderStore.getState().show({
+        message: `Uploading ${pendingEntries} pending entr${pendingEntries === 1 ? 'y' : 'ies'} before settlement...`,
+      });
+      await syncService.uploadPendingBeforeSettlement();
+      useLoaderStore
+        .getState()
+        .show({ message: 'Pending entries uploaded. Completing settlement...' });
+    }
+
     const payload =
       carryForwardStock &&
       typeof carryForwardStock === 'object' &&
@@ -1097,7 +1109,9 @@ export const homeService: HomeService = {
       // Pull the completed work session/activity immediately. Otherwise the
       // local database still contains the pre-settlement ACTIVE records and
       // shows an ongoing activity after switching offline.
-      await syncService.sync().catch(() => undefined);
+      // Settlement is already complete on the server, so do not keep the user
+      // waiting for a full upload/download and snapshot refresh.
+      void syncService.sync().catch(() => undefined);
     }
 
     return response;

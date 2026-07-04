@@ -13,6 +13,14 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
 
 import { getAccessToken } from './tokenStorage';
+// import {
+//   getDeviceContext,
+//   getNativeCurrentLocation,
+//   startNativeBackgroundLocation,
+//   startNativeSyncWorker,
+//   stopNativeBackgroundLocation,
+//   stopNativeSyncWorker,
+// } from './native-capabilities.service.native';
 
 export const SALESMAN_BACKGROUND_LOCATION_TASK = 'salesman-background-location';
 const locationTrackingKey = (ownerId: string) => `location_tracking_enabled:${ownerId}`;
@@ -20,12 +28,14 @@ const ACTIVE_LOCATION_SESSION_KEY = 'active_location_work_session_id';
 const LAST_BACKGROUND_LOCATION_KEY = 'last_background_location';
 const LAST_BACKGROUND_LOCATION_ERROR_KEY = 'last_background_location_error';
 
-const FOREGROUND_TRACKING_INTERVAL_MS = 2_000;
-const FOREGROUND_TRACKING_DISTANCE_METERS = 5;
-const BACKGROUND_TRACKING_INTERVAL_MS = 10_000;
-const BACKGROUND_TRACKING_DISTANCE_METERS = 10;
-const FOREGROUND_HEARTBEAT_INTERVAL_MS = 5_000;
-const BACKGROUND_HEARTBEAT_INTERVAL_MS = 10_000;
+// Zero asks the native location provider for updates as soon as fixes are
+// available. The OS/GPS hardware still controls the actual callback rate.
+const FOREGROUND_TRACKING_INTERVAL_MS = 0;
+const FOREGROUND_TRACKING_DISTANCE_METERS = 0;
+const BACKGROUND_TRACKING_INTERVAL_MS = 0;
+const BACKGROUND_TRACKING_DISTANCE_METERS = 0;
+const FOREGROUND_HEARTBEAT_INTERVAL_MS = 0;
+const BACKGROUND_HEARTBEAT_INTERVAL_MS = 0;
 const LOCATION_MAX_AGE_MS = 15_000;
 const LOCATION_MAX_ACCURACY_METERS = 50;
 const MAX_SPEED_METERS_PER_SECOND = 200 / 3.6;
@@ -88,11 +98,16 @@ let locationSocketToken: string | null = null;
 let offlineSyncPromise: Promise<void> | null = null;
 let locationTrackingStartPromise: Promise<void> | null = null;
 let activeLocationDelivery: Promise<void> | null = null;
-let pendingLocationDelivery: { location: CapturedLocation; workSessionId?: string } | null = null;
+let pendingLocationDelivery: {
+  location: CapturedLocation;
+  workSessionId?: string;
+  emittedRealtime: boolean;
+} | null = null;
 let latestCapturedLocation: CapturedLocation | null = null;
 let latestDeviceHeading: number | null = null;
 let lastAcceptedLocation: CapturedLocation | null = null;
 let lastUploadError: string | null = null;
+// let deviceContextPromise: ReturnType<typeof getDeviceContext> | null = null;
 const acceptedLocationKeys = new Set<string>();
 
 const logLocation = (message: string, details?: Record<string, unknown>) => {
@@ -285,8 +300,10 @@ const connectLocationSocket = async () => {
 
 const emitLocationOverSocket = async (payload: Record<string, unknown>) => {
   const socket = await connectLocationSocket();
-  if (!socket?.connected) return false;
+  if (!socket) return false;
 
+  // Socket.IO buffers this event while a background task reconnects. The
+  // acknowledgement timeout keeps HTTP/offline delivery as a reliable fallback.
   return new Promise<boolean>((resolve) => {
     socket
       .timeout(3_000)
@@ -299,6 +316,33 @@ const emitLocationOverSocket = async (payload: Record<string, unknown>) => {
         },
       );
   });
+};
+
+/**
+ * Hot path for live map updates. Socket.IO queues the event while reconnecting,
+ * so GPS callbacks never wait for an acknowledgement, HTTP, storage, or retries.
+ */
+const emitLocationImmediately = (location: CapturedLocation, workSessionId?: string) => {
+  const sessionId = workSessionId || useAuthStore.getState().workSessionId;
+  // A Socket.IO instance can remain allocated after Android backgrounds the
+  // app even though its transport is disconnected. Treating that as a
+  // successful delivery drops the HTTP/offline fallback below.
+  if (!locationSocket?.connected || !sessionId) return false;
+
+  locationSocket.emit(
+    'live-location:track',
+    {
+      workSessionId: sessionId,
+      source: currentAppState === 'active' ? 'FOREGROUND' : 'BACKGROUND',
+      location,
+    },
+    (response?: { success?: boolean; statusCode?: number; message?: string }) => {
+      if (response?.success === false) {
+        console.warn('[Location] Realtime socket rejected location:', response.message);
+      }
+    },
+  );
+  return true;
 };
 
 const postLocationPayload = async (payload: Record<string, unknown>) => {
@@ -326,10 +370,12 @@ const postLocationPayload = async (payload: Record<string, unknown>) => {
 };
 
 const uploadLocationRequest = async (location: CapturedLocation, workSessionId: string) => {
+  // deviceContextPromise ??= getDeviceContext();
   const payload = {
     workSessionId,
     source: currentAppState === 'active' ? 'FOREGROUND' : 'BACKGROUND',
     location,
+    // device: await deviceContextPromise,
   };
   if (await emitLocationOverSocket(payload)) return;
 
@@ -424,10 +470,23 @@ const hasNetworkConnection = async () => {
   }
 };
 
-const processAcceptedLocation = async (accepted: CapturedLocation, workSessionId?: string) => {
+const processAcceptedLocation = async (
+  accepted: CapturedLocation,
+  workSessionId?: string,
+  emittedRealtime = false,
+) => {
   const sessionId = await getActiveSessionId(workSessionId);
   if (!sessionId) {
     await setLastUploadError('Location upload requires an active work session');
+    return;
+  }
+
+  if (emittedRealtime) {
+    await storage.setItem(
+      LAST_BACKGROUND_LOCATION_KEY,
+      JSON.stringify({ ...accepted, uploadedAt: new Date().toISOString() }),
+    );
+    await clearLastUploadError();
     return;
   }
 
@@ -447,9 +506,12 @@ const queueLocation = (location: CapturedLocation, workSessionId?: string) => {
   const accepted = validateLocation(location);
   if (!accepted) return Promise.resolve();
 
+  // Broadcast before entering the serialized persistence/retry queue.
+  const emittedRealtime = emitLocationImmediately(accepted, workSessionId);
+
   // Bound delivery work: on a poor connection, starting a multi-retry promise
   // every two seconds eventually exhausts the Android process.
-  pendingLocationDelivery = { location: accepted, workSessionId };
+  pendingLocationDelivery = { location: accepted, workSessionId, emittedRealtime };
   if (activeLocationDelivery) return activeLocationDelivery;
 
   activeLocationDelivery = (async () => {
@@ -457,7 +519,11 @@ const queueLocation = (location: CapturedLocation, workSessionId?: string) => {
       const pending = pendingLocationDelivery;
       pendingLocationDelivery = null;
       try {
-        await processAcceptedLocation(pending.location, pending.workSessionId);
+        await processAcceptedLocation(
+          pending.location,
+          pending.workSessionId,
+          pending.emittedRealtime,
+        );
       } catch (error) {
         await setLastUploadError(error);
       }
@@ -604,12 +670,14 @@ const withLocationTimeout = async <T>(promise: Promise<T>, timeoutMs: number): P
 
 let activeLocationCapture: Promise<CapturedLocation | undefined> | null = null;
 
-const performLocationCapture = async (): Promise<CapturedLocation | undefined> => {
+const performLocationCapture = async (
+  preferCached = true,
+): Promise<CapturedLocation | undefined> => {
   try {
     // Live tracking normally already has a recent high-quality point. Reusing
     // it makes actions such as van settlement immediate instead of forcing the
     // GPS chipset to acquire another fix.
-    if (latestCapturedLocation) {
+    if (preferCached && latestCapturedLocation) {
       const age = Date.now() - new Date(latestCapturedLocation.capturedAt).getTime();
       const accuracy = latestCapturedLocation.accuracy;
       if (
@@ -682,12 +750,17 @@ const performLocationCapture = async (): Promise<CapturedLocation | undefined> =
   }
 };
 
-export const captureCurrentLocation = async (): Promise<CapturedLocation | undefined> => {
+export const captureCurrentLocation = async (
+  options: { preferCached?: boolean } = {},
+): Promise<CapturedLocation | undefined> => {
   if (activeLocationCapture) return activeLocationCapture;
   // Bound the complete native flow, including permission and GPS-service
   // checks. Timing only getCurrentPositionAsync still allowed callers such as
   // online van settlement to wait forever before their HTTP request began.
-  activeLocationCapture = withLocationTimeout(performLocationCapture(), 12_000).catch((error) => {
+  activeLocationCapture = withLocationTimeout(
+    performLocationCapture(options.preferCached !== false),
+    12_000,
+  ).catch((error) => {
     console.warn('[Location] Complete GPS capture timed out:', error);
     return undefined;
   });
@@ -739,10 +812,15 @@ const stopForegroundTracking = () => {
 
 const restartHeartbeat = (workSessionId: string) => {
   if (heartbeatTimer) clearInterval(heartbeatTimer);
+  heartbeatTimer = null;
   const interval =
     currentAppState === 'active'
       ? FOREGROUND_HEARTBEAT_INTERVAL_MS
       : BACKGROUND_HEARTBEAT_INTERVAL_MS;
+
+  // Continuous native tracking owns delivery when the configured interval is
+  // zero. Never create setInterval(0), which would continuously request GPS.
+  if (interval <= 0) return;
 
   heartbeatTimer = setInterval(() => {
     const lastUpdateAt = latestCapturedLocation
@@ -750,7 +828,10 @@ const restartHeartbeat = (workSessionId: string) => {
       : 0;
     if (Date.now() - lastUpdateAt < interval) return;
 
-    void captureCurrentLocation().then((location) => {
+    // A heartbeat must request a new fix. The general capture path reuses a
+    // point for up to 15 seconds, which otherwise turns this 5-second timer
+    // into an apparent ~15-second update interval.
+    void captureCurrentLocation({ preferCached: false }).then((location) => {
       if (location) void queueLocation(location, workSessionId);
     });
   }, interval);
@@ -835,10 +916,14 @@ const performStartSalesmanBackgroundLocation = async (user?: LocationOwner) => {
       return;
     }
 
+    // Create the Socket.IO client before starting GPS callbacks. Emits are
+    // buffered by Socket.IO during reconnect and never block location capture.
+    await connectLocationSocket();
     await startForegroundTracking();
     await startBackgroundTracking();
+    // await startNativeBackgroundLocation((location) => queueLocation(location, activeSessionId));
+    // await startNativeSyncWorker(syncPendingLocationUploads);
     startLocationLifecycle(activeSessionId);
-    void connectLocationSocket();
     void syncPendingLocationUploads();
     void captureCurrentLocation().then((location) => {
       if (location) return queueLocation(location, activeSessionId);
@@ -880,6 +965,9 @@ export const stopSalesmanBackgroundLocation = async () => {
     pendingLocationDelivery = null;
     acceptedLocationKeys.clear();
     lastAcceptedLocation = null;
+
+    // await stopNativeSyncWorker();
+    // await stopNativeBackgroundLocation();
 
     if (await Location.hasStartedLocationUpdatesAsync(SALESMAN_BACKGROUND_LOCATION_TASK)) {
       await Location.stopLocationUpdatesAsync(SALESMAN_BACKGROUND_LOCATION_TASK);

@@ -771,20 +771,44 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   ) => {
     if (isPendingOutletApproval(item)) {
       const customerId = String(item.data?.customerId || '');
+      const outletVerificationId = String(item.data?.outletVerificationId || '') || undefined;
       if (!customerId || processing) return;
       setProcessing({ id: item.id, action });
       try {
         const response =
           action === 'approve'
-            ? await notificationService.approveOutlet(customerId)
-            : await notificationService.rejectOutlet(customerId);
+            ? await notificationService.approveOutlet(customerId, outletVerificationId)
+            : await notificationService.rejectOutlet(
+                customerId,
+                'Rejected by reporting manager',
+                outletVerificationId,
+              );
         if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
           toast.error(response?.message || `Failed to ${action} outlet`);
           return;
         }
         toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === item.id
+              ? {
+                  ...notification,
+                  unread: false,
+                  data: {
+                    ...notification.data,
+                    action: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                    status: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                  },
+                }
+              : notification,
+          ),
+        );
+        await notificationService.markAsRead(item.id);
         navigateBack();
         loadNotifications();
+      } catch (error: any) {
+        console.warn(`Failed to ${action} outlet:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action} outlet`);
       } finally {
         setProcessing(null);
       }
@@ -848,15 +872,18 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
       return;
     }
 
-    const workSessionId = item.data?.workSessionId;
-    if (!workSessionId || processing) return;
+    const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
+    if (!vanChangeRequestId || processing) {
+      toast.error('Van change request ID not found');
+      return;
+    }
 
     setProcessing({ id: item.id, action });
     try {
       const response =
         action === 'approve'
-          ? await notificationService.approveVanChange(String(workSessionId))
-          : await notificationService.rejectVanChange(String(workSessionId));
+          ? await notificationService.approveVanChange(String(vanChangeRequestId))
+          : await notificationService.rejectVanChange(String(vanChangeRequestId));
 
       if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
         toast.error(response?.message || `Failed to ${action} request`);

@@ -307,6 +307,47 @@ const download = async () => {
 };
 
 export const syncService = {
+  async getPendingCount() {
+    return pendingCount();
+  },
+
+  async uploadPendingBeforeSettlement() {
+    const queuedBeforeUpload = await pendingCount();
+    if (!queuedBeforeUpload) return 0;
+
+    const state = useOfflineStore.getState();
+    if (!state.isConnected || !state.isInternetReachable) {
+      throw new Error(
+        `${queuedBeforeUpload} pending entr${queuedBeforeUpload === 1 ? 'y' : 'ies'} must be uploaded before settlement. Please connect to the internet.`,
+      );
+    }
+    // Do not start a second uploader while normal background sync is active.
+    if (activeSync) await activeSync;
+    else {
+      state.setSyncing(true);
+      state.setLastError(null);
+      try {
+        const warnings = await upload();
+        if (warnings.length) state.setLastError(`Media pending — ${warnings.join('; ')}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Pending entry upload failed';
+        state.setLastError(message);
+        throw new Error(message);
+      } finally {
+        state.setSyncing(false);
+        await updatePendingCount();
+      }
+    }
+
+    const remaining = await pendingCount();
+    if (remaining) {
+      throw new Error(
+        `${remaining} pending entr${remaining === 1 ? 'y is' : 'ies are'} still not uploaded. Settlement was not completed.`,
+      );
+    }
+    return queuedBeforeUpload;
+  },
+
   async initialise() {
     await hydrateOfflinePreference(ownerId());
     if (useAuthStore.getState().user?.offlineAccessAllowed !== true) {

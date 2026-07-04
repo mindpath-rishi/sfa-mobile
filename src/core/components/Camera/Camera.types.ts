@@ -158,6 +158,8 @@ export interface CameraModalProps {
   closeOnCapture?: boolean;
   /** Whether to auto-focus camera when modal opens */
   autoFocusOnMount?: boolean;
+  /** Whether the user can switch between front and back cameras */
+  allowCameraSwitch?: boolean;
   /** Camera ref for external control */
   cameraRef?: React.RefObject<CameraRef>;
   /** Camera component props */

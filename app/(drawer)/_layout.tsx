@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { View, Text, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import { router, useSegments } from 'expo-router';
@@ -534,8 +534,9 @@ const CustomDrawerContent = (props: any) => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
-      <View style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }} edges={['top', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <ModernDrawerHeader
           colors={colors}
           userName={user?.name || 'Field User'}

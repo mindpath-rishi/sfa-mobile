@@ -8,6 +8,7 @@ import {
   Alert,
   Linking,
   Share,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -16,6 +17,8 @@ import { AppCard } from '@/core/components/Card';
 
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
+import { api } from '@/core/network';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useThemeStore } from '@/core/store/theme.store';
 import { authService } from '@/features/auth/services/auth.service';
@@ -151,7 +154,7 @@ const buildProfileData = (authUser: any) => {
 };
 
 // Profile Header Component
-const ProfileHeader = ({ user, onEditPress }: any) => {
+const ProfileHeader = ({ user, onImagePress, uploading }: any) => {
   const { colors } = useTheme();
   const logout = useAuthStore((s) => s.logout);
 
@@ -168,7 +171,11 @@ const ProfileHeader = ({ user, onEditPress }: any) => {
       }}
     >
       <View style={{ alignItems: 'center' }}>
-        <TouchableOpacity onPress={onEditPress} style={{ position: 'relative', marginBottom: 16 }}>
+        <TouchableOpacity
+          onPress={onImagePress}
+          disabled={uploading}
+          style={{ position: 'relative', marginBottom: 16, opacity: uploading ? 0.65 : 1 }}
+        >
           <View
             style={{
               width: 100,
@@ -205,7 +212,7 @@ const ProfileHeader = ({ user, onEditPress }: any) => {
               borderColor: 'white',
             }}
           >
-            <Ionicons name="camera" size={16} color="white" />
+            <Ionicons name={uploading ? 'cloud-upload' : 'camera'} size={16} color="white" />
           </View>
         </TouchableOpacity>
 
@@ -421,7 +428,9 @@ export default function ProfileScreen() {
   );
   const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'settings', 'docs'
   const logout = useAuthStore((s) => s.logout);
+  const updateAuthUser = useAuthStore((s) => s.updateUser);
   const [notificationSyncing, setNotificationSyncing] = useState(false);
+  const [profileImageUploading, setProfileImageUploading] = useState(false);
 
   useEffect(() => {
     setSettings((prev) => ({ ...prev, darkMode: isDark }));
@@ -442,6 +451,106 @@ export default function ProfileScreen() {
 
   const handleEditProfile = () => {
     router.push('/profile/edit');
+  };
+
+  const uploadProfileImage = async (uri: string) => {
+    const employeeId = authUser?.employeeId || authUser?.userId;
+    if (!employeeId || profileImageUploading) return;
+
+    setProfileImageUploading(true);
+    try {
+      const cleanUri = uri.split('?')[0];
+      const extension = cleanUri.split('.').pop()?.toLowerCase() || 'jpg';
+      const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+      const fileName = `profile-${employeeId}-${Date.now()}.${extension}`;
+      const formData = new FormData();
+
+      if (Platform.OS === 'web') {
+        const blob = await fetch(uri).then((response) => response.blob());
+        formData.append('file', blob, fileName);
+      } else {
+        formData.append('file', { uri, name: fileName, type: mimeType } as any);
+      }
+      formData.append('ownerType', 'EMPLOYEE');
+      formData.append('ownerId', employeeId);
+      formData.append('mediaType', 'IMAGE');
+      formData.append('purpose', 'PROFILE');
+      formData.append('title', 'Profile Image');
+      formData.append('isPrimary', 'true');
+      if (authUser?.profileImageMediaId) {
+        formData.append('mediaId', authUser.profileImageMediaId);
+      }
+
+      const mediaResponse = await api.post<any, FormData>('/media/upload', formData);
+      const media = mediaResponse?.data;
+      if (!mediaResponse?.success || !media?.mediaId || !media?.url) {
+        throw new Error(mediaResponse?.message || 'Profile image upload failed');
+      }
+
+      const employeeResponse = await api.patch<any>(`/employee/${employeeId}`, {
+        profileImageMediaId: media.mediaId,
+        profileImageUrl: media.url,
+      });
+      if (!employeeResponse?.success) {
+        throw new Error(employeeResponse?.message || 'Could not update employee profile');
+      }
+
+      await updateAuthUser({
+        avatar: media.url,
+        profileImage: media.url,
+        profileImageUrl: media.url,
+        profileImageMediaId: media.mediaId,
+      });
+      Alert.alert('Profile updated', 'Your profile image was uploaded successfully.');
+    } catch (error: any) {
+      Alert.alert('Upload failed', error?.message || 'Unable to upload profile image.');
+    } finally {
+      setProfileImageUploading(false);
+    }
+  };
+
+  const chooseProfileImage = () => {
+    Alert.alert('Profile image', 'Choose an image source', [
+      {
+        text: 'Camera',
+        onPress: async () => {
+          const permission = await ImagePicker.requestCameraPermissionsAsync();
+          if (!permission.granted) {
+            Alert.alert('Permission required', 'Camera permission is required.');
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+          if (!result.canceled && result.assets[0]?.uri) {
+            await uploadProfileImage(result.assets[0].uri);
+          }
+        },
+      },
+      {
+        text: 'Gallery',
+        onPress: async () => {
+          const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (!permission.granted) {
+            Alert.alert('Permission required', 'Photo library permission is required.');
+            return;
+          }
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          });
+          if (!result.canceled && result.assets[0]?.uri) {
+            await uploadProfileImage(result.assets[0].uri);
+          }
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const handleCall = () => {
@@ -974,7 +1083,11 @@ export default function ProfileScreen() {
       /> */}
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <ProfileHeader user={userData} onEditPress={handleEditProfile} />
+        <ProfileHeader
+          user={userData}
+          onImagePress={chooseProfileImage}
+          uploading={profileImageUploading}
+        />
 
         {/* Tab Navigation */}
         <View

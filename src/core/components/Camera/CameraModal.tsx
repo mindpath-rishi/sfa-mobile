@@ -18,6 +18,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   animation = 'slide',
   closeOnCapture = true,
   autoFocusOnMount = true,
+  allowCameraSwitch = true,
   cameraProps = {},
   modalProps = {},
 }) => {
@@ -75,14 +76,16 @@ export const CameraModal: React.FC<CameraModalProps> = ({
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={styles.flipButton}
-          onPress={() => cameraRef.current?.switchCamera()}
-          activeOpacity={0.7}
-          accessibilityLabel="Switch camera"
-        >
-          <Ionicons name="camera-reverse-outline" size={24} color="white" />
-        </TouchableOpacity>
+        {allowCameraSwitch && (
+          <TouchableOpacity
+            style={styles.flipButton}
+            onPress={() => cameraRef.current?.switchCamera()}
+            activeOpacity={0.7}
+            accessibilityLabel="Switch camera"
+          >
+            <Ionicons name="camera-reverse-outline" size={24} color="white" />
+          </TouchableOpacity>
+        )}
 
         {/* Title */}
         {showHeader && title && (

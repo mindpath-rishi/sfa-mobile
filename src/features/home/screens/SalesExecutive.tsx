@@ -1,6 +1,13 @@
 // SalesExecutiveScreen.tsx - Fixed Full Width Van Card
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { View, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  Alert,
+  View,
+  ScrollView,
+  RefreshControl,
+  StyleSheet,
+  TouchableOpacity,
+} from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -110,6 +117,7 @@ export default function SalesExecutiveScreen() {
   const [isTodayLeave, setIsTodayLeave] = useState<boolean>(false);
 
   const cameraRef = useRef<any>(null);
+  const dayStartWithVanChangeRef = useRef(false);
   const handledApprovedVanChangeSessionRef = useRef<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [filteredOtherWorkOptions, setFilteredOtherWorkOptions] =
@@ -365,7 +373,12 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
-    void handleStartDay({ skipRouteValidation: true, forceVanChangePending: true });
+    // A selfie is required when the executive starts the day, including when
+    // they request a different van. Van/activity changes during an active day
+    // continue without opening the camera.
+    dayStartWithVanChangeRef.current = true;
+    setUnifiedModalVisible(false);
+    void openCamera();
   };
 
   const handleRouteSelect = (route: any) => {
@@ -472,9 +485,13 @@ export default function SalesExecutiveScreen() {
           userId,
         });
 
-        if (response?.statusCode === 200 || response?.statusCode === 201) {
+        if (response?.success || [200, 201, 202].includes(Number(response?.statusCode))) {
+          setIsTodayLeave(true);
           await getDayStatus();
-          toast.success('Leave marked successfully.');
+          Alert.alert(
+            'Leave Marked',
+            `${leaveTypeName} has been marked successfully. Quick actions are disabled for today.`,
+          );
         } else {
           toast.error(response?.message || 'Failed to mark leave. Please try again.');
         }
@@ -502,10 +519,20 @@ export default function SalesExecutiveScreen() {
       setCameraVisible(false);
       if (isChangingActivity) return;
 
+      if (dayStartWithVanChangeRef.current) {
+        dayStartWithVanChangeRef.current = false;
+        void handleStartDay({
+          skipRouteValidation: true,
+          forceVanChangePending: true,
+          photoUri: photo.uri,
+        });
+        return;
+      }
+
       if (selectedRoute) {
         setLoadSummaryVisible(true);
       } else {
-        handleStartDay();
+        handleStartDay({ photoUri: photo.uri });
       }
     } else {
       console.error('No photo captured');
@@ -529,6 +556,7 @@ export default function SalesExecutiveScreen() {
   const handleStartDay = async (options?: {
     skipRouteValidation?: boolean;
     forceVanChangePending?: boolean;
+    photoUri?: string;
   }) => {
     console.log('Selected Activity:', selectedActivity);
     console.log('Selected Route:', selectedRoute);
@@ -553,12 +581,13 @@ export default function SalesExecutiveScreen() {
       let dayStartImage: { mediaId?: string; url?: string } | null = null;
       let dayStartLocation = await captureCurrentLocation();
 
-      if (userPhoto) {
+      const dayStartPhotoUri = options?.photoUri || userPhoto;
+      if (dayStartPhotoUri) {
         loader.show({ message: 'Uploading day start photo...' });
 
         const mediaResponse = await homeService.uploadDayStartImage(
           {
-            uri: userPhoto,
+            uri: dayStartPhotoUri,
             ownerId: user?.employeeId || user?.id || 'day-start',
             subOwnnerId: workSessionId as any,
           },
@@ -623,7 +652,9 @@ export default function SalesExecutiveScreen() {
             setPendingVanChangeName('');
             setVanChangeRequestId('');
             setUnifiedModalVisible(false);
-            toast.error('Day started, but its work session could not be identified. Please refresh.');
+            toast.error(
+              'Day started, but its work session could not be identified. Please refresh.',
+            );
             return;
           }
 
@@ -753,6 +784,7 @@ export default function SalesExecutiveScreen() {
   };
 
   const handleCancelCamera = () => {
+    dayStartWithVanChangeRef.current = false;
     setCameraVisible(false);
   };
 
@@ -879,12 +911,14 @@ export default function SalesExecutiveScreen() {
       console.log('Day Status Response:', response);
       setTodayActivities(data?.todayActivities || []);
 
-      // Check if today's activity is LEAVE
-      if (data?.type === 'LEAVE') {
-        setIsTodayLeave(true);
-      } else {
-        setIsTodayLeave(false);
-      }
+      const hasLeaveToday =
+        data?.type === 'LEAVE' ||
+        Boolean(data?.leave) ||
+        data?.activeActivity?.name?.toUpperCase() === 'LEAVE' ||
+        data?.todayActivities?.some(
+          (activity: any) => String(activity?.name || activity?.type).toUpperCase() === 'LEAVE',
+        );
+      setIsTodayLeave(Boolean(hasLeaveToday));
 
       if (response.statusCode === 200 && data?.status === 'ACTIVE') {
         setWorkSessionId(data?.workSessionId || '');
@@ -906,6 +940,10 @@ export default function SalesExecutiveScreen() {
 
         if (van) {
           routeStore.setVan(van);
+          setMappedVan({
+            ...van,
+            name: van.name || van.vanName,
+          });
         }
 
         const isPendingVanChange = data?.vanChangeStatus === 'PENDING';
@@ -959,6 +997,19 @@ export default function SalesExecutiveScreen() {
       const response: any = await homeService.getVanMappedRoutes();
 
       if (response.statusCode === 200) {
+        const mappedRouteVan = response?.data
+          ? {
+              vanId: response.data.vanId,
+              name: response.data.vanName,
+              vanNumber: response.data.vanNumber || '',
+              capacity: response.data.capacity || '',
+            }
+          : null;
+        if (mappedRouteVan?.vanId) {
+          setMappedVan(mappedRouteVan);
+          useRouteStore.getState().setVan(mappedRouteVan);
+        }
+
         if (response?.data?.routes?.length) {
           setRoutes(
             response.data.routes.map((item: any) => ({
@@ -995,6 +1046,12 @@ export default function SalesExecutiveScreen() {
       if (response.statusCode === 200) {
         const van = response?.data?.[0] || null;
         useRouteStore.getState().setVan(van);
+        if (van) {
+          setMappedVan({
+            ...van,
+            name: van.name || van.vanName,
+          });
+        }
         console.log('Van set in store:', van);
       }
     } catch (error) {
@@ -1384,6 +1441,7 @@ export default function SalesExecutiveScreen() {
         onCapture={handleCaptureImage}
         onError={(error) => console.error('Camera error:', error)}
         title="Take a Selfie to Start"
+        allowCameraSwitch={false}
         cameraProps={{
           facing: 'front',
           quality: 0.8,

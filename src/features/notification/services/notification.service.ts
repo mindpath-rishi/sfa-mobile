@@ -33,13 +33,13 @@ export const notificationService = {
       showLoader: false,
     }) as Promise<ApiResponse<null>>,
 
-  approveVanChange: (workSessionId: string) =>
-    api.patch<any>(`/work-session/van-change/${workSessionId}/approve`, {}) as Promise<
+  approveVanChange: (vanChangeRequestId: string) =>
+    api.patch<any>(`/van-change-request/${vanChangeRequestId}/approve`, {}) as Promise<
       ApiResponse<any>
     >,
 
-  rejectVanChange: (workSessionId: string) =>
-    api.patch<any>(`/work-session/van-change/${workSessionId}/reject`, {}) as Promise<
+  rejectVanChange: (vanChangeRequestId: string) =>
+    api.patch<any>(`/van-change-request/${vanChangeRequestId}/reject`, {}) as Promise<
       ApiResponse<any>
     >,
 
@@ -49,9 +49,23 @@ export const notificationService = {
   rejectTopup: (topupId: string, payload: any = {}) =>
     api.patch<any>(`/van-inventory-topup/${topupId}/reject`, payload) as Promise<ApiResponse<any>>,
 
-  approveOutlet: (customerId: string) =>
-    api.patch<any>(`/customer/${customerId}/approve`, {}) as Promise<ApiResponse<any>>,
+  approveOutlet: (customerId: string, outletVerificationId?: string) =>
+    api.patch<any>(
+      outletVerificationId
+        ? `/outlet-verification/${outletVerificationId}/approve`
+        : `/customer/${customerId}/approve`,
+      {},
+    ) as Promise<ApiResponse<any>>,
 
-  rejectOutlet: (customerId: string, reason = 'Rejected by reporting manager') =>
-    api.patch<any>(`/customer/${customerId}/reject`, { reason }) as Promise<ApiResponse<any>>,
+  rejectOutlet: (
+    customerId: string,
+    reason = 'Rejected by reporting manager',
+    outletVerificationId?: string,
+  ) =>
+    api.patch<any>(
+      outletVerificationId
+        ? `/outlet-verification/${outletVerificationId}/reject`
+        : `/customer/${customerId}/reject`,
+      { reason },
+    ) as Promise<ApiResponse<any>>,
 };

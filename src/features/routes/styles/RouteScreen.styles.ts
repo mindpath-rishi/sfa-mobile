@@ -327,11 +327,8 @@ export const useRouteScreenStyles = () => {
     } as ViewStyle,
 
     nameRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      marginBottom: 4,
-      gap: 6,
+      width: '100%',
+      marginBottom: 6,
     } as ViewStyle,
 
     outletName: {
@@ -374,6 +371,22 @@ export const useRouteScreenStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+    } as ViewStyle,
+
+    cardMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 8,
+      gap: 8,
+    } as ViewStyle,
+
+    cardBadgesRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 6,
+      flex: 1,
     } as ViewStyle,
 
     stopAddress: {

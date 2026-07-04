@@ -26,6 +26,9 @@ export const useUnifiedActionModalStyles = () => {
       shadowRadius: 12,
       elevation: 10,
     },
+    vanSelectionModalContent: {
+      height: '85%',
+    },
 
     // Drag Indicator
     dragIndicator: {
@@ -274,6 +277,61 @@ export const useUnifiedActionModalStyles = () => {
       minHeight: 46,
       textAlignVertical: 'top',
       fontSize: 14,
+    },
+    reasonDropdownButton: {
+      minHeight: 46,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    reasonDropdownText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    reasonDropdownMenu: {
+      marginTop: 8,
+      borderWidth: 1,
+      borderRadius: 12,
+      backgroundColor: colors.card,
+      overflow: 'hidden',
+    },
+    reasonDropdownOption: {
+      minHeight: 44,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.divider,
+    },
+    reasonDropdownOptionText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    vanSelectionContent: {
+      flex: 1,
+    },
+    vanSelectionBody: {
+      flex: 1,
+      minHeight: 0,
+    },
+    vanList: {
+      flex: 1,
+    },
+    vanSelectionFooter: {
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.divider,
+      backgroundColor: colors.surface,
     },
     vanListContainer: {
       paddingBottom: 8,

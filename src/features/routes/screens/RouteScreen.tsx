@@ -288,15 +288,33 @@ const OutletCardComponent = React.memo(
 
             <View style={styles.headerInfo}>
               <View style={styles.nameRow}>
-                <Text style={styles.outletName} numberOfLines={3} ellipsizeMode="tail">
-                  {outlet.name}
+                <Text style={styles.outletName}>{outlet.name}</Text>
+              </View>
+              <View style={styles.detailsRow}>
+                <Text style={styles.stopAddress} numberOfLines={1}>
+                  {outlet.address?.line1}
                 </Text>
-                {isInside && !isCompleted && !isActive && (
-                  <View style={styles.nearbyBadge}>
-                    <Ionicons name="location" size={12} color={colors.success} />
-                    <Text style={styles.nearbyBadgeText}>Nearby</Text>
+                <View style={styles.distanceBadge}>
+                  <Feather name="map-pin" size={12} color={colors.textSecondary} />
+                  <Text style={styles.distanceText}>
+                    {((outlet.distance ?? 0) / 1000).toFixed(1)} km
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.cardMetaRow}>
+                <View style={styles.cardBadgesRow}>
+                  <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
+                      {statusLabel}
+                    </Text>
                   </View>
-                )}
+                  {isInside && !isCompleted && !isActive && (
+                    <View style={styles.nearbyBadge}>
+                      <Ionicons name="location" size={12} color={colors.success} />
+                      <Text style={styles.nearbyBadgeText}>Nearby</Text>
+                    </View>
+                  )}
+                </View>
                 <View style={styles.headerIconsRow}>
                   <TouchableOpacity
                     onPress={(e) => {
@@ -322,24 +340,6 @@ const OutletCardComponent = React.memo(
                   </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.detailsRow}>
-                <Text style={styles.stopAddress} numberOfLines={1}>
-                  {outlet.address?.line1}
-                </Text>
-                <View style={styles.distanceBadge}>
-                  <Feather name="map-pin" size={12} color={colors.textSecondary} />
-                  <Text style={styles.distanceText}>
-                    {((outlet.distance ?? 0) / 1000).toFixed(1)} km
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-          <View style={styles.headerRight}>
-            <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
-              <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-                {statusLabel}
-              </Text>
             </View>
           </View>
         </TouchableOpacity>

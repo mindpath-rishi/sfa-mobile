@@ -189,6 +189,7 @@ type AuthUser = {
   avatar?: string | null;
   profileImage?: string | null;
   profileImageUrl?: string | null;
+  profileImageMediaId?: string | null;
   offlineAccessAllowed?: boolean;
   stats?: Record<string, unknown>;
   achievements?: unknown[];
@@ -253,6 +254,7 @@ type AuthStore = {
 
   logout: () => Promise<void>;
   setWorkSessionId: (id: WorkSessionId) => void;
+  updateUser: (changes: Partial<AuthUser>) => Promise<void>;
 };
 
 export const useAuthStore = create<AuthStore>((set) => ({
@@ -263,6 +265,14 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
   setWorkSessionId: (id) => {
     set({ workSessionId: id });
+  },
+
+  updateUser: async (changes) => {
+    const current = useAuthStore.getState().user;
+    if (!current) return;
+    const user = { ...current, ...changes };
+    await storage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    set({ user });
   },
 
   /**
