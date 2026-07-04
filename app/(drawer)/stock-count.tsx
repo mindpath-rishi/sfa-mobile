@@ -95,7 +95,7 @@ export default function StockCountScreen({
   const hasPromptedSettlementRef = useRef(false);
   const loader = useLoaderStore();
 
-  const { user } = useAuthStore();
+  const { user, workSessionId } = useAuthStore();
   const { selectedRoute: route } = useRouteStore();
   const { setHeader } = useHeader();
   const {
@@ -123,7 +123,7 @@ export default function StockCountScreen({
       }
 
       const res: any = await vanService.fetchTodayStockSummary(
-        { vanId: vanIdToUse },
+        { vanId: vanIdToUse, workSessionId },
         { showLoader: false },
       );
       setDayEndSummary(res?.data);
@@ -134,7 +134,7 @@ export default function StockCountScreen({
     } finally {
       loader.hide();
     }
-  }, [loader, user?.vanId, vanId]);
+  }, [loader, user?.vanId, vanId, workSessionId]);
 
   const submitDayEnd = useCallback(async () => {
     try {

@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   Platform,
-  ActivityIndicator,
   BackHandler,
   LayoutChangeEvent,
 } from 'react-native';
@@ -21,6 +20,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { ConfirmationModal } from '@/core/components';
 import { useInvoiceStore } from '@/core/store/invoice.store';
+import { PageSkeleton } from '@/shared/components/PageSkeleton';
 
 export default function InvoiceSharingScreen() {
   const { colors } = useTheme();
@@ -63,28 +63,7 @@ export default function InvoiceSharingScreen() {
   }, [customerId]);
 
   if (!invoice) {
-    return (
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: colors.background,
-            justifyContent: 'center',
-            alignItems: 'center',
-            paddingTop: insets.top,
-            paddingBottom: insets.bottom,
-          },
-        ]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ color: colors.textSecondary, marginTop: 16, textAlign: 'center' }}>
-          Preparing invoice...
-        </Text>
-        <TouchableOpacity onPress={handleBackNavigation} style={{ marginTop: 20 }}>
-          <Text style={{ color: colors.primary }}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <PageSkeleton variant="detail" />;
   }
 
   // Company Details (ONLY in PDF, not in UI)
@@ -534,7 +513,9 @@ export default function InvoiceSharingScreen() {
               </View>
               <View style={styles.optionTextBlock}>
                 <Text style={styles.optionTitle}>Print Invoice</Text>
-                <Text style={styles.optionDescription} numberOfLines={2}>Print a copy for your records</Text>
+                <Text style={styles.optionDescription} numberOfLines={2}>
+                  Print a copy for your records
+                </Text>
               </View>
             </View>
             {selectedOption === 'print' && (
@@ -555,7 +536,9 @@ export default function InvoiceSharingScreen() {
               </View>
               <View style={styles.optionTextBlock}>
                 <Text style={styles.optionTitle}>Share Invoice</Text>
-                <Text style={styles.optionDescription} numberOfLines={2}>Share PDF via WhatsApp, Email, etc.</Text>
+                <Text style={styles.optionDescription} numberOfLines={2}>
+                  Share PDF via WhatsApp, Email, etc.
+                </Text>
               </View>
             </View>
             {selectedOption === 'share' && (
@@ -667,7 +650,7 @@ export default function InvoiceSharingScreen() {
           onPress={handleReturnToCheckIn}
           activeOpacity={0.9}
         >
-          <Text style={styles.proceedButtonText}>Return to My Route</Text>
+          <Text style={styles.proceedButtonText}>Return to Route</Text>
         </TouchableOpacity>
       </View>
 

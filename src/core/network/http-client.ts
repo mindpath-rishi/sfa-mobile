@@ -6,6 +6,7 @@ import axios, {
   AxiosHeaders,
 } from 'axios';
 import Constants from 'expo-constants';
+import * as Network from 'expo-network';
 
 import { errorHandler } from '@/core/errors/error.handler';
 import { logger } from '@/core/logger/logger';
@@ -15,7 +16,6 @@ import { useOfflineStore } from '@/core/offline/offline.store';
 import { getCachedApiResponse, setCachedApiResponse } from '@/database';
 import { getAccessToken } from '@/shared/services/tokenStorage';
 import { isTokenExpired } from '@/shared/utils/auth-token.utils';
-import { useLoaderStore } from '../loader/loader.store';
 
 import type { ApiRequestConfig, ApiResponse, HttpMethod } from './api.types';
 import { toast } from '../utils';
@@ -90,10 +90,6 @@ const getToken = async (): Promise<string | null> => {
 httpClient.interceptors.request.use(
   async (config: CustomAxiosRequestConfig): Promise<CustomAxiosRequestConfig> => {
     try {
-      // if (config.showLoader !== false) {
-      //   useLoaderStore.getState().show({ message: 'Loading...' });
-      // }
-
       const token = await getToken();
 
       if (token) {
@@ -123,21 +119,9 @@ httpClient.interceptors.request.use(
 
 httpClient.interceptors.response.use(
   (response: AxiosResponse<ApiResponse<unknown>>) => {
-    const config = response.config as CustomAxiosRequestConfig;
-
-    if (config.showLoader !== false) {
-      useLoaderStore.getState().hide();
-    }
-
     return response;
   },
   (error: AxiosError) => {
-    const config = error.config as CustomAxiosRequestConfig;
-
-    if (config?.showLoader !== false) {
-      useLoaderStore.getState().hide();
-    }
-
     const appError = errorHandler(error);
 
     if (error.response?.status === 401) {
@@ -181,11 +165,27 @@ export const apiRequest = async <TResponse, TBody = unknown>(
   config?: ApiRequestConfig,
 ): Promise<ApiResponse<TResponse>> => {
   const user = useAuthStore.getState().user;
-  const network = useOfflineStore.getState();
-  const salesmanOffline =
-    isSalesman(user) && (!network.isConnected || !network.isInternetReachable);
+  let network = useOfflineStore.getState();
 
-  if (salesmanOffline && method === 'GET') {
+  // Android can deliver the connectivity listener after a focused screen has
+  // already started loading. Verify connectivity at the final HTTP boundary
+  // so a stale online value cannot leak a request while offline mode is enabled.
+  if (isSalesman(user) && network.offlineEnabled) {
+    try {
+      const current = await Network.getNetworkStateAsync();
+      const isConnected = current.isConnected === true;
+      const isInternetReachable = isConnected && current.isInternetReachable !== false;
+      network.setConnection(isConnected, isInternetReachable);
+      network = useOfflineStore.getState();
+    } catch (error) {
+      logger.warn('Unable to verify connectivity before request', { url, error });
+    }
+  }
+
+  const noInternet = !network.isConnected || !network.isInternetReachable;
+  const salesmanOffline = isSalesman(user) && network.offlineEnabled && noInternet;
+
+  if (salesmanOffline && method === 'GET' && config?.cache !== false) {
     const cached = await getCachedApiResponse<TResponse>(user?.userId ?? '', url, config?.params);
     if (cached) return cached;
   }
@@ -200,17 +200,34 @@ export const apiRequest = async <TResponse, TBody = unknown>(
     };
   }
 
+  if (isSalesman(user) && noInternet) {
+    return {
+      success: false,
+      statusCode: 503,
+      message: 'Enable Offline while connected to use the app without internet',
+      data: null as TResponse,
+      offline: true,
+    };
+  }
+
   const res = await httpClient.request<ApiResponse<TResponse>>({
     method,
     url,
     data: body,
     params: config?.params,
     headers: config?.headers,
+    timeout: config?.timeoutMs,
     showLoader: config?.showLoader !== false,
   } as CustomAxiosRequestConfig);
 
   const response = res.data;
-  if (method === 'GET' && isSalesman(user) && response?.success && !url.startsWith('/sync/')) {
+  if (
+    method === 'GET' &&
+    config?.cache !== false &&
+    isSalesman(user) &&
+    response?.success &&
+    !url.startsWith('/sync/')
+  ) {
     try {
       await setCachedApiResponse(user?.userId ?? '', url, config?.params, response);
     } catch (error) {
@@ -218,12 +235,7 @@ export const apiRequest = async <TResponse, TBody = unknown>(
     }
   }
 
-  if (
-    method !== 'GET' &&
-    isSalesman(user) &&
-    response?.success &&
-    !url.startsWith('/sync/')
-  ) {
+  if (method !== 'GET' && isSalesman(user) && response?.success && !url.startsWith('/sync/')) {
     // Keep the offline database current after successful online mutations.
     // Dynamic import avoids a static cycle: syncApi uses this HTTP client.
     void import('@/sync/sync.service')

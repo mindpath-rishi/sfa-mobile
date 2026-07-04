@@ -6,6 +6,7 @@ import { CurrentActivityCardProps } from '../../types/activity.types';
 import { useCurrentActivityCardStyles } from '../../styles/CurrentActivityCard.styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText } from '@/core/components';
+import { useRouter } from 'expo-router';
 
 // Helper function to format elapsed time
 const formatElapsedTime = (
@@ -46,6 +47,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
 }) => {
   const styles = useCurrentActivityCardStyles({ selectedActivity: selectedActivity || '' });
   const { colors } = useTheme();
+  const router = useRouter();
 
   // Timer state
   const [elapsedFormatted, setElapsedFormatted] = useState<string>('00:00');
@@ -140,7 +142,13 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
     if (selectedActivity !== 'Retailing' || !selectedRoute) return null;
 
     return (
-      <View style={styles.infoCard}>
+      <TouchableOpacity
+        style={styles.infoCard}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel={`Open route details for ${selectedRoute.routeName}`}
+        onPress={() => router.push('/route')}
+      >
         <View style={styles.infoCardHeader}>
           <Ionicons name="map-outline" size={14} color={colors.primary} />
           <AppText style={styles.infoCardTitle}>Route Details</AppText>
@@ -154,7 +162,7 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
             <AppText style={styles.routeStatsText}>{selectedRoute.totalShops} Outlets</AppText>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 

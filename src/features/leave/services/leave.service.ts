@@ -5,6 +5,7 @@ import { isSalesman } from '@/core/navigation/role.utils';
 import { isOfflineMode } from '@/core/offline/offline.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
+import { createSchemaId } from '@/utils/uuid';
 
 export interface LeaveService {
   applyLeave(payload: ApplyLeavePayload): Promise<ApiResponse<any>>;
@@ -16,8 +17,11 @@ export const leaveService: LeaveService = {
     if (!isSalesman(user) || !isOfflineMode()) {
       return api.post<any, ApplyLeavePayload>('/leave', payload) as Promise<ApiResponse<any>>;
     }
+    const leaveId = createSchemaId('Leave');
     const record = await repositories.leaves.create(user?.userId ?? '', {
       ...payload,
+      uuid: leaveId,
+      leaveId,
       userId: user?.userId,
       userName: user?.name,
       status: 'COMPLETED',
@@ -26,7 +30,7 @@ export const leaveService: LeaveService = {
       success: true,
       statusCode: 202,
       message: 'Leave saved locally',
-      data: { ...record, leaveId: record.uuid },
+      data: { ...record, leaveId },
       offline: true,
     } as ApiResponse<any>;
   },

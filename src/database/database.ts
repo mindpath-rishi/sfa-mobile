@@ -6,7 +6,7 @@ let databasePromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 export const getDatabase = async () => {
   if (!databasePromise) {
-    databasePromise = SQLite.openDatabaseAsync('sfa-offline.db').then(async (database) => {
+    databasePromise = SQLite.openDatabaseAsync('Sales Stream-offline.db').then(async (database) => {
       await database.execAsync(DATABASE_SCHEMA);
       await database.runAsync(
         'INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)',
@@ -27,4 +27,3 @@ export const withTransaction = async <T>(work: (database: SQLite.SQLiteDatabase)
   });
   return result;
 };
-

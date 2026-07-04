@@ -10,6 +10,7 @@ export type HeaderConfig = {
 
   showBack?: boolean;
   showMenu?: boolean;
+  onBackPress?: () => void;
 
   showSearch?: boolean;
   showFilter?: boolean;
@@ -36,7 +37,7 @@ export type HeaderConfig = {
 
   backgroundColor?: string;
 
-  size?: 'small' | 'medium' | 'large';
+  size?: 'small' | 'medium' | 'large' | 'sm' | 'md' | 'lg';
 };
 
 type HeaderContextType = {
@@ -86,7 +87,7 @@ export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
 
       backgroundColor: colors.primary,
 
-      size: 'medium',
+      size: 'small',
 
       rightIcon: undefined,
       rightIcon2: undefined,

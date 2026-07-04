@@ -183,10 +183,13 @@ type AuthUser = {
   territory?: string;
   manager?: string;
   managerName?: string;
+  reportingEmployeeId?: string;
+  reportingEmployeeName?: string;
   vanId?: string | null;
   avatar?: string | null;
   profileImage?: string | null;
   profileImageUrl?: string | null;
+  offlineAccessAllowed?: boolean;
   stats?: Record<string, unknown>;
   achievements?: unknown[];
   recentActivity?: unknown[];
@@ -199,6 +202,7 @@ type JwtPayload = {
   role?: string;
   roleId?: string;
   vanId?: string;
+  offlineAccessAllowed?: boolean;
   exp?: number;
 };
 
@@ -226,6 +230,7 @@ const decodeToken = (token: string): AuthUser | null => {
       role: decoded.role,
       roleId: decoded.roleId || decoded.role,
       vanId: decoded.vanId ?? null,
+      offlineAccessAllowed: decoded.offlineAccessAllowed === true,
     };
   } catch (error) {
     console.warn('JWT decode failed:', error);
@@ -291,6 +296,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
       const allowExpiredOfflineSalesman =
         isTokenExpired(token) &&
         isSalesman(storedUser) &&
+        storedUser?.offlineAccessAllowed === true &&
         (network?.isConnected === false || network?.isInternetReachable === false);
 
       if (isTokenExpired(token) && !allowExpiredOfflineSalesman) {

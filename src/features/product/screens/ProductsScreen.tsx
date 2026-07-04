@@ -33,6 +33,7 @@ import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.st
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { categoryService } from '@/shared/services/category.service';
 import { productService } from '@/shared/services/product.service';
+import { toast } from '@/shared/utils/toast';
 import { ProductsScreenRef, ProductsScreenProps } from '../types/product.types';
 import { EmptyState } from '@/core/components/EmptyState';
 
@@ -190,13 +191,22 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         const latestRoute = useRouteStore.getState().selectedRoute;
         const resolvedCustomerCategoryId = getRouteCustomerCategoryId(latestRoute);
 
+        if (latestRoute?.vanId) params.vanId = latestRoute.vanId;
+
         if (!resolvedCustomerCategoryId) {
           setProducts([]);
           setTotalCount(0);
           setHasMore(false);
+          toast.error(
+            'Customer category missing',
+            'No customer category is configured for the selected route. Products cannot be displayed.',
+          );
           throw new Error('Customer category is required to fetch products');
         }
         params.customerCategoryId = resolvedCustomerCategoryId;
+        if (mode === 'topup') {
+          params.includeUnpricedProducts = true;
+        }
 
         const response = await productService.fetchProducts(params);
 
@@ -217,13 +227,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         if (shouldAppend) setIsLoadingMore(false);
       }
     },
-    [
-      searchQuery,
-      filters,
-      selectedCategory,
-      quickFilter,
-      customerCategoryId,
-    ],
+    [searchQuery, filters, selectedCategory, quickFilter, customerCategoryId, mode],
   );
 
   const fetchCategories = useCallback(async () => {
@@ -301,7 +305,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           stock: product.stock,
           caseNetWeight: product.caseNetWeight,
           pieceNetWeight: product.pieceNetWeight,
-          compCode: product.compCode,
+          compCode: product.compCode ?? product.companyCode ?? product.comp_code,
           categoryId: product.categoryId,
           parentCategoryId: product.parentCategoryId,
         },

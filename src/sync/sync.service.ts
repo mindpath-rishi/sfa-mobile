@@ -1,7 +1,11 @@
 import { getDatabase } from '@/database';
 import type { EntityName } from '@/database/entities';
 import { isSalesman } from '@/core/navigation/role.utils';
-import { useOfflineStore } from '@/core/offline/offline.store';
+import {
+  hydrateOfflinePreference,
+  saveOfflinePreference,
+  useOfflineStore,
+} from '@/core/offline/offline.store';
 import { prefetchOfflineSnapshots } from '@/core/offline/offline-snapshot.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import type { SyncQueueItem } from '@/models/offline.models';
@@ -13,9 +17,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 
 import { syncApi, type UploadOperation } from './sync.api';
 
-// v7 forces one full download after adding three-month Pocket/Target data.
+// v8 forces one full download after adding customer-creation master data.
 // Pending local operations remain untouched and upload before this download.
-const LAST_SYNC_KEY = 'last_sync_time_v7';
+const LAST_SYNC_KEY = 'last_sync_time_v8';
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 8;
 const BASE_RETRY_MS = 2_000;
@@ -36,7 +40,10 @@ type QueueRow = {
 };
 
 const ownerId = () => useAuthStore.getState().user?.userId ?? '';
-const enabled = () => isSalesman(useAuthStore.getState().user);
+const enabled = () =>
+  isSalesman(useAuthStore.getState().user) &&
+  useAuthStore.getState().user?.offlineAccessAllowed === true &&
+  useOfflineStore.getState().offlineEnabled;
 
 let activeSync: Promise<void> | null = null;
 let syncRequestedWhileActive = false;
@@ -107,9 +114,10 @@ const nextBatch = async () => {
 
 const upload = async () => {
   const database = await getDatabase();
+  const mediaWarnings: string[] = [];
   while (true) {
     const batch = await nextBatch();
-    if (!batch.length) return;
+    if (!batch.length) return mediaWarnings;
     const ids = batch.map((item) => item.id);
     await database.runAsync(
       `UPDATE sync_queue SET status = 'SYNCING', updated_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`,
@@ -125,7 +133,7 @@ const upload = async () => {
       localId: item.record_id,
       payload: JSON.parse(item.payload),
     }));
-    const batchErrors: string[] = [];
+    const regularErrors: string[] = [];
 
     if (regularItems.length) {
       let response;
@@ -138,11 +146,12 @@ const upload = async () => {
         throw error;
       }
       if (!response.success || !response.data?.results) {
+        const message = response.message ?? 'Upload failed';
         for (const item of regularItems) {
-          await markFailed(item, response.message ?? 'Upload failed');
+          await markFailed(item, message);
         }
         await resetToPending(mediaItems);
-        return;
+        throw new Error(message);
       }
       for (const item of regularItems) {
         const result = response.data.results.find((entry) => entry.queueId === item.id);
@@ -150,7 +159,7 @@ const upload = async () => {
           const message =
             result?.error ?? (result?.conflict ? 'VERSION_CONFLICT' : 'Upload failed');
           await markFailed(item, message);
-          batchErrors.push(`${item.entity}: ${message}`);
+          regularErrors.push(`${item.entity}: ${message}`);
           continue;
         }
         await repositories[item.entity].markSynced(
@@ -164,31 +173,24 @@ const upload = async () => {
       }
     }
 
-    if (batchErrors.length) {
-      await resetToPending(mediaItems);
-    } else {
-      for (const item of mediaItems) {
-        try {
-          const serverId = await uploadMediaItem(item);
-          await repositories.mediaUploads.markSynced(
-            ownerId(),
-            item.record_id,
-            serverId,
-            1,
-            item.id,
-          );
-          await markQueueItemSynced(item);
-          await deleteQueuedMediaFile(item);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Media upload failed';
-          await markFailed(item, message);
-          batchErrors.push(`${item.entity}: ${message}`);
-        }
+    // Media is independent from the JSON operation batch. A photo failure must
+    // remain retryable and visible, but must not prevent master-data download or
+    // the initial offline dataset from becoming available.
+    for (const item of mediaItems) {
+      try {
+        const serverId = await uploadMediaItem(item);
+        await repositories.mediaUploads.markSynced(ownerId(), item.record_id, serverId, 1, item.id);
+        await markQueueItemSynced(item);
+        await deleteQueuedMediaFile(item);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Media upload failed';
+        await markFailed(item, message);
+        mediaWarnings.push(`Photo ${item.record_id.slice(-8)}: ${message}`);
       }
     }
     await updatePendingCount();
-    if (batchErrors.length) {
-      throw new Error(`Offline upload failed — ${batchErrors.join('; ')}`);
+    if (regularErrors.length) {
+      throw new Error(`Offline upload failed — ${regularErrors.join('; ')}`);
     }
   }
 };
@@ -222,6 +224,13 @@ const uploadMediaItem = async (item: QueueRow) => {
   };
   if (!payload.customerId || !payload.uri) {
     throw new Error('Offline media record is missing customerId or file URI');
+  }
+
+  if (Platform.OS !== 'web' && payload.uri.startsWith('file://')) {
+    const file = await FileSystem.getInfoAsync(payload.uri);
+    if (!file.exists) {
+      throw new Error('Saved photo file no longer exists on this device');
+    }
   }
 
   const extension = payload.extension || 'jpg';
@@ -299,6 +308,10 @@ const download = async () => {
 
 export const syncService = {
   async initialise() {
+    await hydrateOfflinePreference(ownerId());
+    if (useAuthStore.getState().user?.offlineAccessAllowed !== true) {
+      await saveOfflinePreference(ownerId(), false);
+    }
     const database = await getDatabase();
     if (ownerId()) {
       // A force-close or OS termination can leave rows permanently marked as
@@ -332,11 +345,14 @@ export const syncService = {
       state.setSyncing(true);
       state.setLastError(null);
       try {
-        await upload();
+        const mediaWarnings = await upload();
         await download();
         // A successful sync must refresh dashboard snapshots immediately;
         // otherwise My Target can show the previous value for up to an hour.
         await prefetchOfflineSnapshots(true);
+        if (mediaWarnings.length) {
+          state.setLastError(`Media pending — ${mediaWarnings.join('; ')}`);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Synchronization failed';
         useOfflineStore.getState().setLastError(message);

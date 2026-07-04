@@ -1598,10 +1598,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Platform,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
   AppState,
-  StatusBar,
   Modal,
   Image,
   Linking,
@@ -1624,6 +1621,8 @@ import { OutletAvatar, OutletStatusBadge } from '../components/outlet';
 import { useOutletDetailStyles } from '../styles/OutletDetail.styles';
 import { getDistance, isInsideGeofence } from '@/shared/utils/geofence.utils';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { isSalesman } from '@/core/navigation/role.utils';
+import { captureCurrentLocation } from '@/shared/services/location.service';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export enum ShopVisitType {
@@ -1702,6 +1701,14 @@ const TABS: { key: TabType; label: string; icon: string }[] = [
 
 const PAGE_SIZE = 10;
 const GEOFENCE_RADIUS = 100;
+
+const resolveGeoTag = (value: any): { lat: number; lng: number } | null => {
+  const latitude = Number(value?.lat ?? value?.latitude ?? value?.coordinates?.[1]);
+  const longitude = Number(value?.lng ?? value?.longitude ?? value?.coordinates?.[0]);
+  return Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? { lat: latitude, lng: longitude }
+    : null;
+};
 
 // ── Shared token map (avoids prop-drilling colors for inline styles) ───────────
 const T = {
@@ -1842,13 +1849,14 @@ export default function CustomerDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [customer, setCustomer] = useState<Outlet | null>(null);
-  const [isTabScrolled, setIsTabScrolled] = useState(false);
-  const clearVisit = useOutletStore((s) => s.clearVisit);
+  const clearActiveVisit = useOutletStore((s) => s.clearActiveVisit);
 
   const [isInsideGeofenceArea, setIsInsideGeofenceArea] = useState(false);
   const [distanceToOutlet, setDistanceToOutlet] = useState<number | null>(null);
-  const [autoStartAttempted, setAutoStartAttempted] = useState(false);
-  const [isAutoStarting, setIsAutoStarting] = useState(false);
+  const [isStartingSale, setIsStartingSale] = useState(false);
+  const [isRecordingInteraction, setIsRecordingInteraction] = useState(false);
+  const [interactionFailed, setInteractionFailed] = useState(false);
+  const [interactionAttempt, setInteractionAttempt] = useState(0);
 
   const [sales, setSales] = useState<SaleItem[]>([]);
   const [salesLoading, setSalesLoading] = useState(false);
@@ -1861,22 +1869,20 @@ export default function CustomerDetailScreen() {
 
   const locationInterval = useRef<NodeJS.Timeout | null>(null);
   const appStateListener = useRef<any>(null);
-  const autoStartTimeout = useRef<NodeJS.Timeout | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
   const route = useRouteStore((s) => s.selectedRoute);
   const van = useRouteStore((s) => s.van);
   const user = useAuthStore((s) => s.user);
   const activeVisit = useOutletStore((s) => s.activeVisit);
+  const activeInteraction = useOutletStore((s) => s.activeInteraction);
+  const selectedOutlet = useOutletStore((s) => s.selectedOutlet);
+  const setActiveInteraction = useOutletStore((s) => s.setActiveInteraction);
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
   const { setSelectedOutlet } = useOutletStore();
   const { setHeader } = useHeader();
   const selectedRoute = useRouteStore((s) => s.selectedRoute);
-  const hasTriggeredRef = useRef(false);
-
-  useEffect(() => {
-    if (activeVisit?.customerId === customer?.customerId) hasTriggeredRef.current = true;
-  }, [activeVisit, customer]);
+  const interactionStartedRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadCustomerData();
@@ -1902,10 +1908,80 @@ export default function CustomerDetailScreen() {
   useEffect(() => {
     customerRef.current = customer;
   }, [customer]);
+
   useEffect(() => {
-    setAutoStartAttempted(false);
-    setIsAutoStarting(false);
-  }, [customer?.customerId, activeVisit]);
+    const startInteraction = async () => {
+      if (
+        !customer?.customerId ||
+        customer.status !== 'ACTIVE' ||
+        !isSalesman(user) ||
+        !route?.routeSessionId ||
+        !route?.workSessionId ||
+        !van?.vanId ||
+        !resolveGeoTag(customer.geoTag) ||
+        interactionStartedRef.current === customer.customerId
+      ) {
+        return;
+      }
+
+      if (
+        activeInteraction?.customerId === customer.customerId &&
+        activeInteraction.status === 'ARRIVED'
+      ) {
+        interactionStartedRef.current = customer.customerId;
+        return;
+      }
+
+      interactionStartedRef.current = customer.customerId;
+      setIsRecordingInteraction(true);
+      setInteractionFailed(false);
+      try {
+        const customerLocation = resolveGeoTag(customer.geoTag);
+        if (!customerLocation) return;
+
+        const response = await outletService.startInteraction({
+          customerId: customer.customerId,
+          routeSessionId: route.routeSessionId,
+          workSessionId: route.workSessionId,
+          vanId: van.vanId,
+          customerLocation: {
+            latitude: customerLocation.lat,
+            longitude: customerLocation.lng,
+          },
+          configuredRadiusMeters: GEOFENCE_RADIUS,
+        });
+        if (!response?.data?.interactionId) {
+          throw new Error('Interaction API did not return an interaction ID');
+        }
+
+        setActiveInteraction({
+          interactionId: response.data.interactionId,
+          customerId: customer.customerId,
+          arrivalTime: String(response.data.arrivalTime || new Date().toISOString()),
+          visitType: response.data.visitType,
+          distanceMeters: Number(response.data.distanceMeters || 0),
+          status: 'ARRIVED',
+        });
+      } catch (error) {
+        interactionStartedRef.current = null;
+        setInteractionFailed(true);
+        console.error('Unable to create interaction log:', error);
+      } finally {
+        setIsRecordingInteraction(false);
+      }
+    };
+
+    void startInteraction();
+  }, [
+    activeInteraction,
+    customer,
+    interactionAttempt,
+    route,
+    setActiveInteraction,
+    user,
+    van?.vanId,
+  ]);
+
   useEffect(() => {
     setSales([]);
     setSalesTotal(0);
@@ -1916,33 +1992,34 @@ export default function CustomerDetailScreen() {
   }, [customer?.customerId, van?.vanId]);
 
   useEffect(() => {
-    if (customer?.geoTag?.lat && customer?.geoTag?.lng) startLocationTracking();
+    if (resolveGeoTag(customer?.geoTag)) startLocationTracking();
     else stopLocationTracking();
     return () => stopLocationTracking();
   }, [customer]);
 
   useEffect(() => {
-    hasTriggeredRef.current = false;
-  }, [customer?.customerId]);
-
-  useEffect(() => {
-    if (!activeVisit && customer?.status === 'ACTIVE' && !hasTriggeredRef.current) {
-      autoStartVisit();
-    }
-  }, [customer]);
-
-  useEffect(() => {
     appStateListener.current = AppState.addEventListener('change', (s) => {
-      if (s === 'active' && customer?.geoTag?.lat) getCurrentLocation();
+      if (s === 'active' && resolveGeoTag(customer?.geoTag)) getCurrentLocation();
     });
     return () => appStateListener.current?.remove();
   }, [customer]);
 
-  useEffect(() => {
-    setIsTabScrolled(false);
-  }, [activeTab]);
+  const checkGeofenceStatus = useCallback((lat: number, lng: number) => {
+    const c = customerRef.current;
+    const outletLocation = resolveGeoTag(c?.geoTag);
+    if (!c || !outletLocation) return;
+    setDistanceToOutlet(getDistance(lat, lng, outletLocation.lat, outletLocation.lng));
+    setIsInsideGeofenceArea(
+      isInsideGeofence(lat, lng, {
+        id: c.customerId,
+        latitude: outletLocation.lat,
+        longitude: outletLocation.lng,
+        radius: GEOFENCE_RADIUS,
+      }),
+    );
+  }, []);
 
-  const getCurrentLocation = useCallback(() => {
+  const getCurrentLocation = useCallback(async () => {
     if (Platform.OS === 'web' && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         ({ coords: { latitude, longitude } }) => {
@@ -1951,27 +2028,19 @@ export default function CustomerDetailScreen() {
         (e) => console.warn('Location error:', e),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
       );
+      return;
     }
-  }, []);
 
-  const checkGeofenceStatus = useCallback((lat: number, lng: number) => {
-    const c = customerRef.current;
-    if (!c?.geoTag?.lat || !c?.geoTag?.lng) return;
-    setDistanceToOutlet(getDistance(lat, lng, c.geoTag.lat, c.geoTag.lng));
-    setIsInsideGeofenceArea(
-      isInsideGeofence(lat, lng, {
-        id: c.customerId,
-        latitude: c.geoTag.lat,
-        longitude: c.geoTag.lng,
-        radius: GEOFENCE_RADIUS,
-      }),
-    );
-  }, []);
+    const location = await captureCurrentLocation();
+    if (location) {
+      checkGeofenceStatus(location.latitude, location.longitude);
+    }
+  }, [checkGeofenceStatus]);
 
   const startLocationTracking = useCallback(() => {
     if (locationInterval.current) clearInterval(locationInterval.current);
     getCurrentLocation();
-    locationInterval.current = setInterval(getCurrentLocation, 3000);
+    locationInterval.current = setInterval(() => void getCurrentLocation(), 15000);
   }, [getCurrentLocation]);
 
   const stopLocationTracking = useCallback(() => {
@@ -1983,10 +2052,10 @@ export default function CustomerDetailScreen() {
 
   const getVisitType = useCallback(
     (): ShopVisitType =>
-      customer?.geoTag?.lat && customer?.geoTag?.lng && isInsideGeofenceArea
+      resolveGeoTag(customer?.geoTag) && isInsideGeofenceArea
         ? ShopVisitType.ON_SITE
         : ShopVisitType.OFF_SITE,
-    [customer?.geoTag?.lat, customer?.geoTag?.lng, isInsideGeofenceArea],
+    [customer?.geoTag, isInsideGeofenceArea],
   );
 
   const checkActiveVisit = async () => {
@@ -2010,97 +2079,42 @@ export default function CustomerDetailScreen() {
           customerId: visit?.customerId,
           visitType: getVisitType(),
         });
-        hasTriggeredRef.current = true;
-      } else if (!visit?.visitId) clearVisit();
+      } else if (!visit?.visitId) clearActiveVisit();
     } catch (e) {
       console.error('checkActiveVisit error:', e);
     }
   };
 
-  const autoStartVisit = useCallback(async () => {
-    if (!customer || autoStartAttempted || isAutoStarting) return;
-    setIsAutoStarting(true);
-    setAutoStartAttempted(true);
-    if (autoStartTimeout.current) clearTimeout(autoStartTimeout.current);
-    autoStartTimeout.current = setTimeout(async () => {
-      try {
-        const q: any = {
-          workSessionId: selectedRoute?.workSessionId,
-          vanId: van?.vanId,
-          routeSessionId: selectedRoute?.routeSessionId,
-          outletId: customer.customerId,
-        };
-        const existing: any = (await outletService.visitStatus(q))?.data;
-        if (existing?.visitId && existing?.status === 'ACTIVE') {
-          setActiveVisit({
-            visitId: existing.visitId,
-            outlet: customer as any,
-            checkInTime: new Date(existing.checkInTime),
-            checkOutTime: existing.checkOutTime ? new Date(existing.checkOutTime) : undefined,
-            status: existing.status,
-            routeSessionId: existing?.routeSessionId,
-            customerId: existing?.customerId,
-            visitType: getVisitType(),
-          });
-          setIsAutoStarting(false);
-          return;
-        }
-        const visitType = getVisitType();
-        const res = await outletService.startVisit({
-          routeSessionId: route?.routeSessionId,
-          workSessionId: route?.workSessionId,
-          vanId: van?.vanId,
-          outletId: customer.customerId,
-          visitType,
-        });
-        if (res.success && res?.data) {
-          const v = res.data;
-          setActiveVisit({
-            visitId: v.visitId,
-            outlet: customer as any,
-            checkInTime: new Date(v.checkInTime),
-            checkOutTime: v.checkOutTime ? new Date(v.checkOutTime) : undefined,
-            status: v.status,
-            routeSessionId: v?.routeSessionId,
-            customerId: v?.customerId,
-            visitType,
-          });
-        } else setAutoStartAttempted(false);
-      } catch (e) {
-        console.error('Auto-start failed:', e);
-        setAutoStartAttempted(false);
-      } finally {
-        setIsAutoStarting(false);
-      }
-    }, 1000);
-  }, [
-    customer,
-    autoStartAttempted,
-    isAutoStarting,
-    route,
-    setActiveVisit,
-    selectedRoute,
-    van,
-    getVisitType,
-  ]);
-
   const loadCustomerData = async () => {
     setIsLoading(true);
     try {
-      const [detailResult, mediaResult] = await Promise.allSettled([
-        outletService.getOutletDetail(id),
-        outletService.getOutletMedia(id),
-      ]);
-      const detail = detailResult.status === 'fulfilled' ? detailResult.value?.data : null;
-      const images =
-        mediaResult.status === 'fulfilled' && Array.isArray(mediaResult.value?.data)
-          ? mediaResult.value.data.filter((item: any) => item?.url)
-          : [];
+      const detailResponse = await outletService.getOutletDetail(id);
+      const detail = detailResponse?.data;
 
       if (detail) {
-        const outlet = { ...detail, images };
+        const fallbackGeoTag =
+          selectedOutlet?.customerId === id ? resolveGeoTag(selectedOutlet.geoTag) : null;
+        const outlet = {
+          ...detail,
+          geoTag: resolveGeoTag(detail.geoTag) ?? fallbackGeoTag ?? detail.geoTag,
+          images: selectedOutlet?.customerId === id ? selectedOutlet.images || [] : [],
+        };
         setCustomer(outlet);
         setSelectedOutlet(outlet);
+
+        // Media is decorative and must not delay rendering, GPS, or interaction creation.
+        void outletService
+          .getOutletMedia(id)
+          .then((mediaResponse) => {
+            const images = Array.isArray(mediaResponse?.data)
+              ? mediaResponse.data.filter((item: any) => item?.url)
+              : [];
+            setCustomer((current) => {
+              if (!current || current.customerId !== outlet.customerId) return current;
+              return { ...current, images } as Outlet;
+            });
+          })
+          .catch((error) => console.warn('Failed to load outlet media:', error));
       } else setCustomer(null);
     } catch (error) {
       console.error('Failed to load outlet details:', error);
@@ -2185,18 +2199,38 @@ export default function CustomerDetailScreen() {
     setRefreshing(false);
   }, [customer, activeTab]);
 
-  const handleProceedToSale = useCallback(() => {
-    if (customer) router.push('/checkin');
-  }, [customer]);
+  const handleStartSale = useCallback(async () => {
+    if (!customer || isStartingSale || isRecordingInteraction) return;
 
-  const handleTabScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y;
-    setIsTabScrolled((prev) => {
-      if (y > 24 && !prev) return true;
-      if (y <= 12 && prev) return false;
-      return prev;
-    });
-  }, []);
+    if (!isSalesman(user)) {
+      Alert.alert('Not allowed', 'Only a salesman can start a visit.');
+      return;
+    }
+
+    if (activeVisit?.customerId === customer.customerId) {
+      router.push('/checkin');
+      return;
+    }
+
+    if (!resolveGeoTag(customer.geoTag)) {
+      Alert.alert(
+        'Outlet location missing',
+        'This outlet does not have a valid geotag. Update the outlet location before starting a sale.',
+      );
+      return;
+    }
+
+    if (
+      !activeInteraction ||
+      activeInteraction.customerId !== customer.customerId ||
+      activeInteraction.status !== 'ARRIVED'
+    ) {
+      interactionStartedRef.current = null;
+      setInteractionAttempt((attempt) => attempt + 1);
+      return;
+    }
+    router.push('/checkin');
+  }, [activeVisit, activeInteraction, customer, isRecordingInteraction, isStartingSale, user]);
 
   if (isLoading) return <LoadingState />;
   if (!customer) return <EmptyState colors={colors} />;
@@ -2208,18 +2242,14 @@ export default function CustomerDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
-
       <ScrollView
         ref={scrollViewRef}
         style={styles.mainScrollView}
         contentContainerStyle={styles.mainScrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        onScroll={handleTabScroll}
-        scrollEventThrottle={16}
       >
-        <CustomerHeader customer={customer} colors={colors} compact={isTabScrolled} />
+        <CustomerHeader customer={customer} colors={colors} />
 
         {/* Last visit / last order */}
         <View style={{ paddingHorizontal: 16, marginTop: 8, marginBottom: 8 }}>
@@ -2295,7 +2325,6 @@ export default function CustomerDetailScreen() {
             <AppText style={{ ...T.label, color: colors.primaryContrast }}>
               {isInsideGeofenceArea ? 'Inside' : 'Outside'} geofence ·{' '}
               {Math.round(distanceToOutlet)}m / {GEOFENCE_RADIUS}m
-              {isAutoStarting ? ' · starting…' : ''}
             </AppText>
           </View>
         )}
@@ -2326,93 +2355,107 @@ export default function CustomerDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Fixed footer — single SafeAreaView, no overlap */}
-      <SafeAreaView
-        edges={['bottom']}
-        style={{
-          backgroundColor: colors.surface,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-        }}
-      >
-        {isAutoStarting && !hasActiveVisit ? (
-          <View
-            style={{
-              paddingHorizontal: 16,
-              paddingVertical: 14,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-            }}
-          >
-            <ActivityIndicator size="small" color={colors.primary} />
-            <AppText style={{ ...T.bodyM, color: colors.primary }}>Starting visit…</AppText>
-          </View>
-        ) : (
-          <Animated.View
-            entering={FadeInUp.duration(300)}
-            style={{ paddingHorizontal: 16, paddingVertical: 12 }}
-          >
-            <TouchableOpacity
-              onPress={handleProceedToSale}
-              activeOpacity={0.85}
+      {/* Only salesmen can start or continue a sale visit. */}
+      {isSalesman(user) && (
+        <SafeAreaView
+          edges={['bottom']}
+          style={{
+            backgroundColor: colors.surface,
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+          }}
+        >
+          {isStartingSale ? (
+            <View
               style={{
-                backgroundColor: colors.primary,
-                borderRadius: 14,
-                padding: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 14,
                 flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                shadowColor: colors.primary,
-                shadowOffset: { width: 0, height: 5 },
-                shadowOpacity: 0.35,
-                shadowRadius: 12,
-                elevation: 7,
+                justifyContent: 'center',
+                gap: 10,
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <AppText style={{ ...T.bodyM, color: colors.primary }}>Starting sale…</AppText>
+            </View>
+          ) : (
+            <Animated.View
+              entering={FadeInUp.duration(300)}
+              style={{ paddingHorizontal: 16, paddingVertical: 12 }}
+            >
+              <TouchableOpacity
+                onPress={handleStartSale}
+                disabled={isRecordingInteraction}
+                activeOpacity={0.85}
+                style={{
+                  backgroundColor: colors.primary,
+                  borderRadius: 14,
+                  padding: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: colors.primary,
+                  shadowOffset: { width: 0, height: 5 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 12,
+                  elevation: 7,
+                  opacity: isRecordingInteraction ? 0.72 : 1,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Ionicons name="cart-outline" size={20} color={colors.primaryContrast} />
+                  </View>
+                  <View>
+                    <AppText
+                      style={{ color: colors.primaryContrast, fontSize: 15, fontWeight: '700' }}
+                    >
+                      {isRecordingInteraction
+                        ? 'Recording arrival…'
+                        : interactionFailed
+                          ? 'Retry arrival'
+                          : 'Start Sale'}
+                    </AppText>
+                    <AppText
+                      style={{ color: colors.primaryContrast + 'B8', fontSize: 11, marginTop: 1 }}
+                    >
+                      {isRecordingInteraction
+                        ? 'Please wait a moment'
+                        : interactionFailed
+                          ? 'Tap to try GPS again'
+                          : hasActiveVisit
+                            ? 'Visit active'
+                            : 'Tap to start'}
+                    </AppText>
+                  </View>
+                </View>
                 <View
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
                     backgroundColor: 'rgba(255,255,255,0.2)',
                     justifyContent: 'center',
                     alignItems: 'center',
                   }}
                 >
-                  <Ionicons name="cart-outline" size={20} color={colors.primaryContrast} />
+                  <Ionicons name="arrow-forward" size={17} color={colors.primaryContrast} />
                 </View>
-                <View>
-                  <AppText
-                    style={{ color: colors.primaryContrast, fontSize: 15, fontWeight: '700' }}
-                  >
-                    Proceed to Sale
-                  </AppText>
-                  <AppText
-                    style={{ color: colors.primaryContrast + 'B8', fontSize: 11, marginTop: 1 }}
-                  >
-                    {hasActiveVisit ? 'Visit active' : 'Tap to start'}
-                  </AppText>
-                </View>
-              </View>
-              <View
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
-              >
-                <Ionicons name="arrow-forward" size={17} color={colors.primaryContrast} />
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        )}
-      </SafeAreaView>
+              </TouchableOpacity>
+            </Animated.View>
+          )}
+        </SafeAreaView>
+      )}
     </View>
   );
 }
@@ -2553,7 +2596,7 @@ const EmptyState = ({ colors }: { colors: any }) => (
 );
 
 // ── Customer Header ────────────────────────────────────────────────────────────
-const CustomerHeader = ({ customer, colors: c, compact }: any) => (
+const CustomerHeader = ({ customer, colors: c }: any) => (
   <Animated.View
     entering={FadeInDown.duration(300)}
     style={{ paddingHorizontal: 16, paddingTop: 12 }}
@@ -2629,25 +2672,22 @@ const CustomerHeader = ({ customer, colors: c, compact }: any) => (
         </View>
       </View>
 
-      {/* Address — hidden when compact */}
-      {!compact && (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            marginTop: 12,
-            paddingTop: 12,
-            borderTopWidth: 1,
-            borderTopColor: c.border,
-          }}
-        >
-          <Ionicons name="location-outline" size={14} color={c.primary} />
-          <AppText numberOfLines={2} style={{ ...T.body, color: c.textSecondary, flex: 1 }}>
-            {customer.address?.line1 || customer.address || 'Address not available'}
-          </AppText>
-        </View>
-      )}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          marginTop: 12,
+          paddingTop: 12,
+          borderTopWidth: 1,
+          borderTopColor: c.border,
+        }}
+      >
+        <Ionicons name="location-outline" size={14} color={c.primary} />
+        <AppText numberOfLines={2} style={{ ...T.body, color: c.textSecondary, flex: 1 }}>
+          {customer.address?.line1 || customer.address || 'Address not available'}
+        </AppText>
+      </View>
     </View>
   </Animated.View>
 );

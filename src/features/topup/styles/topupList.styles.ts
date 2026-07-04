@@ -7,7 +7,9 @@ export const useTopupListStyles = () => {
 
   const styles = createStyles((utils) => ({
     listContent: {
-      padding: utils.spacing[3],
+      paddingHorizontal: utils.spacing[3],
+      paddingTop: utils.spacing[2],
+      paddingBottom: 32,
       gap: utils.spacing[2],
     } as ViewStyle,
 
@@ -21,7 +23,7 @@ export const useTopupListStyles = () => {
     filterChip: {
       backgroundColor: colors.primary + '10',
       paddingHorizontal: utils.spacing[2.5],
-      paddingVertical: utils.spacing[1.25],
+      paddingVertical: 5,
       borderRadius: 20,
     } as ViewStyle,
 
@@ -34,7 +36,7 @@ export const useTopupListStyles = () => {
     clearAllChip: {
       backgroundColor: colors.surface,
       paddingHorizontal: utils.spacing[2.5],
-      paddingVertical: utils.spacing[1.25],
+      paddingVertical: 5,
       borderRadius: 20,
       borderWidth: 0.5,
       borderColor: colors.border,
@@ -48,29 +50,56 @@ export const useTopupListStyles = () => {
 
     itemContainer: {
       backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: utils.spacing[3],
+      borderRadius: 18,
+      padding: 16,
       marginBottom: utils.spacing[2],
-      borderWidth: 0.5,
-      borderColor: colors.divider,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      overflow: 'hidden',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 5 },
+      shadowOpacity: 1,
+      shadowRadius: 12,
+      elevation: 3,
+    } as ViewStyle,
+
+    cardAccent: {
+      position: 'absolute',
+      left: 0,
+      top: 16,
+      bottom: 16,
+      width: 3,
+      borderTopRightRadius: 4,
+      borderBottomRightRadius: 4,
     } as ViewStyle,
 
     itemHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
-      marginBottom: utils.spacing[2],
+      marginBottom: 12,
+    } as ViewStyle,
+
+    titleGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 } as ViewStyle,
+    titleCopy: { flex: 1 } as ViewStyle,
+    vanIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary + '10',
     } as ViewStyle,
 
     title: {
-      fontSize: utils.fontSize.sm,
-      fontWeight: '600',
+      fontSize: 15,
+      fontWeight: '700',
       color: colors.textPrimary,
       marginBottom: 2,
     } as TextStyle,
 
     reference: {
-      fontSize: utils.fontSize.xs - 1,
+      fontSize: 11,
       color: colors.textTertiary,
     } as TextStyle,
 
@@ -78,9 +107,9 @@ export const useTopupListStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: utils.spacing[2],
-      paddingVertical: utils.spacing[0.75],
+      paddingVertical: 3,
       borderRadius: 20,
-      gap: utils.spacing[0.75],
+      gap: 3,
     } as ViewStyle,
 
     statusDot: {
@@ -98,8 +127,11 @@ export const useTopupListStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: utils.spacing[1],
-      marginBottom: utils.spacing[2],
+      marginBottom: 12,
+      paddingHorizontal: 2,
     } as ViewStyle,
+
+    metaItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5 } as ViewStyle,
 
     metaText: {
       fontSize: utils.fontSize.xs - 1,
@@ -110,31 +142,41 @@ export const useTopupListStyles = () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       gap: utils.spacing[2],
-      marginBottom: utils.spacing[2],
-      paddingTop: utils.spacing[2],
-      // borderTopWidth: 0.5,
-      borderTopColor: colors.divider,
+      marginBottom: 10,
     } as ViewStyle,
 
-    amountBlock: { flex: 1 } as ViewStyle,
+    amountBlock: { flex: 1, padding: 12, borderRadius: 12 } as ViewStyle,
+    requestedBlock: { backgroundColor: colors.backgroundTertiary } as ViewStyle,
+    approvedBlock: { backgroundColor: colors.success + '0D' } as ViewStyle,
 
     amountLabel: {
-      fontSize: utils.fontSize.xs - 1,
-      fontWeight: '500',
+      fontSize: 10,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
       color: colors.textTertiary,
       marginBottom: 4,
     } as TextStyle,
 
     amountValue: {
-      fontSize: utils.fontSize.md,
-      fontWeight: '700',
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.textPrimary,
       marginBottom: 4,
     } as TextStyle,
 
     quantityText: {
-      fontSize: utils.fontSize.xs - 1,
+      fontSize: 10,
       color: colors.textSecondary,
     } as TextStyle,
+
+    quantityRow: { flexDirection: 'row', alignItems: 'center', gap: 6 } as ViewStyle,
+    quantityDot: {
+      width: 3,
+      height: 3,
+      borderRadius: 2,
+      backgroundColor: colors.textTertiary,
+    } as ViewStyle,
 
     infoRow: {
       paddingVertical: utils.spacing[1],
@@ -142,6 +184,9 @@ export const useTopupListStyles = () => {
       backgroundColor: colors.background,
       borderRadius: 8,
       marginTop: utils.spacing[1],
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
     } as ViewStyle,
 
     infoText: {
@@ -167,7 +212,7 @@ export const useTopupListStyles = () => {
 
     skeletonItem: {
       backgroundColor: colors.surface,
-      borderRadius: 12,
+      borderRadius: 18,
       padding: utils.spacing[3],
       gap: utils.spacing[2],
       borderWidth: 0.5,

@@ -1,4 +1,4 @@
-package com.sfa.app
+package com.salesstream.app
 
 import android.app.Application
 import android.content.res.Configuration

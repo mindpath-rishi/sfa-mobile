@@ -895,7 +895,7 @@ export const Modal: React.FC<ModalProps> & {
       visible={modalMounted}
       transparent
       animationType="none"
-      onRequestClose={dismissible ? onClose : undefined}
+      onRequestClose={dismissible ? onClose : () => undefined}
       testID={testID}
       hardwareAccelerated={hardwareAccelerated}
       presentationStyle={presentationStyle}

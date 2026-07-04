@@ -16,6 +16,7 @@ import { useOutletStore } from '@/core/store/outlet.store';
 import { toast } from '@/shared/utils/toast';
 import { useRouteStore } from '@/core/store/route.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { PageSkeleton } from '@/shared/components/PageSkeleton';
 
 const LIMIT = 10;
 
@@ -254,7 +255,9 @@ export default function OutletsScreen() {
         <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
       </View>
 
-      {routeOutlets.length === 0 && !loading ? (
+      {loading && routeOutlets.length === 0 ? (
+        <PageSkeleton rows={6} />
+      ) : routeOutlets.length === 0 ? (
         <EmptyState
           title="No items found"
           description="Try adjusting your filters"

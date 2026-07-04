@@ -13,7 +13,9 @@ export interface FetchProductParams {
   searchText?: string;
   categoryIds?: string;
   brandIds?: string;
-  customerCategoryId: string;
+  customerCategoryId?: string;
+  includeUnpricedProducts?: boolean;
+  vanId?: string;
 }
 
 /* ================= SERVICE ================= */
@@ -45,11 +47,14 @@ const loadAll = async (
 export const productService: ProductService = {
   fetchProducts: async (params: FetchProductParams) => {
     const customerCategoryId = params.customerCategoryId?.trim();
-    if (!customerCategoryId) {
-      throw new Error('Customer category is required to fetch products');
-    }
-
-    const requestParams = { ...params, customerCategoryId };
+    const requestParams = {
+      ...params,
+      ...(customerCategoryId ? { customerCategoryId } : {}),
+    };
+    // The online product endpoint does not accept vanId; it is used only to
+    // select the correct downloaded inventory row below.
+    delete requestParams.vanId;
+    if (!customerCategoryId) delete requestParams.customerCategoryId;
     const user = useAuthStore.getState().user;
     if (!isSalesman(user) || !isOfflineMode()) {
       return api.get<any>('/product', { params: requestParams });
@@ -63,7 +68,7 @@ export const productService: ProductService = {
 
     const now = Date.now();
     const prices = priceCandidates
-      .filter((price) => price.categoryCode === customerCategoryId)
+      .filter((price) => !customerCategoryId || price.categoryCode === customerCategoryId)
       .filter((price) => {
         const effectiveTime = new Date(price.effectiveDate).getTime();
         return Number.isFinite(effectiveTime) && effectiveTime <= now && !price.isDeleted;
@@ -76,23 +81,48 @@ export const productService: ProductService = {
     for (const price of prices) {
       if (!priceByProduct.has(price.productId)) priceByProduct.set(price.productId, price);
     }
-    const stockByProduct = new Map(stock.map((item) => [item.productId, item]));
+    const inventoryForProduct = (productId: string) => {
+      const candidates = stock.filter((item) => String(item.productId) === String(productId));
+      if (!params.vanId) return candidates[0];
+      return (
+        candidates.find((item) => String(item.vanId) === String(params.vanId)) ??
+        candidates.find((item) => !item.vanId)
+      );
+    };
     const categoryIds = new Set(params.categoryIds?.split(',').filter(Boolean) ?? []);
     const brandIds = new Set(params.brandIds?.split(',').filter(Boolean) ?? []);
     const query = params.searchText?.trim().toLocaleLowerCase();
     const filteredProducts = allProducts.filter((product) => {
-      if (!priceByProduct.has(product.productId)) return false;
-      if (categoryIds.size && !categoryIds.has(product.categoryId) && !categoryIds.has(product.parentCategoryId)) return false;
+      if (
+        customerCategoryId &&
+        !params.includeUnpricedProducts &&
+        !priceByProduct.has(product.productId)
+      )
+        return false;
+      if (
+        categoryIds.size &&
+        !categoryIds.has(product.categoryId) &&
+        !categoryIds.has(product.parentCategoryId)
+      )
+        return false;
       if (brandIds.size && !brandIds.has(product.brand)) return false;
-      if (query && ![product.name, product.productId, product.productSysCode, product.sku, product.brand]
-        .some((value) => String(value ?? '').toLocaleLowerCase().includes(query))) return false;
+      if (
+        query &&
+        ![product.name, product.productId, product.productSysCode, product.sku, product.brand].some(
+          (value) =>
+            String(value ?? '')
+              .toLocaleLowerCase()
+              .includes(query),
+        )
+      )
+        return false;
       return true;
     });
     const start = (params.page - 1) * params.limit;
     const data = filteredProducts.slice(start, start + params.limit);
     const products = data.map((product) => {
       const price = priceByProduct.get(product.productId);
-      const inventory = stockByProduct.get(product.productId);
+      const inventory = inventoryForProduct(product.productId);
       return {
         ...product,
         casePrice: price?.casePriceInclVat ?? product.casePrice,

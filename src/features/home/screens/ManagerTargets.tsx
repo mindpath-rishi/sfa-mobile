@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { AppText } from '@/core/components';
+import { AppText, Skeleton } from '@/core/components';
+import { PageSkeleton } from '@/shared/components/PageSkeleton';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import {
@@ -22,6 +23,15 @@ type TargetUser = UserWiseTargetSummary & {
   children?: TargetUser[];
 };
 
+type TargetView = 'user' | 'ubo' | 'focused-pack';
+
+type BreakdownRow = {
+  id: string;
+  name: string;
+  target: string;
+  achievement: string;
+};
+
 const TARGET_USERS: TargetUser[] = [];
 
 const findUser = (id?: string | string[], users: TargetUser[] = []) => {
@@ -36,30 +46,25 @@ const findUser = (id?: string | string[], users: TargetUser[] = []) => {
   return undefined;
 };
 
-const formatSelectedDate = (date: Date) =>
-  new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  }).format(date);
-
-const getCurrentMonthPeriod = () => {
-  const now = new Date();
-  const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-  return `${formatSelectedDate(startDate)} - ${formatSelectedDate(now)}`;
-};
-
 const METRIC_OPTIONS: { value: TargetMetric; label: string; unit: string }[] = [
   { value: 'cases', label: 'Cases', unit: 'Cases' },
   { value: 'value', label: 'Value', unit: 'Value' },
   { value: 'tonnage', label: 'Tonnage', unit: 'Tonnage' },
 ];
 
+const TARGET_VIEWS: { value: TargetView; label: string }[] = [
+  { value: 'user', label: 'User' },
+  { value: 'ubo', label: 'UBO' },
+  { value: 'focused-pack', label: 'Focused Pack' },
+];
+
 const formatMetric = (value: number, metric: TargetMetric) => {
   const unit = METRIC_OPTIONS.find((option) => option.value === metric)?.unit || 'Cases';
   return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)} ${unit}`;
 };
+
+const formatCount = (value: number) =>
+  new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
 
 const getTargetValue = (user: TargetUser, metric: TargetMetric) => {
   if (metric === 'value') return Number(user.targetValue || 0);
@@ -108,20 +113,105 @@ function TargetMetricItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function TargetBreakdownModal({
+  visible,
+  userName,
+  view,
+  rows,
+  loading,
+  colors,
+  isWide,
+  onClose,
+}: {
+  visible: boolean;
+  userName: string;
+  view: TargetView;
+  rows: BreakdownRow[];
+  loading: boolean;
+  colors: any;
+  isWide: boolean;
+  onClose: () => void;
+}) {
+  const styles = createManagerTargetsStyles(colors);
+  const title =
+    view === 'ubo'
+      ? 'UBO by Category'
+      : view === 'focused-pack'
+        ? 'Focused Pack by Product'
+        : 'Primary Category Targets';
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <TouchableOpacity style={styles.modalDismissArea} activeOpacity={1} onPress={onClose} />
+        <View style={[styles.bottomSheet, isWide && styles.bottomSheetWide]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <View style={styles.sheetTitleBlock}>
+              <AppText style={styles.sheetTitle}>{title}</AppText>
+              <AppText style={styles.sheetSubtitle}>{userName}</AppText>
+            </View>
+            <TouchableOpacity
+              style={styles.sheetCloseButton}
+              activeOpacity={0.75}
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close target details"
+            >
+              <Ionicons name="close" size={19} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.breakdownHeader}>
+            <AppText style={[styles.breakdownHeaderText, styles.breakdownNameColumn]}>Name</AppText>
+            <AppText style={styles.breakdownHeaderText}>Target</AppText>
+            <AppText style={styles.breakdownHeaderText}>Achievement</AppText>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.breakdownScroll}>
+            {loading ? (
+              <View style={styles.breakdownLoading}>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={index} height={54} width="100%" borderRadius={8} />
+                ))}
+              </View>
+            ) : rows.length > 0 ? (
+              rows.map((row) => (
+                <View key={row.id} style={styles.breakdownRow}>
+                  <AppText style={[styles.breakdownName, styles.breakdownNameColumn]}>
+                    {row.name}
+                  </AppText>
+                  <AppText style={styles.breakdownValue}>{row.target}</AppText>
+                  <AppText style={styles.breakdownValue}>{row.achievement}</AppText>
+                </View>
+              ))
+            ) : (
+              <View style={styles.modalEmptyState}>
+                <Ionicons name="analytics-outline" size={26} color={colors.textQuaternary} />
+                <AppText style={styles.emptyText}>No target details found</AppText>
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function TargetUserCard({
   user,
   colors,
   metric,
   onPress,
-  onViewCategory,
-  categoryExpanded,
+  onCardPress,
+  view = 'user',
 }: {
   user: TargetUser;
   colors: any;
   metric: TargetMetric;
   onPress?: () => void;
-  onViewCategory: () => void;
-  categoryExpanded: boolean;
+  onCardPress: () => void;
+  view?: TargetView;
 }) {
   const styles = createManagerTargetsStyles(colors);
   const hasDrillDown = Boolean(onPress);
@@ -131,64 +221,72 @@ function TargetUserCard({
     targetValue > 0 ? Math.min((achievementValue / targetValue) * 100, 100) : 0;
 
   return (
-    <View style={styles.userCard}>
+    <TouchableOpacity style={styles.userCard} activeOpacity={0.82} onPress={onCardPress}>
       <View style={styles.userCardHeader}>
-        <View style={styles.avatar}>
-          <AppText style={styles.avatarText}>
-            {user.employeeName
-              .split(' ')
-              .map((part) => part[0])
-              .join('')
-              .slice(0, 2)}
-          </AppText>
+        <View style={styles.cardIdentity}>
+          <View style={styles.cardAccent} />
+          <View style={styles.userTitleWrap}>
+            <AppText style={styles.userName}>{user.employeeName}</AppText>
+            {view !== 'ubo' && (
+              <AppText style={styles.userPosition}>
+                {view === 'focused-pack' ? 'Focused Pack' : user.designation || 'User'}
+              </AppText>
+            )}
+          </View>
         </View>
-        <View style={styles.userTitleWrap}>
-          <AppText style={styles.userName}>{user.employeeName}</AppText>
-          <AppText style={styles.userPosition}>{user.designation || 'User'}</AppText>
-        </View>
-        {hasDrillDown && (
-          <TouchableOpacity style={styles.drillButton} activeOpacity={0.82} onPress={onPress}>
-            <AppText style={styles.drillText}>Team</AppText>
-            <Ionicons name="chevron-forward" size={13} color={colors.primary} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.metricsRow}>
-        <TargetMetricItem label="Target" value={formatMetric(targetValue, metric)} />
-        <TargetMetricItem label="Achievement" value={formatMetric(achievementValue, metric)} />
-      </View>
-
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${achievementPercentage}%` }]} />
-      </View>
-      <View style={styles.progressMetaRow}>
-        <AppText style={styles.progressMetaText}>{achievementPercentage.toFixed(1)}%</AppText>
-        <AppText style={styles.progressMetaText}>
-          Remaining {formatMetric(Math.max(targetValue - achievementValue, 0), metric)}
-        </AppText>
-      </View>
-
-      <View style={styles.rateRow}>
-        <View style={styles.rateBadge}>
-          <AppText style={styles.rateLabel}>RRR: {user.rrr}</AppText>
-        </View>
-        <View style={styles.rateBadge}>
-          <AppText style={styles.rateLabel}>CRR: {user.crr}</AppText>
+        <View style={styles.headerActions}>
+          {view !== 'ubo' && (
+            <View style={styles.percentBadge}>
+              <AppText style={styles.percentBadgeText}>{achievementPercentage.toFixed(1)}%</AppText>
+            </View>
+          )}
+          {hasDrillDown && (
+            <TouchableOpacity
+              style={styles.drillButton}
+              activeOpacity={0.82}
+              onPress={(event) => {
+                event.stopPropagation();
+                onPress?.();
+              }}
+            >
+              <Ionicons name="people-outline" size={14} color={colors.primary} />
+              <AppText style={styles.drillText}>Team</AppText>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      <TouchableOpacity style={styles.categoryButton} activeOpacity={0.82} onPress={onViewCategory}>
-        <AppText style={styles.categoryButtonText}>
-          {categoryExpanded ? 'Hide Primary Category' : 'View Primary Category'}
-        </AppText>
-        <Ionicons
-          name={categoryExpanded ? 'chevron-up' : 'chevron-down'}
-          size={14}
-          color={colors.primary}
+      <View style={styles.performanceBand}>
+        <TargetMetricItem
+          label="Target"
+          value={view === 'ubo' ? formatCount(targetValue) : formatMetric(targetValue, metric)}
         />
-      </TouchableOpacity>
-    </View>
+        <View style={styles.metricDivider} />
+        <TargetMetricItem
+          label="Achievement"
+          value={
+            view === 'ubo' ? formatCount(achievementValue) : formatMetric(achievementValue, metric)
+          }
+        />
+      </View>
+
+      {view !== 'ubo' && (
+        <>
+          <View style={styles.progressMetaRow}>
+            <AppText style={styles.progressMetaText}>
+              Remaining {formatMetric(Math.max(targetValue - achievementValue, 0), metric)}
+            </AppText>
+          </View>
+
+          <View style={styles.cardFooter}>
+            <AppText style={styles.rateLabel}>RRR {user.rrr}</AppText>
+            <View style={styles.footerDot} />
+            <AppText style={styles.rateLabel}>CRR {user.crr}</AppText>
+            <Ionicons name="chevron-forward" size={14} color={colors.textQuaternary} />
+          </View>
+        </>
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -220,7 +318,11 @@ function CategoryTargetPanel({
       </View>
 
       {loading ? (
-        <AppText style={styles.emptyText}>Loading categories...</AppText>
+        <View style={{ gap: 10 }}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} height={72} width="100%" borderRadius={12} />
+          ))}
+        </View>
       ) : data.length === 0 ? (
         <AppText style={styles.emptyText}>No category targets found</AppText>
       ) : (
@@ -238,9 +340,6 @@ function CategoryTargetPanel({
                 </AppText>
                 <AppText style={styles.categoryPercent}>{percentage.toFixed(1)}%</AppText>
               </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${percentage}%` }]} />
-              </View>
               <View style={styles.categoryMetricsGrid}>
                 <TargetMetricItem label="Target" value={formatMetric(target, metric)} />
                 <TargetMetricItem label="Achieved" value={formatMetric(achievement, metric)} />
@@ -256,17 +355,26 @@ function CategoryTargetPanel({
 
 export default function ManagerTargetsScreen() {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
   const styles = createManagerTargetsStyles(colors);
   const { setHeader } = useHeader();
   const params = useLocalSearchParams<{ userId?: string; date?: string }>();
   const [targetUsers, setTargetUsers] = useState<TargetUser[]>(TARGET_USERS);
   const [loading, setLoading] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<TargetMetric>('cases');
-  const [expandedCategoryUserId, setExpandedCategoryUserId] = useState<string | null>(null);
-  const [categoryTargetsByUser, setCategoryTargetsByUser] = useState<
-    Record<string, UserPrimaryCategoryTargetSummary[]>
-  >({});
-  const [categoryLoadingUserId, setCategoryLoadingUserId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<TargetView>('user');
+  const [specialTargets, setSpecialTargets] = useState<
+    Record<Exclude<TargetView, 'user'>, TargetUser[]>
+  >({ ubo: [], 'focused-pack': [] });
+  const [specialTargetsLoaded, setSpecialTargetsLoaded] = useState<
+    Record<Exclude<TargetView, 'user'>, boolean>
+  >({ ubo: false, 'focused-pack': false });
+  const [loadingSpecialTargets, setLoadingSpecialTargets] = useState(false);
+  const [breakdownUser, setBreakdownUser] = useState<TargetUser | null>(null);
+  const [breakdownView, setBreakdownView] = useState<TargetView>('user');
+  const [breakdownRows, setBreakdownRows] = useState<BreakdownRow[]>([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
 
   const selectedUser = useMemo(
     () => findUser(params.userId, targetUsers),
@@ -282,13 +390,13 @@ export default function ManagerTargetsScreen() {
   useFocusEffect(
     useCallback(() => {
       setHeader({
-        title: `Primary Targets (${METRIC_OPTIONS.find((item) => item.value === selectedMetric)?.label})`,
+        title: 'Targets Vs Ach',
         showBack: true,
         showMenu: false,
         showFilter: false,
         backgroundColor: colors.primary,
       });
-    }, [colors.primary, selectedMetric, setHeader]),
+    }, [colors.primary, setHeader]),
   );
 
   const fetchTargetSummary = async () => {
@@ -307,59 +415,152 @@ export default function ManagerTargetsScreen() {
     }
   };
 
-  const handleToggleCategoryTargets = async (user: TargetUser) => {
-    if (expandedCategoryUserId === user.employeeId) {
-      setExpandedCategoryUserId(null);
-      return;
-    }
-
-    setExpandedCategoryUserId(user.employeeId);
-
-    if (categoryTargetsByUser[user.employeeId]) return;
-
-    setCategoryLoadingUserId(user.employeeId);
+  const openTargetBreakdown = async (user: TargetUser) => {
+    const view = activeView;
+    const metric = view === 'ubo' ? 'cases' : selectedMetric;
+    setBreakdownUser(user);
+    setBreakdownView(view);
+    setBreakdownRows([]);
+    setBreakdownLoading(true);
 
     try {
-      const response = await homeService.getUserPrimaryCategoryTargets({
-        employeeId: user.employeeId,
-        date: selectedRouteDate,
-      });
+      const params = { employeeId: user.employeeId, date: selectedRouteDate };
 
-      if (response.success && response.data) {
-        setCategoryTargetsByUser((current) => ({
-          ...current,
-          [user.employeeId]: response.data || [],
-        }));
+      if (view === 'ubo') {
+        const response = await homeService.getUserUboTargets(params);
+        setBreakdownRows(
+          (response.data || []).map((item) => ({
+            id: item.categoryId,
+            name: item.category,
+            target: formatCount(item.target),
+            achievement: formatCount(item.achievement),
+          })),
+        );
+      } else if (view === 'focused-pack') {
+        const response = await homeService.getUserFocusedPackTargets(params);
+        setBreakdownRows(
+          (response.data || []).map((item) => ({
+            id: item.productId,
+            name: item.productName,
+            target: formatMetric(
+              metric === 'value'
+                ? item.targetValue
+                : metric === 'tonnage'
+                  ? item.targetTonnage
+                  : item.targetCases,
+              metric,
+            ),
+            achievement: formatMetric(
+              metric === 'value'
+                ? item.achievementValue
+                : metric === 'tonnage'
+                  ? item.achievementTonnage
+                  : item.achievementCases,
+              metric,
+            ),
+          })),
+        );
+      } else {
+        const response = await homeService.getUserPrimaryCategoryTargets(params);
+        setBreakdownRows(
+          (response.data || []).map((item) => ({
+            id: item.categoryId,
+            name: item.category,
+            target: formatMetric(getCategoryTargetValue(item, metric), metric),
+            achievement: formatMetric(getCategoryAchievementValue(item, metric), metric),
+          })),
+        );
       }
     } catch (error) {
-      console.warn('Failed to load user primary category targets', error);
-      setCategoryTargetsByUser((current) => ({
-        ...current,
-        [user.employeeId]: [],
-      }));
+      console.warn('Failed to load target breakdown', error);
+      setBreakdownRows([]);
     } finally {
-      setCategoryLoadingUserId(null);
+      setBreakdownLoading(false);
     }
+  };
+
+  const closeTargetBreakdown = () => {
+    setBreakdownUser(null);
+    setBreakdownRows([]);
   };
 
   useEffect(() => {
     fetchTargetSummary();
   }, []);
 
+  useEffect(() => {
+    if (activeView === 'user' || specialTargetsLoaded[activeView]) return;
+
+    let active = true;
+    setLoadingSpecialTargets(true);
+    const request =
+      activeView === 'ubo'
+        ? homeService.getUboTargetSummary(selectedRouteDate)
+        : homeService.getFocusedPackTargetSummary(selectedRouteDate);
+
+    void request
+      .then((response) => {
+        if (!active) return;
+        setSpecialTargets((current) => ({
+          ...current,
+          [activeView]: response.success && Array.isArray(response.data) ? response.data : [],
+        }));
+        setSpecialTargetsLoaded((current) => ({ ...current, [activeView]: true }));
+      })
+      .catch((error) => console.warn(`Failed to load ${activeView} targets`, error))
+      .finally(() => {
+        if (active) setLoadingSpecialTargets(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeView, selectedRouteDate, specialTargetsLoaded]);
+
+  if (loading && users.length === 0) {
+    return <PageSkeleton variant="dashboard" rows={3} />;
+  }
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroBand}>
-          <View style={styles.heroIcon}>
-            <Ionicons name="flag-outline" size={18} color={colors.primary} />
-          </View>
-          <View style={styles.parentTextWrap}>
-            <AppText style={styles.heroTitle}>User wise Primary Category Targets</AppText>
-            <AppText style={styles.parentSubtitle}>{getCurrentMonthPeriod()}</AppText>
-          </View>
+      <TargetBreakdownModal
+        visible={Boolean(breakdownUser)}
+        userName={breakdownUser?.employeeName || ''}
+        view={breakdownView}
+        rows={breakdownRows}
+        loading={breakdownLoading}
+        colors={colors}
+        isWide={isWide}
+        onClose={closeTargetBreakdown}
+      />
+      <ScrollView
+        contentContainerStyle={[styles.content, isWide && styles.contentWide]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.targetTabs}>
+          {TARGET_VIEWS.map((tab) => (
+            <TouchableOpacity
+              key={tab.value}
+              activeOpacity={0.82}
+              onPress={() => {
+                setActiveView(tab.value);
+              }}
+              style={[styles.targetTab, activeView === tab.value && styles.targetTabActive]}
+            >
+              <AppText
+                style={[
+                  styles.targetTabText,
+                  activeView === tab.value && styles.targetTabTextActive,
+                ]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </AppText>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {selectedUser && (
+        {activeView === 'user' && selectedUser && (
           <View style={styles.parentBanner}>
             <Ionicons name="git-branch-outline" size={16} color={colors.primary} />
             <View style={styles.parentTextWrap}>
@@ -371,60 +572,85 @@ export default function ManagerTargetsScreen() {
           </View>
         )}
 
-        <View style={styles.metricToggle}>
-          {METRIC_OPTIONS.map((option) => (
-            <TouchableOpacity
-              key={option.value}
-              activeOpacity={0.82}
-              onPress={() => setSelectedMetric(option.value)}
-              style={[
-                styles.metricToggleItem,
-                selectedMetric === option.value && styles.metricToggleItemActive,
-              ]}
-            >
-              <AppText
-                style={[
-                  styles.metricToggleText,
-                  selectedMetric === option.value && styles.metricToggleTextActive,
-                ]}
-              >
-                {option.label}
-              </AppText>
-            </TouchableOpacity>
-          ))}
+        {activeView !== 'ubo' && (
+          <View style={styles.metricToolbar}>
+            {METRIC_OPTIONS.map((option) => {
+              const selected = selectedMetric === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.metricChip, selected && styles.metricChipActive]}
+                  activeOpacity={0.78}
+                  onPress={() => setSelectedMetric(option.value)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`Show targets by ${option.label}`}
+                >
+                  <AppText style={[styles.metricChipText, selected && styles.metricChipTextActive]}>
+                    {option.label}
+                  </AppText>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.cardsGrid}>
+          {activeView === 'user' ? (
+            users.length > 0 ? (
+              users.map((user) => (
+                <View key={user.employeeId} style={styles.cardColumn}>
+                  <TargetUserCard
+                    user={user}
+                    colors={colors}
+                    metric={selectedMetric}
+                    onCardPress={() => openTargetBreakdown(user)}
+                    onPress={
+                      user.children?.length
+                        ? () =>
+                            router.push({
+                              pathname: '/(drawer)/manager-targets',
+                              params: { userId: user.employeeId },
+                            })
+                        : undefined
+                    }
+                  />
+                </View>
+              ))
+            ) : (
+              <View style={styles.fullWidthRow}>
+                <AppText style={styles.emptyText}>No user targets found</AppText>
+              </View>
+            )
+          ) : loadingSpecialTargets ? (
+            Array.from({ length: 3 }).map((_, index) => (
+              <View key={index} style={styles.cardColumn}>
+                <Skeleton height={176} width="100%" borderRadius={8} />
+              </View>
+            ))
+          ) : specialTargets[activeView].length > 0 ? (
+            specialTargets[activeView].map((user) => (
+              <View key={user.employeeId} style={styles.cardColumn}>
+                <TargetUserCard
+                  user={user}
+                  colors={colors}
+                  metric={activeView === 'ubo' ? 'cases' : selectedMetric}
+                  view={activeView}
+                  onCardPress={() => openTargetBreakdown(user)}
+                />
+              </View>
+            ))
+          ) : (
+            <View style={styles.fullWidthRow}>
+              <View style={styles.tabEmptyState}>
+                <Ionicons name="analytics-outline" size={26} color={colors.textQuaternary} />
+                <AppText style={styles.tabEmptyTitle}>
+                  No {activeView === 'ubo' ? 'UBO' : 'Focused Pack'} targets found
+                </AppText>
+              </View>
+            </View>
+          )}
         </View>
-
-        {loading && <AppText style={styles.emptyText}>Loading target summary...</AppText>}
-
-        {users.map((user) => (
-          <React.Fragment key={user.employeeId}>
-            <TargetUserCard
-              user={user}
-              colors={colors}
-              metric={selectedMetric}
-              categoryExpanded={expandedCategoryUserId === user.employeeId}
-              onViewCategory={() => handleToggleCategoryTargets(user)}
-              onPress={
-                user.children?.length
-                  ? () =>
-                      router.push({
-                        pathname: '/(drawer)/manager-targets',
-                        params: { userId: user.employeeId },
-                      })
-                  : undefined
-              }
-            />
-            {expandedCategoryUserId === user.employeeId && (
-              <CategoryTargetPanel
-                user={user}
-                data={categoryTargetsByUser[user.employeeId] || []}
-                metric={selectedMetric}
-                colors={colors}
-                loading={categoryLoadingUserId === user.employeeId}
-              />
-            )}
-          </React.Fragment>
-        ))}
       </ScrollView>
     </View>
   );

@@ -65,8 +65,11 @@ export const NonSaleFinalScreen: React.FC = () => {
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const activeVisit = useOutletStore((s) => s.activeVisit);
+  const selectedOutlet = useOutletStore((s) => s.selectedOutlet);
+  const activeInteraction = useOutletStore((s) => s.activeInteraction);
   const clearVisit = useOutletStore((s) => s.clearVisit);
   const van = useRouteStore((s) => s.van);
+  const selectedRoute = useRouteStore((s) => s.selectedRoute);
   const user = useAuthStore((s) => s.user);
 
   // Extract data from params
@@ -110,17 +113,52 @@ export const NonSaleFinalScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!activeVisit?.visitId || !activeVisit?.outlet?.customerId) {
-      toast.error('No active visit', 'Start an outlet visit before marking No Sale.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
+      let visit = activeVisit;
+      if (!visit) {
+        if (
+          !selectedOutlet?.customerId ||
+          !activeInteraction ||
+          activeInteraction.customerId !== selectedOutlet.customerId ||
+          !selectedRoute?.routeSessionId ||
+          !selectedRoute.workSessionId ||
+          !van?.vanId
+        ) {
+          toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
+          return;
+        }
+        const visitResponse = await outletService.startVisit({
+          routeSessionId: selectedRoute.routeSessionId,
+          workSessionId: selectedRoute.workSessionId,
+          vanId: van.vanId,
+          outletId: selectedOutlet.customerId,
+          visitType: activeInteraction.visitType,
+          interactionId: activeInteraction.interactionId,
+        });
+        if (!visitResponse.success || !visitResponse.data?.visitId) {
+          toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
+          return;
+        }
+        visit = {
+          visitId: visitResponse.data.visitId,
+          outlet: selectedOutlet,
+          checkInTime: new Date(visitResponse.data.checkInTime || activeInteraction.arrivalTime),
+          status: 'ACTIVE',
+          routeSessionId: selectedRoute.routeSessionId,
+          customerId: selectedOutlet.customerId,
+          visitType: activeInteraction.visitType,
+        };
+        useOutletStore.getState().setActiveVisit(visit);
+        useOutletStore
+          .getState()
+          .setActiveInteraction({ ...activeInteraction, status: 'CONVERTED' });
+      }
+
       const payload: any = {
-        visitId: activeVisit.visitId,
+        visitId: visit.visitId,
         vanId: van?.vanId ?? user?.vanId,
-        outletId: activeVisit.outlet.customerId,
+        outletId: visit.outlet.customerId,
         reasonId: selectedReason || reasonId,
         reasonCategoryId: categoryId,
         remark: reasonLabel || '',
@@ -131,7 +169,18 @@ export const NonSaleFinalScreen: React.FC = () => {
         return;
       }
 
-      await outletService.completeVisit(activeVisit.visitId);
+      // Online non-sale creation already completes the visit atomically on the
+      // backend. Only offline records need the separate local visit update.
+      if (response.offline) {
+        const completionResponse = await outletService.completeVisit(visit.visitId);
+        if (!completionResponse.success) {
+          toast.error(
+            'Visit completion failed',
+            completionResponse.message || 'No Sale was saved, but the local visit was not closed.',
+          );
+          return;
+        }
+      }
       clearVisit();
       router.replace('/route');
     } catch (error) {

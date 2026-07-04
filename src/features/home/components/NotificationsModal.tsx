@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,6 +21,7 @@ import {
 import { toast } from '@/core/utils';
 import { useAuthStore } from '@/core/store/auth.store';
 import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
+import { outletService } from '@/features/outlet/services/outlet.service';
 
 // ─── Constants ─────────────────────────────────────────────────────────────
 
@@ -22,7 +32,14 @@ const isManagerRole = (role?: string) => !!role && MANAGER_ROLES.includes(role.t
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type NotificationType = 'order' | 'route' | 'target' | 'system' | 'van_change' | 'topup';
+type NotificationType =
+  | 'order'
+  | 'route'
+  | 'target'
+  | 'system'
+  | 'van_change'
+  | 'topup'
+  | 'outlet_approval';
 
 type NotificationItem = {
   id: string;
@@ -75,8 +92,16 @@ const formatFullDate = (value?: string) => {
 };
 
 const mapNotification = (item: ApiNotificationItem): NotificationItem => {
-  const category = String(item.category || item.data?.category || 'system').toLowerCase();
-  const type: NotificationType = ['order', 'route', 'target', 'van_change', 'topup'].includes(category)
+  const rawCategory = String(item.category || item.data?.category || 'system').toLowerCase();
+  const category = rawCategory === 'outlet_approval_result' ? 'outlet_approval' : rawCategory;
+  const type: NotificationType = [
+    'order',
+    'route',
+    'target',
+    'van_change',
+    'topup',
+    'outlet_approval',
+  ].includes(category)
     ? (category as NotificationType)
     : 'system';
 
@@ -99,6 +124,7 @@ const ICON_MAP: Record<NotificationType, string> = {
   target: 'flag-outline',
   van_change: 'car-outline',
   topup: 'cube-outline',
+  outlet_approval: 'storefront-outline',
   system: 'checkmark-circle-outline',
 };
 
@@ -108,6 +134,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   target: 'Target',
   van_change: 'Van Change',
   topup: 'Top-up',
+  outlet_approval: 'Outlet Approval',
   system: 'System',
 };
 
@@ -163,6 +190,18 @@ const isPendingTopupAcceptance = (item: NotificationItem) => {
 const getTopupStatus = (item: NotificationItem) => {
   const status = String(item.data?.status || '').toUpperCase();
   return ['ACCEPTED', 'DECLINED'].includes(status) ? status : '';
+};
+
+const isPendingOutletApproval = (item: NotificationItem) => {
+  const category = String(item.data?.category || item.category || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.status || 'PENDING').toUpperCase();
+  return category === 'outlet_approval' && action === 'APPROVAL_REQUIRED' && status === 'PENDING';
+};
+
+const getOutletApprovalStatus = (item: NotificationItem) => {
+  const status = String(item.data?.status || '').toUpperCase();
+  return ['ACTIVE', 'REJECTED'].includes(status) ? status : '';
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -235,10 +274,12 @@ function NotificationDetail({
   const isManager = isManagerRole(user?.role ?? user?.roleId);
   const isVanChange = isPendingVanChangeApproval(item);
   const isTopupAcceptance = isPendingTopupAcceptance(item);
+  const isOutletApproval = isPendingOutletApproval(item);
   const isApprovingThis = processing?.id === item.id && processing?.action === 'approve';
   const isRejectingThis = processing?.id === item.id && processing?.action === 'reject';
   const vanChangeStatus = getVanChangeStatus(item);
   const topupStatus = getTopupStatus(item);
+  const outletApprovalStatus = getOutletApprovalStatus(item);
 
   // Metadata rows extracted from item.data
   const metaRows: { label: string; value: string }[] = [];
@@ -275,6 +316,26 @@ function NotificationDetail({
       metaRows.push({ label: 'Session ID', value: String(item.data.workSessionId) });
     if (item.data.routeCode) metaRows.push({ label: 'Route', value: item.data.routeCode });
     if (item.data.orderId) metaRows.push({ label: 'Order ID', value: String(item.data.orderId) });
+    if (item.data.outletName)
+      metaRows.push({ label: 'Outlet', value: String(item.data.outletName) });
+    if (item.data.ownerName) metaRows.push({ label: 'Owner', value: String(item.data.ownerName) });
+    if (item.data.phoneNumber)
+      metaRows.push({ label: 'Phone', value: String(item.data.phoneNumber) });
+    const address = item.data.address;
+    if (address?.line1)
+      metaRows.push({
+        label: 'Address',
+        value: [address.line1, address.line2].filter(Boolean).join(', '),
+      });
+    if (item.data.createdByName)
+      metaRows.push({ label: 'Created By', value: String(item.data.createdByName) });
+    if (outletApprovalStatus) {
+      metaRows.push({
+        label: 'Approval Status',
+        value: outletApprovalStatus === 'ACTIVE' ? 'Approved' : 'Rejected',
+      });
+    }
+    if (item.data.reason) metaRows.push({ label: 'Reason', value: String(item.data.reason) });
   }
 
   return (
@@ -350,8 +411,37 @@ function NotificationDetail({
           </View>
         )}
 
+        {isOutletApproval && !!item.data?.imageUrls?.length && (
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <AppText style={[styles.sectionLabel, { color: colors.textTertiary }]}>
+              Outlet Images
+            </AppText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {item.data.imageUrls.map((url: string) => (
+                <Image key={url} source={{ uri: url }} style={styles.outletImage} />
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {isOutletApproval && item.data?.geoTag?.lat && item.data?.geoTag?.lng && (
+          <Pressable
+            style={[styles.section, styles.locationButton, { backgroundColor: colors.surface }]}
+            onPress={() =>
+              Linking.openURL(
+                `https://www.google.com/maps/search/?api=1&query=${item.data?.geoTag?.lat},${item.data?.geoTag?.lng}`,
+              )
+            }
+          >
+            <Ionicons name="location-outline" size={20} color={colors.primary} />
+            <AppText style={{ color: colors.primary, fontWeight: '800' }}>
+              View Outlet Location
+            </AppText>
+          </Pressable>
+        )}
+
         {/* Approval/acceptance actions */}
-        {((isManager && isVanChange) || isTopupAcceptance) && (
+        {((isManager && isVanChange) || isTopupAcceptance || isOutletApproval) && (
           <View style={[styles.section, { backgroundColor: colors.surface }]}>
             <AppText style={[styles.sectionLabel, { color: colors.textTertiary }]}>
               Action Required
@@ -359,7 +449,9 @@ function NotificationDetail({
             <AppText style={[styles.approvalNote, { color: colors.textSecondary }]}>
               {isTopupAcceptance
                 ? 'This approved top-up is waiting for your acceptance. Accepting will add the approved quantity to your van stock.'
-                : 'This van change request is pending your approval. Please review the details above before taking action.'}
+                : isOutletApproval
+                  ? 'Review the outlet details, images, and registered location before approving or rejecting it.'
+                  : 'This van change request is pending your approval. Please review the details above before taking action.'}
             </AppText>
             <View style={styles.approvalButtons}>
               <Pressable
@@ -377,7 +469,11 @@ function NotificationDetail({
                   <>
                     <Ionicons name="close-circle-outline" size={16} color={colors.error} />
                     <AppText style={[styles.approvalBtnText, { color: colors.error }]}>
-                      {isTopupAcceptance ? 'Reject Top-up' : 'Reject Request'}
+                      {isTopupAcceptance
+                        ? 'Reject Top-up'
+                        : isOutletApproval
+                          ? 'Reject Outlet'
+                          : 'Reject Request'}
                     </AppText>
                   </>
                 )}
@@ -397,7 +493,11 @@ function NotificationDetail({
                   <>
                     <Ionicons name="checkmark-circle-outline" size={16} color={colors.surface} />
                     <AppText style={[styles.approvalBtnText, { color: colors.surface }]}>
-                      {isTopupAcceptance ? 'Accept Stock' : 'Approve Request'}
+                      {isTopupAcceptance
+                        ? 'Accept Stock'
+                        : isOutletApproval
+                          ? 'Approve Outlet'
+                          : 'Approve Request'}
                     </AppText>
                   </>
                 )}
@@ -549,11 +649,28 @@ const createDetailStyles = (colors: any, insets: { top: number; bottom: number }
       fontSize: 14,
       fontWeight: '800',
     },
+    outletImage: { width: 180, height: 120, borderRadius: 10, marginRight: 10 },
+    locationButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
   });
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
-const FILTER_OPTIONS = ['All', 'Unread', 'Order', 'Route', 'Target', 'Van Change', 'Top-up', 'System'];
+const FILTER_OPTIONS = [
+  'All',
+  'Unread',
+  'Order',
+  'Route',
+  'Target',
+  'Van Change',
+  'Top-up',
+  'Outlet Approval',
+  'System',
+];
 
 export function NotificationsModal({ visible, onClose }: NotificationsModalProps) {
   const { colors } = useTheme();
@@ -586,8 +703,30 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     setLoading(true);
     notificationService
       .getNotifications({ limit: 20 })
-      .then((response) => {
-        if (isMounted) setNotifications((response.data || []).map(mapNotification));
+      .then(async (response) => {
+        const items = (response.data || []).map(mapNotification);
+        if (isMounted) setNotifications(items);
+        await Promise.all(
+          items.filter(isPendingOutletApproval).map(async (item) => {
+            const customerId = String(item.data?.customerId || '');
+            if (!customerId) return;
+            const media = await outletService.getOutletMedia(customerId);
+            const imageUrls = Array.isArray(media?.data)
+              ? media.data.map((entry: any) => entry?.url).filter(Boolean)
+              : [];
+            if (!isMounted) return;
+            setNotifications((current) =>
+              current.map((entry) =>
+                entry.id === item.id ? { ...entry, data: { ...entry.data, imageUrls } } : entry,
+              ),
+            );
+            setSelectedItem((current) =>
+              current?.id === item.id
+                ? { ...current, data: { ...current.data, imageUrls } }
+                : current,
+            );
+          }),
+        );
       })
       .catch((error) => {
         console.warn('Failed to load notifications:', error);
@@ -630,6 +769,28 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     action: 'approve' | 'reject',
     confirmed = false,
   ) => {
+    if (isPendingOutletApproval(item)) {
+      const customerId = String(item.data?.customerId || '');
+      if (!customerId || processing) return;
+      setProcessing({ id: item.id, action });
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveOutlet(customerId)
+            : await notificationService.rejectOutlet(customerId);
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} outlet`);
+          return;
+        }
+        toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
+        navigateBack();
+        loadNotifications();
+      } finally {
+        setProcessing(null);
+      }
+      return;
+    }
+
     if (isPendingTopupAcceptance(item)) {
       const topupId = item.data?.vanInventoryTopupId;
       if (!topupId || processing) return;
@@ -649,7 +810,9 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
               });
 
         if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-          toast.error(response?.message || `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`);
+          toast.error(
+            response?.message || `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`,
+          );
           return;
         }
 
@@ -675,7 +838,10 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         loadNotifications();
       } catch (error: any) {
         console.warn(`Failed to ${action} top-up:`, error);
-        toast.error(error?.response?.data?.message || `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`);
+        toast.error(
+          error?.response?.data?.message ||
+            `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`,
+        );
       } finally {
         setProcessing(null);
       }
@@ -804,6 +970,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                   {filteredNotifications.map((item) => {
                     const isVanChange = isPendingVanChangeApproval(item);
                     const isTopupAcceptance = isPendingTopupAcceptance(item);
+                    const isOutletApproval = isPendingOutletApproval(item);
                     const vanChangeReason = getVanChangeReason(item);
                     const vanChangeStatus = getVanChangeStatus(item);
 
@@ -932,6 +1099,45 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                               </View>
                             )}
 
+                            {isOutletApproval && (
+                              <View style={styles.inlineActions}>
+                                <Pressable
+                                  disabled={!!processing}
+                                  onPress={(e) => {
+                                    e.stopPropagation?.();
+                                    handleNotificationAction(item, 'reject');
+                                  }}
+                                  style={[
+                                    styles.inlineBtn,
+                                    styles.inlineReject,
+                                    { borderColor: colors.error },
+                                  ]}
+                                >
+                                  <AppText style={[styles.inlineBtnText, { color: colors.error }]}>
+                                    Reject
+                                  </AppText>
+                                </Pressable>
+                                <Pressable
+                                  disabled={!!processing}
+                                  onPress={(e) => {
+                                    e.stopPropagation?.();
+                                    handleNotificationAction(item, 'approve');
+                                  }}
+                                  style={[
+                                    styles.inlineBtn,
+                                    styles.inlineApprove,
+                                    { backgroundColor: colors.success },
+                                  ]}
+                                >
+                                  <AppText
+                                    style={[styles.inlineBtnText, { color: colors.surface }]}
+                                  >
+                                    Approve
+                                  </AppText>
+                                </Pressable>
+                              </View>
+                            )}
+
                             {isTopupAcceptance && (
                               <View style={styles.inlineActions}>
                                 <Pressable
@@ -1023,11 +1229,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
           onClose={() => setConfirmTopupAction(null)}
           onConfirm={() => {
             if (!confirmTopupAction) return;
-            void handleNotificationAction(
-              confirmTopupAction.item,
-              confirmTopupAction.action,
-              true,
-            );
+            void handleNotificationAction(confirmTopupAction.item, confirmTopupAction.action, true);
           }}
         />
       </View>

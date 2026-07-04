@@ -71,7 +71,7 @@ export const TopupActionConfirmSheet: React.FC<TopupActionConfirmSheetProps> = (
           </View>
           <View style={{ flex: 1 }}>
             <AppText style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '900' }}>
-              {isAccept ? 'Accept Stock' : 'Reject Top-up'}
+              {isAccept ? 'Accept Stock' : 'Decline Top-up'}
             </AppText>
             <AppText
               style={{
@@ -82,8 +82,8 @@ export const TopupActionConfirmSheet: React.FC<TopupActionConfirmSheetProps> = (
               }}
             >
               {isAccept
-                ? 'Approved quantities will be added to your van stock.'
-                : 'This approved top-up will be declined and stock will not be added.'}
+                ? 'Approved quantities will be added to your van stock immediately.'
+                : 'The warehouse will be notified and this stock will not be added to your van.'}
             </AppText>
           </View>
         </View>
@@ -129,13 +129,13 @@ export const TopupActionConfirmSheet: React.FC<TopupActionConfirmSheetProps> = (
               <ActivityIndicator size="small" color={colors.primaryContrast} />
             ) : (
               <Ionicons
-                name={isAccept ? 'checkmark-circle-outline' : 'trash-outline'}
+                name={isAccept ? 'checkmark-circle-outline' : 'close-circle-outline'}
                 size={17}
                 color={colors.primaryContrast}
               />
             )}
             <AppText style={{ color: colors.primaryContrast, fontSize: 14, fontWeight: '900' }}>
-              {isAccept ? 'Accept Stock' : 'Reject'}
+              {isAccept ? 'Accept Stock' : 'Decline'}
             </AppText>
           </TouchableOpacity>
         </View>

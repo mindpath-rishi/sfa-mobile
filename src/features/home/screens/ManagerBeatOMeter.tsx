@@ -1,19 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ScrollView, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 
-import { AppText } from '@/core/components';
-import { useAuthStore } from '@/core/store/auth.store';
+import { AppText, Skeleton } from '@/core/components';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { homeService } from '../services/home.service';
 import type { ManagerBeatOMeterResponse } from '../services/home.service';
 import { createManagerBeatOMeterStyles } from '../styles/ManagerBeatOMeter.styles';
-
-const BEATS = [
-  { id: 'tk', title: 'TK Beatometer', subtitle: 'TK Beatometer' },
-];
 
 const INITIAL_BEAT_O_METER: ManagerBeatOMeterResponse = {
   employeeId: '',
@@ -41,13 +36,59 @@ const formatCountPercentage = (count: unknown, percentage: unknown) =>
 
 const clampPercentage = (value: unknown) => Math.max(0, Math.min(toNumber(value), 100));
 
+const formatPercentage = (value: unknown) => `${clampPercentage(value).toFixed(1)}%`;
+
+function BeatOMeterSkeleton({
+  styles,
+}: {
+  styles: ReturnType<typeof createManagerBeatOMeterStyles>;
+}) {
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryHeader}>
+          <View style={styles.skeletonTitleBlock}>
+            <Skeleton width="46%" height={11} borderRadius={6} />
+            <Skeleton width="64%" height={25} borderRadius={6} style={styles.skeletonLineGap} />
+          </View>
+          <Skeleton width={58} height={58} borderRadius={8} />
+        </View>
+        <View style={styles.primaryMetricRow}>
+          <Skeleton width="48%" height={70} borderRadius={8} />
+          <Skeleton width="48%" height={70} borderRadius={8} />
+        </View>
+        <Skeleton width="100%" height={10} borderRadius={6} />
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.tableHeader}>
+          <Skeleton width="38%" height={18} borderRadius={6} />
+          <Skeleton width="20%" height={13} borderRadius={6} />
+        </View>
+        {Array.from({ length: 3 }).map((_, index) => (
+          <View key={index} style={styles.skeletonOutletRow}>
+            <Skeleton width="42%" height={16} borderRadius={6} />
+            <Skeleton width="100%" height={6} borderRadius={6} style={styles.skeletonLineGap} />
+            <View style={styles.skeletonStatsRow}>
+              <Skeleton width="38%" height={24} borderRadius={6} />
+              <Skeleton width="38%" height={24} borderRadius={6} />
+            </View>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
 export default function ManagerBeatOMeterScreen() {
   const { colors } = useTheme();
   const styles = createManagerBeatOMeterStyles(colors);
   const { setHeader } = useHeader();
-  const user = useAuthStore((state) => state.user);
-  const [selectedBeat, setSelectedBeat] = useState(BEATS[0]);
   const [beatOMeter, setBeatOMeter] = useState<ManagerBeatOMeterResponse>(INITIAL_BEAT_O_METER);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const isFetchingRef = useRef(false);
 
   const outletPalette = useMemo(
     () => [
@@ -77,10 +118,13 @@ export default function ManagerBeatOMeterScreen() {
       total: formatNumber(row.total),
       visited: formatCountPercentage(row.mtdVisited?.count, row.mtdVisited?.percentage),
       order: formatCountPercentage(row.mtdOrder?.count, row.mtdOrder?.percentage),
+      visitedPercentage: clampPercentage(row.mtdVisited?.percentage),
+      orderPercentage: clampPercentage(row.mtdOrder?.percentage),
     }));
   }, [beatOMeter.outletTypes, outletPalette]);
   const visitedPercentage = clampPercentage(beatOMeter.summary?.visitedPercentage);
   const unvisitedPercentage = 100 - visitedPercentage;
+  const orderedPercentage = clampPercentage(beatOMeter.summary?.orderedPercentage);
 
   useFocusEffect(
     useCallback(() => {
@@ -95,7 +139,13 @@ export default function ManagerBeatOMeterScreen() {
     }, [colors.primary, setHeader]),
   );
 
-  const fetchBeatOMeter = useCallback(async () => {
+  const fetchBeatOMeter = useCallback(async ({ silent }: { silent?: boolean } = {}) => {
+    if (isFetchingRef.current) {
+      return;
+    }
+
+    isFetchingRef.current = true;
+
     try {
       const response = await homeService.getManagerBeatOMeter();
 
@@ -107,69 +157,152 @@ export default function ManagerBeatOMeterScreen() {
             ...INITIAL_BEAT_O_METER.summary,
             ...response.data.summary,
           },
-          outletTypes: response.data.outletTypes?.length
-            ? response.data.outletTypes
-            : [],
+          outletTypes: response.data.outletTypes?.length ? response.data.outletTypes : [],
         });
+        setHasError(false);
+      } else if (!silent) {
+        setHasError(true);
       }
     } catch (error) {
       console.warn('Failed to load manager beat-o-meter', error);
+      setHasError(true);
+    } finally {
+      isFetchingRef.current = false;
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    fetchBeatOMeter();
+  useFocusEffect(
+    useCallback(() => {
+      setIsLoading(true);
+      fetchBeatOMeter();
+    }, [fetchBeatOMeter]),
+  );
+
+  const handleRefresh = useCallback(() => {
+    if (isFetchingRef.current) {
+      return;
+    }
+
+    setIsRefreshing(true);
+    fetchBeatOMeter({ silent: true });
   }, [fetchBeatOMeter]);
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.listCard}>
-        {BEATS.map((beat) => (
-          <TouchableOpacity
-            key={beat.id}
-            style={[styles.beatRow, selectedBeat.id === beat.id && styles.beatRowActive]}
-            activeOpacity={0.82}
-            onPress={() => setSelectedBeat(beat)}
-          >
-            <View>
-              <AppText style={styles.beatTitle}>{beat.title}</AppText>
-              <AppText style={styles.beatSubtitle}>{beat.subtitle}</AppText>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textQuaternary} />
-          </TouchableOpacity>
-        ))}
-      </View>
+  if (isLoading) {
+    return <BeatOMeterSkeleton styles={styles} />;
+  }
 
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <View>
-            <AppText style={styles.eyebrow}>All L6Position under you</AppText>
-            <AppText style={styles.title}>Manager</AppText>
-            <AppText style={styles.subtitle}>
-              {user?.name || beatOMeter.employeeName || 'Manager'}
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
+    >
+      {hasError && (
+        <TouchableOpacity
+          style={styles.errorBanner}
+          activeOpacity={0.82}
+          onPress={() => fetchBeatOMeter()}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading beat-o-meter"
+        >
+          <Ionicons name="alert-circle-outline" size={17} color={colors.error} />
+          <AppText style={styles.errorBannerText}>Couldn't refresh data. Tap to retry.</AppText>
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryHeader}>
+          <View style={styles.summaryTitleBlock}>
+            <AppText style={styles.summaryEyebrow}>MTD coverage health</AppText>
+            <AppText style={styles.summaryTitle}>Beat-O-Meter</AppText>
+          </View>
+          <View style={styles.totalBadge}>
+            <AppText style={styles.totalBadgeValue}>
+              {formatNumber(beatOMeter.totalOutlets)}
+            </AppText>
+            <AppText style={styles.totalBadgeLabel}>Outlets</AppText>
+          </View>
+        </View>
+
+        <View style={styles.primaryMetricRow}>
+          <View style={styles.primaryMetric}>
+            <View style={[styles.primaryMetricIcon, styles.visitedMetricIcon]}>
+              <Ionicons name="walk-outline" size={17} color={colors.success} />
+            </View>
+            <View style={styles.primaryMetricTextBlock}>
+              <AppText style={styles.primaryMetricValue}>
+                {formatNumber(beatOMeter.summary?.visitedOutlets)}
+              </AppText>
+              <AppText style={styles.primaryMetricLabel}>Visited</AppText>
+            </View>
+            <AppText style={styles.primaryMetricPercent}>
+              {formatPercentage(beatOMeter.summary?.visitedPercentage)}
             </AppText>
           </View>
-          <TouchableOpacity style={styles.shareButton} activeOpacity={0.8}>
-            <Ionicons name="share-social-outline" size={18} color={colors.info} />
-          </TouchableOpacity>
+
+          <View style={styles.primaryMetric}>
+            <View style={[styles.primaryMetricIcon, styles.orderedMetricIcon]}>
+              <Ionicons name="receipt-outline" size={17} color={colors.info} />
+            </View>
+            <View style={styles.primaryMetricTextBlock}>
+              <AppText style={styles.primaryMetricValue}>
+                {formatNumber(beatOMeter.summary?.orderedOutlets)}
+              </AppText>
+              <AppText style={styles.primaryMetricLabel}>Ordered</AppText>
+            </View>
+            <AppText style={styles.primaryMetricPercent}>
+              {formatPercentage(beatOMeter.summary?.orderedPercentage)}
+            </AppText>
+          </View>
         </View>
 
-        <View style={styles.totalRow}>
-          <AppText style={styles.totalLabel}>Total outlets</AppText>
-          <AppText style={styles.totalValue}>{formatNumber(beatOMeter.totalOutlets)}</AppText>
+        <View style={styles.progressHeader}>
+          <AppText style={styles.progressLabel}>Visited progress</AppText>
+          <AppText style={styles.progressValue}>{formatPercentage(visitedPercentage)}</AppText>
         </View>
-        <View style={styles.progressTrack}>
+        <View
+          style={styles.progressTrack}
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 0, max: 100, now: visitedPercentage }}
+        >
           <View style={[styles.progressFill, { width: `${visitedPercentage}%` }]} />
           <View style={[styles.progressTail, { width: `${unvisitedPercentage}%` }]} />
         </View>
 
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+            <AppText style={styles.legendText}>Visited</AppText>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.error }]} />
+            <AppText style={styles.legendText}>Pending</AppText>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: colors.info }]} />
+            <AppText style={styles.legendText}>
+              {formatPercentage(orderedPercentage)} ordered
+            </AppText>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.card}>
         <View style={styles.tableHeader}>
           <AppText style={[styles.tableHeadText, styles.typeColumn]}>Outlet Type</AppText>
           <AppText style={styles.tableHeadText}>Total</AppText>
           <AppText style={styles.tableHeadText}>MTD Visited</AppText>
           <AppText style={styles.tableHeadText}>MTD Order</AppText>
         </View>
-
         {outletRows.length === 0 ? (
           <AppText style={styles.emptyText}>No beat-o-meter data found</AppText>
         ) : (

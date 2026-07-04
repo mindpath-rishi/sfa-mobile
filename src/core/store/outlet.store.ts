@@ -17,9 +17,19 @@ type ActiveVisit = {
   visitType?: 'ON_SITE' | 'OFF_SITE';
 };
 
+export type ActiveInteraction = {
+  interactionId: string;
+  customerId: string;
+  arrivalTime: string;
+  visitType: 'ON_SITE' | 'OFF_SITE';
+  distanceMeters: number;
+  status: 'ARRIVED' | 'CONVERTED' | 'ABANDONED';
+};
+
 type OutletStore = {
   selectedOutlet: Outlet | null;
   activeVisit: ActiveVisit | null;
+  activeInteraction: ActiveInteraction | null;
 
   /* ================= OUTLET ================= */
   setSelectedOutlet: (outlet: Outlet | null) => void;
@@ -28,7 +38,9 @@ type OutletStore = {
   /* ================= VISIT ================= */
   setActiveVisit: (visit: ActiveVisit | null) => void;
   updateVisitStatus: (status: VisitStatus, checkOutTime?: Date) => void;
+  clearActiveVisit: () => void;
   clearVisit: () => void;
+  setActiveInteraction: (interaction: ActiveInteraction | null) => void;
 
   reset: () => void; // ✅ added
 };
@@ -38,6 +50,7 @@ type OutletStore = {
 const initialState = {
   selectedOutlet: null,
   activeVisit: null,
+  activeInteraction: null,
 };
 
 /* ================= STORE ================= */
@@ -89,11 +102,16 @@ export const useOutletStore = create<OutletStore>((set) => {
       });
     },
 
+    clearActiveVisit: () => {
+      set({ activeVisit: null });
+    },
+
     clearVisit: () => {
       set({
         activeVisit: null,
         selectedOutlet: null,
       });
     },
+    setActiveInteraction: (activeInteraction) => set({ activeInteraction }),
   };
 });

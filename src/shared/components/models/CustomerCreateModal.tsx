@@ -11,9 +11,12 @@ import {
   Keyboard,
   FlatList,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as NavigationBar from 'expo-navigation-bar';
+import { StatusBar } from 'expo-status-bar';
 import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCustomerCreateStyles } from '@/shared/styles/CustomerCreateModal.styles';
@@ -27,11 +30,15 @@ import {
   customerMasterService,
   CustomerDropdownOption,
 } from '@/shared/services/customer-master.service';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import LoaderOverlay from '@/core/screens/LoaderOverlay';
+import { useLoaderStore } from '@/core/loader/loader.store';
 
 interface CustomerCreateModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: CustomerData, photos?: string[]) => void;
+  onSubmit: (data: CustomerData, photos?: string[]) => void | Promise<void>;
   loading?: boolean;
 }
 
@@ -316,10 +323,12 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   onSubmit,
   loading = false,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useCustomerCreateStyles();
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
+  const submittingRef = useRef(false);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
@@ -378,6 +387,43 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       .then((options) => setDropdownOptions(options))
       .catch((error) => console.warn('Failed to load customer dropdowns:', error));
   }, [selectedRoute, visible]);
+
+  useEffect(() => {
+    if (!loading) submittingRef.current = false;
+  }, [loading]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible || !loading) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, [loading, visible]);
+
+  useEffect(() => {
+    if (visible) return;
+    Keyboard.dismiss();
+    submittingRef.current = false;
+    setActiveDropdown((previous) => ({ ...previous, visible: false }));
+  }, [visible]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) return;
+
+    void NavigationBar.setBackgroundColorAsync(colors.surface).catch(() => undefined);
+    void NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch(() => undefined);
+
+    return () => {
+      void NavigationBar.setBackgroundColorAsync(colors.background + '00').catch(() => undefined);
+      void NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch(() => undefined);
+    };
+  }, [colors.background, colors.surface, isDark, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    const subscription = Keyboard.addListener('keyboardDidHide', () => {
+      setFocusedField(null);
+    });
+    return () => subscription.remove();
+  }, [visible]);
 
   const currentSection = useMemo(() => FORM_SECTIONS[currentStep], [currentStep]);
   const totalSteps = FORM_SECTIONS.length;
@@ -438,10 +484,12 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   };
 
   const handleSubmit = () => {
-    if (!validateCurrentSection()) return;
+    if (loading || submittingRef.current || !validateCurrentSection()) return;
 
+    submittingRef.current = true;
+    useLoaderStore.getState().show({ message: 'Preparing customer creation…' });
     Keyboard.dismiss();
-    onSubmit(
+    void onSubmit(
       { ...formData, segmentation: formData.segmentation.trim() },
       capturedPhotos.length ? capturedPhotos : undefined,
     );
@@ -470,7 +518,9 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   const handleFieldSubmit = (nextFieldKey?: string) => {
     if (nextFieldKey && inputRefs.current[nextFieldKey]) {
       inputRefs.current[nextFieldKey]?.focus();
+      return;
     }
+    Keyboard.dismiss();
   };
 
   const openDropdown = (fieldKey: string, options: any[], title: string) => {
@@ -556,6 +606,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   };
 
   const handleClose = () => {
+    if (loading) return;
     resetForm();
     onClose();
   };
@@ -644,7 +695,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             placeholderTextColor={colors.textTertiary}
             value={value?.toString() || ''}
             onChangeText={(text) => updateField(field.key, text)}
-            // onFocus={() => handleFieldFocus(field.key)}
+            onFocus={() => handleFieldFocus(field.key)}
             onBlur={() => {
               setFocusedField(null);
               setTouchedFields((prev) => new Set(prev).add(field.key));
@@ -756,17 +807,36 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
   return (
     <>
+      {visible && <StatusBar style="light" backgroundColor={colors.primary} translucent={false} />}
       <AppModal
         visible={visible}
         onClose={handleClose}
-        title={`Create Customer - ${currentSection.title}`}
+        title={`Create Outlet - ${currentSection.title}`}
         size="full"
         position="bottom"
         animation="slide"
-        showCloseButton={true}
+        showCloseButton={!loading}
+        hideCloseButton={loading}
+        dismissible={!loading}
         closeOnBackdropPress={!loading}
+        // Android already uses adjustResize. Enabling another height-based
+        // KeyboardAvoidingView causes repeated focus jumps and stale bottom gaps.
+        keyboardAvoiding={Platform.OS === 'ios'}
         contentStyle={{ padding: 0, flex: 1 }}
-        style={{ flex: 1 }}
+        headerStyle={{
+          backgroundColor: colors.primary,
+          borderBottomColor: colors.primary,
+        }}
+        titleStyle={{ color: '#FFFFFF' }}
+        closeButtonStyle={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
+        closeIcon={<Ionicons name="close" size={19} color="#FFFFFF" />}
+        style={{
+          flex: 1,
+          width: '100%',
+          maxHeight: '100%',
+          borderRadius: 0,
+          paddingTop: insets.top,
+        }}
       >
         <View style={{ flex: 1, backgroundColor: colors.background }}>
           {/* Progress Bar */}
@@ -792,6 +862,8 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
             style={{ flex: 1 }}
           >
             {/* Section Header */}
@@ -848,7 +920,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
                 ) : (
                   <>
                     <AppText style={styles.primaryButtonText}>
-                      {isLastStep ? 'Create Customer' : 'Next'}
+                      {isLastStep ? 'Create Outlet' : 'Next'}
                     </AppText>
                     {!isLastStep && <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />}
                   </>
@@ -856,6 +928,9 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
               </TouchableOpacity>
             </View>
           </View>
+
+          <LoaderOverlay />
+          <Toast position="top" topOffset={insets.top + 12} />
         </View>
       </AppModal>
 

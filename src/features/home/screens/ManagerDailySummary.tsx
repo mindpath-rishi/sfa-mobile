@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -13,8 +13,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
-import { AppText } from '@/core/components';
-import { useAuthStore } from '@/core/store/auth.store';
+import { AppText, Skeleton } from '@/core/components';
 import { toast } from '@/core/utils';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -151,6 +150,8 @@ const SUMMARY_COUNTS: Record<SummaryStatus | 'total', number> = {
   leave: 0,
   absent: 37,
 };
+
+const LIVE_LOCATION_REFRESH_MS = 5_000;
 
 const INITIAL_MANAGER_STATS: ManagerStatsResponse = {
   userSummary: {
@@ -334,6 +335,51 @@ function CallSummaryCard({
   );
 }
 
+function DailySummarySkeleton({
+  styles,
+}: {
+  styles: ReturnType<typeof createManagerDailySummaryStyles>;
+}) {
+  return (
+    <View style={styles.summaryCard}>
+      <View style={styles.cardHeader}>
+        <View style={styles.dailyHeaderMain}>
+          <Skeleton width={36} height={36} borderRadius={8} />
+          <View style={styles.dailyHeaderText}>
+            <Skeleton width="55%" height={14} borderRadius={5} />
+            <Skeleton width="38%" height={10} borderRadius={5} style={{ marginTop: 5 }} />
+          </View>
+        </View>
+        <Skeleton width={104} height={30} borderRadius={8} />
+      </View>
+
+      <View style={styles.summaryKpiRow}>
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} height={48} width="23%" borderRadius={8} />
+        ))}
+      </View>
+
+      <View style={styles.attendancePanel}>
+        <View style={styles.attendanceHeader}>
+          <Skeleton width="32%" height={14} borderRadius={5} />
+          <Skeleton width="16%" height={10} borderRadius={5} />
+        </View>
+        <View style={styles.attendanceList}>
+          {Array.from({ length: 5 }).map((_, index) => (
+            <Skeleton key={index} height={48} width="100%" borderRadius={8} />
+          ))}
+        </View>
+        <Skeleton width="30%" height={14} borderRadius={5} style={{ marginTop: 12 }} />
+        <View style={[styles.callSummaryGrid, { marginTop: 8 }]}>
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} height={52} width="31%" borderRadius={8} />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function UserStat({
   label,
   value,
@@ -356,7 +402,6 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const styles = createManagerDailySummaryStyles(colors);
   const baseStyles = useMemo(() => createBaseStyles(colors), [colors]);
   const { setHeader } = useHeader();
-  const user = useAuthStore((state) => state.user);
   const params = useLocalSearchParams<{
     status?: SummaryStatus;
     userId?: string;
@@ -365,6 +410,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     date?: string;
   }>();
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingSummary, setLoadingSummary] = useState(true);
   const [selectedDate, setSelectedDate] = useState(() => parseRouteDate(getParam(params.date)));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [managerStats, setManagerStats] = useState<ManagerStatsResponse>(INITIAL_MANAGER_STATS);
@@ -385,6 +431,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const [loadingMtdSummary, setLoadingMtdSummary] = useState(false);
   const [loadingRoutePlan, setLoadingRoutePlan] = useState(false);
   const [activeTab, setActiveTab] = useState<TimelineTab>('timeline');
+  const isFetchingManagerStatsRef = useRef(false);
+  const isFetchingTimelineRef = useRef(false);
 
   const status = getParam(params.status) as SummaryStatus | undefined;
   const userId = getParam(params.userId);
@@ -489,6 +537,10 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   );
 
   const fetchManagerStats = useCallback(async (date?: string) => {
+    if (isFetchingManagerStatsRef.current) return;
+
+    isFetchingManagerStatsRef.current = true;
+
     try {
       const response = await homeService.getManagerStats(date);
 
@@ -500,8 +552,18 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       }
     } catch (error) {
       console.warn('Failed to load daily summary manager stats', error);
+    } finally {
+      isFetchingManagerStatsRef.current = false;
+      setLoadingSummary(false);
     }
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoadingSummary(true);
+      fetchManagerStats(selectedRouteDate);
+    }, [fetchManagerStats, selectedRouteDate]),
+  );
 
   const fetchFieldUsers = useCallback(async (date?: string, nextSearchKey?: string) => {
     setLoadingFieldUsers(true);
@@ -524,30 +586,36 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     }
   }, []);
 
-  const fetchUserTimeline = useCallback(async (employeeId: string, date?: string) => {
-    setLoadingTimeline(true);
+  const fetchUserTimeline = useCallback(
+    async (employeeId: string, date?: string, silent = false) => {
+      if (isFetchingTimelineRef.current) return;
+      isFetchingTimelineRef.current = true;
+      if (!silent) setLoadingTimeline(true);
 
-    try {
-      const response = await homeService.getManagerUserTimeline({
-        employeeId,
-        date,
-      });
+      try {
+        const response = await homeService.getManagerUserTimeline({
+          employeeId,
+          date,
+        });
 
-      if ((response.success || response.statusCode === 200) && response.data) {
-        setTimelinesByUser((prev) => ({
-          ...prev,
-          [employeeId]: {
-            ...response.data,
-            activities: dedupeTimelineActivities(response.data.activities || []),
-          },
-        }));
+        if ((response.success || response.statusCode === 200) && response.data) {
+          setTimelinesByUser((prev) => ({
+            ...prev,
+            [employeeId]: {
+              ...response.data,
+              activities: dedupeTimelineActivities(response.data.activities || []),
+            },
+          }));
+        }
+      } catch (error) {
+        console.warn('Failed to load manager user timeline', error);
+      } finally {
+        isFetchingTimelineRef.current = false;
+        if (!silent) setLoadingTimeline(false);
       }
-    } catch (error) {
-      console.warn('Failed to load manager user timeline', error);
-    } finally {
-      setLoadingTimeline(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   const fetchUserMtdSummary = useCallback(async (employeeId: string, date?: string) => {
     setLoadingMtdSummary(true);
@@ -614,10 +682,6 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   };
 
   useEffect(() => {
-    fetchManagerStats(selectedRouteDate);
-  }, [fetchManagerStats, selectedRouteDate]);
-
-  useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearchKey(searchKey.trim()), 350);
 
     return () => clearTimeout(timer);
@@ -636,6 +700,20 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       fetchUserRoutePlan(userId, selectedRouteDate);
     }
   }, [fetchUserMtdSummary, fetchUserRoutePlan, fetchUserTimeline, selectedRouteDate, userId, view]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const isViewingLiveUser = userId && (view === 'timeline' || view === 'order');
+      const isToday = selectedRouteDate === formatLocalApiDate(new Date());
+      if (!isViewingLiveUser || !isToday) return undefined;
+
+      const timer = setInterval(() => {
+        void fetchUserTimeline(userId, selectedRouteDate, true);
+      }, LIVE_LOCATION_REFRESH_MS);
+
+      return () => clearInterval(timer);
+    }, [fetchUserTimeline, selectedRouteDate, userId, view]),
+  );
 
   const openDatePicker = () => {
     setShowDatePicker(true);
@@ -729,14 +807,6 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       params: { date: selectedRouteDate },
     });
   };
-
-  const userInitials = (user?.name || 'Manager')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((item) => item[0])
-    .join('')
-    .toUpperCase();
 
   const handleWhatsApp = async (phoneNumber: string) => {
     const phone = getNormalizedPhoneNumber(phoneNumber);
@@ -900,100 +970,105 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         }
       >
         {/* Summary Card - Only on summary screen */}
-        {view === 'summary' && (
-          <View style={styles.summaryCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.managerInfo}>
-                <View style={styles.managerAvatar}>
-                  <AppText style={styles.managerAvatarText}>{userInitials || 'M'}</AppText>
+        {view === 'summary' &&
+          (loadingSummary ? (
+            <DailySummarySkeleton styles={styles} />
+          ) : (
+            <View style={styles.summaryCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.dailyHeaderMain}>
+                  <View style={styles.dailyIcon}>
+                    <Ionicons name="analytics-outline" size={19} color={colors.primary} />
+                  </View>
+                  <View style={styles.dailyHeaderText}>
+                    <AppText style={styles.dailyTitle}>Daily overview</AppText>
+                    <AppText style={styles.sectionTitle}>Team performance</AppText>
+                  </View>
                 </View>
-                <View style={styles.managerTextBlock}>
-                  <AppText style={styles.cardTitle}>{user?.name || 'Manager'}</AppText>
-                  <AppText style={styles.sectionTitle}>Area Manager</AppText>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={styles.dateButton}
-                activeOpacity={0.7}
-                onPress={openDatePicker}
-              >
-                <Ionicons name="calendar-clear-outline" size={12} color={colors.primary} />
-                <AppText style={styles.dateButtonText}>{formatSelectedDate(selectedDate)}</AppText>
-                <Ionicons name="chevron-down" size={10} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.summaryKpiRow}>
-              <View style={styles.summaryKpiCard}>
-                <AppText style={styles.summaryKpiValue}>
-                  {formatNumber(managerStats.callSummary.tc)}
-                </AppText>
-                <AppText style={styles.summaryKpiLabel}>TC</AppText>
-              </View>
-              <View style={styles.summaryKpiCard}>
-                <AppText style={styles.summaryKpiValue}>
-                  {formatNumber(managerStats.callSummary.pc)}
-                </AppText>
-                <AppText style={styles.summaryKpiLabel}>PC</AppText>
-              </View>
-              <View style={styles.summaryKpiCard}>
-                <AppText style={styles.summaryKpiValue}>
-                  {formatNumber(managerStats.callSummary.sc)}
-                </AppText>
-                <AppText style={styles.summaryKpiLabel}>SC</AppText>
-              </View>
-              <View style={styles.summaryKpiCard}>
-                <AppText style={styles.summaryKpiValue}>
-                  {formatNumber(managerStats.callSummary.productivity)}%
-                </AppText>
-                <AppText style={styles.summaryKpiLabel}>Productivity</AppText>
-              </View>
-            </View>
-
-            <View style={styles.attendancePanel}>
-              <View style={styles.attendanceHeader}>
-                <AppText style={styles.attendanceTitle}>Attendance</AppText>
-                <TouchableOpacity activeOpacity={0.7} onPress={() => openUsers()}>
-                  <AppText style={styles.viewAllText}>View all</AppText>
+                <TouchableOpacity
+                  style={styles.dateButton}
+                  activeOpacity={0.7}
+                  onPress={openDatePicker}
+                >
+                  <Ionicons name="calendar-clear-outline" size={12} color={colors.primary} />
+                  <AppText style={styles.dateButtonText}>
+                    {formatSelectedDate(selectedDate)}
+                  </AppText>
+                  <Ionicons name="chevron-down" size={10} color={colors.primary} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.attendanceList}>
-                {attendanceRows.map((item) => (
-                  <AttendanceRow
-                    key={item.key}
-                    label={item.label}
-                    value={item.value}
-                    subLabel={item.subLabel}
-                    color={item.color}
-                    badgeLabel={item.badgeLabel}
-                    badgeBackgroundColor={item.badgeBackgroundColor}
-                    mutedColor={colors.textQuaternary}
-                    styles={styles}
-                    onPress={item.onPress}
-                  />
-                ))}
+
+              <View style={styles.summaryKpiRow}>
+                <View style={styles.summaryKpiCard}>
+                  <AppText style={styles.summaryKpiValue}>
+                    {formatNumber(managerStats.callSummary.tc)}
+                  </AppText>
+                  <AppText style={styles.summaryKpiLabel}>TC</AppText>
+                </View>
+                <View style={styles.summaryKpiCard}>
+                  <AppText style={styles.summaryKpiValue}>
+                    {formatNumber(managerStats.callSummary.pc)}
+                  </AppText>
+                  <AppText style={styles.summaryKpiLabel}>PC</AppText>
+                </View>
+                <View style={styles.summaryKpiCard}>
+                  <AppText style={styles.summaryKpiValue}>
+                    {formatNumber(managerStats.callSummary.sc)}
+                  </AppText>
+                  <AppText style={styles.summaryKpiLabel}>SC</AppText>
+                </View>
+                <View style={styles.summaryKpiCard}>
+                  <AppText style={styles.summaryKpiValue}>
+                    {formatNumber(managerStats.callSummary.productivity)}%
+                  </AppText>
+                  <AppText style={styles.summaryKpiLabel}>Productivity</AppText>
+                </View>
               </View>
-              <AppText style={styles.callSummaryTitle}>Call summary</AppText>
-              <View style={styles.callSummaryGrid}>
-                <CallSummaryCard
-                  label="Cases"
-                  value={managerStats.callSummary.qtyCases ?? 0}
-                  styles={styles}
-                />
-                <CallSummaryCard
-                  label="Value"
-                  value={managerStats.callSummary.qtyValue ?? managerStats.callSummary.sc}
-                  styles={styles}
-                />
-                <CallSummaryCard
-                  label="Tonnage"
-                  value={managerStats.callSummary.qtyTonnage ?? 0}
-                  styles={styles}
-                />
+
+              <View style={styles.attendancePanel}>
+                <View style={styles.attendanceHeader}>
+                  <AppText style={styles.attendanceTitle}>Attendance</AppText>
+                  <TouchableOpacity activeOpacity={0.7} onPress={() => openUsers()}>
+                    <AppText style={styles.viewAllText}>View all</AppText>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.attendanceList}>
+                  {attendanceRows.map((item) => (
+                    <AttendanceRow
+                      key={item.key}
+                      label={item.label}
+                      value={item.value}
+                      subLabel={item.subLabel}
+                      color={item.color}
+                      badgeLabel={item.badgeLabel}
+                      badgeBackgroundColor={item.badgeBackgroundColor}
+                      mutedColor={colors.textQuaternary}
+                      styles={styles}
+                      onPress={item.onPress}
+                    />
+                  ))}
+                </View>
+                <AppText style={styles.callSummaryTitle}>Call summary</AppText>
+                <View style={styles.callSummaryGrid}>
+                  <CallSummaryCard
+                    label="Cases"
+                    value={managerStats.callSummary.qtyCases ?? 0}
+                    styles={styles}
+                  />
+                  <CallSummaryCard
+                    label="Value"
+                    value={managerStats.callSummary.qtyValue ?? managerStats.callSummary.sc}
+                    styles={styles}
+                  />
+                  <CallSummaryCard
+                    label="Tonnage"
+                    value={managerStats.callSummary.qtyTonnage ?? 0}
+                    styles={styles}
+                  />
+                </View>
               </View>
             </View>
-          </View>
-        )}
+          ))}
 
         {/* Users Screen */}
         {view === 'users' && (
@@ -1023,12 +1098,14 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
               </AppText>
             </View>
 
-            {filteredUsers.length === 0 ? (
-              <AppText style={styles.emptyText}>
-                {loadingFieldUsers
-                  ? 'Loading field users...'
-                  : 'No field users found for this status.'}
-              </AppText>
+            {loadingFieldUsers && filteredUsers.length === 0 ? (
+              <View style={{ gap: 10 }}>
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={index} height={88} width="100%" borderRadius={14} />
+                ))}
+              </View>
+            ) : filteredUsers.length === 0 ? (
+              <AppText style={styles.emptyText}>No field users found for this status.</AppText>
             ) : (
               filteredUsers.map((user) => {
                 const meta = statusMeta[user.status];
@@ -1268,7 +1345,11 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 </View>
 
                 {loadingTimeline && selectedUser.activities.length === 0 ? (
-                  <AppText style={styles.emptyText}>Loading timeline...</AppText>
+                  <View style={{ gap: 12 }}>
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <Skeleton key={index} height={92} width="100%" borderRadius={14} />
+                    ))}
+                  </View>
                 ) : selectedUser.activities.length === 0 ? (
                   <AppText style={styles.emptyText}>No timeline data found for this date.</AppText>
                 ) : (
@@ -1380,7 +1461,10 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   ))}
                 </View>
                 {loadingMtdSummary && (
-                  <AppText style={styles.emptyText}>Loading MTD summary...</AppText>
+                  <View style={{ gap: 10 }}>
+                    <Skeleton height={86} width="100%" borderRadius={14} />
+                    <Skeleton height={86} width="100%" borderRadius={14} />
+                  </View>
                 )}
               </View>
             )}
@@ -1407,7 +1491,11 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
 
                 <View style={styles.routeTimeline}>
                   {loadingRoutePlan ? (
-                    <AppText style={styles.emptyText}>Loading route plan...</AppText>
+                    <View style={{ gap: 10 }}>
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <Skeleton key={index} height={72} width="100%" borderRadius={12} />
+                      ))}
+                    </View>
                   ) : routeFallbackStops.length === 0 ? (
                     <AppText style={styles.emptyText}>No route plan found for this date.</AppText>
                   ) : (

@@ -255,7 +255,7 @@ export const useRouteScreenStyles = () => {
     // ============= OUTLET LIST & CARDS =============
     outletList: {
       marginTop: utils.spacing[2],
-      paddingBottom: utils.spacing[4],
+      paddingBottom: utils.spacing[2],
     } as ViewStyle,
 
     expandableCard: {
@@ -328,9 +328,10 @@ export const useRouteScreenStyles = () => {
 
     nameRow: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       justifyContent: 'space-between',
       marginBottom: 4,
+      gap: 6,
     } as ViewStyle,
 
     outletName: {
@@ -338,6 +339,8 @@ export const useRouteScreenStyles = () => {
       fontWeight: utils.getFontWeight('bold'),
       color: colors.textPrimary,
       flex: 1,
+      flexShrink: 1,
+      lineHeight: 20,
     } as TextStyle,
 
     nearbyBadge: {
@@ -360,6 +363,7 @@ export const useRouteScreenStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+      flexShrink: 0,
     } as ViewStyle,
 
     headerIconButton: {

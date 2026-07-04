@@ -10,7 +10,7 @@ export default ({ config }: any) => {
       [
         'expo-splash-screen',
         {
-          image: './assets/images/sfa-splash.png',
+          image: './assets/images/sales-stream-splash.png',
           resizeMode: 'cover',
           backgroundColor: '#FFFFFF',
         },
@@ -25,11 +25,11 @@ export default ({ config }: any) => {
         'expo-location',
         {
           locationAlwaysAndWhenInUsePermission:
-            'Allow SFA to capture salesman location while the work day is active.',
+            'Allow Sales Stream to capture salesman location while the work day is active.',
           locationAlwaysPermission:
-            'Allow SFA to capture salesman location while the work day is active.',
+            'Allow Sales Stream to capture salesman location while the work day is active.',
           locationWhenInUsePermission:
-            'Allow SFA to capture your location for day and visit tracking.',
+            'Allow Sales Stream to capture your location for day and visit tracking.',
           isIosBackgroundLocationEnabled: true,
           isAndroidBackgroundLocationEnabled: true,
         },
@@ -42,15 +42,15 @@ export default ({ config }: any) => {
       //   },
     ],
 
-    name: 'SFA',
+    name: 'Sales Stream',
     slug: 'expo-jwt-tabs-template-ultimate',
     scheme: 'expojwttabsultimate',
-    version: '2.0.0',
-    icon: './assets/images/sfa-icon.png',
+    version: '1.0.0',
+    icon: './assets/images/sales-stream-logo.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
     splash: {
-      image: './assets/images/sfa-splash.png',
+      image: './assets/images/Sales Stream-splash.png',
       resizeMode: 'cover',
       backgroundColor: '#FFFFFF',
     },
@@ -62,20 +62,20 @@ export default ({ config }: any) => {
 
     android: {
       softwareKeyboardLayoutMode: 'resize',
-      package: 'com.sfa.app',
+      package: 'com.salesstream.app',
+      versionCode: 2,
       adaptiveIcon: {
-        foregroundImage: './assets/images/sfa-icon.png',
+        foregroundImage: './assets/images/sales-stream-logo.png',
         backgroundColor: '#FFFFFF',
       },
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
       config: {
         googleMaps: {
-          apiKey:
-            process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
-            process.env.GOOGLE_MAPS_API_KEY,
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY,
         },
       },
       permissions: [
+        'android.permission.ACCESS_NETWORK_STATE',
         'android.permission.POST_NOTIFICATIONS',
         'android.permission.ACCESS_COARSE_LOCATION',
         'android.permission.ACCESS_FINE_LOCATION',
@@ -86,13 +86,12 @@ export default ({ config }: any) => {
     },
 
     ios: {
-      bundleIdentifier: 'com.sfa.app',
-      icon: './assets/images/sfa-icon.png',
+      bundleIdentifier: 'com.salesstream.app',
+      icon: './assets/images/sales-stream-logo.png',
       googleServicesFile: process.env.GOOGLE_SERVICE_INFO_PLIST ?? './GoogleService-Info.plist',
       config: {
         googleMapsApiKey:
-          process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
-          process.env.GOOGLE_MAPS_API_KEY,
+          process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.GOOGLE_MAPS_API_KEY,
       },
       infoPlist: {
         UIBackgroundModes: ['location'],

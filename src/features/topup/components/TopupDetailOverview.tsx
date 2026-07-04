@@ -1,360 +1,207 @@
 import React from 'react';
-import { View, ScrollView } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { AppText } from '@/core/components';
+import { formatCurrency } from '@/shared/utils/currenty.utils';
+import { formatDateTime } from '@/shared/utils/date.utils';
+import { formatWeight } from '@/shared/utils/weight.utils';
+
 import { OverviewProps } from '../types/topupDetail.types';
 import { createTopupDetailStyles } from '../styles/topupDetail.styles';
-import { formatDateTime } from '@/shared/utils/date.utils';
-import { formatCurrency } from '@/shared/utils/currenty.utils';
-import { formatWeight } from '@/shared/utils/weight.utils';
+import { getStatusColor, getStatusIcon, getStatusLabel } from '../utils/topup.utils';
+import { TopupStatusType } from '../constants/topup.constants';
+
+type MetricProps = {
+  label: string;
+  requested: string;
+  approved: string;
+  approvedVisible: boolean;
+};
 
 export const TopupDetailOverview: React.FC<OverviewProps> = ({ detail, colors }) => {
   const styles = createTopupDetailStyles(colors);
   const hasApprovedTotals = ['APPROVED', 'ACCEPTED', 'DECLINED', 'REJECTED'].includes(
     detail.status,
   );
-  const isApproved = detail.status === 'APPROVED';
-  const isAccepted = detail.status === 'ACCEPTED';
-  const isDeclined = detail.status === 'DECLINED';
-  const isRejected = detail.status === 'REJECTED';
-  const isPending = detail.status === 'SUBMITTED' || detail.status === 'DRAFT';
+  const status = detail.status as TopupStatusType;
+  const statusColor = getStatusColor(status);
+  const statusLabel = getStatusLabel(status);
+  const statusIcon = getStatusIcon(status) as React.ComponentProps<typeof Ionicons>['name'];
 
-  // Requested totals
-  const requestedCases = detail.totalRequestedCases || 0;
-  const requestedPieces = detail.totalRequestedPieces || 0;
-  const requestedValue = detail.totalRequestedValue || 0;
-  const requestedWeight = detail.totalRequestedWeight || 0;
+  const statusCopy: Record<string, string> = {
+    DRAFT: 'This request is still being prepared.',
+    SUBMITTED: 'Waiting for approval from the warehouse manager.',
+    APPROVED: 'Stock is approved and ready for your confirmation.',
+    ACCEPTED: 'Approved stock has been added to the van inventory.',
+    DECLINED: detail.declinedReason || 'This top-up was declined by the salesman.',
+    REJECTED: detail.rejectedReason || 'This request was rejected by the warehouse.',
+  };
 
-  // Approved totals (only if approved)
-  const approvedCases = detail.totalApprovedCases || 0;
-  const approvedPieces = detail.totalApprovedPieces || 0;
-  const approvedValue = detail.totalApprovedValue || 0;
-  const approvedWeight = detail.totalApprovedWeight || 0;
-
-  // Calculate differences
-  const casesDiff = approvedCases - requestedCases;
-  const piecesDiff = approvedPieces - requestedPieces;
-  const valueDiff = approvedValue - requestedValue;
-  const weightDiff = approvedWeight - requestedWeight;
+  const metrics: MetricProps[] = [
+    {
+      label: 'Value',
+      requested: formatCurrency(detail.totalRequestedValue || 0),
+      approved: formatCurrency(detail.totalApprovedValue || 0),
+      approvedVisible: hasApprovedTotals,
+    },
+    {
+      label: 'Cases',
+      requested: String(detail.totalRequestedCases || 0),
+      approved: String(detail.totalApprovedCases || 0),
+      approvedVisible: hasApprovedTotals,
+    },
+    {
+      label: 'Pieces',
+      requested: String(detail.totalRequestedPieces || 0),
+      approved: String(detail.totalApprovedPieces || 0),
+      approvedVisible: hasApprovedTotals,
+    },
+    {
+      label: 'Weight',
+      requested: formatWeight(detail.totalRequestedWeight || 0),
+      approved: formatWeight(detail.totalApprovedWeight || 0),
+      approvedVisible: hasApprovedTotals,
+    },
+  ];
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.overviewContent}>
-      {/* Info Section */}
-      <View style={styles.infoSection}>
-        <View style={styles.infoRow}>
-          <View style={styles.infoCard}>
-            <Ionicons name="car-outline" size={20} color={colors.primary} />
-            <View>
-              <AppText style={styles.infoLabel}>Van</AppText>
-              <AppText style={styles.infoValue}>{detail.vanName || 'N/A'}</AppText>
-            </View>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="business-outline" size={20} color={colors.primary} />
-            <View>
-              <AppText style={styles.infoLabel}>Warehouse</AppText>
-              <AppText style={styles.infoValue}>{detail.warehouseId || 'N/A'}</AppText>
-            </View>
-          </View>
+      <View style={[styles.statusCallout, { borderColor: statusColor + '35' }]}>
+        <View style={[styles.statusCalloutIcon, { backgroundColor: statusColor + '14' }]}>
+          <Ionicons name={statusIcon} size={22} color={statusColor} />
         </View>
-
-        <View style={styles.infoRow}>
-          <View style={styles.infoCard}>
-            <Ionicons name="person-outline" size={20} color={colors.primary} />
-            <View>
-              <AppText style={styles.infoLabel}>Employee</AppText>
-              <AppText style={styles.infoValue}>
-                {detail.employeeName || detail.employeeId || 'N/A'}
-              </AppText>
-            </View>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-            <View>
-              <AppText style={styles.infoLabel}>Request Date</AppText>
-              <AppText style={styles.infoValue}>{formatDateTime(detail.date)}</AppText>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Requested vs Approved Section */}
-      <View style={styles.comparisonSection}>
-        <View style={styles.comparisonHeader}>
-          <MaterialCommunityIcons name="compare" size={20} color={colors.primary} />
-          <AppText style={styles.comparisonTitle}>Requested vs Approved</AppText>
-        </View>
-
-        <View style={styles.comparisonGrid}>
-          {/* Cases */}
-          <View style={styles.comparisonCard}>
-            <View style={styles.comparisonRow}>
-              <View style={styles.requestedBox}>
-                <MaterialCommunityIcons name="cube-outline" size={16} color={colors.warning} />
-                <AppText style={styles.comparisonLabel}>Requested</AppText>
-                <AppText style={styles.comparisonValue}>{requestedCases} Cases</AppText>
-              </View>
-              {hasApprovedTotals && (
-                <>
-                  <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
-                  <View style={styles.approvedBox}>
-                    <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-                    <AppText style={styles.comparisonLabel}>Approved</AppText>
-                    <AppText style={styles.comparisonValue}>{approvedCases} Cases</AppText>
-                    {casesDiff !== 0 && (
-                      <AppText
-                        style={[
-                          styles.diffText,
-                          casesDiff > 0 ? styles.positiveDiff : styles.negativeDiff,
-                        ]}
-                      >
-                        {casesDiff > 0 ? `+${casesDiff}` : `${casesDiff}`}
-                      </AppText>
-                    )}
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* Pieces */}
-          <View style={styles.comparisonCard}>
-            <View style={styles.comparisonRow}>
-              <View style={styles.requestedBox}>
-                <MaterialCommunityIcons name="layers-outline" size={16} color={colors.warning} />
-                <AppText style={styles.comparisonLabel}>Requested</AppText>
-                <AppText style={styles.comparisonValue}>{requestedPieces} Pieces</AppText>
-              </View>
-              {hasApprovedTotals && (
-                <>
-                  <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
-                  <View style={styles.approvedBox}>
-                    <MaterialCommunityIcons name="check-circle" size={16} color={colors.success} />
-                    <AppText style={styles.comparisonLabel}>Approved</AppText>
-                    <AppText style={styles.comparisonValue}>{approvedPieces} Pieces</AppText>
-                    {piecesDiff !== 0 && (
-                      <AppText
-                        style={[
-                          styles.diffText,
-                          piecesDiff > 0 ? styles.positiveDiff : styles.negativeDiff,
-                        ]}
-                      >
-                        {piecesDiff > 0 ? `+${piecesDiff}` : `${piecesDiff}`}
-                      </AppText>
-                    )}
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* Value */}
-          <View style={styles.comparisonCard}>
-            <View style={styles.comparisonRow}>
-              <View style={styles.requestedBox}>
-                <Ionicons name="cash-outline" size={16} color={colors.warning} />
-                <AppText style={styles.comparisonLabel}>Requested</AppText>
-                <AppText style={styles.comparisonValue}>{formatCurrency(requestedValue)}</AppText>
-              </View>
-              {hasApprovedTotals && (
-                <>
-                  <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
-                  <View style={styles.approvedBox}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                    <AppText style={styles.comparisonLabel}>Approved</AppText>
-                    <AppText style={styles.comparisonValue}>
-                      {formatCurrency(approvedValue)}
-                    </AppText>
-                    {valueDiff !== 0 && (
-                      <AppText
-                        style={[
-                          styles.diffText,
-                          valueDiff > 0 ? styles.positiveDiff : styles.negativeDiff,
-                        ]}
-                      >
-                        {valueDiff > 0
-                          ? `+${formatCurrency(valueDiff)}`
-                          : formatCurrency(valueDiff)}
-                      </AppText>
-                    )}
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
-
-          {/* Weight */}
-          <View style={styles.comparisonCard}>
-            <View style={styles.comparisonRow}>
-              <View style={styles.requestedBox}>
-                <Ionicons name="scale-outline" size={16} color={colors.warning} />
-                <AppText style={styles.comparisonLabel}>Requested</AppText>
-                <AppText style={styles.comparisonValue}>{formatWeight(requestedWeight)}</AppText>
-              </View>
-              {hasApprovedTotals && (
-                <>
-                  <Ionicons name="arrow-forward" size={16} color={colors.textTertiary} />
-                  <View style={styles.approvedBox}>
-                    <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                    <AppText style={styles.comparisonLabel}>Approved</AppText>
-                    <AppText style={styles.comparisonValue}>{formatWeight(approvedWeight)}</AppText>
-                    {weightDiff !== 0 && (
-                      <AppText
-                        style={[
-                          styles.diffText,
-                          weightDiff > 0 ? styles.positiveDiff : styles.negativeDiff,
-                        ]}
-                      >
-                        {weightDiff > 0 ? `+${formatWeight(weightDiff)}` : formatWeight(weightDiff)}
-                      </AppText>
-                    )}
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Pending Indicator */}
-      {isPending && (
-        <View style={styles.pendingSection}>
-          <LinearGradient
-            colors={[colors.warning + '15', colors.warning + '05']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.pendingCard}
-          >
-            <Ionicons name="time-outline" size={24} color={colors.warning} />
-            <View style={styles.pendingContent}>
-              <AppText style={styles.pendingTitle}>Pending Approval</AppText>
-              <AppText style={styles.pendingText}>
-                This request is waiting for approval from the warehouse manager.
-              </AppText>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
-
-      {isApproved && (
-        <View style={styles.pendingSection}>
-          <LinearGradient
-            colors={[colors.warning + '15', colors.warning + '05']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.pendingCard}
-          >
-            <Ionicons name="cube-outline" size={24} color={colors.warning} />
-            <View style={styles.pendingContent}>
-              <AppText style={styles.pendingTitle}>Approved</AppText>
-              <AppText style={styles.pendingText}>
-                This top-up is approved and waiting for salesman acceptance.
-              </AppText>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
-
-      {isAccepted && (
-        <View style={styles.approvedSection}>
-          <LinearGradient
-            colors={[colors.success + '15', colors.success + '05']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.approvedCard}
-          >
-            <View style={styles.approvedHeader}>
-              <View style={[styles.approvedIcon, { backgroundColor: colors.success + '15' }]}>
-                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              </View>
-              <View>
-                <AppText style={styles.approvedTitle}>Accepted</AppText>
-                <AppText style={styles.approvedDate}>
-                  {detail.acceptedAt ? formatDateTime(detail.acceptedAt) : formatDateTime(detail.updatedAt)}
-                </AppText>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
-
-      {/* Rejected Indicator */}
-      {isRejected && (
-        <View style={styles.rejectedSection}>
-          <LinearGradient
-            colors={[colors.error + '15', colors.error + '05']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.rejectedCard}
-          >
-            <Ionicons name="alert-circle" size={24} color={colors.error} />
-            <View style={styles.rejectedContent}>
-              <AppText style={styles.rejectedTitle}>Request Rejected</AppText>
-              <AppText style={styles.rejectedText}>
-                {detail.rejectedReason || 'No reason provided'}
-              </AppText>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
-
-      {isDeclined && (
-        <View style={styles.rejectedSection}>
-          <LinearGradient
-            colors={[colors.error + '15', colors.error + '05']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.rejectedCard}
-          >
-            <Ionicons name="close-circle" size={24} color={colors.error} />
-            <View style={styles.rejectedContent}>
-              <AppText style={styles.rejectedTitle}>Declined</AppText>
-              <AppText style={styles.rejectedText}>
-                {detail.declinedReason || 'Declined by salesman'}
-              </AppText>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
-
-      {/* Approved By Section (for approved requests) */}
-      {isApproved && detail.approvedByName && (
-        <View style={styles.approvedSection}>
-          <LinearGradient
-            colors={[colors.success + '15', colors.success + '05']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.approvedCard}
-          >
-            <View style={styles.approvedHeader}>
-              <View style={[styles.approvedIcon, { backgroundColor: colors.success + '15' }]}>
-                <Ionicons name="shield-checkmark" size={20} color={colors.success} />
-              </View>
-              <View>
-                <AppText style={styles.approvedTitle}>Approved By</AppText>
-                <AppText style={styles.approvedName}>{detail.approvedByName}</AppText>
-                <AppText style={styles.approvedDate}>
-                  {detail.approvedAt
-                    ? formatDateTime(detail.approvedAt)
-                    : formatDateTime(detail.updatedAt)}
-                </AppText>
-              </View>
-            </View>
-          </LinearGradient>
-        </View>
-      )}
-
-      {/* Remark */}
-      {detail.remark && (
-        <View style={styles.remarkCard}>
-          <Ionicons name="chatbubble-outline" size={18} color={colors.textSecondary} />
-          <AppText style={[styles.remarkText, { color: colors.textSecondary }]}>
-            {detail.remark}
+        <View style={styles.statusCalloutCopy}>
+          <AppText style={[styles.statusCalloutTitle, { color: statusColor }]}>
+            {statusLabel}
           </AppText>
+          <AppText style={styles.statusCalloutText}>{statusCopy[detail.status]}</AppText>
+        </View>
+      </View>
+
+      <View style={styles.detailSection}>
+        <AppText style={styles.detailSectionTitle}>Request information</AppText>
+        <View style={styles.detailInfoCard}>
+          <InfoRow
+            icon="business-outline"
+            label="Warehouse"
+            value={detail.warehouseId || 'Not assigned'}
+            colors={colors}
+            styles={styles}
+          />
+          <View style={styles.detailInfoDivider} />
+          <InfoRow
+            icon="person-outline"
+            label="Requested by"
+            value={detail.employeeName || detail.employeeId || 'Unknown'}
+            colors={colors}
+            styles={styles}
+          />
+          <View style={styles.detailInfoDivider} />
+          <InfoRow
+            icon="calendar-clear-outline"
+            label="Requested on"
+            value={formatDateTime(detail.date)}
+            colors={colors}
+            styles={styles}
+          />
+        </View>
+      </View>
+
+      <View style={styles.detailSection}>
+        <View style={styles.sectionTitleRow}>
+          <AppText style={styles.detailSectionTitle}>Quantity summary</AppText>
+          {hasApprovedTotals && (
+            <View style={styles.comparisonLegend}>
+              <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
+              <AppText style={styles.legendText}>Requested</AppText>
+              <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+              <AppText style={styles.legendText}>Approved</AppText>
+            </View>
+          )}
+        </View>
+        <View style={styles.metricTable}>
+          {metrics.map((metric, index) => (
+            <View key={metric.label}>
+              <View style={styles.metricRow}>
+                <AppText style={styles.metricLabel}>{metric.label}</AppText>
+                <View style={styles.metricValues}>
+                  <AppText style={styles.metricRequested}>{metric.requested}</AppText>
+                  {metric.approvedVisible && (
+                    <>
+                      <Ionicons name="arrow-forward" size={13} color={colors.textQuaternary} />
+                      <AppText style={styles.metricApproved}>{metric.approved}</AppText>
+                    </>
+                  )}
+                </View>
+              </View>
+              {index < metrics.length - 1 && <View style={styles.metricDivider} />}
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {(detail.approvedByName || detail.acceptedAt) && (
+        <View style={styles.detailSection}>
+          <AppText style={styles.detailSectionTitle}>Activity</AppText>
+          <View style={styles.timelineCard}>
+            {detail.approvedByName && (
+              <TimelineRow
+                icon="shield-checkmark-outline"
+                title={`Approved by ${detail.approvedByName}`}
+                date={formatDateTime(detail.approvedAt || detail.updatedAt)}
+                color={colors.info}
+                styles={styles}
+              />
+            )}
+            {detail.acceptedAt && (
+              <TimelineRow
+                icon="checkmark-done-outline"
+                title="Stock accepted"
+                date={formatDateTime(detail.acceptedAt)}
+                color={colors.success}
+                styles={styles}
+              />
+            )}
+          </View>
+        </View>
+      )}
+
+      {detail.remark && (
+        <View style={styles.detailSection}>
+          <AppText style={styles.detailSectionTitle}>Remark</AppText>
+          <View style={styles.modernRemarkCard}>
+            <MaterialCommunityIcons name="message-text-outline" size={19} color={colors.primary} />
+            <AppText style={styles.modernRemarkText}>{detail.remark}</AppText>
+          </View>
         </View>
       )}
     </ScrollView>
   );
 };
+
+const InfoRow = ({ icon, label, value, colors, styles }: any) => (
+  <View style={styles.detailInfoRow}>
+    <View style={styles.detailInfoIcon}>
+      <Ionicons name={icon} size={17} color={colors.primary} />
+    </View>
+    <View style={styles.detailInfoCopy}>
+      <AppText style={styles.detailInfoLabel}>{label}</AppText>
+      <AppText style={styles.detailInfoValue} numberOfLines={2}>
+        {value}
+      </AppText>
+    </View>
+  </View>
+);
+
+const TimelineRow = ({ icon, title, date, color, styles }: any) => (
+  <View style={styles.timelineRow}>
+    <View style={[styles.timelineIcon, { backgroundColor: color + '14' }]}>
+      <Ionicons name={icon} size={17} color={color} />
+    </View>
+    <View style={styles.timelineCopy}>
+      <AppText style={styles.timelineTitle}>{title}</AppText>
+      <AppText style={styles.timelineDate}>{date}</AppText>
+    </View>
+  </View>
+);

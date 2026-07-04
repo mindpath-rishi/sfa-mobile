@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "224520668749",
-    "project_id": "sales-force-automation-d398d",
-    "storage_bucket": "sales-force-automation-d398d.firebasestorage.app"
+    "project_number": "325326236916",
+    "project_id": "sales-stream-mobile",
+    "storage_bucket": "sales-stream-mobile.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:224520668749:android:d0253921ef2a5715bcbe04",
+        "mobilesdk_app_id": "1:325326236916:android:c176af667e4f845fae02a1",
         "android_client_info": {
-          "package_name": "com.sfa.app"
+          "package_name": "com.salesstream.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyAMD2Y9krfpntUaDUwnABPVjjWNz28UJ00"
+          "current_key": "AIzaSyC1vO2j9-ZppBMP-si_2j1ne6g6FZnFRq0"
         }
       ],
       "services": {

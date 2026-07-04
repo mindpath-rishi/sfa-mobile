@@ -45,9 +45,7 @@ export default function TopupScreen({
   const { user } = useAuthStore();
   const van = useRouteStore((state) => state.van);
   const styles = useTopupStyles();
-  const offline = useOfflineStore(
-    (state) => !state.isConnected || !state.isInternetReachable,
-  );
+  const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);
 
   const { setHeader } = useHeader();
   const { updateTopupFilterCount, resetTopupFilterCount, setOpenTopupFilterHandler } =
@@ -291,7 +289,6 @@ export default function TopupScreen({
       setHeader({
         title: `${vanName} Top-up`,
         showBack: true,
-        showSearchBar: false,
         showSearch: false,
         showFilter: false,
         filterCount: activeFilterCount,
@@ -299,8 +296,6 @@ export default function TopupScreen({
         onFilterPress: () => setShowFilters(true),
         rightIcon: offline ? undefined : HEADER.RIGHT_ICON,
         onRightPress: offline ? undefined : handleCreateTopup,
-        elevated: true,
-        showBorder: false,
         backgroundColor: colors.primary,
       });
       if (hasFocusedOnce.current) {

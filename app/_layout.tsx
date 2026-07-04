@@ -31,11 +31,13 @@ import {
 } from '@/shared/services/push-notification.service';
 import { authService } from '@/features/auth/services/auth.service';
 import { getClientDeviceIdAsync } from '@/shared/services/device.service';
-import '@/shared/services/location.service';
+import {
+  startSalesmanBackgroundLocation,
+  syncPendingLocationUploads,
+} from '@/shared/services/location.service';
 import {
   initialiseOffline,
   OfflineSyncGate,
-  OfflineStatusBanner,
   subscribeToOfflineSync,
   syncOfflineQueue,
 } from '@/core/offline';
@@ -55,6 +57,7 @@ export default function RootLayout() {
   const { hydrate: hydrateLanguage, hydrated: languageHydrated } = useLanguageStore();
 
   const { hydrate: hydrateAuth, isHydrated: authHydrated, accessToken: token } = useAuthStore();
+  const authUser = useAuthStore((state) => state.user);
 
   const errorType = useGlobalErrorStore((s) => s.type);
   const clearError = useGlobalErrorStore((s) => s.clear);
@@ -77,6 +80,14 @@ export default function RootLayout() {
     return () => subscription.remove();
   }, []);
 
+  // The first initialization can run before auth hydration has restored the
+  // user on a cold mobile launch. Reinitialize for the resolved user so their
+  // saved offline preference, sync watermark, and queue are loaded correctly.
+  useEffect(() => {
+    if (!authHydrated || !authUser?.userId) return;
+    void initialiseOffline();
+  }, [authHydrated, authUser?.userId]);
+
   // Auth hydration can finish after the network listener is registered. Re-check
   // the salesman queue once a persisted or newly-created session becomes active.
   useEffect(() => {
@@ -91,6 +102,23 @@ export default function RootLayout() {
       appState.remove();
     };
   }, [token]);
+
+  // Reopen/reboot recovery: the location service reads the persisted active
+  // work-session id and safely no-ops when no work day is active.
+  useEffect(() => {
+    if (!authHydrated || !token || !authUser) return;
+
+    const resumeLocationTracking = () => {
+      void startSalesmanBackgroundLocation(authUser);
+      void syncPendingLocationUploads();
+    };
+    resumeLocationTracking();
+
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'active') resumeLocationTracking();
+    });
+    return () => appState.remove();
+  }, [authHydrated, token, authUser]);
 
   useEffect(() => {
     setupNotificationChannelAsync().catch((error) =>
@@ -243,7 +271,6 @@ export default function RootLayout() {
                 <Stack.Screen name="(drawer)" />
               </Stack>
             </HeaderProvider>
-            <OfflineStatusBanner />
             <OfflineSyncGate />
             <LoaderOverlay />
             <Toast position="top" />

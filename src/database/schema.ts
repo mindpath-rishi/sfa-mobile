@@ -23,7 +23,7 @@ const entityTables = Object.values(ENTITY_TABLES)
   )
   .join('\n');
 
-export const DATABASE_SCHEMA_VERSION = 1;
+export const DATABASE_SCHEMA_VERSION = 2;
 export const DATABASE_SCHEMA = `
   PRAGMA journal_mode = WAL;
   PRAGMA synchronous = FULL;

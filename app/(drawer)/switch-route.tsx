@@ -3,22 +3,22 @@ import {
   View,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   RefreshControl,
   StyleSheet,
   Platform,
   Dimensions,
   Animated,
   FlatList,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, usePathname } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppText, Skeleton } from '@/core/components';
+import { AppText, SearchBar, Skeleton } from '@/core/components';
 import { EmptyState } from '@/core/components/EmptyState';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import {
@@ -90,23 +90,57 @@ interface ChangeRouteSummary {
 const ROUTE_OUTLETS_LIMIT = 100;
 const ESTIMATED_TIME_PER_OUTLET = 5;
 
-export default function ChangeRoute() {
+export default function Routes() {
   const { colors } = useTheme();
   const { setHeader } = useHeader();
   const { selectedRoute, setSelectedRoute, van } = useRouteStore();
   const workSessionId = useAuthStore((state) => state.workSessionId);
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const params = useLocalSearchParams<{ route?: string }>();
+
+  const routeStep: 'routes' | 'outlets' | 'confirmation' = pathname.endsWith('/confirmation')
+    ? 'confirmation'
+    : pathname.endsWith('/outlets')
+      ? 'outlets'
+      : 'routes';
+
+  const handleGoBack = useCallback(() => {
+    if (routeStep === 'confirmation') {
+      router.navigate({
+        pathname: '/switch-route/outlets' as any,
+        params: params.route ? { route: params.route } : undefined,
+      });
+      return;
+    }
+
+    if (routeStep === 'outlets') {
+      router.navigate('/switch-route');
+      return;
+    }
+
+    router.back();
+  }, [params.route, routeStep]);
+
+  const routeFromParams = React.useMemo<VanRoute | null>(() => {
+    if (!params.route) return null;
+    try {
+      return JSON.parse(params.route) as VanRoute;
+    } catch {
+      return null;
+    }
+  }, [params.route]);
 
   const fadeInAnim = useRef(new Animated.Value(0)).current;
 
   const [routes, setRoutes] = useState<VanRoute[]>([]);
-  const [selectedVanRoute, setSelectedVanRoute] = useState<VanRoute | null>(null);
+  const [selectedVanRoute, setSelectedVanRoute] = useState<VanRoute | null>(routeFromParams);
   const [outlets, setOutlets] = useState<RouteOutlet[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentStep, setCurrentStep] = useState<'routes' | 'outlets' | 'confirmation'>('routes');
+  const currentStep = routeStep;
   const [searchQuery, setSearchQuery] = useState('');
   const [hasValidSession, setHasValidSession] = useState(true);
 
@@ -137,9 +171,16 @@ export default function ChangeRoute() {
     React.useCallback(() => {
       isMountedRef.current = true;
       setHeader({
-        title: 'Change Route',
+        title:
+          routeStep === 'confirmation'
+            ? 'Review Route'
+            : routeStep === 'outlets'
+              ? 'Route Outlets'
+              : 'Routes',
         showBack: true,
         showMenu: false,
+        size: 'small',
+        onBackPress: handleGoBack,
       });
 
       startAnimations();
@@ -147,7 +188,20 @@ export default function ChangeRoute() {
       return () => {
         isMountedRef.current = false;
       };
-    }, []),
+    }, [handleGoBack, routeStep, setHeader]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'web' || routeStep === 'routes') return;
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleGoBack();
+        return true;
+      });
+
+      return () => subscription.remove();
+    }, [handleGoBack, routeStep]),
   );
 
   const startAnimations = () => {
@@ -165,6 +219,25 @@ export default function ChangeRoute() {
     }
 
     setIsLoadingRoutes(true);
+    const currentRouteFromStore: VanRoute | null = selectedRoute?.routeId
+      ? {
+          routeId: selectedRoute.routeId,
+          routeName: selectedRoute.routeName || selectedRoute.name || 'Current route',
+          routeCode: selectedRoute.routeCode,
+          routeSessionId: selectedRoute.routeSessionId || '',
+          workSessionId: selectedRoute.workSessionId || workSessionId || '',
+          vanId: selectedRoute.vanId || van?.vanId || '',
+          name: selectedRoute.routeName || selectedRoute.name || 'Current route',
+          totalShops: selectedRoute.totalShops || 0,
+          distance: selectedRoute.distance || 'N/A',
+          stops: selectedRoute.totalShops || 0,
+          customerCategoryId: selectedRoute.customerCategoryId,
+          marketId: selectedRoute.marketId ? String(selectedRoute.marketId) : undefined,
+          provinceId: selectedRoute.provinceId ? String(selectedRoute.provinceId) : undefined,
+          countryId: selectedRoute.countryId ? String(selectedRoute.countryId) : undefined,
+        }
+      : null;
+
     try {
       const response: any = await homeService.getVanMappedRoutes();
 
@@ -188,12 +261,23 @@ export default function ChangeRoute() {
           }),
         }));
 
-        const filteredRoutes = transformedRoutes.filter(
-          (route: VanRoute) => route.routeId !== selectedRoute?.routeId,
+        const hasCurrentRoute = transformedRoutes.some(
+          (route: VanRoute) => route.routeId === selectedRoute?.routeId,
         );
-        setRoutes(filteredRoutes);
+        const availableRoutes =
+          currentRouteFromStore && !hasCurrentRoute
+            ? [currentRouteFromStore, ...transformedRoutes]
+            : transformedRoutes;
+
+        setRoutes(
+          availableRoutes.sort((left: VanRoute, right: VanRoute) => {
+            if (left.routeId === selectedRoute?.routeId) return -1;
+            if (right.routeId === selectedRoute?.routeId) return 1;
+            return left.routeName.localeCompare(right.routeName);
+          }),
+        );
       } else {
-        setRoutes([]);
+        setRoutes(currentRouteFromStore ? [currentRouteFromStore] : []);
       }
     } catch (error) {
       console.error('Failed to fetch routes:', error);
@@ -203,18 +287,17 @@ export default function ChangeRoute() {
     } finally {
       setIsLoadingRoutes(false);
     }
-  }, [selectedRoute?.routeId, workSessionId, validateWorkSession]);
+  }, [selectedRoute, van?.vanId, workSessionId, validateWorkSession]);
 
   useFocusEffect(
     useCallback(() => {
-      if (validateWorkSession()) {
-        setCurrentStep('routes');
+      if (routeStep === 'routes' && validateWorkSession()) {
         setSelectedVanRoute(null);
         setOutlets([]);
         setSearchQuery('');
         void fetchRoutes();
       }
-    }, [fetchRoutes, validateWorkSession]),
+    }, [fetchRoutes, routeStep, validateWorkSession]),
   );
 
   const fetchRouteOutlets = useCallback(
@@ -265,6 +348,15 @@ export default function ChangeRoute() {
     [workSessionId, validateWorkSession],
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      if (routeStep === 'routes' || !routeFromParams || !validateWorkSession()) return;
+
+      setSelectedVanRoute(routeFromParams);
+      void fetchRouteOutlets(routeFromParams);
+    }, [fetchRouteOutlets, routeFromParams, routeStep, validateWorkSession]),
+  );
+
   const transformOutletsData = (outletsData: any[]): RouteOutlet[] => {
     return outletsData.map((outlet: any, index: number) => ({
       outletId: outlet.customerId || outlet._id,
@@ -291,15 +383,22 @@ export default function ChangeRoute() {
     return 'PENDING';
   };
 
-  const handleRouteSelect = async (route: VanRoute) => {
+  const handleRouteSelect = (route: VanRoute) => {
     if (!validateWorkSession()) return;
+
+    if (route.routeId === selectedRoute?.routeId) {
+      router.push('/route');
+      return;
+    }
 
     if (!isWeb) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     setSelectedVanRoute(route);
-    await fetchRouteOutlets(route);
-    setCurrentStep('outlets');
+    router.push({
+      pathname: '/switch-route/outlets' as any,
+      params: { route: JSON.stringify(route) },
+    });
   };
 
   const handleProceedToConfirmation = () => {
@@ -308,7 +407,12 @@ export default function ChangeRoute() {
     if (!isWeb) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    setCurrentStep('confirmation');
+    if (!selectedVanRoute) return;
+
+    router.push({
+      pathname: '/switch-route/confirmation' as any,
+      params: { route: JSON.stringify(selectedVanRoute) },
+    });
   };
 
   const handleSubmitChange = async () => {
@@ -353,7 +457,6 @@ export default function ChangeRoute() {
         }
 
         toast.success('Success', `Route changed to "${selectedVanRoute.routeName}"`);
-        setCurrentStep('routes');
         setTimeout(() => {
           router.push('/route');
         }, 500);
@@ -390,19 +493,6 @@ export default function ChangeRoute() {
     setRefreshing(false);
   };
 
-  const handleGoBack = () => {
-    if (currentStep === 'confirmation') {
-      setCurrentStep('outlets');
-    } else if (currentStep === 'outlets') {
-      setCurrentStep('routes');
-      setSearchQuery('');
-      setSelectedVanRoute(null);
-      setOutlets([]);
-    } else {
-      router.back();
-    }
-  };
-
   const getVisitStatusColor = (status: string): string => {
     const statusColors: Record<string, string> = {
       VISITED: colors.success,
@@ -428,9 +518,16 @@ export default function ChangeRoute() {
     return `${hours}h ${remainingMinutes}m`;
   };
 
-  const filteredRoutes = routes.filter((route) =>
-    route.routeName.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const currentRoute = routes.find((route) => route.routeId === selectedRoute?.routeId) || null;
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredRoutes = routes.filter((route) => {
+    if (route.routeId === selectedRoute?.routeId) return false;
+    if (!normalizedSearchQuery) return true;
+
+    return [route.routeName, route.routeCode].some((value) =>
+      value?.toLowerCase().includes(normalizedSearchQuery),
+    );
+  });
 
   const styles = getStyles(colors, insets);
 
@@ -490,45 +587,47 @@ export default function ChangeRoute() {
     </SafeAreaView>
   );
 
-  const renderRouteCard = (route: VanRoute) => (
-    <TouchableOpacity
-      key={route.routeId}
-      style={styles.routeCard}
-      onPress={() => handleRouteSelect(route)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.routeCardInner}>
-        <View style={styles.routeIconSection}>
-          <LinearGradient
-            colors={[colors.primary + '20', colors.primary + '10']}
-            style={styles.routeIcon}
-          >
-            <Ionicons name="map-outline" size={24} color={colors.primary} />
-          </LinearGradient>
-        </View>
-
-        <View style={styles.routeContent}>
-          <AppText style={styles.routeName} numberOfLines={2}>
-            {route.routeName}
-          </AppText>
-          <View style={styles.routeMetaRow}>
-            <View style={styles.routeMetaItem}>
-              <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
-              <AppText style={styles.routeMetaText}>{route.totalShops} outlets</AppText>
-            </View>
-            {route.distance !== 'N/A' && (
-              <View style={styles.routeMetaItem}>
-                <Ionicons name="navigate-outline" size={12} color={colors.textSecondary} />
-                <AppText style={styles.routeMetaText}>{route.distance}</AppText>
-              </View>
-            )}
+  const renderRouteCard = (route: VanRoute) => {
+    return (
+      <TouchableOpacity
+        key={route.routeId}
+        style={styles.routeCard}
+        onPress={() => handleRouteSelect(route)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.routeCardInner}>
+          <View style={styles.routeIconSection}>
+            <LinearGradient
+              colors={[colors.primary + '20', colors.primary + '10']}
+              style={styles.routeIcon}
+            >
+              <Ionicons name="map-outline" size={24} color={colors.primary} />
+            </LinearGradient>
           </View>
-        </View>
 
-        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-      </View>
-    </TouchableOpacity>
-  );
+          <View style={styles.routeContent}>
+            <AppText style={styles.routeName} numberOfLines={2}>
+              {route.routeName}
+            </AppText>
+            <View style={styles.routeMetaRow}>
+              <View style={styles.routeMetaItem}>
+                <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
+                <AppText style={styles.routeMetaText}>{route.totalShops} outlets</AppText>
+              </View>
+              {route.distance !== 'N/A' && (
+                <View style={styles.routeMetaItem}>
+                  <Ionicons name="navigate-outline" size={12} color={colors.textSecondary} />
+                  <AppText style={styles.routeMetaText}>{route.distance}</AppText>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderOutletItem = ({ item, index }: { item: RouteOutlet; index: number }) => {
     const statusColor = getVisitStatusColor(item.visitStatus);
@@ -563,32 +662,59 @@ export default function ChangeRoute() {
   const renderRoutesList = () => (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
+        <View style={styles.fixedSearchContainer}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search routes..."
+            clearable
+            debounceDelay={0}
+          />
+        </View>
         <ScrollView
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          contentContainerStyle={styles.scrollContainer}
+          contentContainerStyle={[styles.scrollContainer, styles.routesScrollContainer]}
         >
-          <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search routes..."
-              placeholderTextColor={colors.textTertiary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
+          {!isLoadingRoutes && currentRoute && (
+            <View style={styles.routeSection}>
+              <View style={styles.sectionHeadingRow}>
+                <AppText style={styles.sectionHeading}>Selected route</AppText>
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <AppText style={styles.liveBadgeText}>ACTIVE</AppText>
+                </View>
+              </View>
+              <View style={styles.routesGrid}>{renderRouteCard(currentRoute)}</View>
+            </View>
+          )}
 
           {isLoadingRoutes ? (
             renderRouteListSkeleton()
-          ) : filteredRoutes.length === 0 ? (
-            <EmptyState
-              title={searchQuery ? 'No Routes Found' : 'No Routes Available'}
-              icon="map-outline"
-            />
           ) : (
-            <View style={styles.routesGrid}>
-              {filteredRoutes.map((route) => renderRouteCard(route))}
+            <View style={styles.routeSection}>
+              <View style={styles.sectionHeadingRow}>
+                <AppText style={styles.sectionHeading}>Available routes</AppText>
+                <AppText style={styles.sectionCount}>{filteredRoutes.length}</AppText>
+              </View>
+              {filteredRoutes.length === 0 ? (
+                <EmptyState
+                  title={searchQuery ? 'No routes found' : 'No routes available'}
+                  description={
+                    searchQuery
+                      ? 'Try a different route name or code'
+                      : 'No other routes are assigned'
+                  }
+                  icon={searchQuery ? 'search-outline' : 'map-outline'}
+                  actionLabel={searchQuery ? 'Clear search' : undefined}
+                  onAction={searchQuery ? () => setSearchQuery('') : undefined}
+                  size="small"
+                />
+              ) : (
+                <View style={styles.routesGrid}>
+                  {filteredRoutes.map((route) => renderRouteCard(route))}
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -647,112 +773,88 @@ export default function ChangeRoute() {
         <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContainer}
+            contentContainerStyle={[styles.scrollContainer, styles.reviewScrollContainer]}
           >
-            {/* Confirmation Header */}
-            <View style={styles.confirmationHeader}>
-              <View style={styles.confirmationIconContainer}>
-                <Ionicons name="swap-horizontal" size={48} color={colors.primary} />
-              </View>
-              <AppText style={styles.confirmationTitle}>Review Route Change</AppText>
-              <AppText style={styles.confirmationSubtitle}>
-                Please review the details before confirming
-              </AppText>
-            </View>
-
-            {/* Current Route Card */}
-            <View style={styles.comparisonSection}>
-              <View style={[styles.comparisonCard, styles.currentRouteCard]}>
-                <View style={styles.comparisonBadge}>
-                  <Ionicons
-                    name="checkmark-circle-outline"
-                    size={14}
-                    color={colors.textSecondary}
-                  />
-                  <AppText style={styles.comparisonBadgeText}>Current</AppText>
-                </View>
-                <AppText style={styles.comparisonRouteName}>
-                  {summary.currentRoute?.routeName || 'No route'}
-                </AppText>
-                <View style={styles.comparisonStats}>
-                  <View style={styles.comparisonStat}>
-                    <Ionicons name="business-outline" size={13} color={colors.textSecondary} />
-                    <AppText style={styles.comparisonStatText}>
+            <View style={styles.reviewSection}>
+              <View style={styles.routeChangeCard}>
+                <View style={styles.routeChangeRow}>
+                  <View style={[styles.routeMarker, styles.currentRouteMarker]}>
+                    <Ionicons name="location-outline" size={19} color={colors.textSecondary} />
+                  </View>
+                  <View style={styles.routeChangeContent}>
+                    <AppText style={styles.routeChangeLabel}>CURRENT ROUTE</AppText>
+                    <AppText style={styles.routeChangeName} numberOfLines={2}>
+                      {summary.currentRoute?.routeName || 'No active route'}
+                    </AppText>
+                    <AppText style={styles.routeChangeMeta}>
                       {summary.currentRoute?.totalShops || 0} outlets
                     </AppText>
                   </View>
                 </View>
-              </View>
 
-              {/* Arrow */}
-              <View style={styles.arrowSection}>
-                <View style={[styles.arrowIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Ionicons name="arrow-down" size={20} color={colors.primary} />
+                <View style={styles.routeChangeDivider}>
+                  <View style={styles.dividerLine} />
+                  <View style={styles.swapIndicator}>
+                    <Ionicons name="arrow-down" size={16} color={colors.primary} />
+                  </View>
+                  <View style={styles.dividerLine} />
                 </View>
-              </View>
 
-              {/* New Route Card */}
-              <View style={[styles.comparisonCard, styles.newRouteCard]}>
-                <View style={[styles.comparisonBadge, styles.newBadge]}>
-                  <Ionicons name="star-outline" size={14} color="#FFF" />
-                  <AppText style={[styles.comparisonBadgeText, styles.newBadgeText]}>New</AppText>
-                </View>
-                <AppText style={[styles.comparisonRouteName, styles.newRouteName]}>
-                  {summary.newRoute?.routeName || 'N/A'}
-                </AppText>
-                <View style={styles.comparisonStats}>
-                  <View style={styles.comparisonStat}>
-                    <Ionicons name="business-outline" size={13} color={colors.primary} />
-                    <AppText style={[styles.comparisonStatText, { color: colors.primary }]}>
-                      {summary.newRoute?.totalShops || 0} outlets
+                <View style={styles.routeChangeRow}>
+                  <View style={[styles.routeMarker, styles.newRouteMarker]}>
+                    <Ionicons name="navigate" size={19} color={colors.primary} />
+                  </View>
+                  <View style={styles.routeChangeContent}>
+                    <View style={styles.newRouteLabelRow}>
+                      <AppText style={[styles.routeChangeLabel, { color: colors.primary }]}>
+                        NEW ROUTE
+                      </AppText>
+                      <View style={styles.selectedBadge}>
+                        <Ionicons name="checkmark" size={11} color={colors.primary} />
+                        <AppText style={styles.selectedBadgeText}>SELECTED</AppText>
+                      </View>
+                    </View>
+                    <AppText
+                      style={[styles.routeChangeName, { color: colors.primary }]}
+                      numberOfLines={2}
+                    >
+                      {summary.newRoute?.routeName || 'Not selected'}
+                    </AppText>
+                    <AppText style={styles.routeChangeMeta}>
+                      {summary.totalOutlets} outlets assigned
                     </AppText>
                   </View>
                 </View>
               </View>
             </View>
 
-            {/* Statistics Grid */}
-            <View style={styles.statsGrid}>
-              <View style={styles.statCardWrapper}>
-                <LinearGradient
-                  colors={[colors.primary + '15', colors.primary + '08']}
-                  style={styles.statCardGradient}
-                >
-                  <Ionicons name="business-outline" size={24} color={colors.primary} />
+            <View style={styles.reviewSection}>
+              <AppText style={styles.reviewSectionTitle}>New route summary</AppText>
+              <View style={styles.statsGrid}>
+                <View style={styles.statCardWrapper}>
+                  <View style={[styles.statIcon, { backgroundColor: colors.primary + '12' }]}>
+                    <Ionicons name="storefront-outline" size={19} color={colors.primary} />
+                  </View>
                   <AppText style={styles.statCardValue}>{summary.totalOutlets}</AppText>
-                  <AppText style={styles.statCardLabel}>Outlets</AppText>
-                </LinearGradient>
-              </View>
+                  <AppText style={styles.statCardLabel}>Total outlets</AppText>
+                </View>
 
-              <View style={styles.statCardWrapper}>
-                <LinearGradient
-                  colors={[colors.warning + '15', colors.warning + '08']}
-                  style={styles.statCardGradient}
-                >
-                  <Ionicons name="time-outline" size={24} color={colors.warning} />
+                <View style={styles.statCardWrapper}>
+                  <View style={[styles.statIcon, { backgroundColor: colors.warning + '12' }]}>
+                    <Ionicons name="time-outline" size={19} color={colors.warning} />
+                  </View>
                   <AppText style={styles.statCardValue}>{summary.estimatedTime}</AppText>
                   <AppText style={styles.statCardLabel}>Est. Time</AppText>
-                </LinearGradient>
-              </View>
+                </View>
 
-              <View style={styles.statCardWrapper}>
-                <LinearGradient
-                  colors={[colors.success + '15', colors.success + '08']}
-                  style={styles.statCardGradient}
-                >
-                  <Ionicons name="checkmark-outline" size={24} color={colors.success} />
+                <View style={styles.statCardWrapper}>
+                  <View style={[styles.statIcon, { backgroundColor: colors.success + '12' }]}>
+                    <Ionicons name="hourglass-outline" size={19} color={colors.success} />
+                  </View>
                   <AppText style={styles.statCardValue}>{summary.outletsToVisit.length}</AppText>
-                  <AppText style={styles.statCardLabel}>Pending</AppText>
-                </LinearGradient>
+                  <AppText style={styles.statCardLabel}>To visit</AppText>
+                </View>
               </View>
-            </View>
-
-            {/* Warning */}
-            <View style={styles.warningCard}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.warning} />
-              <AppText style={styles.warningText}>
-                Your current progress will be reset. Unvisited outlets will be marked as pending.
-              </AppText>
             </View>
           </ScrollView>
         </Animated.View>
@@ -831,29 +933,73 @@ const getStyles = (colors: any, insets: any) =>
     scrollContainer: {
       paddingBottom: 100,
     },
+    routesScrollContainer: {
+      paddingTop: 16,
+    },
     emptyStateContainer: {
       flexGrow: 1,
       justifyContent: 'center',
       minHeight: Dimensions.get('window').height - 100,
     },
-    searchContainer: {
+    routeSection: {
+      marginBottom: 18,
+    },
+    sectionHeadingRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 24,
       marginHorizontal: 16,
-      marginBottom: 20,
-      marginTop: 16,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.divider,
-      gap: 10,
+      marginBottom: 10,
     },
-    searchInput: {
-      flex: 1,
-      fontSize: 14,
+    sectionHeading: {
       color: colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+      lineHeight: 18,
+      letterSpacing: 0.2,
+      textTransform: 'uppercase',
+    },
+    sectionCount: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+      backgroundColor: colors.surface,
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    liveBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      minHeight: 24,
+      paddingHorizontal: 9,
+      borderRadius: 12,
+      backgroundColor: colors.success + '15',
+    },
+    liveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.success,
+    },
+    liveBadgeText: {
+      color: colors.success,
+      fontSize: 9,
+      fontWeight: '800',
+      lineHeight: 12,
+      letterSpacing: 0.5,
+    },
+    fixedSearchContainer: {
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 8,
+      backgroundColor: colors.background,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.divider,
     },
     centerContainer: {
       flex: 1,
@@ -898,6 +1044,7 @@ const getStyles = (colors: any, insets: any) =>
     },
     routeContent: {
       flex: 1,
+      minWidth: 0,
       gap: 6,
     },
     routeName: {
@@ -908,6 +1055,7 @@ const getStyles = (colors: any, insets: any) =>
     },
     routeMetaRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 12,
     },
     routeMetaItem: {
@@ -1016,32 +1164,108 @@ const getStyles = (colors: any, insets: any) =>
       fontSize: 10,
       fontWeight: '600',
     },
-    confirmationHeader: {
-      alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingTop: 20,
-      paddingBottom: 16,
-      gap: 12,
+    reviewSection: {
+      paddingHorizontal: 16,
+      marginBottom: 20,
+      gap: 10,
     },
-    confirmationIconContainer: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: colors.primary + '15',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 8,
+    reviewScrollContainer: {
+      paddingTop: 16,
     },
-    confirmationTitle: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      textAlign: 'center',
-    },
-    confirmationSubtitle: {
-      fontSize: 14,
+    reviewSectionTitle: {
       color: colors.textSecondary,
-      textAlign: 'center',
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 0.7,
+      textTransform: 'uppercase',
+    },
+    routeChangeCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      padding: 14,
+    },
+    routeChangeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 2,
+    },
+    routeMarker: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    currentRouteMarker: {
+      backgroundColor: colors.background,
+    },
+    newRouteMarker: {
+      backgroundColor: colors.primary + '12',
+    },
+    routeChangeContent: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    routeChangeLabel: {
+      color: colors.textTertiary,
+      fontSize: 9,
+      fontWeight: '800',
+      letterSpacing: 0.7,
+    },
+    routeChangeName: {
+      color: colors.textPrimary,
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: '700',
+    },
+    routeChangeMeta: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      lineHeight: 16,
+    },
+    routeChangeDivider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginVertical: 10,
+      marginLeft: 52,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.divider,
+    },
+    swapIndicator: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary + '12',
+    },
+    newRouteLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    selectedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 7,
+      backgroundColor: colors.primary + '12',
+    },
+    selectedBadgeText: {
+      color: colors.primary,
+      fontSize: 8,
+      fontWeight: '800',
+      letterSpacing: 0.4,
     },
     comparisonSection: {
       gap: 16,
@@ -1121,20 +1345,27 @@ const getStyles = (colors: any, insets: any) =>
     },
     statsGrid: {
       flexDirection: 'row',
-      gap: 10,
-      paddingHorizontal: 16,
-      marginBottom: 20,
+      gap: 8,
     },
     statCardWrapper: {
       flex: 1,
-      borderRadius: 12,
-      overflow: 'hidden',
-    },
-    statCardGradient: {
-      paddingVertical: 12,
-      paddingHorizontal: 10,
+      minHeight: 116,
+      padding: 10,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
       alignItems: 'center',
-      gap: 6,
+      gap: 5,
+    },
+    statIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
     },
     statCardValue: {
       fontSize: 18,
@@ -1145,24 +1376,6 @@ const getStyles = (colors: any, insets: any) =>
       fontSize: 10,
       color: colors.textSecondary,
       fontWeight: '600',
-    },
-    warningCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      marginHorizontal: 16,
-      marginBottom: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 12,
-      backgroundColor: colors.warning + '10',
-      borderRadius: 12,
-    },
-    warningText: {
-      flex: 1,
-      fontSize: 12,
-      color: colors.warning,
-      lineHeight: 18,
-      fontWeight: '500',
     },
     footer: {
       position: 'absolute',

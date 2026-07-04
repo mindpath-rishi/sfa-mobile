@@ -1,4 +1,4 @@
-package com.sfa.app
+package com.salesstream.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

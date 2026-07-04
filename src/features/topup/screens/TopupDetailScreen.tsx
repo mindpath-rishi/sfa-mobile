@@ -4,12 +4,14 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Loader, AppText } from '@/core/components';
+import { AppText } from '@/core/components';
 import { EmptyState } from '@/core/components/EmptyState';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { vanService } from '@/shared/services/van.service';
 import { toast } from '@/shared/utils/toast';
+import { PageSkeleton } from '@/shared/components/PageSkeleton';
+import { Ionicons } from '@expo/vector-icons';
 
 import { TopupDetailHeader } from '../components/TopupDetailHeader';
 import { TopupDetailProducts } from '../components/TopupDetailProducts';
@@ -112,7 +114,7 @@ export const VanInventoryTopupDetail: React.FC = () => {
   }, [actionLoading, detail?.vanInventoryTopupId]);
 
   if (isLoading) {
-    return <Loader fullScreen overlay label="Loading details..." />;
+    return <PageSkeleton variant="detail" />;
   }
 
   if (!detail) {
@@ -145,29 +147,35 @@ export const VanInventoryTopupDetail: React.FC = () => {
       )}
 
       {detail.status === 'APPROVED' && (
-        <View style={{ flexDirection: 'row', gap: 10, padding: 16, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border }}>
+        <View style={styles.actionBar}>
           <TouchableOpacity
             activeOpacity={0.85}
             disabled={!!actionLoading}
             onPress={handleRejectTopup}
-            style={{ flex: 1, height: 48, borderRadius: 10, borderWidth: 1, borderColor: colors.error, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, opacity: actionLoading ? 0.7 : 1 }}
+            style={[styles.rejectButton, actionLoading && styles.actionDisabled]}
           >
             {actionLoading === 'reject' ? (
               <ActivityIndicator size="small" color={colors.error} />
             ) : (
-              <AppText style={{ color: colors.error, fontWeight: '700' }}>Reject</AppText>
+              <>
+                <Ionicons name="close-circle-outline" size={19} color={colors.error} />
+                <AppText style={styles.rejectButtonText}>Decline</AppText>
+              </>
             )}
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.85}
             disabled={!!actionLoading}
             onPress={handleAcceptTopup}
-            style={{ flex: 1, height: 48, borderRadius: 10, backgroundColor: colors.success, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6, opacity: actionLoading ? 0.7 : 1 }}
+            style={[styles.acceptButton, actionLoading && styles.actionDisabled]}
           >
             {actionLoading === 'accept' ? (
               <ActivityIndicator size="small" color={colors.primaryContrast} />
             ) : (
-              <AppText style={{ color: colors.primaryContrast, fontWeight: '700' }}>Accept Stock</AppText>
+              <>
+                <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+                <AppText style={styles.acceptButtonText}>Accept stock</AppText>
+              </>
             )}
           </TouchableOpacity>
         </View>

@@ -404,9 +404,7 @@ const CustomDrawerContent = (props: any) => {
   const roleId = getRoleId(user);
   const allowedRoutes = roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
   const loader = useLoaderStore();
-  const offline = useOfflineStore(
-    (state) => !state.isConnected || !state.isInternetReachable,
-  );
+  const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
@@ -471,7 +469,11 @@ const CustomDrawerContent = (props: any) => {
       toast.error(response?.message || 'Failed to complete day');
     } catch (error) {
       console.error('Error completing day:', error);
-      toast.error('Failed to complete day. Please try again.');
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error instanceof Error ? error.message : null) ||
+        'Failed to complete day. Please try again.';
+      toast.error(message);
     } finally {
       settleInFlightRef.current = false;
       loader.hide();
@@ -488,6 +490,8 @@ const CustomDrawerContent = (props: any) => {
 
       const statusRes: any = await homeService.getDayStatus('', {
         showLoader: false,
+        cache: false,
+        timeoutMs: 20_000,
       });
       const status = statusRes?.data?.status;
       if (status !== 'ACTIVE') {
@@ -795,7 +799,7 @@ export default function DrawerLayout() {
     },
 
     'switch-route': {
-      title: 'Change Route',
+      title: 'Routes',
       showMenu: false,
       showFilter: false,
       showBack: true,
@@ -826,7 +830,7 @@ export default function DrawerLayout() {
     },
 
     route: {
-      title: 'My Route',
+      title: 'Route',
       showMenu: false,
       showFilter: true,
       showBack: true,
@@ -942,8 +946,8 @@ export default function DrawerLayout() {
         },
         'switch-route': {
           component: MaterialCommunityIcons,
-          focusedIcon: 'swap-horizontal-circle',
-          unfocusedIcon: 'swap-horizontal-circle-outline',
+          focusedIcon: 'map-marker-path',
+          unfocusedIcon: 'map-outline',
         },
         'my-pocket': {
           component: MaterialCommunityIcons,
@@ -1056,8 +1060,9 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="route"
         options={{
-          title: 'Route Management',
-          drawerLabel: 'My Route',
+          title: 'Route',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
         }}
       />
 
@@ -1073,8 +1078,8 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="switch-route"
         options={{
-          title: 'Change Route',
-          drawerLabel: 'Change Route',
+          title: 'Routes',
+          drawerLabel: 'Routes',
         }}
       />
 

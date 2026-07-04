@@ -1,6 +1,6 @@
 {
   "common": {
-    "appTitle": "SFA",
+    "appTitle": "Sales Stream",
     "appFullName": "Sales Force Automation",
     "ok": "OK",
     "cancel": "Cancel",
@@ -88,7 +88,7 @@
       "loginWithBiometric": "Login with Biometric",
       "loginWithPassword": "Login with Password",
       "enterCredentials": "Enter your credentials to continue",
-      "welcomeMessage": "Welcome to SFA",
+      "welcomeMessage": "Welcome to Sales Stream",
       "tagline": "Streamline your sales process",
       "loginHelp": "Need help logging in?",
       "contactSupport": "Contact Support",

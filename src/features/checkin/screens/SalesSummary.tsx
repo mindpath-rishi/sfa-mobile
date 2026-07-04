@@ -17,11 +17,17 @@ import { useHeader } from '@/shared/contexts/HeaderContext';
 
 type ScreenMode = 'sales' | 'topup';
 
+const numberOrZero = (value: unknown) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : 0;
+};
+
 export default function OrderSummary() {
   const { colors } = useTheme();
   const { mode } = useLocalSearchParams<{ mode: ScreenMode }>();
   const currentMode = mode || 'sales';
-  const user = useAuthStore.getState().user;
+  const user = useAuthStore((state) => state.user);
+  const activeWorkSessionId = useAuthStore((state) => state.workSessionId);
   const { setHeader } = useHeader();
 
   // Zustand stores
@@ -53,8 +59,8 @@ export default function OrderSummary() {
     return items.reduce((acc, item) => {
       return (
         acc +
-        (item.caseQty || 0) * (item.caseNetWeight || 0) +
-        (item.pieceQty || 0) * (item.pieceNetWeight || 0)
+        numberOrZero(item.caseQty) * numberOrZero(item.caseNetWeight) +
+        numberOrZero(item.pieceQty) * numberOrZero(item.pieceNetWeight)
       );
     }, 0);
   }, [items]);
@@ -107,54 +113,64 @@ export default function OrderSummary() {
   /* ================= BUILD TOP-UP PAYLOAD ================= */
   const buildTopupPayload = useCallback(() => {
     const totalRequestedCases = items.reduce((acc, item) => {
-      return acc + (item.caseQty || 0);
+      return acc + numberOrZero(item.caseQty);
     }, 0);
 
     const totalRequestedPieces = items.reduce((acc, item) => {
-      return acc + (item.pieceQty || 0);
+      return acc + numberOrZero(item.pieceQty);
     }, 0);
 
     const totalRequestedQty = items.reduce((acc, item) => {
-      return acc + (item.caseQty || 0) * item.unitQtyInCase + (item.pieceQty || 0);
+      return (
+        acc +
+        numberOrZero(item.caseQty) * Math.max(numberOrZero(item.unitQtyInCase), 1) +
+        numberOrZero(item.pieceQty)
+      );
     }, 0);
 
     const totalRequestedWeight = items.reduce((acc, item) => {
       return (
         acc +
-        (item.caseQty || 0) * (item.caseNetWeight || 0) +
-        (item.pieceQty || 0) * (item.pieceNetWeight || 0)
+        numberOrZero(item.caseQty) * numberOrZero(item.caseNetWeight) +
+        numberOrZero(item.pieceQty) * numberOrZero(item.pieceNetWeight)
       );
     }, 0);
 
     const totalRequestedValue = items.reduce((acc, item) => {
-      return acc + (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice;
+      return (
+        acc +
+        numberOrZero(item.caseQty) * numberOrZero(item.casePrice) +
+        numberOrZero(item.pieceQty) * numberOrZero(item.piecePrice)
+      );
     }, 0);
 
     const topupItems = items.map((item) => ({
       productId: item.productId,
       productName: item.productName,
 
-      requestedCaseQty: item.caseQty || 0,
-      requestedPieceQty: item.pieceQty || 0,
+      requestedCaseQty: numberOrZero(item.caseQty),
+      requestedPieceQty: numberOrZero(item.pieceQty),
 
-      requestedQty: (item.caseQty || 0) * item.unitQtyInCase + (item.pieceQty || 0),
+      requestedQty:
+        numberOrZero(item.caseQty) * Math.max(numberOrZero(item.unitQtyInCase), 1) +
+        numberOrZero(item.pieceQty),
 
-      unitQtyInCase: item.unitQtyInCase,
+      unitQtyInCase: Math.max(numberOrZero(item.unitQtyInCase), 1),
 
-      piecePrice: item.piecePrice,
-      casePrice: item.casePrice,
+      piecePrice: numberOrZero(item.piecePrice),
+      casePrice: numberOrZero(item.casePrice),
 
-      pieceNetWeight: item.pieceNetWeight || 0,
-      caseNetWeight: item.caseNetWeight || 0,
+      pieceNetWeight: numberOrZero(item.pieceNetWeight),
+      caseNetWeight: numberOrZero(item.caseNetWeight),
       compCode: item.compCode,
-      categoryId: item.categoryId,
-      parentCategoryId: item.parentCategoryId,
 
       requestedWeight:
-        (item.caseQty || 0) * (item.caseNetWeight || 0) +
-        (item.pieceQty || 0) * (item.pieceNetWeight || 0),
+        numberOrZero(item.caseQty) * numberOrZero(item.caseNetWeight) +
+        numberOrZero(item.pieceQty) * numberOrZero(item.pieceNetWeight),
 
-      requestedValue: (item.caseQty || 0) * item.casePrice + (item.pieceQty || 0) * item.piecePrice,
+      requestedValue:
+        numberOrZero(item.caseQty) * numberOrZero(item.casePrice) +
+        numberOrZero(item.pieceQty) * numberOrZero(item.piecePrice),
     }));
 
     return {
@@ -170,13 +186,13 @@ export default function OrderSummary() {
       totalRequestedWeight,
       totalRequestedValue,
 
-      remark: `Top-up request for ${van?.vanName} - ${new Date().toLocaleDateString()}`,
+      remark: `Top-up request for ${van?.name || 'van'} - ${new Date().toLocaleDateString()}`,
       status: 'DRAFT',
 
       items: topupItems,
-      workSessionId: selectedRoute?.workSessionId,
+      workSessionId: activeWorkSessionId || selectedRoute?.workSessionId,
     };
-  }, [items, van, user, selectedRoute]);
+  }, [items, van, user, activeWorkSessionId, selectedRoute]);
 
   /* ================= HANDLE TOP-UP SUBMIT ================= */
   const handleTopupSubmit = useCallback(async () => {
@@ -185,11 +201,26 @@ export default function OrderSummary() {
 
     try {
       const payload = buildTopupPayload();
-      const response = await vanService.createInventoryTopupRequest(payload);
-      if (!response?.success) {
+      const missingHeader = [
+        ['van', payload.vanId],
+        ['van name', payload.vanName],
+        ['employee', payload.employeeId],
+        ['work session', payload.workSessionId],
+      ].find(([, value]) => !String(value ?? '').trim());
+      if (missingHeader) {
+        toast.error(
+          'Unable to create top-up',
+          `Missing ${missingHeader[0]}. Please return to Home, start your day, and try again.`,
+        );
         return;
       }
-      toast.success('Your topup request approved successfully.');
+      const response = await vanService.createInventoryTopupRequest(payload);
+      if (!response?.success) {
+        toast.error('Top-up request failed', response?.message || 'Please check the request data.');
+        return;
+      }
+      clearCart();
+      toast.success('Your top-up request was submitted successfully.');
       router.replace('topup');
     } catch (error) {
       console.error('Error submitting top-up:', error);
@@ -197,7 +228,7 @@ export default function OrderSummary() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [buildTopupPayload]);
+  }, [buildTopupPayload, clearCart]);
 
   /* ================= HANDLE SUBMIT ================= */
   const handleSubmit = useCallback(() => {

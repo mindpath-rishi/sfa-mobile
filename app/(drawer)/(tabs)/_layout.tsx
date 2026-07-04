@@ -42,7 +42,10 @@ export default function TabsLayout() {
       showFilter: false,
       showBack: false,
       showMenu: true,
-      title: '',
+      title:
+        activeTab === 'home'
+          ? user?.name || (salesman ? 'Sales Executive' : 'Manager')
+          : '',
       rightIcon: activeTab === 'home' ? 'bell' : undefined,
       badgeCount: activeTab === 'home' ? unreadCount : 0,
       onRightPress:
@@ -52,7 +55,7 @@ export default function TabsLayout() {
             }
           : undefined,
     });
-  }, [segments, setHeader, setNotificationsVisible, unreadCount]);
+  }, [salesman, segments, setHeader, setNotificationsVisible, unreadCount, user?.name]);
 
   useFocusEffect(configureTabHeader);
 

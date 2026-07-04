@@ -5,6 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  Image,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -18,13 +20,14 @@ import {
 } from '@/features/notification/services/notification.service';
 import { toast } from '@/core/utils';
 import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
+import { outletService } from '@/features/outlet/services/outlet.service';
 
 type NotificationItem = {
   id: string;
   title: string;
   message: string;
   time: string;
-  type: 'order' | 'route' | 'target' | 'topup' | 'system';
+  type: 'order' | 'route' | 'target' | 'topup' | 'outlet_approval' | 'system';
   unread?: boolean;
   data?: Record<string, any>;
 };
@@ -51,14 +54,15 @@ const formatRelativeTime = (value?: string) => {
 };
 
 const mapNotification = (item: ApiNotificationItem): NotificationItem => {
-  const category = String(item.category || item.data?.category || 'system').toLowerCase();
+  const rawCategory = String(item.category || item.data?.category || 'system').toLowerCase();
+  const category = rawCategory === 'outlet_approval_result' ? 'outlet_approval' : rawCategory;
 
   return {
     id: item._id || item.id || `${item.title}-${item.createdAt || item.sentAt || Date.now()}`,
     title: item.title,
     message: item.body || item.message || '',
     time: formatRelativeTime(item.createdAt || item.sentAt),
-    type: ['order', 'route', 'target', 'topup'].includes(category)
+    type: ['order', 'route', 'target', 'topup', 'outlet_approval'].includes(category)
       ? (category as NotificationItem['type'])
       : 'system',
     unread: !item.isRead,
@@ -76,6 +80,8 @@ const getNotificationIcon = (type: NotificationItem['type']) => {
       return 'flag-outline';
     case 'topup':
       return 'cube-outline';
+    case 'outlet_approval':
+      return 'storefront-outline';
     case 'system':
     default:
       return 'checkmark-circle-outline';
@@ -117,6 +123,16 @@ const getVanChangeStatus = (item: NotificationItem) => {
   return '';
 };
 
+const isPendingOutletApproval = (item: NotificationItem) =>
+  String(item.data?.category || '').toLowerCase() === 'outlet_approval' &&
+  String(item.data?.action || '').toUpperCase() === 'APPROVAL_REQUIRED' &&
+  String(item.data?.status || 'PENDING').toUpperCase() === 'PENDING';
+
+const getOutletApprovalStatus = (item: NotificationItem) => {
+  const status = String(item.data?.status || '').toUpperCase();
+  return ['ACTIVE', 'REJECTED'].includes(status) ? status : '';
+};
+
 export default function NotificationsScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -139,7 +155,23 @@ export default function NotificationsScreen() {
 
     try {
       const response = await notificationService.getNotifications();
-      setNotifications((response.data || []).map(mapNotification));
+      const items = (response.data || []).map(mapNotification);
+      setNotifications(items);
+      void Promise.all(
+        items.filter(isPendingOutletApproval).map(async (item) => {
+          const customerId = String(item.data?.customerId || '');
+          if (!customerId) return;
+          const media = await outletService.getOutletMedia(customerId);
+          const imageUrls = Array.isArray(media?.data)
+            ? media.data.map((entry: any) => entry?.url).filter(Boolean)
+            : [];
+          setNotifications((current) =>
+            current.map((entry) =>
+              entry.id === item.id ? { ...entry, data: { ...entry.data, imageUrls } } : entry,
+            ),
+          );
+        }),
+      );
     } catch (error) {
       console.warn('Failed to load notifications:', error);
       setNotifications([]);
@@ -284,6 +316,26 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleOutletAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
+    const customerId = String(item.data?.customerId || '');
+    if (!customerId || processingId) return;
+    setProcessingId(item.id);
+    try {
+      const response =
+        action === 'approve'
+          ? await notificationService.approveOutlet(customerId)
+          : await notificationService.rejectOutlet(customerId);
+      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+        toast.error(response?.message || `Failed to ${action} outlet`);
+        return;
+      }
+      toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
+      await loadNotifications(true);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const renderNotificationSkeleton = () => (
     <View style={styles.list}>
       {[1, 2, 3, 4, 5].map((item) => (
@@ -320,113 +372,188 @@ export default function NotificationsScreen() {
               <Ionicons name="notifications-off-outline" size={30} color={colors.textTertiary} />
             </View>
             <AppText style={styles.emptyText}>No notifications yet</AppText>
-            <AppText style={styles.emptySubtext}>New alerts and approvals will appear here.</AppText>
+            <AppText style={styles.emptySubtext}>
+              New alerts and approvals will appear here.
+            </AppText>
           </View>
         ) : (
           <View style={styles.list}>
             {notifications.map((item) => {
-            const vanChangeReason = getVanChangeReason(item);
-            const vanChangeStatus = getVanChangeStatus(item);
-            const topupStatus = getTopupStatus(item);
+              const vanChangeReason = getVanChangeReason(item);
+              const vanChangeStatus = getVanChangeStatus(item);
+              const topupStatus = getTopupStatus(item);
+              const outletApprovalStatus = getOutletApprovalStatus(item);
 
-            return (
-              <View key={item.id} style={[styles.card, item.unread && styles.unreadCard]}>
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={() => handleNotificationPress(item)}
-                  style={styles.cardPressArea}
-                >
-                  <View style={[styles.iconWrap, item.unread && styles.unreadIconWrap]}>
-                    <Ionicons
-                      name={getNotificationIcon(item.type)}
-                      size={18}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <View style={styles.cardBody}>
-                    <View style={styles.cardHeader}>
-                      <AppText style={styles.title}>{item.title}</AppText>
-                      {item.unread && <View style={styles.unreadDot} />}
+              return (
+                <View key={item.id} style={[styles.card, item.unread && styles.unreadCard]}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => handleNotificationPress(item)}
+                    style={styles.cardPressArea}
+                  >
+                    <View style={[styles.iconWrap, item.unread && styles.unreadIconWrap]}>
+                      <Ionicons
+                        name={getNotificationIcon(item.type)}
+                        size={18}
+                        color={colors.primary}
+                      />
                     </View>
-                    <AppText style={styles.message}>{item.message}</AppText>
-                    {vanChangeReason && (
-                      <AppText style={styles.reasonText}>Reason: {vanChangeReason}</AppText>
-                    )}
-                    {vanChangeStatus && (
-                      <AppText
-                        style={[
-                          styles.statusText,
-                          {
-                            color: vanChangeStatus === 'APPROVED' ? colors.success : colors.error,
-                          },
-                        ]}
-                      >
-                        {vanChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
-                      </AppText>
-                    )}
-                    {topupStatus && (
-                      <AppText
-                        style={[
-                          styles.statusText,
-                          {
-                            color: topupStatus === 'ACCEPTED' ? colors.success : colors.error,
-                          },
-                        ]}
-                      >
-                        {topupStatus === 'ACCEPTED' ? 'Accepted' : 'Declined'}
-                      </AppText>
-                    )}
-                    <AppText style={styles.time}>{item.time}</AppText>
-                  </View>
-                </TouchableOpacity>
+                    <View style={styles.cardBody}>
+                      <View style={styles.cardHeader}>
+                        <AppText style={styles.title}>{item.title}</AppText>
+                        {item.unread && <View style={styles.unreadDot} />}
+                      </View>
+                      <AppText style={styles.message}>{item.message}</AppText>
+                      {item.type === 'outlet_approval' && (
+                        <View style={styles.outletDetails}>
+                          <AppText style={styles.outletName}>{item.data?.outletName}</AppText>
+                          <AppText style={styles.detailText}>Owner: {item.data?.ownerName}</AppText>
+                          <AppText style={styles.detailText}>
+                            Phone: {item.data?.phoneNumber}
+                          </AppText>
+                          <AppText style={styles.detailText}>
+                            Address: {item.data?.address?.line1}
+                            {item.data?.address?.line2 ? `, ${item.data.address.line2}` : ''}
+                          </AppText>
+                          {!!item.data?.imageUrls?.length && (
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                              {item.data.imageUrls.map((url: string) => (
+                                <Image key={url} source={{ uri: url }} style={styles.outletImage} />
+                              ))}
+                            </ScrollView>
+                          )}
+                          {item.data?.geoTag?.lat && item.data?.geoTag?.lng && (
+                            <TouchableOpacity
+                              onPress={() =>
+                                Linking.openURL(
+                                  `https://www.google.com/maps/search/?api=1&query=${item.data?.geoTag?.lat},${item.data?.geoTag?.lng}`,
+                                )
+                              }
+                            >
+                              <AppText style={styles.locationLink}>View outlet location</AppText>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      )}
+                      {vanChangeReason && (
+                        <AppText style={styles.reasonText}>Reason: {vanChangeReason}</AppText>
+                      )}
+                      {vanChangeStatus && (
+                        <AppText
+                          style={[
+                            styles.statusText,
+                            {
+                              color: vanChangeStatus === 'APPROVED' ? colors.success : colors.error,
+                            },
+                          ]}
+                        >
+                          {vanChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                        </AppText>
+                      )}
+                      {topupStatus && (
+                        <AppText
+                          style={[
+                            styles.statusText,
+                            {
+                              color: topupStatus === 'ACCEPTED' ? colors.success : colors.error,
+                            },
+                          ]}
+                        >
+                          {topupStatus === 'ACCEPTED' ? 'Accepted' : 'Declined'}
+                        </AppText>
+                      )}
+                      {outletApprovalStatus && (
+                        <AppText
+                          style={[
+                            styles.statusText,
+                            {
+                              color:
+                                outletApprovalStatus === 'ACTIVE' ? colors.success : colors.error,
+                            },
+                          ]}
+                        >
+                          {outletApprovalStatus === 'ACTIVE'
+                            ? 'Outlet Approved'
+                            : 'Outlet Rejected'}
+                        </AppText>
+                      )}
+                      {outletApprovalStatus === 'REJECTED' && item.data?.reason && (
+                        <AppText style={styles.reasonText}>Reason: {item.data.reason}</AppText>
+                      )}
+                      <AppText style={styles.time}>{item.time}</AppText>
+                    </View>
+                  </TouchableOpacity>
 
-                {isPendingVanChangeApproval(item) && (
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      disabled={processingId === item.id}
-                      onPress={() => handleVanChangeAction(item, 'reject')}
-                      style={[styles.actionButton, styles.rejectButton]}
-                    >
-                      <AppText style={[styles.actionButtonText, { color: colors.error }]}>
-                        Reject
-                      </AppText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      disabled={processingId === item.id}
-                      onPress={() => handleVanChangeAction(item, 'approve')}
-                      style={[styles.actionButton, styles.approveButton]}
-                    >
-                      <AppText style={[styles.actionButtonText, { color: colors.success }]}>
-                        Approve
-                      </AppText>
-                    </TouchableOpacity>
-                  </View>
-                )}
+                  {isPendingVanChangeApproval(item) && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleVanChangeAction(item, 'reject')}
+                        style={[styles.actionButton, styles.rejectButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                          Reject
+                        </AppText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleVanChangeAction(item, 'approve')}
+                        style={[styles.actionButton, styles.approveButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                          Approve
+                        </AppText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
 
-                {isPendingTopupAcceptance(item) && (
-                  <View style={styles.actionRow}>
-                    <TouchableOpacity
-                      disabled={processingId === item.id}
-                      onPress={() => handleTopupAction(item, 'reject')}
-                      style={[styles.actionButton, styles.rejectButton]}
-                    >
-                      <AppText style={[styles.actionButtonText, { color: colors.error }]}>
-                        Reject
-                      </AppText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      disabled={processingId === item.id}
-                      onPress={() => handleTopupAction(item, 'accept')}
-                      style={[styles.actionButton, styles.approveButton]}
-                    >
-                      <AppText style={[styles.actionButtonText, { color: colors.success }]}>
-                        Accept Stock
-                      </AppText>
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
+                  {isPendingOutletApproval(item) && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleOutletAction(item, 'reject')}
+                        style={[styles.actionButton, styles.rejectButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                          Reject
+                        </AppText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleOutletAction(item, 'approve')}
+                        style={[styles.actionButton, styles.approveButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                          Approve
+                        </AppText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {isPendingTopupAcceptance(item) && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleTopupAction(item, 'reject')}
+                        style={[styles.actionButton, styles.rejectButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                          Reject
+                        </AppText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleTopupAction(item, 'accept')}
+                        style={[styles.actionButton, styles.approveButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                          Accept Stock
+                        </AppText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              );
             })}
           </View>
         )}
@@ -535,6 +662,11 @@ const createStyles = (colors: any) =>
       gap: 8,
       paddingLeft: 42,
     },
+    outletDetails: { gap: 5, marginTop: 10 },
+    outletName: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
+    detailText: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
+    outletImage: { width: 120, height: 82, borderRadius: 8, marginRight: 8, marginTop: 5 },
+    locationLink: { color: colors.primary, fontSize: 12, fontWeight: '700', marginTop: 3 },
     actionButton: {
       minWidth: 86,
       height: 36,

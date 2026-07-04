@@ -17,9 +17,10 @@ export function OfflineStatusBanner() {
     isSyncing,
     lastSyncTime,
     lastError,
+    offlineEnabled,
   } = useOfflineStore();
 
-  if (!isSalesman(user)) {
+  if (!isSalesman(user) || user?.offlineAccessAllowed !== true || !offlineEnabled) {
     return null;
   }
 
@@ -33,11 +34,11 @@ export function OfflineStatusBanner() {
         ? pendingCount
           ? `Online • ${pendingCount} change${pendingCount === 1 ? '' : 's'} syncing in background`
           : 'Online'
-      : lastError
-        ? `Sync failed • Tap to retry: ${lastError}`
-      : pendingCount
-        ? `${pendingCount} item${pendingCount === 1 ? '' : 's'} waiting to sync`
-        : `Online${lastSyncTime ? ` • Last sync ${new Date(lastSyncTime).toLocaleTimeString()}` : ''}`;
+        : lastError
+          ? `Sync failed • Tap to retry: ${lastError}`
+          : pendingCount
+            ? `${pendingCount} item${pendingCount === 1 ? '' : 's'} waiting to sync`
+            : `Online${lastSyncTime ? ` • Last sync ${new Date(lastSyncTime).toLocaleTimeString()}` : ''}`;
 
   return (
     <Pressable

@@ -5,3 +5,11 @@ export const createUuid = () =>
     return value.toString(16);
   });
 
+export const createSchemaId = (schemaName: string, length = 8) => {
+  const schemaInitial = schemaName.trim().charAt(0).toUpperCase();
+  const min = 10 ** (length - 1);
+  const max = 10 ** length - 1;
+  const numericId = Math.floor(min + Math.random() * (max - min + 1));
+
+  return `${schemaInitial}ID${numericId}`;
+};

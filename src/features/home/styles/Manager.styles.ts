@@ -23,6 +23,23 @@ export const managerStylesBase = StyleSheet.create({
     top: 56,
     alignItems: 'center',
   },
+  outletCircleMetric: {
+    alignItems: 'center',
+    gap: 5,
+  },
+  outletCircleValueWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outletCircleValue: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  outletCircleLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });
 
 export const createManagerStyles = (colors: AppColors) =>
@@ -44,6 +61,36 @@ export const createManagerStyles = (colors: AppColors) =>
       borderWidth: 1,
       borderColor: colors.border,
       gap: 12,
+    },
+    summaryFilterRow: {
+      gap: 8,
+      paddingRight: 4,
+    },
+    skeletonFilterRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    summaryFilterChip: {
+      minWidth: 72,
+      paddingHorizontal: 13,
+      paddingVertical: 8,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.backgroundSecondary,
+      alignItems: 'center',
+    },
+    summaryFilterChipActive: {
+      borderColor: colors.primary,
+      backgroundColor: colors.primary,
+    },
+    summaryFilterText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    summaryFilterTextActive: {
+      color: colors.primaryContrast,
     },
     header: {
       flexDirection: 'row',
@@ -106,79 +153,6 @@ export const createManagerStyles = (colors: AppColors) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    dateCard: {
-      minHeight: 54,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: 10,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
-    },
-    dateHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 8,
-    },
-    dateTitleRow: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    dateAction: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    dateLabel: {
-      fontSize: 13,
-      fontWeight: '800',
-      color: colors.textPrimary,
-    },
-    refreshedText: {
-      fontSize: 10,
-      fontWeight: '800',
-      color: colors.primary,
-    },
-    kpiStrip: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    kpiTile: {
-      flex: 1,
-      minHeight: 84,
-      borderRadius: 10,
-      padding: 10,
-      backgroundColor: colors.backgroundSecondary,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      justifyContent: 'space-between',
-    },
-    kpiIcon: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    kpiValue: {
-      fontSize: 17,
-      fontWeight: '900',
-      color: colors.textPrimary,
-      marginTop: 6,
-    },
-    kpiLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: colors.textTertiary,
-      marginTop: 2,
-    },
     sectionHeader: {
       flexDirection: 'row',
       alignItems: 'flex-end',
@@ -186,6 +160,17 @@ export const createManagerStyles = (colors: AppColors) =>
       gap: 10,
       paddingHorizontal: 2,
       marginTop: 2,
+    },
+    skeletonSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      gap: 10,
+      paddingHorizontal: 2,
+      marginTop: 2,
+    },
+    skeletonLineGap: {
+      marginTop: 7,
     },
     sectionTitle: {
       fontSize: 15,
@@ -220,6 +205,82 @@ export const createManagerStyles = (colors: AppColors) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
+    outletSummaryCard: {
+      flexGrow: 0,
+      flexShrink: 0,
+      flexBasis: 'auto',
+      overflow: 'hidden',
+    },
+    outletSummaryContent: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: 14,
+    },
+    outletSummaryList: {
+      flex: 1,
+      minWidth: 0,
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    outletCompactRow: {
+      gap: 6,
+    },
+    outletCompactHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    outletCompactLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textSecondary,
+    },
+    outletCompactValue: {
+      fontSize: 13,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      flexShrink: 1,
+    },
+    outletMetricPanel: {
+      width: 146,
+      borderLeftWidth: 1,
+      borderLeftColor: colors.borderLight,
+      paddingLeft: 12,
+      gap: 12,
+    },
+    outletMetricTitle: {
+      fontSize: 13,
+      fontWeight: '900',
+      color: colors.textPrimary,
+    },
+    productivityMetricRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 6,
+    },
+    productivityCounts: {
+      flex: 1,
+      minWidth: 0,
+    },
+    productivityCountLabel: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: colors.textTertiary,
+    },
+    productivityCountValue: {
+      fontSize: 12,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    outletBottomMetrics: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 6,
+    },
     cardHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -242,6 +303,14 @@ export const createManagerStyles = (colors: AppColors) =>
       marginTop: 2,
     },
     summaryRow: {
+      minHeight: 34,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+    skeletonSummaryRow: {
       minHeight: 34,
       flexDirection: 'row',
       alignItems: 'center',
@@ -295,6 +364,10 @@ export const createManagerStyles = (colors: AppColors) =>
       gap: 10,
       marginBottom: 10,
     },
+    callCircleItem: {
+      alignItems: 'center',
+      gap: 5,
+    },
     callCircle: {
       width: 64,
       height: 64,
@@ -319,9 +392,9 @@ export const createManagerStyles = (colors: AppColors) =>
       color: colors.textPrimary,
     },
     callLabel: {
-      fontSize: 8,
-      fontWeight: '700',
-      color: colors.textTertiary,
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.textSecondary,
       textAlign: 'center',
     },
     callMetrics: {
@@ -427,6 +500,23 @@ export const createManagerStyles = (colors: AppColors) =>
       alignItems: 'center',
       gap: 12,
     },
+    skeletonChartRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginTop: 10,
+    },
+    skeletonGauge: {
+      alignSelf: 'center',
+      marginVertical: 9,
+    },
+    chartEmptyText: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
     legend: {
       flex: 1,
       gap: 8,
@@ -516,17 +606,20 @@ export const createManagerStyles = (colors: AppColors) =>
     outletRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: 8,
       minHeight: 52,
       paddingVertical: 6,
       borderBottomWidth: 1,
       borderBottomColor: colors.borderLight,
     },
     outletText: {
-      width: 70,
+      width: 88,
+      minWidth: 0,
+      overflow: 'hidden',
     },
     outletProgressTrack: {
       flex: 1,
+      minWidth: 24,
       height: 6,
       borderRadius: 3,
       overflow: 'hidden',
@@ -537,9 +630,10 @@ export const createManagerStyles = (colors: AppColors) =>
       borderRadius: 4,
     },
     percentBadge: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      flexShrink: 0,
       borderWidth: 2,
       alignItems: 'center',
       justifyContent: 'center',

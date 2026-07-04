@@ -1909,7 +1909,7 @@ const T = {
 };
 
 // ── Types & defaults ──────────────────────────────────────────────────────────
-type PocketFilter = 'today' | 'week' | 'month' | 'custom';
+type PocketFilter = 'today' | 'yesterday' | 'mtd' | 'custom';
 type ProductSalesGroup = SalesmanProductSalesGroupBy;
 type DayWiseSummaryItem = SalesmanDayWiseSummaryItem;
 type ShareReportType = Extract<SalesmanReportType, 'MST' | 'DSR'>;
@@ -1954,8 +1954,8 @@ const defaultVanUtilizationData = {
 
 const filterOptions: { value: PocketFilter; label: string }[] = [
   { value: 'today', label: 'Today' },
-  { value: 'week', label: 'This Week' },
-  { value: 'month', label: 'This Month' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'mtd', label: 'MTD' },
   { value: 'custom', label: 'Custom' },
 ];
 
@@ -2001,12 +2001,12 @@ const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDat
 const getFilterRange = (filter: PocketFilter, custom: { startDate: Date; endDate: Date }) => {
   const today = startOfDay(new Date());
   if (filter === 'today') return { startDate: today, endDate: today };
-  if (filter === 'week') {
-    const s = new Date(today);
-    s.setDate(today.getDate() - today.getDay());
-    return { startDate: s, endDate: today };
+  if (filter === 'yesterday') {
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    return { startDate: yesterday, endDate: yesterday };
   }
-  if (filter === 'month') {
+  if (filter === 'mtd') {
     return { startDate: new Date(today.getFullYear(), today.getMonth(), 1), endDate: today };
   }
   return custom;
@@ -2277,14 +2277,18 @@ export default function PocketMISScreen() {
   const [showProductWiseModal, setShowProductWiseModal] = useState(false);
   const [showDayWiseModal, setShowDayWiseModal] = useState(false);
   const [showDispatchModal, setShowDispatchModal] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<PocketFilter>('month');
+  const [selectedFilter, setSelectedFilter] = useState<PocketFilter>('today');
   const [selectedCategory, setSelectedCategory] = useState<ProductSalesGroup>('PRIMARYCATEGORY');
   const [customRange, setCustomRange] = useState(() => {
     const today = startOfDay(new Date());
     return { startDate: today, endDate: today };
   });
   const [showDateRangePicker, setShowDateRangePicker] = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>('vanUtilization');
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    daywise: true,
+    performance: true,
+    vanUtilization: true,
+  });
   const [summaryData, setSummaryData] = useState(defaultSummaryData);
   const [performanceData, setPerformanceData] = useState(defaultPerformanceData);
   const [productData, setProductData] = useState(defaultProductData);
@@ -2315,6 +2319,10 @@ export default function PocketMISScreen() {
     setSelectedFilter('custom');
     setShowDateRangePicker(true);
   };
+
+  const toggleSection = useCallback((section: string) => {
+    setExpandedSections((current) => ({ ...current, [section]: !current[section] }));
+  }, []);
 
   const fetchDayWiseSummary = useCallback(async () => {
     const range = getFilterRange(selectedFilter, customRange);
@@ -2376,7 +2384,12 @@ export default function PocketMISScreen() {
       if (response.success && Array.isArray(data)) {
         setDispatchStatus(data);
       } else if (response.success && data) {
-        setDispatchStatus(data.orders || data.items || data.records || []);
+        const grouped = data as {
+          orders?: SalesmanDispatchStatusItem[];
+          items?: SalesmanDispatchStatusItem[];
+          records?: SalesmanDispatchStatusItem[];
+        };
+        setDispatchStatus(grouped.orders || grouped.items || grouped.records || []);
       } else {
         setDispatchStatus([]);
       }
@@ -3644,8 +3657,8 @@ export default function PocketMISScreen() {
             title="DAY WISE SUMMARY"
             icon="calendar"
             sectionKey="daywise"
-            expanded={expandedSection === 'daywise'}
-            onToggle={() => setExpandedSection(expandedSection === 'daywise' ? null : 'daywise')}
+            expanded={expandedSections.daywise}
+            onToggle={() => toggleSection('daywise')}
             colors={colors}
           >
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
@@ -3699,10 +3712,8 @@ export default function PocketMISScreen() {
             title="PERFORMANCE SUMMARY"
             icon="stats-chart"
             sectionKey="performance"
-            expanded={expandedSection === 'performance'}
-            onToggle={() =>
-              setExpandedSection(expandedSection === 'performance' ? null : 'performance')
-            }
+            expanded={expandedSections.performance}
+            onToggle={() => toggleSection('performance')}
             colors={colors}
           >
             <SubBadge label="MTD" color={colors.primary} />
@@ -3784,10 +3795,8 @@ export default function PocketMISScreen() {
             title="VAN UTILIZATION"
             icon="speedometer"
             sectionKey="vanUtilization"
-            expanded={expandedSection === 'vanUtilization'}
-            onToggle={() =>
-              setExpandedSection(expandedSection === 'vanUtilization' ? null : 'vanUtilization')
-            }
+            expanded={expandedSections.vanUtilization}
+            onToggle={() => toggleSection('vanUtilization')}
             colors={colors}
           >
             <View

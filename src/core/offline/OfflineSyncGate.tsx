@@ -39,10 +39,11 @@ export function OfflineSyncGate() {
   const [slideIndex, setSlideIndex] = useState(0);
   const { colors } = useTheme();
   const user = useAuthStore((state) => state.user);
-  const { isConnected, isInternetReachable, isSyncing, lastSyncTime, lastError } =
+  const { isConnected, isInternetReachable, isSyncing, lastSyncTime, lastError, offlineEnabled } =
     useOfflineStore();
 
-  const initialSyncRequired = isSalesman(user) && !lastSyncTime;
+  const initialSyncRequired =
+    isSalesman(user) && user?.offlineAccessAllowed === true && offlineEnabled && !lastSyncTime;
 
   useEffect(() => {
     if (!initialSyncRequired || !isSyncing) return;

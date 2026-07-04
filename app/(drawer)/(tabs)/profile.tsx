@@ -25,6 +25,16 @@ import {
   isPushNotificationsEnabledAsync,
   setPushNotificationsEnabledAsync,
 } from '@/shared/services/push-notification.service';
+import { isSalesman } from '@/core/navigation/role.utils';
+import { saveOfflinePreference, useOfflineStore } from '@/core/offline/offline.store';
+import { OfflineStatusBanner } from '@/core/offline/OfflineStatusBanner';
+import { syncService } from '@/sync';
+import {
+  isLocationTrackingEnabled,
+  saveLocationTrackingPreference,
+  startSalesmanBackgroundLocation,
+  stopSalesmanBackgroundLocation,
+} from '@/shared/services/location.service';
 
 const DEFAULT_PROFILE_DATA = {
   id: 'EMP001',
@@ -35,7 +45,6 @@ const DEFAULT_PROFILE_DATA = {
   role: 'Sales Representative',
   territory: 'Not assigned',
   manager: 'Not assigned',
-  joinDate: 'Not available',
   employeeId: 'Not available',
   aadhar: 'XXXX-XXXX-1234',
   pan: 'ABCDE1234F',
@@ -71,9 +80,6 @@ const DEFAULT_PROFILE_DATA = {
     darkMode: false,
     biometricLogin: true,
     locationTracking: true,
-    emailUpdates: true,
-    smsAlerts: false,
-    autoCheckIn: true,
     offlineMode: false,
   },
   recentActivity: [
@@ -124,9 +130,12 @@ const buildProfileData = (authUser: any) => {
     role: humanizeRole(getProfileValue(authUser?.role, authUser?.roleId, authUser?.designation)),
     territory: routeOrTerritory || DEFAULT_PROFILE_DATA.territory,
     manager:
-      getProfileValue(authUser?.managerName, authUser?.manager) || DEFAULT_PROFILE_DATA.manager,
-    joinDate:
-      getProfileValue(authUser?.joinDate, authUser?.createdAt) || DEFAULT_PROFILE_DATA.joinDate,
+      getProfileValue(
+        authUser?.managerName,
+        authUser?.manager,
+        authUser?.reportingEmployeeName,
+        authUser?.reportingManagerName,
+      ) || DEFAULT_PROFILE_DATA.manager,
     employeeId: employeeId || DEFAULT_PROFILE_DATA.employeeId,
     stats: {
       ...DEFAULT_PROFILE_DATA.stats,
@@ -398,6 +407,9 @@ export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
   const setThemeMode = useThemeStore((s) => s.setMode);
   const authUser = useAuthStore((s) => s.user);
+  const activeWorkSessionId = useAuthStore((s) => s.workSessionId);
+  const canConfigureOfflineMode = isSalesman(authUser) && authUser?.offlineAccessAllowed === true;
+  const offlineEnabled = useOfflineStore((state) => state.offlineEnabled);
   const profileData = useMemo(() => buildProfileData(authUser), [authUser]);
   const [settings, setSettings] = useState(DEFAULT_PROFILE_DATA.settings);
   const userData = useMemo(
@@ -414,6 +426,13 @@ export default function ProfileScreen() {
   useEffect(() => {
     setSettings((prev) => ({ ...prev, darkMode: isDark }));
   }, [isDark]);
+
+  useEffect(() => {
+    const ownerId = authUser?.userId || '';
+    void isLocationTrackingEnabled(ownerId).then((enabled) =>
+      setSettings((previous) => ({ ...previous, locationTracking: enabled })),
+    );
+  }, [authUser?.userId]);
 
   useEffect(() => {
     isPushNotificationsEnabledAsync()
@@ -515,6 +534,72 @@ export default function ProfileScreen() {
     router.replace('/(auth)');
   };
 
+  const handleComingSoon = (feature: string) => {
+    Alert.alert('Coming soon', `${feature} will be available in a future update.`);
+  };
+
+  const handleOfflineModeToggle = async (enabled: boolean) => {
+    const ownerId = authUser?.userId || '';
+    if (enabled) {
+      await saveOfflinePreference(ownerId, true);
+      setSettings((previous) => ({ ...previous, offlineMode: true }));
+      await syncService.sync();
+      const syncState = useOfflineStore.getState();
+      if (!syncState.lastSyncTime) {
+        Alert.alert(
+          'Offline setup incomplete',
+          syncState.lastError ||
+            'Offline data could not be prepared. Tap the sync banner to retry.',
+        );
+        return;
+      }
+      Alert.alert(
+        'Offline enabled',
+        syncState.lastError
+          ? `Offline data is ready. ${syncState.lastError}`
+          : 'Offline data is ready to use.',
+      );
+      return;
+    }
+
+    const offline = useOfflineStore.getState();
+    if ((!offline.isConnected || !offline.isInternetReachable) && offline.pendingCount > 0) {
+      Alert.alert(
+        'Cannot disable offline',
+        'Connect to the internet and synchronize pending work before disabling offline access.',
+      );
+      return;
+    }
+
+    if (offline.pendingCount > 0) {
+      await syncService.sync();
+      const afterSync = useOfflineStore.getState();
+      if (afterSync.pendingCount > 0) {
+        Alert.alert(
+          'Cannot disable offline',
+          afterSync.lastError ||
+            `${afterSync.pendingCount} item(s) are still waiting to sync. Tap the sync banner to retry.`,
+        );
+        return;
+      }
+    }
+    await saveOfflinePreference(ownerId, false);
+    setSettings((previous) => ({ ...previous, offlineMode: false }));
+  };
+
+  const handleLocationTrackingToggle = async (enabled: boolean) => {
+    const ownerId = authUser?.userId || '';
+    await saveLocationTrackingPreference(ownerId, enabled);
+    setSettings((previous) => ({ ...previous, locationTracking: enabled }));
+
+    if (!isSalesman(authUser)) return;
+    if (enabled && activeWorkSessionId) {
+      await startSalesmanBackgroundLocation(authUser);
+    } else {
+      await stopSalesmanBackgroundLocation();
+    }
+  };
+
   const handleUploadDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
@@ -552,7 +637,6 @@ export default function ProfileScreen() {
         <InfoRow icon="mail" label="Email" value={userData.email} onPress={handleEmail} />
         <InfoRow icon="call" label="Phone" value={userData.phone} onPress={handleCall} />
         <InfoRow icon="business" label="Employee ID" value={userData.employeeId} />
-        <InfoRow icon="calendar" label="Join Date" value={userData.joinDate} />
         <InfoRow icon="people" label="Manager" value={userData.manager} />
       </AppCard>
 
@@ -703,55 +787,46 @@ export default function ProfileScreen() {
           value={userData.settings.biometricLogin}
           onPress={(val: boolean) => setSettings((prev) => ({ ...prev, biometricLogin: val }))}
         />
-        <SettingRow
-          icon="location"
-          label="Location Tracking"
-          value={userData.settings.locationTracking}
-          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, locationTracking: val }))}
-        />
+        {canConfigureOfflineMode && (
+          <SettingRow
+            icon="location"
+            label="Location Tracking"
+            value={userData.settings.locationTracking}
+            onPress={handleLocationTrackingToggle}
+          />
+        )}
       </AppCard>
 
-      {/* Communication Preferences */}
-      <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16 }}>
-        <Text
-          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
+      {/* Offline mode is supported only for field salesmen. */}
+      {canConfigureOfflineMode && (
+        <AppCard
+          variant="elevated"
+          padding="md"
+          style={{ marginHorizontal: 16, marginVertical: 16 }}
         >
-          Communication
-        </Text>
-        <SettingRow
-          icon="mail"
-          label="Email Updates"
-          value={userData.settings.emailUpdates}
-          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, emailUpdates: val }))}
-        />
-        <SettingRow
-          icon="chatbubbles"
-          label="SMS Alerts"
-          value={userData.settings.smsAlerts}
-          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, smsAlerts: val }))}
-        />
-      </AppCard>
-
-      {/* Work Preferences */}
-      <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginVertical: 16 }}>
-        <Text
-          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
-        >
-          Work Preferences
-        </Text>
-        <SettingRow
-          icon="log-in"
-          label="Auto Check-in"
-          value={userData.settings.autoCheckIn}
-          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, autoCheckIn: val }))}
-        />
-        <SettingRow
-          icon="cloud-offline"
-          label="Offline Mode"
-          value={userData.settings.offlineMode}
-          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, offlineMode: val }))}
-        />
-      </AppCard>
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontSize: 16,
+              fontWeight: '600',
+              marginBottom: 16,
+            }}
+          >
+            Work Preferences
+          </Text>
+          <SettingRow
+            icon="cloud-offline"
+            label="Offline Mode"
+            value={offlineEnabled}
+            onPress={handleOfflineModeToggle}
+          />
+          {offlineEnabled && (
+            <View style={{ marginTop: 12, borderRadius: 10, overflow: 'hidden' }}>
+              <OfflineStatusBanner />
+            </View>
+          )}
+        </AppCard>
+      )}
 
       {/* Account Actions */}
       <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 30 }}>
@@ -770,33 +845,39 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/profile/privacy')}>
+        <TouchableOpacity onPress={() => handleComingSoon('Privacy Policy')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="shield" size={20} color={colors.textSecondary} />
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
               Privacy Policy
             </Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
+              Coming soon
+            </Text>
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/profile/terms')}>
+        <TouchableOpacity onPress={() => handleComingSoon('Terms & Conditions')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="document-text" size={20} color={colors.textSecondary} />
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
               Terms & Conditions
             </Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
+              Coming soon
+            </Text>
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => router.push('/profile/help')}>
+        <TouchableOpacity onPress={() => handleComingSoon('Help Center')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="help-circle" size={20} color={colors.textSecondary} />
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
-              Help & Support
+              Help Center
             </Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+            <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
+              Coming soon
+            </Text>
           </View>
         </TouchableOpacity>
 

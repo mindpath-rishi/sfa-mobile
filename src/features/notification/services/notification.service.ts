@@ -48,4 +48,10 @@ export const notificationService = {
 
   rejectTopup: (topupId: string, payload: any = {}) =>
     api.patch<any>(`/van-inventory-topup/${topupId}/reject`, payload) as Promise<ApiResponse<any>>,
+
+  approveOutlet: (customerId: string) =>
+    api.patch<any>(`/customer/${customerId}/approve`, {}) as Promise<ApiResponse<any>>,
+
+  rejectOutlet: (customerId: string, reason = 'Rejected by reporting manager') =>
+    api.patch<any>(`/customer/${customerId}/reject`, { reason }) as Promise<ApiResponse<any>>,
 };

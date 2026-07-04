@@ -1021,6 +1021,7 @@ export default function PaymentCollectionScreen() {
       const pieceQty = item.pieceQty || 0;
       const unitQtyInCase = item.unitQtyInCase || 1;
       const customerCategoryId = selectedRoute?.customerCategoryId || '';
+      const quantity = caseQty * unitQtyInCase + pieceQty;
 
       return {
         productId: item.productId,
@@ -1031,7 +1032,8 @@ export default function PaymentCollectionScreen() {
         customerCategoryId,
         caseQty,
         pieceQty,
-        quantity: caseQty * unitQtyInCase + pieceQty,
+        quantity,
+        netCases: toFixed4(quantity / unitQtyInCase),
         unitQtyInCase,
         casePrice: item.casePrice,
         caseNetWeight: item.caseNetWeight,
@@ -1043,6 +1045,7 @@ export default function PaymentCollectionScreen() {
     });
 
     const firstSaleItem = saleItems[0];
+    const netCases = toFixed4(saleItems.reduce((sum, item) => sum + item.netCases, 0));
 
     const totalQty = items.reduce((sum, item) => {
       const caseQty = item.caseQty || 0;
@@ -1064,6 +1067,48 @@ export default function PaymentCollectionScreen() {
       }
     }
 
+    let saleVisit = useOutletStore.getState().activeVisit;
+    if (!saleVisit) {
+      const interaction = useOutletStore.getState().activeInteraction;
+      if (
+        !interaction ||
+        !outlet?.customerId ||
+        interaction.customerId !== outlet?.customerId ||
+        !selectedRoute?.routeSessionId ||
+        !selectedRoute?.workSessionId ||
+        !van?.vanId
+      ) {
+        toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
+        setIsSubmitting(false);
+        return;
+      }
+      const visitResponse = await outletService.startVisit({
+        routeSessionId: selectedRoute.routeSessionId,
+        workSessionId: selectedRoute.workSessionId,
+        vanId: van.vanId,
+        outletId: outlet.customerId,
+        visitType: interaction.visitType,
+        interactionId: interaction.interactionId,
+      });
+      if (!visitResponse.success || !visitResponse.data?.visitId) {
+        toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
+        setIsSubmitting(false);
+        return;
+      }
+      const visit = visitResponse.data;
+      saleVisit = {
+        visitId: visit.visitId,
+        outlet,
+        checkInTime: new Date(visit.checkInTime || interaction.arrivalTime),
+        status: 'ACTIVE',
+        routeSessionId: selectedRoute.routeSessionId,
+        customerId: outlet.customerId,
+        visitType: interaction.visitType,
+      };
+      useOutletStore.getState().setActiveVisit(saleVisit);
+      useOutletStore.getState().setActiveInteraction({ ...interaction, status: 'CONVERTED' });
+    }
+
     const payload: any = {
       vanId: van?.vanId,
       vanName: van?.vanNumber || 'Van',
@@ -1074,6 +1119,7 @@ export default function PaymentCollectionScreen() {
       customerName: outlet?.name || 'test',
       date: new Date().toISOString(),
       totalCases: caseDetails.totalCases,
+      netCases,
       totalPieces: pieceDetails.totalPieces,
       totalQty,
       totalWeight: toFixed4(totalNetWeight),
@@ -1084,7 +1130,7 @@ export default function PaymentCollectionScreen() {
       pendingAmount,
       remark: remarkText,
       items: saleItems,
-      visitId: activeVisit?.visitId,
+      visitId: saleVisit.visitId,
     };
 
     // Add split payment details if applicable
@@ -1190,9 +1236,10 @@ export default function PaymentCollectionScreen() {
     // COMPLETED to SQLite, allowing My Route's focus refresh to immediately
     // recalculate visited/not-visited and summary metrics.
     clearCart();
-    if (activeVisit?.visitId) {
+    const completedVisit = useOutletStore.getState().activeVisit;
+    if (completedVisit?.visitId) {
       try {
-        await outletService.completeVisit(activeVisit.visitId);
+        await outletService.completeVisit(completedVisit.visitId);
         useOutletStore.getState().setActiveVisit(null);
       } catch (error) {
         console.error('Error completing visit:', error);

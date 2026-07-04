@@ -4,6 +4,7 @@ import { isSalesman } from '@/core/navigation/role.utils';
 import { isOfflineMode } from '@/core/offline/offline.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
+import { createSchemaId } from '@/utils/uuid';
 
 /**
  * Query params for fetching route outlets
@@ -51,8 +52,11 @@ export const nonSaleService: NonSaleService = {
   markNonSale: async (payload: NonSalePayload) => {
     const user = useAuthStore.getState().user;
     if (isSalesman(user) && isOfflineMode()) {
+      const nonSaleId = createSchemaId('NonSale');
       const record = await repositories.nonSales.create(user?.userId ?? '', {
         ...cleanParams(payload),
+        uuid: nonSaleId,
+        nonSaleId,
         employeeId: user?.userId,
         status: 'COMPLETED',
       });
@@ -60,7 +64,7 @@ export const nonSaleService: NonSaleService = {
         success: true,
         statusCode: 202,
         message: 'Non-sale visit saved locally',
-        data: { ...record, nonSaleId: record.uuid },
+        data: { ...record, nonSaleId },
         offline: true,
       } as ApiResponse<any>;
     }

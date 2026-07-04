@@ -4,7 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { AppText } from '@/core/components';
+import { AppText, Skeleton } from '@/core/components';
 import { useAuthStore } from '@/core/store/auth.store';
 import { homeService } from '@/features/home/services/home.service';
 import type {
@@ -12,6 +12,7 @@ import type {
   ManagerTargetResponse,
   TargetMetric,
 } from '@/features/home/services/home.service';
+import { categoryService, type Category } from '@/shared/services/category.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { formatLocalApiDate } from '@/shared/utils/date.utils';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
@@ -55,6 +56,15 @@ type CallSummaryData = {
   qtyCases: number;
 };
 
+type SummaryDateFilter = 'today' | 'yesterday' | 'mtd' | 'custom';
+
+const SUMMARY_DATE_FILTERS: { value: SummaryDateFilter; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'mtd', label: 'MTD' },
+  { value: 'custom', label: 'Custom' },
+];
+
 const INITIAL_USER_SUMMARY: UserSummaryData = {
   retailing: 152,
   officeWork: 1,
@@ -72,14 +82,8 @@ const INITIAL_CALL_SUMMARY: CallSummaryData = {
   qtyCases: 2425.1,
 };
 
-const CATEGORY_ORDERS: Omit<CategoryOrder, 'color'>[] = [
-  { label: 'Laundry', value: 54, metricValue: '60,603.8' },
-  { label: 'Confectionery', value: 25, metricValue: '28,431.3' },
-  { label: 'Personal Care', value: 15, metricValue: '16,721.5' },
-  { label: 'Household', value: 6, metricValue: '6,699.8' },
-];
-
 const OUTLET_SUMMARY: Omit<OutletSummary, 'color'>[] = [
+  { label: 'UTC', value: '0', progress: 0 },
   { label: 'UPC', value: '0', progress: 0 },
   { label: 'Zero Order', value: '0', progress: 0 },
   { label: 'Not Visited', value: '0', progress: 0 },
@@ -135,6 +139,7 @@ const METRIC_OPTIONS: { value: TargetMetric; label: string; unit: string }[] = [
   { value: 'value', label: 'Value', unit: 'Value' },
   { value: 'tonnage', label: 'Tonnage', unit: 'Tonnage' },
 ];
+const TARGET_NOT_CONFIGURED_HINT = 'Target has not been configured for this period';
 
 const getMetricLabel = (metric: TargetMetric) =>
   METRIC_OPTIONS.find((item) => item.value === metric)?.unit || 'Cases';
@@ -351,17 +356,187 @@ function Gauge({
   );
 }
 
+function OutletCircleMetric({
+  label,
+  percentage,
+  color,
+  colors,
+}: {
+  label: string;
+  percentage: number;
+  color: string;
+  colors: any;
+}) {
+  const size = 66;
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = clampPercentage(percentage);
+
+  return (
+    <View style={stylesBase.outletCircleMetric}>
+      <View style={{ width: size, height: size }}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke={colors.backgroundTertiary}
+            strokeWidth={strokeWidth}
+          />
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="transparent"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeLinecap="round"
+            strokeDasharray={`${(progress / 100) * circumference} ${circumference}`}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          />
+        </Svg>
+        <View style={stylesBase.outletCircleValueWrap}>
+          <AppText style={[stylesBase.outletCircleValue, { color: colors.textPrimary }]}>
+            {Math.round(progress)}%
+          </AppText>
+        </View>
+      </View>
+      <AppText style={[stylesBase.outletCircleLabel, { color: colors.textSecondary }]}>
+        {label}
+      </AppText>
+    </View>
+  );
+}
+
+function ManagerSkeleton({
+  colors,
+  styles,
+}: {
+  colors: any;
+  styles: ReturnType<typeof createManagerStyles>;
+}) {
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={styles.scrollContent}
+      style={styles.container}
+    >
+      <View style={styles.headerPanel}>
+        <View style={styles.skeletonFilterRow}>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} width={72} height={34} borderRadius={18} />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.skeletonSectionHeader}>
+        <View style={styles.headerText}>
+          <Skeleton width="46%" height={16} borderRadius={8} />
+          <Skeleton width="72%" height={11} borderRadius={6} style={styles.skeletonLineGap} />
+        </View>
+      </View>
+
+      <View style={styles.summaryGrid}>
+        {Array.from({ length: 2 }).map((_, cardIndex) => (
+          <View key={cardIndex} style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Skeleton width="42%" height={16} borderRadius={8} />
+              <Skeleton width={cardIndex === 0 ? 92 : 18} height={18} borderRadius={9} />
+            </View>
+            {Array.from({ length: cardIndex === 0 ? 4 : 2 }).map((_, rowIndex) => (
+              <View key={rowIndex} style={styles.skeletonSummaryRow}>
+                <Skeleton width="48%" height={12} borderRadius={6} />
+                <Skeleton width={34} height={12} borderRadius={6} />
+              </View>
+            ))}
+            <Skeleton width="100%" height={cardIndex === 0 ? 22 : 48} borderRadius={10} />
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.skeletonSectionHeader}>
+        <View style={styles.headerText}>
+          <Skeleton width="50%" height={16} borderRadius={8} />
+          <Skeleton width="64%" height={11} borderRadius={6} style={styles.skeletonLineGap} />
+        </View>
+        <Skeleton width={56} height={22} borderRadius={7} />
+      </View>
+
+      {Array.from({ length: 2 }).map((_, index) => (
+        <View key={index} style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.headerText}>
+              <Skeleton width="74%" height={15} borderRadius={8} />
+              <Skeleton width="46%" height={10} borderRadius={5} style={styles.skeletonLineGap} />
+            </View>
+            <Skeleton width={20} height={20} variant="circle" />
+          </View>
+          <Skeleton width="100%" height={32} borderRadius={8} />
+          <Skeleton width={180} height={104} borderRadius={52} style={styles.skeletonGauge} />
+          <Skeleton width="100%" height={34} borderRadius={10} />
+        </View>
+      ))}
+
+      <View style={styles.skeletonSectionHeader}>
+        <View style={styles.headerText}>
+          <Skeleton width="42%" height={16} borderRadius={8} />
+          <Skeleton width="70%" height={11} borderRadius={6} style={styles.skeletonLineGap} />
+        </View>
+        <Skeleton width={38} height={22} borderRadius={7} />
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Skeleton width="58%" height={15} borderRadius={8} />
+          <Skeleton width={38} height={20} borderRadius={7} />
+        </View>
+        <Skeleton width="100%" height={32} borderRadius={8} />
+        <View style={styles.skeletonChartRow}>
+          <Skeleton width={116} height={116} variant="circle" />
+          <View style={styles.legend}>
+            {Array.from({ length: 5 }).map((_, index) => (
+              <Skeleton key={index} width="100%" height={18} borderRadius={8} />
+            ))}
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Skeleton width="44%" height={15} borderRadius={8} />
+          <Skeleton width={38} height={20} borderRadius={7} />
+        </View>
+        <Skeleton width="100%" height={32} borderRadius={8} />
+        <View style={[styles.routeInfo, { backgroundColor: colors.backgroundSecondary }]}>
+          <Skeleton width={34} height={34} variant="circle" />
+          <View style={styles.headerText}>
+            <Skeleton width="36%" height={12} borderRadius={6} />
+            <Skeleton width="58%" height={10} borderRadius={5} style={styles.skeletonLineGap} />
+          </View>
+        </View>
+        <Skeleton width="100%" height={28} borderRadius={7} />
+        <Skeleton width="74%" height={28} borderRadius={7} />
+      </View>
+    </ScrollView>
+  );
+}
+
 export default function ManagerHomeScreen() {
   const { colors } = useTheme();
   const styles = createManagerStyles(colors);
   const user = useAuthStore((state) => state.user);
   const [refreshing, setRefreshing] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [summaryDateRange, setSummaryDateRange] = useState(getCurrentMonthRange);
+  const [summaryDateFilter, setSummaryDateFilter] = useState<SummaryDateFilter>('mtd');
   const [showSummaryDatePicker, setShowSummaryDatePicker] = useState(false);
   const [userSummary, setUserSummary] = useState<UserSummaryData>(INITIAL_USER_SUMMARY);
   const [callSummary, setCallSummary] = useState<CallSummaryData>(INITIAL_CALL_SUMMARY);
   const [managerOrderSummary, setManagerOrderSummary] =
     useState<ManagerOrderSummaryResponse | null>(null);
+  const [primaryCategories, setPrimaryCategories] = useState<Category[]>([]);
   const [primaryTargetMetric, setPrimaryTargetMetric] = useState<TargetMetric>('cases');
   const [uboTargetMetric, setUboTargetMetric] = useState<TargetMetric>('cases');
   const [categoryOrderMetric, setCategoryOrderMetric] = useState<TargetMetric>('cases');
@@ -411,8 +586,10 @@ export default function ManagerHomeScreen() {
     const categories = managerOrderSummary?.primaryCategoryWiseOrder?.categories;
 
     if (!categories?.length) {
-      return CATEGORY_ORDERS.map((item, index) => ({
-        ...item,
+      return primaryCategories.map((item, index) => ({
+        label: item.name,
+        value: 0,
+        metricValue: '0',
         color: categoryOrderColors[index % categoryOrderColors.length],
       }));
     }
@@ -423,15 +600,13 @@ export default function ManagerHomeScreen() {
       metricValue: formatNumber(getCategoryMetric(item, categoryOrderMetric)),
       color: categoryOrderColors[index % categoryOrderColors.length],
     }));
-  }, [categoryOrderColors, categoryOrderMetric, managerOrderSummary]);
+  }, [categoryOrderColors, categoryOrderMetric, managerOrderSummary, primaryCategories]);
   const categoryOrderTotal =
     categoryOrderMetric === 'value'
       ? formatNumber(managerOrderSummary?.primaryCategoryWiseOrder?.totalValue ?? 0)
       : categoryOrderMetric === 'tonnage'
         ? formatNumber(managerOrderSummary?.primaryCategoryWiseOrder?.totalTonnage ?? 0)
-        : managerOrderSummary?.primaryCategoryWiseOrder?.totalCases !== undefined
-          ? formatNumber(managerOrderSummary.primaryCategoryWiseOrder.totalCases)
-          : '112,456.3';
+        : formatNumber(managerOrderSummary?.primaryCategoryWiseOrder?.totalCases ?? 0);
   const categoryOrderUnit = getMetricLabel(categoryOrderMetric);
   const positionOrderUnit = getMetricLabel(positionOrderMetric);
   const orderCases = getOrderMetricValue(
@@ -457,6 +632,18 @@ export default function ManagerHomeScreen() {
     }
 
     return [
+      {
+        label: 'UTC',
+        value: formatNumber(summary.utc?.count ?? summary.productivity?.tc ?? callSummary.tc),
+        progress:
+          clampPercentage(
+            summary.utc?.percentage ??
+              (summary.total.count > 0
+                ? ((summary.productivity?.tc ?? callSummary.tc) / summary.total.count) * 100
+                : 0),
+          ) / 100,
+        color: colors.successDark,
+      },
       {
         label: 'UPC',
         value: formatNumber(summary.upc.count),
@@ -486,10 +673,27 @@ export default function ManagerHomeScreen() {
     colors.info,
     colors.secondary,
     colors.success,
+    colors.successDark,
     colors.warning,
+    callSummary.pc,
+    callSummary.productivity,
+    callSummary.tc,
     managerOrderSummary,
     outletSummaryColors,
   ]);
+  const outletProductivity = clampPercentage(
+    managerOrderSummary?.outletSummary?.productivity?.percentage ?? callSummary.productivity,
+  );
+  const outletCovered = clampPercentage(
+    managerOrderSummary?.outletSummary?.utc?.percentage ?? callSummary.covered,
+  );
+  const outletOrdered = clampPercentage(
+    managerOrderSummary?.outletSummary?.ordered?.percentage ??
+      managerOrderSummary?.outletSummary?.upc?.percentage ??
+      0,
+  );
+  const outletPc = managerOrderSummary?.outletSummary?.productivity?.pc ?? callSummary.pc;
+  const outletTc = managerOrderSummary?.outletSummary?.productivity?.tc ?? callSummary.tc;
   const primaryTargetSnapshot = getManagerTargetMetric(managerTarget, primaryTargetMetric);
   const managerInitials =
     user?.name
@@ -498,41 +702,17 @@ export default function ManagerHomeScreen() {
       ?.join('')
       ?.toUpperCase()
       ?.slice(0, 2) || 'FM';
-  const topMetrics = [
-    {
-      label: 'Team',
-      value: formatNumber(totalUsers),
-      icon: 'people-outline' as const,
-      color: colors.primary,
-    },
-    {
-      label: 'Productivity',
-      value: `${formatNumber(callSummary.productivity)}%`,
-      icon: 'trending-up-outline' as const,
-      color: colors.success,
-    },
-    {
-      label: 'Orders',
-      value: formatNumber(orderCases),
-      icon: 'receipt-outline' as const,
-      color: colors.secondary,
-    },
-  ];
-
   const TARGETS = [
     {
       title: 'User wise Primary Category Targets',
       period: getCurrentMonthPeriod(),
-      percentage: 34,
-      value: '112 K Cases',
-      hint: 'Only 217,383.55 more Cases to achieve your target',
+      hint: TARGET_NOT_CONFIGURED_HINT,
     },
     {
       title: 'User Wise Target UBO',
       period: 'N/A - N/A',
       percentage: 0,
-      value: '0',
-      hint: 'Target has not been configured for this period',
+      hint: TARGET_NOT_CONFIGURED_HINT,
     },
   ];
 
@@ -564,9 +744,12 @@ export default function ManagerHomeScreen() {
     }
   };
 
-  const fetchManagerOrderSummary = async () => {
+  const fetchManagerOrderSummary = async (range = summaryDateRange) => {
     try {
-      const response = await homeService.getManagerOrderSummary();
+      const response = await homeService.getManagerOrderSummary({
+        startDate: formatLocalApiDate(range.startDate),
+        endDate: formatLocalApiDate(range.endDate),
+      });
 
       if (response.success && response.data) {
         setManagerOrderSummary(response.data as ManagerOrderSummaryResponse);
@@ -576,23 +759,83 @@ export default function ManagerHomeScreen() {
     }
   };
 
+  const fetchPrimaryCategories = async () => {
+    try {
+      const response = await categoryService.fetchCategory({
+        page: 1,
+        limit: 100,
+        type: 'PARENT',
+        status: 'ACTIVE',
+      });
+
+      if (response.success && response.data) {
+        setPrimaryCategories(response.data as Category[]);
+      }
+    } catch (error) {
+      console.warn('Failed to load primary categories', error);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchManagerStats(summaryDateRange);
-    await fetchManagerOrderSummary();
+    await Promise.all([
+      fetchManagerStats(summaryDateRange),
+      fetchManagerOrderSummary(summaryDateRange),
+      fetchPrimaryCategories(),
+    ]);
     setRefreshing(false);
   };
 
   useEffect(() => {
-    fetchManagerStats(summaryDateRange);
+    let mounted = true;
+
+    const loadSummary = async () => {
+      try {
+        await Promise.all([
+          fetchManagerStats(summaryDateRange),
+          fetchManagerOrderSummary(summaryDateRange),
+        ]);
+      } finally {
+        if (mounted) {
+          setIsInitialLoading(false);
+        }
+      }
+    };
+
+    loadSummary();
+
+    return () => {
+      mounted = false;
+    };
   }, [summaryStartRouteDate, summaryEndRouteDate]);
 
   useEffect(() => {
     fetchManagerTarget();
-    fetchManagerOrderSummary();
+    fetchPrimaryCategories();
   }, []);
 
-  const openSummaryDatePicker = () => {
+  const applySummaryDateFilter = (filter: SummaryDateFilter) => {
+    setSummaryDateFilter(filter);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (filter === 'today') {
+      setSummaryDateRange({ startDate: today, endDate: today });
+      return;
+    }
+    if (filter === 'yesterday') {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      setSummaryDateRange({ startDate: yesterday, endDate: yesterday });
+      return;
+    }
+    if (filter === 'mtd') {
+      setSummaryDateRange({
+        startDate: new Date(today.getFullYear(), today.getMonth(), 1),
+        endDate: today,
+      });
+      return;
+    }
     setShowSummaryDatePicker(true);
   };
 
@@ -638,326 +881,375 @@ export default function ManagerHomeScreen() {
         title="Select summary date range"
         onClose={() => setShowSummaryDatePicker(false)}
         onApply={() => {}}
-        onApplyRange={setSummaryDateRange}
+        onApplyRange={(range) => {
+          setSummaryDateFilter('custom');
+          setSummaryDateRange(range);
+        }}
       />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
-        }
-      >
-        <View style={styles.headerPanel}>
-          <View style={styles.header}>
-            <View style={styles.headerIdentity}>
-              <View style={styles.headerAvatar}>
-                <AppText style={styles.headerAvatarText}>{managerInitials}</AppText>
-              </View>
-              <View style={styles.headerText}>
-                <AppText style={styles.eyebrow}>Executive Dashboard</AppText>
-                <AppText style={styles.title}>{user?.name || 'Field Manager'}</AppText>
-              </View>
-            </View>
-            <TouchableOpacity
-              style={styles.headerRangeButton}
-              activeOpacity={0.82}
-              onPress={openSummaryDatePicker}
+      {isInitialLoading ? <ManagerSkeleton colors={colors} styles={styles} /> : null}
+      {!isInitialLoading ? (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[colors.primary]}
+            />
+          }
+        >
+          <View style={styles.headerPanel}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.summaryFilterRow}
             >
-              <Ionicons name="calendar-number-outline" size={16} color={colors.primary} />
-              <Ionicons name="chevron-down" size={14} color={colors.textQuaternary} />
-            </TouchableOpacity>
+              {SUMMARY_DATE_FILTERS.map((filter) => {
+                const active = summaryDateFilter === filter.value;
+                return (
+                  <TouchableOpacity
+                    key={filter.value}
+                    activeOpacity={0.82}
+                    onPress={() => applySummaryDateFilter(filter.value)}
+                    style={[styles.summaryFilterChip, active && styles.summaryFilterChipActive]}
+                  >
+                    <AppText
+                      style={[styles.summaryFilterText, active && styles.summaryFilterTextActive]}
+                    >
+                      {filter.label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
-          <TouchableOpacity
-            style={styles.dateCard}
-            activeOpacity={0.82}
-            onPress={openSummaryDatePicker}
-          >
-            <View style={styles.dateTitleRow}>
-              <Ionicons name="calendar-outline" size={16} color={colors.primary} />
-              <View style={styles.headerText}>
-                <AppText style={styles.dateLabel}>Reporting period</AppText>
+          {renderSectionHeader('Workforce Summary', 'Today and selected-period team activity')}
+          <View style={styles.summaryGrid}>
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <AppText style={styles.cardTitle}>User Summary</AppText>
                 <AppText style={styles.cardMeta}>{summaryDateRangeLabel}</AppText>
               </View>
+              {userSummaryRows.map((item) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={styles.summaryRow}
+                  activeOpacity={0.75}
+                  // onPress={() =>
+                  //   router.push({
+                  //     pathname: '/(drawer)/(tabs)/daily-summary/users',
+                  //     params: {
+                  //       status: item.label.toLowerCase().replace(/\s+/g, '-'),
+                  //       date: selectedRouteDate,
+                  //     },
+                  //   })
+                  // }
+                >
+                  <View style={styles.summaryLabelWrap}>
+                    <View style={[styles.statusDot, { backgroundColor: item.color }]} />
+                    <AppText style={styles.summaryLabel}>{item.label}</AppText>
+                  </View>
+                  <AppText style={styles.summaryValue}>{item.value}</AppText>
+                </TouchableOpacity>
+              ))}
+              <View style={styles.totalRow}>
+                <AppText style={styles.totalLabel}>Total</AppText>
+                <AppText style={styles.totalValue}>{totalUsers}</AppText>
+              </View>
             </View>
-            <AppText style={styles.refreshedText}>Change</AppText>
-          </TouchableOpacity>
 
-          <View style={styles.kpiStrip}>
-            {topMetrics.map((item) => (
-              <View key={item.label} style={styles.kpiTile}>
-                <View style={[styles.kpiIcon, { backgroundColor: `${item.color}14` }]}>
-                  <Ionicons name={item.icon} size={15} color={item.color} />
-                </View>
-                <AppText style={styles.kpiValue} numberOfLines={1}>
-                  {item.value}
-                </AppText>
-                <AppText style={styles.kpiLabel} numberOfLines={1}>
-                  {item.label}
-                </AppText>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {renderSectionHeader('Workforce Summary', 'Today and selected-period team activity')}
-        <View style={styles.summaryGrid}>
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <AppText style={styles.cardTitle}>User Summary</AppText>
-              <AppText style={styles.cardMeta}>{summaryDateRangeLabel}</AppText>
-            </View>
-            {userSummaryRows.map((item) => (
-              <TouchableOpacity
-                key={item.label}
-                style={styles.summaryRow}
-                activeOpacity={0.75}
-                // onPress={() =>
-                //   router.push({
-                //     pathname: '/(drawer)/(tabs)/daily-summary/users',
-                //     params: {
-                //       status: item.label.toLowerCase().replace(/\s+/g, '-'),
-                //       date: selectedRouteDate,
-                //     },
-                //   })
-                // }
-              >
-                <View style={styles.summaryLabelWrap}>
-                  <View style={[styles.statusDot, { backgroundColor: item.color }]} />
-                  <AppText style={styles.summaryLabel}>{item.label}</AppText>
-                </View>
-                <AppText style={styles.summaryValue}>{item.value}</AppText>
-              </TouchableOpacity>
-            ))}
-            <View style={styles.totalRow}>
-              <AppText style={styles.totalLabel}>Total</AppText>
-              <AppText style={styles.totalValue}>{totalUsers}</AppText>
-            </View>
-          </View>
-
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <AppText style={styles.cardTitle}>Call Summary</AppText>
-              <MaterialCommunityIcons name="phone-check-outline" size={18} color={colors.primary} />
-            </View>
-            <View style={styles.callCircleRow}>
-              <View style={styles.callCircle}>
-                <AppText style={styles.callValue}>{callSummary.productivity}</AppText>
-                <AppText style={styles.callLabel}>Productivity %</AppText>
-              </View>
-              <View style={styles.callCircleMuted}>
-                <AppText style={styles.callValue}>{callSummary.covered}</AppText>
-                <AppText style={styles.callLabel}>Covered %</AppText>
-              </View>
-            </View>
-            <View style={styles.callMetrics}>
-              <View style={styles.metricItem}>
-                <AppText style={styles.metricValue}>{callSummary.pc}</AppText>
-                <AppText style={styles.metricLabel}>PC</AppText>
-              </View>
-              <View style={styles.metricItem}>
-                <AppText style={styles.metricValue}>{callSummary.tc}</AppText>
-                <AppText style={styles.metricLabel}>TC</AppText>
-              </View>
-              <View style={styles.metricItem}>
-                <AppText style={styles.metricValue}>{callSummary.sc}</AppText>
-                <AppText style={styles.metricLabel}>SC</AppText>
-              </View>
-            </View>
-            <View style={styles.orderValue}>
-              <AppText style={styles.orderValueLabel}>Qty Cases</AppText>
-              <AppText style={styles.orderValueText}>{callSummary.qtyCases}</AppText>
-            </View>
-          </View>
-        </View>
-
-        {renderSectionHeader(
-          'Target Performance',
-          `${formatNumber(primaryTargetSnapshot.percentage)}% achieved for selected metric`,
-          getMetricLabel(primaryTargetMetric),
-        )}
-        {TARGETS.map((target, index) => {
-          const sectionMetric = index === 0 ? primaryTargetMetric : uboTargetMetric;
-          const sectionMetricUnit = getMetricLabel(sectionMetric);
-          const targetMetric =
-            index === 0
-              ? getManagerTargetMetric(managerTarget, sectionMetric)
-              : {
-                  targetValue: 0,
-                  achievedValue: 0,
-                  remainingValue: 0,
-                  percentage: 0,
-                };
-          const targetMetricValue = `${formatNumber(targetMetric.achievedValue)} ${sectionMetricUnit}`;
-          const targetMetricHint =
-            index === 0 && targetMetric.targetValue > 0
-              ? `Only ${formatNumber(targetMetric.remainingValue)} more ${sectionMetricUnit} to achieve your target`
-              : target.hint;
-
-          const content = (
-            <>
+            <View style={styles.card}>
               <View style={styles.cardHeader}>
-                <View style={styles.headerText}>
-                  <AppText style={styles.cardTitle}>{target.title}</AppText>
-                  <AppText style={styles.cardMeta}>{target.period}</AppText>
-                </View>
-                <Ionicons
-                  name={index === 0 ? 'chevron-forward-circle-outline' : 'stats-chart-outline'}
-                  size={20}
+                <AppText style={styles.cardTitle}>Call Summary</AppText>
+                <MaterialCommunityIcons
+                  name="phone-check-outline"
+                  size={18}
                   color={colors.primary}
                 />
               </View>
-              {renderMetricToggle(
-                sectionMetric,
-                index === 0 ? setPrimaryTargetMetric : setUboTargetMetric,
-              )}
-              <Gauge
-                percentage={index === 0 ? targetMetric.percentage : target.percentage}
-                value={index === 0 ? targetMetricValue : `0 ${sectionMetricUnit}`}
-                color={index === 0 ? colors.success : colors.border}
-                colors={colors}
-              />
-              <View style={[styles.targetHint, index === 1 && styles.targetHintMuted]}>
-                <Ionicons
-                  name={index === 0 ? 'bulb-outline' : 'information-circle-outline'}
-                  size={14}
-                  color={index === 0 ? colors.primaryContrast : colors.textTertiary}
-                />
-                <AppText style={[styles.targetHintText, index === 1 && styles.targetHintTextMuted]}>
-                  {targetMetricHint}
-                </AppText>
+              <View style={styles.callCircleRow}>
+                <View style={styles.callCircleItem}>
+                  <View style={styles.callCircle}>
+                    <AppText style={styles.callValue}>{callSummary.productivity}%</AppText>
+                  </View>
+                  <AppText style={styles.callLabel}>Productivity</AppText>
+                </View>
+                <View style={styles.callCircleItem}>
+                  <View style={styles.callCircleMuted}>
+                    <AppText style={styles.callValue}>{callSummary.covered}%</AppText>
+                  </View>
+                  <AppText style={styles.callLabel}>Covered</AppText>
+                </View>
               </View>
-            </>
-          );
-
-          if (index === 0) {
-            return (
-              <TouchableOpacity
-                key={target.title}
-                style={styles.card}
-                activeOpacity={0.82}
-                onPress={() =>
-                  router.push({
-                    pathname: '/(drawer)/manager-targets',
-                    params: { date: selectedRouteDate },
-                  })
-                }
-              >
-                {content}
-              </TouchableOpacity>
-            );
-          }
-
-          return (
-            <View key={target.title} style={styles.card}>
-              {content}
+              <View style={styles.callMetrics}>
+                <View style={styles.metricItem}>
+                  <AppText style={styles.metricValue}>{callSummary.pc}</AppText>
+                  <AppText style={styles.metricLabel}>PC</AppText>
+                </View>
+                <View style={styles.metricItem}>
+                  <AppText style={styles.metricValue}>{callSummary.tc}</AppText>
+                  <AppText style={styles.metricLabel}>TC</AppText>
+                </View>
+                <View style={styles.metricItem}>
+                  <AppText style={styles.metricValue}>{callSummary.sc}</AppText>
+                  <AppText style={styles.metricLabel}>SC</AppText>
+                </View>
+              </View>
+              <View style={styles.orderValue}>
+                <AppText style={styles.orderValueLabel}>Qty Cases</AppText>
+                <AppText style={styles.orderValueText}>{callSummary.qtyCases}</AppText>
+              </View>
             </View>
-          );
-        })}
-
-        {renderSectionHeader('Order Analytics', 'Category and position-wise order movement', 'MTD')}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <AppText style={styles.cardTitle}>Primary Category Wise Order</AppText>
-            <AppText style={styles.mtdBadge}>MTD</AppText>
           </View>
-          {renderMetricToggle(categoryOrderMetric, setCategoryOrderMetric)}
-          <View style={styles.chartRow}>
-            <DonutChart data={categoryOrders} total={categoryOrderTotal} colors={colors} />
-            <View style={styles.legend}>
-              {categoryOrders.map((item) => (
-                <View key={item.label} style={styles.legendRow}>
-                  <View style={[styles.statusDot, { backgroundColor: item.color }]} />
-                  <View style={styles.legendTextWrap}>
-                    <AppText style={styles.legendLabel} numberOfLines={1}>
-                      {item.label}
+
+          {renderSectionHeader(
+            'Target Performance',
+            `${formatNumber(primaryTargetSnapshot.percentage)}% achieved for selected metric`,
+            getMetricLabel(primaryTargetMetric),
+          )}
+          {TARGETS.map((target, index) => {
+            const sectionMetric = index === 0 ? primaryTargetMetric : uboTargetMetric;
+            const sectionMetricUnit = getMetricLabel(sectionMetric);
+            const targetMetric =
+              index === 0
+                ? getManagerTargetMetric(managerTarget, sectionMetric)
+                : {
+                    targetValue: 0,
+                    achievedValue: 0,
+                    remainingValue: 0,
+                    percentage: 0,
+                  };
+            const targetMetricValue = `${formatNumber(targetMetric.achievedValue)} ${sectionMetricUnit}`;
+            const targetMetricHint =
+              index === 0 && targetMetric.targetValue > 0
+                ? targetMetric.remainingValue > 0
+                  ? `Only ${formatNumber(targetMetric.remainingValue)} more ${sectionMetricUnit} to achieve your target`
+                  : 'Target achieved for selected metric'
+                : target.hint;
+
+            const content = (
+              <>
+                <View style={styles.cardHeader}>
+                  <View style={styles.headerText}>
+                    <AppText style={styles.cardTitle}>{target.title}</AppText>
+                    <AppText style={styles.cardMeta}>{target.period}</AppText>
+                  </View>
+                  <Ionicons
+                    name={index === 0 ? 'chevron-forward-circle-outline' : 'stats-chart-outline'}
+                    size={20}
+                    color={colors.primary}
+                  />
+                </View>
+                {renderMetricToggle(
+                  sectionMetric,
+                  index === 0 ? setPrimaryTargetMetric : setUboTargetMetric,
+                )}
+                <Gauge
+                  percentage={index === 0 ? targetMetric.percentage : (target.percentage ?? 0)}
+                  value={index === 0 ? targetMetricValue : `0 ${sectionMetricUnit}`}
+                  color={index === 0 ? colors.success : colors.border}
+                  colors={colors}
+                />
+                <View style={[styles.targetHint, index === 1 && styles.targetHintMuted]}>
+                  <Ionicons
+                    name={index === 0 ? 'bulb-outline' : 'information-circle-outline'}
+                    size={14}
+                    color={index === 0 ? colors.primaryContrast : colors.textTertiary}
+                  />
+                  <AppText
+                    style={[styles.targetHintText, index === 1 && styles.targetHintTextMuted]}
+                  >
+                    {targetMetricHint}
+                  </AppText>
+                </View>
+              </>
+            );
+
+            if (index === 0) {
+              return (
+                <TouchableOpacity
+                  key={target.title}
+                  style={styles.card}
+                  activeOpacity={0.82}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(drawer)/manager-targets',
+                      params: { date: selectedRouteDate },
+                    })
+                  }
+                >
+                  {content}
+                </TouchableOpacity>
+              );
+            }
+
+            return (
+              <View key={target.title} style={styles.card}>
+                {content}
+              </View>
+            );
+          })}
+
+          {renderSectionHeader(
+            'Order Analytics',
+            'Category and position-wise order movement',
+            'MTD',
+          )}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <AppText style={styles.cardTitle}>Primary Category Wise Order</AppText>
+              <AppText style={styles.mtdBadge}>MTD</AppText>
+            </View>
+            {renderMetricToggle(categoryOrderMetric, setCategoryOrderMetric)}
+            <View style={styles.chartRow}>
+              <DonutChart data={categoryOrders} total={categoryOrderTotal} colors={colors} />
+              {categoryOrders.length > 0 ? (
+                <View style={styles.legend}>
+                  {categoryOrders.map((item) => (
+                    <View key={item.label} style={styles.legendRow}>
+                      <View style={[styles.statusDot, { backgroundColor: item.color }]} />
+                      <View style={styles.legendTextWrap}>
+                        <AppText style={styles.legendLabel} numberOfLines={1}>
+                          {item.label}
+                        </AppText>
+                        <AppText style={styles.legendValue}>
+                          {item.metricValue} {categoryOrderUnit}
+                        </AppText>
+                      </View>
+                      <AppText style={styles.legendPercent}>{item.value}%</AppText>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <AppText style={styles.chartEmptyText}>No category order data available</AppText>
+              )}
+            </View>
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <AppText style={styles.cardTitle}>Position Wise Order</AppText>
+              <AppText style={styles.mtdBadge}>MTD</AppText>
+            </View>
+            {renderMetricToggle(positionOrderMetric, setPositionOrderMetric)}
+            <View style={styles.routeInfo}>
+              <View style={styles.avatar}>
+                <AppText style={styles.avatarText}>{managerInitials}</AppText>
+              </View>
+              <View style={styles.headerText}>
+                <AppText style={styles.routeName}>Manager</AppText>
+                <AppText style={styles.cardMeta}>{user?.name || 'Manager'}</AppText>
+              </View>
+            </View>
+            <View style={styles.progressLegend}>
+              <View style={styles.progressLegendItem}>
+                <View style={[styles.statusDot, { backgroundColor: orderProgressColor }]} />
+                <AppText style={styles.cardMeta}>Order</AppText>
+              </View>
+              <View style={styles.progressLegendItem}>
+                <View style={[styles.statusDot, { backgroundColor: validationProgressColor }]} />
+                <AppText style={styles.cardMeta}>Validation</AppText>
+              </View>
+            </View>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: '100%', backgroundColor: orderProgressColor },
+                ]}
+              />
+              <AppText style={styles.progressText}>
+                {formatNumber(orderCases)} {positionOrderUnit}
+              </AppText>
+            </View>
+            <View style={styles.progressTrack}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${validationPercentage}%`, backgroundColor: validationProgressColor },
+                ]}
+              />
+              <AppText style={styles.progressText}>
+                {formatNumber(validationCases)} {positionOrderUnit}
+              </AppText>
+            </View>
+          </View>
+
+          {renderSectionHeader('Outlet Execution', 'Coverage and zero-order health')}
+          <View style={[styles.card, styles.outletSummaryCard]}>
+            <View style={styles.cardHeader}>
+              <AppText style={styles.cardTitle}>Outlets Summary</AppText>
+              <AppText style={styles.mtdBadge}>
+                {summaryDateFilter === 'mtd'
+                  ? 'MTD'
+                  : summaryDateFilter === 'today'
+                    ? 'TODAY'
+                    : summaryDateFilter === 'yesterday'
+                      ? 'YESTERDAY'
+                      : 'CUSTOM'}
+              </AppText>
+            </View>
+            <View style={styles.outletSummaryContent}>
+              <View style={styles.outletSummaryList}>
+                {outletSummaryRows.map((item) => (
+                  <View key={item.label} style={styles.outletCompactRow}>
+                    <View style={styles.outletCompactHeader}>
+                      <AppText style={styles.outletCompactLabel}>{item.label}</AppText>
+                      <AppText style={styles.outletCompactValue}>{item.value}</AppText>
+                    </View>
+                    <View style={styles.outletProgressTrack}>
+                      <View
+                        style={[
+                          styles.outletProgressFill,
+                          { width: `${item.progress * 100}%`, backgroundColor: item.color },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.outletMetricPanel}>
+                <AppText style={styles.outletMetricTitle}>Productivity</AppText>
+                <View style={styles.productivityMetricRow}>
+                  <View style={styles.productivityCounts}>
+                    <AppText style={styles.productivityCountLabel}>PC</AppText>
+                    <AppText style={styles.productivityCountValue}>
+                      {formatNumber(outletPc)}
                     </AppText>
-                    <AppText style={styles.legendValue}>
-                      {item.metricValue} {categoryOrderUnit}
+                    <AppText style={styles.productivityCountLabel}>TC</AppText>
+                    <AppText style={styles.productivityCountValue}>
+                      {formatNumber(outletTc)}
                     </AppText>
                   </View>
-                  <AppText style={styles.legendPercent}>{item.value}%</AppText>
+                  <OutletCircleMetric
+                    label=""
+                    percentage={outletProductivity}
+                    color={colors.success}
+                    colors={colors}
+                  />
                 </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <AppText style={styles.cardTitle}>Position Wise Order</AppText>
-            <AppText style={styles.mtdBadge}>MTD</AppText>
-          </View>
-          {renderMetricToggle(positionOrderMetric, setPositionOrderMetric)}
-          <View style={styles.routeInfo}>
-            <View style={styles.avatar}>
-              <AppText style={styles.avatarText}>{managerInitials}</AppText>
-            </View>
-            <View style={styles.headerText}>
-              <AppText style={styles.routeName}>Manager</AppText>
-              <AppText style={styles.cardMeta}>{user?.name || 'Manager'}</AppText>
-            </View>
-          </View>
-          <View style={styles.progressLegend}>
-            <View style={styles.progressLegendItem}>
-              <View style={[styles.statusDot, { backgroundColor: orderProgressColor }]} />
-              <AppText style={styles.cardMeta}>Order</AppText>
-            </View>
-            <View style={styles.progressLegendItem}>
-              <View style={[styles.statusDot, { backgroundColor: validationProgressColor }]} />
-              <AppText style={styles.cardMeta}>Validation</AppText>
-            </View>
-          </View>
-          <View style={styles.progressTrack}>
-            <View
-              style={[styles.progressFill, { width: '100%', backgroundColor: orderProgressColor }]}
-            />
-            <AppText style={styles.progressText}>
-              {formatNumber(orderCases)} {positionOrderUnit}
-            </AppText>
-          </View>
-          <View style={styles.progressTrack}>
-            <View
-              style={[
-                styles.progressFill,
-                { width: `${validationPercentage}%`, backgroundColor: validationProgressColor },
-              ]}
-            />
-            <AppText style={styles.progressText}>
-              {formatNumber(validationCases)} {positionOrderUnit}
-            </AppText>
-          </View>
-        </View>
-
-        {renderSectionHeader('Outlet Execution', 'Coverage and zero-order health')}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <AppText style={styles.cardTitle}>Outlets Summary</AppText>
-            <AppText style={styles.mtdBadge}>MTD</AppText>
-          </View>
-          {outletSummaryRows.map((item) => (
-            <View key={item.label} style={styles.outletRow}>
-              <View style={styles.outletText}>
-                <AppText style={styles.summaryLabel}>{item.label}</AppText>
-                <AppText style={styles.summaryValue}>{item.value}</AppText>
-              </View>
-              <View style={styles.outletProgressTrack}>
-                <View
-                  style={[
-                    styles.outletProgressFill,
-                    { width: `${item.progress * 100}%`, backgroundColor: item.color },
-                  ]}
-                />
-              </View>
-              <View style={[styles.percentBadge, { borderColor: item.color }]}>
-                <AppText style={[styles.percentBadgeText, { color: item.color }]}>
-                  {Math.round(item.progress * 100)}%
-                </AppText>
+                <View style={styles.outletBottomMetrics}>
+                  <OutletCircleMetric
+                    label="Covered"
+                    percentage={outletCovered}
+                    color={colors.secondary}
+                    colors={colors}
+                  />
+                  <OutletCircleMetric
+                    label="Ordered"
+                    percentage={outletOrdered}
+                    color={colors.error}
+                    colors={colors}
+                  />
+                </View>
               </View>
             </View>
-          ))}
-        </View>
-      </ScrollView>
+          </View>
+        </ScrollView>
+      ) : null}
     </View>
   );
 }

@@ -157,7 +157,7 @@ export default function CheckInScreen() {
         showBack: true,
         showMenu: false,
         elevated: true,
-        size: 'md',
+        size: 'small',
         showFilter: true,
         filterActive: productsFilterCount > 0,
         filterCount: productsFilterCount,

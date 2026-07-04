@@ -7,7 +7,8 @@ import { repositories } from '@/repositories';
 import { captureCurrentLocation, type CapturedLocation } from '@/shared/services/location.service';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
-import { createUuid } from '@/utils/uuid';
+import { createSchemaId } from '@/utils/uuid';
+import { getDistance } from '@/shared/utils/geofence.utils';
 
 /**
  * Query params for fetching route outlets
@@ -46,6 +47,16 @@ export interface StartVisitPayload {
   sequence?: number;
   visitType?: 'ON_SITE' | 'OFF_SITE';
   checkInLocation?: CapturedLocation;
+  interactionId?: string;
+}
+
+export interface StartInteractionPayload {
+  customerId: string;
+  routeSessionId: string;
+  workSessionId: string;
+  vanId: string;
+  customerLocation: { latitude: number; longitude: number };
+  configuredRadiusMeters: number;
 }
 
 /**
@@ -56,6 +67,8 @@ export interface OutletService {
   getOutletDetail(customerId: string): Promise<ApiResponse<any>>;
   getOutletMedia(customerId: string): Promise<ApiResponse<any>>;
   startVisit(payload: StartVisitPayload): Promise<ApiResponse<any>>;
+  startInteraction(payload: StartInteractionPayload): Promise<ApiResponse<any>>;
+  abandonInteraction(interactionId: string): Promise<ApiResponse<any>>;
   visitStatus(payload: VisitStatusParams): Promise<ApiResponse<any>>;
   completeVisit(visitId: string | undefined): Promise<ApiResponse<any>>;
   createCustomer(payload: any): Promise<ApiResponse<any>>;
@@ -92,6 +105,56 @@ const cleanParams = (params: Record<string, any>) => {
  * Service implementation
  */
 export const outletService: OutletService = {
+  startInteraction: async (payload) => {
+    const user = useAuthStore.getState().user;
+    if (!isSalesman(user)) throw new Error('Only a salesman can start an interaction');
+    const salesmanLocation = await captureCurrentLocation();
+    if (!salesmanLocation) throw new Error('Current GPS location is required');
+
+    if (isOfflineMode()) {
+      const interactionId = createSchemaId('InteractionLog', 10);
+      const distanceMeters = getDistance(
+        payload.customerLocation.latitude,
+        payload.customerLocation.longitude,
+        salesmanLocation.latitude,
+        salesmanLocation.longitude,
+      );
+      const visitType = distanceMeters <= payload.configuredRadiusMeters ? 'ON_SITE' : 'OFF_SITE';
+      const arrivalTime = new Date().toISOString();
+      const record = await repositories.interactions.create(user?.userId ?? '', {
+        ...payload,
+        uuid: interactionId,
+        interactionId,
+        employeeId: user?.userId,
+        salesmanLocation,
+        arrivalLocation: salesmanLocation,
+        distanceMeters,
+        visitType,
+        arrivalTime,
+        status: 'ARRIVED',
+      });
+      return {
+        success: true,
+        statusCode: 202,
+        data: { ...record, interactionId },
+      } as ApiResponse<any>;
+    }
+
+    return api.post<any>('shop-visit/interaction', { ...payload, salesmanLocation });
+  },
+
+  abandonInteraction: async (interactionId) => {
+    const user = useAuthStore.getState().user;
+    if (isSalesman(user) && isOfflineMode()) {
+      const record = await repositories.interactions.update(user?.userId ?? '', interactionId, {
+        status: 'ABANDONED',
+        abandonedAt: new Date().toISOString(),
+      });
+      return { success: true, statusCode: 202, data: record } as ApiResponse<any>;
+    }
+    return api.patch<any>(`shop-visit/interaction/${interactionId}/abandon`, {});
+  },
+
   getRouteOutlets: async (params) => {
     const { routeId, page = 1, limit = 10, searchText, filters = {}, routeSessionId } = params;
 
@@ -130,6 +193,21 @@ export const outletService: OutletService = {
         });
         records.push(...batch);
         if (batch.length < localPageSize) break;
+      }
+      // Older app builds stored offline-created outlets in the customers table.
+      // Include only unsynced legacy records so they remain visible until their
+      // queued operation is uploaded and the outlet snapshot is refreshed.
+      const legacyCustomers = await repositories.customers.findAll(user?.userId ?? '', {
+        limit: localPageSize,
+        search: searchText,
+      });
+      for (const legacyCustomer of legacyCustomers) {
+        if (legacyCustomer.syncStatus === 'SYNCED') continue;
+        const legacyId = String(legacyCustomer.customerId ?? legacyCustomer.uuid ?? '');
+        const alreadyIncluded = records.some(
+          (record) => String(record.customerId ?? record.uuid ?? '') === legacyId,
+        );
+        if (!alreadyIncluded) records.push(legacyCustomer);
       }
       const [visits, orders, nonSales] = await Promise.all([
         repositories.visits.findAll(user?.userId ?? '', { limit: 200 }),
@@ -229,25 +307,47 @@ export const outletService: OutletService = {
     }) as Promise<ApiResponse<any>>;
   },
   startVisit: async (payload: StartVisitPayload) => {
-    const checkInLocation = payload.checkInLocation || (await captureCurrentLocation());
     const user = useAuthStore.getState().user;
-    if (isSalesman(user) && isOfflineMode()) {
+    if (!isSalesman(user)) {
+      throw new Error('Only a salesman can start a visit');
+    }
+
+    const checkInLocation = payload.checkInLocation || (await captureCurrentLocation());
+    if (isOfflineMode()) {
       const customer = await repositories.outlets.findById(user?.userId ?? '', payload.outletId);
       if (customer?.status !== 'ACTIVE') {
         throw new Error('Visits can only be created for verified, active customers');
       }
+      const visitId = createSchemaId('ShopVisit');
+      const interaction = payload.interactionId
+        ? await repositories.interactions.findById(user?.userId ?? '', payload.interactionId)
+        : null;
+      if (!interaction || interaction.status !== 'ARRIVED') {
+        throw new Error('A valid arrived interaction is required');
+      }
       const record = await repositories.visits.create(user?.userId ?? '', {
         ...payload,
+        uuid: visitId,
+        visitId,
         employeeId: user?.userId,
         checkInLocation,
-        checkInTime: new Date().toISOString(),
+        checkInTime: interaction?.arrivalTime || new Date().toISOString(),
+        visitType: interaction?.visitType || payload.visitType,
+        distanceMeters: interaction?.distanceMeters,
+        customerLocation: interaction?.customerLocation,
         status: 'ACTIVE',
       });
+      if (interaction) {
+        await repositories.interactions.update(user?.userId ?? '', interaction.uuid, {
+          status: 'CONVERTED',
+          visitId,
+        });
+      }
       return {
         success: true,
         statusCode: 202,
         message: 'Visit saved locally',
-        data: { ...record, visitId: record.uuid },
+        data: { ...record, visitId },
       } as ApiResponse<any>;
     }
     return api.post<any>('shop-visit', {
@@ -276,6 +376,7 @@ export const outletService: OutletService = {
 
   completeVisit: async (visitId?: string) => {
     const checkOutLocation = await captureCurrentLocation();
+    if (!checkOutLocation) throw new Error('Current GPS location is required to complete a visit');
     const user = useAuthStore.getState().user;
     if (isSalesman(user) && isOfflineMode() && visitId) {
       const record = await repositories.visits.update(user?.userId ?? '', visitId, {
@@ -303,9 +404,9 @@ export const outletService: OutletService = {
     if (isSalesman(user) && isOfflineMode()) {
       const offlinePayload = {
         ...pendingPayload,
-        customerId: Number(pendingPayload.customerId) || Date.now(),
+        customerId: String(pendingPayload.customerId || Date.now()),
       };
-      const record = await repositories.customers.create(user?.userId ?? '', offlinePayload);
+      const record = await repositories.outlets.create(user?.userId ?? '', offlinePayload);
       return {
         success: true,
         statusCode: 202,
@@ -321,7 +422,7 @@ export const outletService: OutletService = {
     if (isSalesman(user) && isOfflineMode()) {
       const cleanUri = uri.split('?')[0];
       const extension = cleanUri.includes('.') ? cleanUri.split('.').pop() || 'jpg' : 'jpg';
-      const mediaId = createUuid();
+      const mediaId = createSchemaId('Media');
       let storedUri = uri;
 
       if (Platform.OS !== 'web' && FileSystem.documentDirectory) {
@@ -375,8 +476,11 @@ export const outletService: OutletService = {
     const user = useAuthStore.getState().user;
     if (isSalesman(user) && isOfflineMode()) {
       const now = new Date().toISOString();
+      const routeSessionId = createSchemaId('RouteSession');
       const record = await repositories.routeSessions.create(user?.userId ?? '', {
         ...payload,
+        uuid: routeSessionId,
+        routeSessionId,
         userId: user?.userId,
         userName: user?.name,
         vanId: user?.vanId,
@@ -390,7 +494,7 @@ export const outletService: OutletService = {
         success: true,
         statusCode: 202,
         message: 'Route change saved locally',
-        data: { ...record, routeSessionId: record.uuid },
+        data: { ...record, routeSessionId },
         offline: true,
       } as ApiResponse<any>;
     }

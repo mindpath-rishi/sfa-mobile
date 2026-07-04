@@ -13,6 +13,7 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { isOfflineMode, useOfflineStore } from '@/core/offline/offline.store';
 import { repositories } from '@/repositories';
 import { syncService } from '@/sync/sync.service';
+import { createSchemaId } from '@/utils/uuid';
 
 /**
  * Auth API contract used by the app.
@@ -108,6 +109,24 @@ export interface UserPrimaryCategoryTargetSummary {
   achievementPercentage: number;
 }
 
+export interface UserUboTargetBreakdown {
+  categoryId: string;
+  category: string;
+  target: number;
+  achievement: number;
+}
+
+export interface UserFocusedPackTargetBreakdown {
+  productId: string;
+  productName: string;
+  targetCases: number;
+  achievementCases: number;
+  targetTonnage: number;
+  achievementTonnage: number;
+  targetValue: number;
+  achievementValue: number;
+}
+
 export interface ManagerOrderSummaryResponse {
   primaryCategoryWiseOrder: {
     totalCases: number;
@@ -135,6 +154,10 @@ export interface ManagerOrderSummaryResponse {
     validationValue?: number;
   };
   outletSummary: {
+    utc?: {
+      count: number;
+      percentage: number;
+    };
     upc: {
       count: number;
       percentage: number;
@@ -156,6 +179,10 @@ export interface ManagerOrderSummaryResponse {
       tc: number;
       percentage: number;
     };
+    ordered?: {
+      count: number;
+      percentage: number;
+    };
   };
 }
 
@@ -168,6 +195,38 @@ export interface ManagerTeamCoverageResponse {
   outletsPlanned: number;
   upc: number;
   uic: number;
+  userList?: Array<{
+    employeeId?: string;
+    name?: string;
+    mobile?: string;
+    designationId?: string;
+  }>;
+  vanList?: Array<{
+    vanId?: string;
+    name?: string;
+    vanNumber?: string;
+    driverName?: string;
+    capacity?: number;
+    warehouseId?: string;
+    associatedUsers?: string[];
+    routeCount?: number;
+  }>;
+  outletList?: Array<{
+    customerId?: string;
+    name?: string;
+    ownerName?: string;
+    phoneNumber?: string;
+    marketId?: string;
+    segmentation?: string;
+  }>;
+  plannedOutletList?: Array<{
+    customerId?: string;
+    name?: string;
+    ownerName?: string;
+    phoneNumber?: string;
+    marketId?: string;
+    segmentation?: string;
+  }>;
 }
 
 export interface ManagerBeatOMeterResponse {
@@ -454,7 +513,7 @@ export interface HomeService {
         },
     config?: ApiRequestConfig,
   ): Promise<ApiResponse<any>>;
-  cancelVanChangeRequest(workSessionId: string): Promise<ApiResponse<any>>;
+  cancelVanChangeRequest(vanChangeRequestId: string): Promise<ApiResponse<any>>;
   requestVanChange(
     workSessionId: string,
     payload: {
@@ -525,11 +584,25 @@ export interface HomeService {
   ): Promise<ApiResponse<ManagerStatsResponse>>;
   getManagerTarget: (date?: string) => Promise<ApiResponse<ManagerTargetResponse>>;
   getUserWiseTargetSummary: (date?: string) => Promise<ApiResponse<UserWiseTargetSummary[]>>;
+  getUboTargetSummary: (date?: string) => Promise<ApiResponse<UserWiseTargetSummary[]>>;
+  getFocusedPackTargetSummary: (date?: string) => Promise<ApiResponse<UserWiseTargetSummary[]>>;
   getUserPrimaryCategoryTargets: (params: {
     employeeId: string;
     date?: string;
   }) => Promise<ApiResponse<UserPrimaryCategoryTargetSummary[]>>;
-  getManagerOrderSummary: () => Promise<ApiResponse<ManagerOrderSummaryResponse>>;
+  getUserUboTargets: (params: {
+    employeeId: string;
+    date?: string;
+  }) => Promise<ApiResponse<UserUboTargetBreakdown[]>>;
+  getUserFocusedPackTargets: (params: {
+    employeeId: string;
+    date?: string;
+  }) => Promise<ApiResponse<UserFocusedPackTargetBreakdown[]>>;
+  getManagerOrderSummary: (params?: {
+    date?: string;
+    startDate?: string;
+    endDate?: string;
+  }) => Promise<ApiResponse<ManagerOrderSummaryResponse>>;
   getManagerTeamCoverage: () => Promise<ApiResponse<ManagerTeamCoverageResponse>>;
   getManagerBeatOMeter: () => Promise<ApiResponse<ManagerBeatOMeterResponse>>;
   getManagerFieldUsers: (params?: {
@@ -561,8 +634,11 @@ export const homeService: HomeService = {
     if (!isSalesman(user) || !isOfflineMode()) {
       return api.post<any, DayStartPayload>('/work-session', payload, config);
     }
+    const workSessionId = createSchemaId('WorkSession');
     const record = await repositories.attendance.create(user?.userId ?? '', {
       ...payload,
+      uuid: workSessionId,
+      workSessionId,
       userId: user?.userId,
       userName: user?.name,
       dayStartTime: new Date().toISOString(),
@@ -570,8 +646,11 @@ export const homeService: HomeService = {
       status: 'ACTIVE',
     } as unknown as Record<string, unknown>);
     const now = new Date().toISOString();
+    const activityId = createSchemaId('Activity');
     await repositories.activities.create(user?.userId ?? '', {
-      workSessionId: record.uuid,
+      uuid: activityId,
+      activityId,
+      workSessionId,
       userId: user?.userId,
       userName: user?.name,
       vanId: payload.vanId ?? user?.vanId,
@@ -581,8 +660,11 @@ export const homeService: HomeService = {
       status: 'ACTIVE',
     });
     if (payload.routeId) {
+      const routeSessionId = createSchemaId('RouteSession');
       await repositories.routeSessions.create(user?.userId ?? '', {
-        workSessionId: record.uuid,
+        uuid: routeSessionId,
+        routeSessionId,
+        workSessionId,
         userId: user?.userId,
         userName: user?.name,
         vanId: payload.vanId ?? user?.vanId,
@@ -596,12 +678,12 @@ export const homeService: HomeService = {
         isActive: true,
       });
     }
-    useAuthStore.getState().setWorkSessionId(record.uuid);
+    useAuthStore.getState().setWorkSessionId(workSessionId);
     return {
       success: true,
       statusCode: 202,
       message: 'Day start saved locally',
-      data: { ...record, workSessionId: record.uuid },
+      data: { ...record, workSessionId },
     } as ApiResponse<any>;
   },
   uploadDayStartImage: async ({ uri, ownerId, subOwnnerId }, config) => {
@@ -814,8 +896,11 @@ export const homeService: HomeService = {
           }),
         ),
     );
+    const activityId = createSchemaId('Activity');
     const record = await repositories.activities.create(ownerId, {
       ...payload,
+      uuid: activityId,
+      activityId,
       userId: user?.userId,
       userName: user?.name,
       startTime: new Date().toISOString(),
@@ -823,7 +908,10 @@ export const homeService: HomeService = {
     } as unknown as Record<string, unknown>);
     if (payload.routeId) {
       const now = new Date().toISOString();
+      const routeSessionId = createSchemaId('RouteSession');
       await repositories.routeSessions.create(ownerId, {
+        uuid: routeSessionId,
+        routeSessionId,
         workSessionId: payload.workSessionId,
         userId: user?.userId,
         userName: user?.name,
@@ -843,7 +931,7 @@ export const homeService: HomeService = {
       success: true,
       statusCode: 202,
       message: 'Activity saved locally',
-      data: { ...record, activityId: record.uuid },
+      data: { ...record, activityId },
       offline: true,
     } as ApiResponse<any>;
   },
@@ -1014,14 +1102,17 @@ export const homeService: HomeService = {
 
     return response;
   },
-  cancelVanChangeRequest: (workSessionId: string) =>
-    api.patch<any>(`/work-session/van-change/${workSessionId}/cancel`, {}) as Promise<
+  cancelVanChangeRequest: (vanChangeRequestId: string) =>
+    api.patch<any>(`/van-change-request/${vanChangeRequestId}/cancel`, {}) as Promise<
       ApiResponse<any>
     >,
   requestVanChange: (workSessionId, payload) =>
-    api.patch<any>(`/work-session/van-change/${workSessionId}/request`, payload) as Promise<
-      ApiResponse<any>
-    >,
+    api.post<any>('/van-change-request', {
+      workSessionId,
+      requestedVanId: payload.requestedVanId,
+      requestedVanName: payload.requestedVanName,
+      reason: payload.vanChangeReason,
+    }) as Promise<ApiResponse<any>>,
   getEmployeeStats: async (employeeId: string) => {
     const user = useAuthStore.getState().user;
     if (!isSalesman(user) || !isOfflineMode()) {
@@ -1114,12 +1205,28 @@ export const homeService: HomeService = {
     api.get<UserWiseTargetSummary[]>(`/employee/manager/user-wise-target`, {
       params: date ? { date } : undefined,
     }) as Promise<ApiResponse<UserWiseTargetSummary[]>>,
+  getUboTargetSummary: (date?: string) =>
+    api.get<UserWiseTargetSummary[]>(`/employee/manager/ubo-target`, {
+      params: date ? { date } : undefined,
+    }) as Promise<ApiResponse<UserWiseTargetSummary[]>>,
+  getFocusedPackTargetSummary: (date?: string) =>
+    api.get<UserWiseTargetSummary[]>(`/employee/manager/focused-pack-target`, {
+      params: date ? { date } : undefined,
+    }) as Promise<ApiResponse<UserWiseTargetSummary[]>>,
   getUserPrimaryCategoryTargets: (params) =>
     api.get<UserPrimaryCategoryTargetSummary[]>(`/employee/manager/user-primary-category-target`, {
       params,
     }) as Promise<ApiResponse<UserPrimaryCategoryTargetSummary[]>>,
-  getManagerOrderSummary: () =>
-    api.get<ManagerOrderSummaryResponse>(`/employee/manager/order-summary`, {}) as Promise<
+  getUserUboTargets: (params) =>
+    api.get<UserUboTargetBreakdown[]>(`/employee/manager/user-ubo-target`, {
+      params,
+    }) as Promise<ApiResponse<UserUboTargetBreakdown[]>>,
+  getUserFocusedPackTargets: (params) =>
+    api.get<UserFocusedPackTargetBreakdown[]>(`/employee/manager/user-focused-pack-target`, {
+      params,
+    }) as Promise<ApiResponse<UserFocusedPackTargetBreakdown[]>>,
+  getManagerOrderSummary: (params) =>
+    api.get<ManagerOrderSummaryResponse>(`/employee/manager/order-summary`, { params }) as Promise<
       ApiResponse<ManagerOrderSummaryResponse>
     >,
   getManagerTeamCoverage: () =>

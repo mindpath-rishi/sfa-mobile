@@ -1,4 +1,4 @@
-// // app/(drawer)/beats.tsx - Enhanced SFA Sales Executive Active Routes
+// // app/(drawer)/beats.tsx - Enhanced Sales Stream Sales Executive Active Routes
 // import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 // import {
 //   View,
@@ -1645,7 +1645,7 @@
 //   return styleGenerator(colors);
 // };
 
-// app/(drawer)/beats.tsx - Enhanced SFA Sales Executive Active Routes
+// app/(drawer)/beats.tsx - Enhanced Sales Stream Sales Executive Active Routes
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,

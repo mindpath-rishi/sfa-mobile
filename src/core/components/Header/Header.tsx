@@ -33,6 +33,7 @@ const Header: React.FC = () => {
 
     showBack: config?.showBack ?? false,
     showMenu: config?.showMenu ?? false,
+    onBackPress: config?.onBackPress,
     showSearch: config?.showSearch ?? false,
     showFilter: config?.showFilter ?? false,
     showSearchBar: config?.showSearchBar ?? false,
@@ -93,6 +94,10 @@ const Header: React.FC = () => {
 
   const handleBackPress = () => {
     backButtonScale.value = withSequence(withTiming(0.8), withTiming(1));
+    if (safeConfig.onBackPress) {
+      safeConfig.onBackPress();
+      return;
+    }
     router.back();
   };
 

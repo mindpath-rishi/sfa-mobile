@@ -6,6 +6,10 @@ export type ApiRequestConfig = {
   headers?: ApiHeaders;
   params?: Record<string, any>;
   showLoader?: boolean; // ✅ NEW: control loader visibility per request
+  /** Disable the device API cache for transient/action-oriented requests. */
+  cache?: boolean;
+  /** Optional per-request timeout override in milliseconds. */
+  timeoutMs?: number;
 };
 
 export type ApiResponse<T> = {

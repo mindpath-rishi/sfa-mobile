@@ -105,7 +105,7 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primaryLight,
+      backgroundColor: `${colors.primary}12`,
     },
     dailyHeaderText: {
       flex: 1,
@@ -136,36 +136,6 @@ export const createManagerDailySummaryStyles = (colors: AppColors) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
-    },
-    managerInfo: {
-      flex: 1,
-      minWidth: 0,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    managerAvatar: {
-      width: 34,
-      height: 34,
-      borderRadius: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: `${colors.primary}15`,
-    },
-    managerAvatarText: {
-      fontSize: managerFontSize.sm,
-      fontWeight: '900',
-      color: colors.primary,
-    },
-    managerTextBlock: {
-      flex: 1,
-      minWidth: 0,
-    },
-    cardTitle: {
-      marginTop: 2,
-      fontSize: managerFontSize.sm,
-      fontWeight: '900',
-      color: colors.textPrimary,
     },
     dateButton: {
       minHeight: 30,

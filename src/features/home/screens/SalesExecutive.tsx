@@ -97,6 +97,7 @@ export default function SalesExecutiveScreen() {
   const [availableVans, setAvailableVans] = useState<any[]>([]);
   const [selectedVanForChange, setSelectedVanForChange] = useState<any | null>(null);
   const [vanChangeRequestPending, setVanChangeRequestPending] = useState(false);
+  const [vanChangeRequestId, setVanChangeRequestId] = useState('');
   const [vanChangePendingBanner, setVanChangePendingBanner] = useState(false);
   const [pendingVanChangeName, setPendingVanChangeName] = useState('');
   const [vanChangeApprovedRoutePrompt, setVanChangeApprovedRoutePrompt] = useState(false);
@@ -340,6 +341,7 @@ export default function SalesExecutiveScreen() {
       setUnifiedModalVisible(false);
       setIsChangingActivity(false);
       setVanChangeRequestPending(true);
+      setVanChangeRequestId(response?.data?.vanChangeRequestId || '');
       setVanChangePendingBanner(true);
       setPendingVanChangeName(requestedVanName);
       setSelectedVanForChange(null);
@@ -363,11 +365,7 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
-    setUnifiedModalVisible(false);
-    setVanChangeRequestPending(true);
-    setVanChangePendingBanner(true);
-    setPendingVanChangeName(getRequestedVanName(selectedVanForChange));
-    handleStartDay({ skipRouteValidation: true, forceVanChangePending: true });
+    void handleStartDay({ skipRouteValidation: true, forceVanChangePending: true });
   };
 
   const handleRouteSelect = (route: any) => {
@@ -581,6 +579,10 @@ export default function SalesExecutiveScreen() {
         loader.show({ message: 'Confirming your start location...' });
         dayStartLocation = await captureCurrentLocation();
       }
+      if (!dayStartLocation) {
+        toast.error('A high-accuracy GPS location is required to start the day.');
+        return;
+      }
 
       const payload: DayStartPayload = {
         activityName: selectedActivity,
@@ -596,11 +598,6 @@ export default function SalesExecutiveScreen() {
         routeName: selectedRoute?.name,
         customerCategoryId: getRouteCustomerCategoryId(selectedRoute),
         vanId: van?.vanId,
-        requestedVanId: isVanChangePending ? selectedVanForChange?.vanId : undefined,
-        requestedVanName: isVanChangePending
-          ? selectedVanForChange?.name || selectedVanForChange?.vanName
-          : undefined,
-        vanChangeReason: isVanChangePending ? vanChangeNote.trim() : undefined,
         dayStartImageMediaId: dayStartImage?.mediaId,
         dayStartImageUrl: dayStartImage?.url,
         dayStartLocation,
@@ -616,22 +613,74 @@ export default function SalesExecutiveScreen() {
       });
 
       if ([201, 202].includes(Number(response?.statusCode))) {
+        const startedWorkSessionId =
+          response?.data?.workSessionId || workSessionId || useAuthStore.getState().workSessionId;
+
+        if (isVanChangePending) {
+          if (!startedWorkSessionId) {
+            setVanChangeRequestPending(false);
+            setVanChangePendingBanner(false);
+            setPendingVanChangeName('');
+            setVanChangeRequestId('');
+            setUnifiedModalVisible(false);
+            toast.error('Day started, but its work session could not be identified. Please refresh.');
+            return;
+          }
+
+          const requestedVanName = getRequestedVanName(selectedVanForChange);
+          const vanChangeResponse = await homeService.requestVanChange(startedWorkSessionId, {
+            requestedVanId: selectedVanForChange?.vanId,
+            requestedVanName,
+            vanChangeReason: vanChangeNote.trim(),
+          });
+
+          if (
+            vanChangeResponse?.success === false ||
+            ![200, 201].includes(Number(vanChangeResponse?.statusCode))
+          ) {
+            setVanChangeRequestPending(false);
+            setVanChangePendingBanner(false);
+            setPendingVanChangeName('');
+            setVanChangeRequestId('');
+            setUnifiedModalVisible(false);
+            toast.error(
+              `Day started, but van change request failed: ${vanChangeResponse?.message || 'Please try again.'}`,
+            );
+          } else {
+            setVanChangeRequestPending(true);
+            setVanChangePendingBanner(true);
+            setPendingVanChangeName(requestedVanName);
+            setVanChangeRequestId(vanChangeResponse?.data?.vanChangeRequestId || '');
+            setUnifiedModalVisible(false);
+            setSelectedVanForChange(null);
+            setVanChangeNote('');
+            toast.success('Day started. Van change request pending approval.');
+          }
+        }
+
         loader.show({ message: 'Preparing today activity...' });
         await getDayStatus({ showLoader: false });
 
         loader.show({ message: 'Starting location tracking...' });
         await startSalesmanBackgroundLocation(user);
 
-        if (isVanChangePending) {
-          setVanChangeRequestPending(true);
-          toast.success('Day started. Van change request pending approval.');
-        } else {
+        if (!isVanChangePending) {
           toast.success('Your day successfully started.');
         }
+      } else {
+        setVanChangeRequestPending(false);
+        setVanChangePendingBanner(false);
+        setPendingVanChangeName('');
+        setVanChangeRequestId('');
+        toast.error(response?.message || 'Failed to start day. Please try again.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting day:', error);
-      toast.error('Failed to start day. Please try again.');
+      setVanChangeRequestPending(false);
+      setVanChangePendingBanner(false);
+      setPendingVanChangeName('');
+      setVanChangeRequestId('');
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to start day.');
     } finally {
       loader.hide();
     }
@@ -751,7 +800,12 @@ export default function SalesExecutiveScreen() {
 
   const handleEndDay = async (carryForwardStock?: boolean) => {
     try {
+      loader.show({ message: 'Getting your end location...' });
       const dayEndLocation = await captureCurrentLocation();
+      if (!dayEndLocation) {
+        toast.error('A high-accuracy GPS location is required to end the day.');
+        return;
+      }
       const response = await homeService.dayComplete({ carryForwardStock, dayEndLocation });
 
       if (response.success) {
@@ -773,21 +827,25 @@ export default function SalesExecutiveScreen() {
       }
     } catch (error) {
       console.error('Error completing day:', error);
-      toast.error('Failed to complete day. Please try again.');
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error instanceof Error ? error.message : null) ||
+        'Failed to complete day. Please try again.';
+      toast.error(message);
+    } finally {
+      loader.hide();
     }
   };
 
   const handleCancelVanChangeRequest = async () => {
-    const activeWorkSessionId = workSessionId || useAuthStore.getState().workSessionId;
-
-    if (!activeWorkSessionId) {
-      toast.error('Work session not found. Please refresh and try again.');
+    if (!vanChangeRequestId) {
+      toast.error('Van change request not found. Please refresh and try again.');
       return;
     }
 
     setCancelVanChangeLoading(true);
     try {
-      const response = await homeService.cancelVanChangeRequest(activeWorkSessionId);
+      const response = await homeService.cancelVanChangeRequest(vanChangeRequestId);
 
       if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
         toast.error(response?.message || 'Failed to cancel van change request');
@@ -797,6 +855,7 @@ export default function SalesExecutiveScreen() {
       setCancelVanChangeVisible(false);
       setVanChangePendingBanner(false);
       setVanChangeRequestPending(false);
+      setVanChangeRequestId('');
       setPendingVanChangeName('');
       setVanChangeApprovedRoutePrompt(false);
       setSelectedVanForChange(null);
@@ -852,6 +911,7 @@ export default function SalesExecutiveScreen() {
         const isPendingVanChange = data?.vanChangeStatus === 'PENDING';
         setVanChangePendingBanner(isPendingVanChange);
         setVanChangeRequestPending(isPendingVanChange);
+        setVanChangeRequestId(isPendingVanChange ? data?.vanChangeRequestId || '' : '');
         setPendingVanChangeName(
           isPendingVanChange
             ? data?.requestedVanName || data?.requestedVan || data?.requestedVanId || ''
@@ -1094,7 +1154,6 @@ export default function SalesExecutiveScreen() {
               <View style={styles.heroHeaderRow}>
                 <View style={styles.heroTextBlock}>
                   <AppText style={styles.heroEyebrow}>{greeting}</AppText>
-                  <AppText style={styles.heroTitle}>{user?.name}</AppText>
                 </View>
 
                 <View
