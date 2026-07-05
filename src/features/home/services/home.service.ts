@@ -494,7 +494,7 @@ export interface HomeService {
     params: {
       uri: string;
       ownerId: string;
-      subOwnnerId: string;
+      subOwnerId: string;
     },
     config?: ApiRequestConfig,
   ) => Promise<ApiResponse<{ mediaId: string; url: string }>>;
@@ -687,7 +687,7 @@ export const homeService: HomeService = {
       data: { ...record, workSessionId },
     } as ApiResponse<any>;
   },
-  uploadDayStartImage: async ({ uri, ownerId, subOwnnerId }, config) => {
+  uploadDayStartImage: async ({ uri, ownerId, subOwnerId }, config) => {
     const formData = new FormData();
     const cleanUri = uri.split('?')[0];
     const extension = cleanUri.includes('.') ? cleanUri.split('.').pop() || 'jpg' : 'jpg';
@@ -717,7 +717,7 @@ export const homeService: HomeService = {
     formData.append('purpose', 'PROOF');
     formData.append('title', 'Day Start Selfie');
     formData.append('isPrimary', 'false');
-    formData.append('subOwnerId', subOwnnerId || '');
+    formData.append('subOwnerId', subOwnerId || '');
 
     return api.post<{ mediaId: string; url: string }, FormData>(
       '/media/upload',

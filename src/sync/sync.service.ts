@@ -42,8 +42,7 @@ type QueueRow = {
 const ownerId = () => useAuthStore.getState().user?.userId ?? '';
 const enabled = () =>
   isSalesman(useAuthStore.getState().user) &&
-  useAuthStore.getState().user?.offlineAccessAllowed === true &&
-  useOfflineStore.getState().offlineEnabled;
+  useAuthStore.getState().user?.offlineAccessAllowed === true;
 
 let activeSync: Promise<void> | null = null;
 let syncRequestedWhileActive = false;

@@ -20,41 +20,49 @@ export function OfflineStatusBanner() {
     offlineEnabled,
   } = useOfflineStore();
 
-  if (!isSalesman(user) || user?.offlineAccessAllowed !== true || !offlineEnabled) {
+  const offline = !isConnected || !isInternetReachable;
+  if (!isSalesman(user) || user?.offlineAccessAllowed !== true || (!offlineEnabled && !offline)) {
     return null;
   }
 
-  const offline = !isConnected || !isInternetReachable;
+  const offlineReady = Boolean(lastSyncTime);
   const isFirstSync = isSyncing && !lastSyncTime;
-  const label = offline
-    ? `Offline${pendingCount ? ` • ${pendingCount} pending` : ''}`
-    : isFirstSync
-      ? 'Preparing offline data for first use…'
-      : isSyncing
-        ? pendingCount
-          ? `Online • ${pendingCount} change${pendingCount === 1 ? '' : 's'} syncing in background`
-          : 'Online'
-        : lastError
-          ? `Sync failed • Tap to retry: ${lastError}`
-          : pendingCount
-            ? `${pendingCount} item${pendingCount === 1 ? '' : 's'} waiting to sync`
-            : `Online${lastSyncTime ? ` • Last sync ${new Date(lastSyncTime).toLocaleTimeString()}` : ''}`;
+  const label =
+    offlineEnabled && offlineReady
+      ? `Offline Mode${pendingCount ? ` • ${pendingCount} pending` : ''}`
+      : offline && !offlineReady
+        ? 'Offline unavailable • Connect to prepare offline data'
+        : offline
+          ? `Offline${pendingCount ? ` • ${pendingCount} pending` : ''}`
+          : isFirstSync
+            ? 'Preparing offline data for first use…'
+            : isSyncing
+              ? pendingCount
+                ? `Online • ${pendingCount} change${pendingCount === 1 ? '' : 's'} syncing in background`
+                : 'Online'
+              : lastError
+                ? `Sync failed • Tap to retry: ${lastError}`
+                : pendingCount
+                  ? `${pendingCount} item${pendingCount === 1 ? '' : 's'} waiting to sync`
+                  : `Online${lastSyncTime ? ` • Last sync ${new Date(lastSyncTime).toLocaleTimeString()}` : ''}`;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label} Tap to sync now when available.`}
-      disabled={offline || isSyncing}
+      disabled={offlineEnabled || offline || isSyncing}
       onPress={() => void syncService.retryFailed()}
       style={[
         styles.banner,
-        offline
-          ? styles.offline
-          : isFirstSync
-            ? styles.syncing
-            : lastError
-              ? styles.error
-              : styles.online,
+        offline && !offlineReady
+          ? styles.error
+          : offlineEnabled || offline
+            ? styles.offline
+            : isFirstSync
+              ? styles.syncing
+              : lastError
+                ? styles.error
+                : styles.online,
       ]}
     >
       <AppText style={styles.text}>{label}</AppText>

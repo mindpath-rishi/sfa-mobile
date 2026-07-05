@@ -589,7 +589,7 @@ export default function SalesExecutiveScreen() {
           {
             uri: dayStartPhotoUri,
             ownerId: user?.employeeId || user?.id || 'day-start',
-            subOwnnerId: workSessionId as any,
+            subOwnerId: workSessionId as any,
           },
           {
             showLoader: false,

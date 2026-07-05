@@ -37,6 +37,7 @@ import {
   saveLocationTrackingPreference,
   startSalesmanBackgroundLocation,
   stopSalesmanBackgroundLocation,
+  syncPendingLocationUploads,
 } from '@/shared/services/location.service';
 
 const DEFAULT_PROFILE_DATA = {
@@ -417,6 +418,13 @@ export default function ProfileScreen() {
   const activeWorkSessionId = useAuthStore((s) => s.workSessionId);
   const canConfigureOfflineMode = isSalesman(authUser) && authUser?.offlineAccessAllowed === true;
   const offlineEnabled = useOfflineStore((state) => state.offlineEnabled);
+  const offlineIsConnected = useOfflineStore((state) => state.isConnected);
+  const offlineInternetReachable = useOfflineStore((state) => state.isInternetReachable);
+  const offlineLastSyncTime = useOfflineStore((state) => state.lastSyncTime);
+  const automaticOfflineMode = Boolean(
+    !offlineEnabled && offlineLastSyncTime && (!offlineIsConnected || !offlineInternetReachable),
+  );
+  const effectiveOfflineMode = offlineEnabled || automaticOfflineMode;
   const profileData = useMemo(() => buildProfileData(authUser), [authUser]);
   const [settings, setSettings] = useState(DEFAULT_PROFILE_DATA.settings);
   const userData = useMemo(
@@ -436,12 +444,12 @@ export default function ProfileScreen() {
     setSettings((prev) => ({ ...prev, darkMode: isDark }));
   }, [isDark]);
 
-  useEffect(() => {
-    const ownerId = authUser?.userId || '';
-    void isLocationTrackingEnabled(ownerId).then((enabled) =>
-      setSettings((previous) => ({ ...previous, locationTracking: enabled })),
-    );
-  }, [authUser?.userId]);
+  // useEffect(() => {
+  //   const ownerId = authUser?.userId || '';
+  //   void isLocationTrackingEnabled(ownerId).then((enabled) =>
+  //     setSettings((previous) => ({ ...previous, locationTracking: enabled })),
+  //   );
+  // }, [authUser?.userId]);
 
   useEffect(() => {
     isPushNotificationsEnabledAsync()
@@ -477,10 +485,6 @@ export default function ProfileScreen() {
       formData.append('purpose', 'PROFILE');
       formData.append('title', 'Profile Image');
       formData.append('isPrimary', 'true');
-      if (authUser?.profileImageMediaId) {
-        formData.append('mediaId', authUser.profileImageMediaId);
-      }
-
       const mediaResponse = await api.post<any, FormData>('/media/upload', formData);
       const media = mediaResponse?.data;
       if (!mediaResponse?.success || !media?.mediaId || !media?.url) {
@@ -650,18 +654,30 @@ export default function ProfileScreen() {
   const handleOfflineModeToggle = async (enabled: boolean) => {
     const ownerId = authUser?.userId || '';
     if (enabled) {
-      await saveOfflinePreference(ownerId, true);
-      setSettings((previous) => ({ ...previous, offlineMode: true }));
-      await syncService.sync();
+      const connection = useOfflineStore.getState();
+      if (!connection.isConnected || !connection.isInternetReachable) {
+        Alert.alert(
+          'Internet required',
+          'Connect to the internet first. Offline Mode can be enabled only after its data is prepared.',
+        );
+        return;
+      }
+
+      // Prepare/refresh the local dataset before changing the preference. This
+      // prevents the UI and request layer from entering Offline Mode while the
+      // first download is still incomplete.
+      if (!connection.lastSyncTime) await syncService.sync();
       const syncState = useOfflineStore.getState();
       if (!syncState.lastSyncTime) {
         Alert.alert(
           'Offline setup incomplete',
           syncState.lastError ||
-            'Offline data could not be prepared. Tap the sync banner to retry.',
+            'Offline data could not be prepared. Offline Mode was not enabled; please try again while online.',
         );
         return;
       }
+      await saveOfflinePreference(ownerId, true);
+      setSettings((previous) => ({ ...previous, offlineMode: true }));
       Alert.alert(
         'Offline enabled',
         syncState.lastError
@@ -694,6 +710,7 @@ export default function ProfileScreen() {
     }
     await saveOfflinePreference(ownerId, false);
     setSettings((previous) => ({ ...previous, offlineMode: false }));
+    void syncPendingLocationUploads();
   };
 
   const handleLocationTrackingToggle = async (enabled: boolean) => {
@@ -890,20 +907,19 @@ export default function ProfileScreen() {
           onPress={handlePushNotificationsToggle}
         />
         <SettingRow icon="moon" label="Dark Mode" value={isDark} onPress={handleDarkModeToggle} />
-        <SettingRow
+        {/* <SettingRow
           icon="finger-print"
           label="Biometric Login"
           value={userData.settings.biometricLogin}
           onPress={(val: boolean) => setSettings((prev) => ({ ...prev, biometricLogin: val }))}
-        />
-        {canConfigureOfflineMode && (
-          <SettingRow
+        /> */}
+
+        {/* <SettingRow
             icon="location"
             label="Location Tracking"
             value={userData.settings.locationTracking}
             onPress={handleLocationTrackingToggle}
-          />
-        )}
+          /> */}
       </AppCard>
 
       {/* Offline mode is supported only for field salesmen. */}
@@ -926,10 +942,11 @@ export default function ProfileScreen() {
           <SettingRow
             icon="cloud-offline"
             label="Offline Mode"
-            value={offlineEnabled}
+            value={effectiveOfflineMode}
             onPress={handleOfflineModeToggle}
+            disabled={automaticOfflineMode}
           />
-          {offlineEnabled && (
+          {effectiveOfflineMode && (
             <View style={{ marginTop: 12, borderRadius: 10, overflow: 'hidden' }}>
               <OfflineStatusBanner />
             </View>

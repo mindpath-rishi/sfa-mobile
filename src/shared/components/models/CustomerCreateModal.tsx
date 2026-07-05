@@ -1514,7 +1514,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             placeholderTextColor={colors.textTertiary}
             value={value?.toString() || ''}
             onChangeText={(text) => updateField(field.key, text)}
-            onFocus={() => handleFieldFocus(field.key)}
+            // onFocus={() => handleFieldFocus(field.key)}
             onBlur={() => {
               setFocusedField(null);
               setTouchedFields((prev) => new Set(prev).add(field.key));

@@ -48,5 +48,8 @@ export const saveOfflinePreference = async (ownerId: string, enabled: boolean) =
 
 export const isOfflineMode = () => {
   const { isConnected, isInternetReachable, offlineEnabled } = useOfflineStore.getState();
-  return offlineEnabled && (!isConnected || !isInternetReachable);
+  return offlineEnabled || !isConnected || !isInternetReachable;
 };
+
+export const isOfflineReady = () =>
+  Boolean(useOfflineStore.getState().offlineEnabled && useOfflineStore.getState().lastSyncTime);

@@ -12,7 +12,7 @@ import { errorHandler } from '@/core/errors/error.handler';
 import { logger } from '@/core/logger/logger';
 import { useAuthStore } from '@/core/store/auth.store';
 import { isSalesman } from '@/core/navigation/role.utils';
-import { useOfflineStore } from '@/core/offline/offline.store';
+import { isOfflineMode, useOfflineStore } from '@/core/offline/offline.store';
 import { getCachedApiResponse, setCachedApiResponse } from '@/database';
 import { getAccessToken } from '@/shared/services/tokenStorage';
 import { isTokenExpired } from '@/shared/utils/auth-token.utils';
@@ -170,7 +170,7 @@ export const apiRequest = async <TResponse, TBody = unknown>(
   // Android can deliver the connectivity listener after a focused screen has
   // already started loading. Verify connectivity at the final HTTP boundary
   // so a stale online value cannot leak a request while offline mode is enabled.
-  if (isSalesman(user) && network.offlineEnabled) {
+  if (isSalesman(user)) {
     try {
       const current = await Network.getNetworkStateAsync();
       const isConnected = current.isConnected === true;
@@ -182,10 +182,10 @@ export const apiRequest = async <TResponse, TBody = unknown>(
     }
   }
 
-  const noInternet = !network.isConnected || !network.isInternetReachable;
-  const salesmanOffline = isSalesman(user) && network.offlineEnabled && noInternet;
+  const offlineDataReady = Boolean(network.lastSyncTime);
+  const salesmanOffline = isSalesman(user) && isOfflineMode();
 
-  if (salesmanOffline && method === 'GET' && config?.cache !== false) {
+  if (salesmanOffline && offlineDataReady && method === 'GET' && config?.cache !== false) {
     const cached = await getCachedApiResponse<TResponse>(user?.userId ?? '', url, config?.params);
     if (cached) return cached;
   }
@@ -194,17 +194,9 @@ export const apiRequest = async <TResponse, TBody = unknown>(
     return {
       success: false,
       statusCode: 503,
-      message: 'This action is not available offline',
-      data: null as TResponse,
-      offline: true,
-    };
-  }
-
-  if (isSalesman(user) && noInternet) {
-    return {
-      success: false,
-      statusCode: 503,
-      message: 'Enable Offline while connected to use the app without internet',
+      message: offlineDataReady
+        ? 'This action is not available offline'
+        : 'Offline data is not ready. Connect to the internet and enable Offline Mode once to prepare it.',
       data: null as TResponse,
       offline: true,
     };
