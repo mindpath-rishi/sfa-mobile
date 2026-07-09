@@ -737,24 +737,26 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
-    const payload: CreateActivityPayload = {
-      name: activityName,
-      routeId: activityRoute?.routeId,
-      description: activityRoute
-        ? `Started Retailing - Route: ${activityRoute.name}, Van: ${mappedVan?.name || van?.name || ASSIGNED_VAN.name}`
-        : activityName === 'Leave'
-          ? `Leave: ${selectedLeaveType || 'Other'}`
-          : `Started ${activityValue?.name || activityName}`,
-      totalShops: activityRoute?.totalShops,
-      routeName: activityRoute?.name,
-      customerCategoryId: getRouteCustomerCategoryId(activityRoute),
-      workSessionId,
-      vanId: activityRoute?.vanId || van?.vanId,
-      vanName: mappedVan?.name || van?.name,
-      startLocation: await captureCurrentLocation(),
-    };
+    loader.show({ message: 'Changing your activity...' });
 
     try {
+      const payload: CreateActivityPayload = {
+        name: activityName,
+        routeId: activityRoute?.routeId,
+        description: activityRoute
+          ? `Started Retailing - Route: ${activityRoute.name}, Van: ${mappedVan?.name || van?.name || ASSIGNED_VAN.name}`
+          : activityName === 'Leave'
+            ? `Leave: ${selectedLeaveType || 'Other'}`
+            : `Started ${activityValue?.name || activityName}`,
+        totalShops: activityRoute?.totalShops,
+        routeName: activityRoute?.name,
+        customerCategoryId: getRouteCustomerCategoryId(activityRoute),
+        workSessionId,
+        vanId: activityRoute?.vanId || van?.vanId,
+        vanName: mappedVan?.name || van?.name,
+        startLocation: await captureCurrentLocation({ preferCached: true, timeoutMs: 5000 }),
+      };
+
       const response: any = await homeService.createActivity(payload);
 
       if ([201, 202].includes(Number(response.statusCode))) {
@@ -762,12 +764,14 @@ export default function SalesExecutiveScreen() {
         setVanChangeApprovedRoutePrompt(false);
         setCurrentActivity(activityName);
         setStartTime(new Date().toISOString());
-        await getDayStatus();
         toast.success(`Activity changed to ${activityName}`);
+        void getDayStatus();
       }
     } catch (error) {
       console.error('Error changing activity:', error);
       toast.error('Failed to change activity. Please try again.');
+    } finally {
+      loader.hide();
     }
   };
 

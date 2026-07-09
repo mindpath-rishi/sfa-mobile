@@ -1,24 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  Alert,
-  Linking,
-  Share,
-  Platform,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Image, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useTheme } from '@/shared/hooks/useTheme';
-import { AppCard } from '@/core/components/Card';
-
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
+
+import { AppCard } from '@/core/components/Card';
 import { api } from '@/core/network';
+import { uploadFormData } from '@/core/network/upload';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useThemeStore } from '@/core/store/theme.store';
 import { authService } from '@/features/auth/services/auth.service';
@@ -33,30 +23,26 @@ import { saveOfflinePreference, useOfflineStore } from '@/core/offline/offline.s
 import { OfflineStatusBanner } from '@/core/offline/OfflineStatusBanner';
 import { syncService } from '@/sync';
 import {
-  isLocationTrackingEnabled,
   saveLocationTrackingPreference,
   startSalesmanBackgroundLocation,
   stopSalesmanBackgroundLocation,
   syncPendingLocationUploads,
 } from '@/shared/services/location.service';
+import { useTheme } from '@/shared/hooks/useTheme';
+import { toast } from '@/core/utils';
 
 const DEFAULT_PROFILE_DATA = {
   id: 'EMP001',
   name: 'Field User',
   email: 'Not available',
   phone: 'Not available',
-  avatar: null,
+  avatar: null as string | null,
   role: 'Sales Representative',
   territory: 'Not assigned',
   manager: 'Not assigned',
   employeeId: 'Not available',
   aadhar: 'XXXX-XXXX-1234',
   pan: 'ABCDE1234F',
-  // bankDetails: {
-  //   account: 'XXXXXX1234',
-  //   ifsc: 'SBIN0001234',
-  //   bank: 'State Bank of India',
-  // },
   stats: {
     totalVisits: 1245,
     totalOrders: 892,
@@ -73,12 +59,6 @@ const DEFAULT_PROFILE_DATA = {
     { id: 3, title: '100% Collection Target', date: 'Jan 2024', icon: 'cash' },
     { id: 4, title: 'Employee of the Month', date: 'Dec 2023', icon: 'medal' },
   ],
-  // documents: [
-  //   { id: 1, name: 'Employment Contract', type: 'pdf', size: '2.5 MB', verified: true },
-  //   { id: 2, name: 'Aadhar Card', type: 'pdf', size: '1.2 MB', verified: true },
-  //   { id: 3, name: 'PAN Card', type: 'pdf', size: '0.8 MB', verified: true },
-  //   { id: 4, name: 'Bank Proof', type: 'pdf', size: '1.5 MB', verified: false },
-  // ],
   settings: {
     notifications: true,
     darkMode: false,
@@ -106,17 +86,81 @@ const humanizeRole = (value?: string) => {
 
 const getProfileValue = (...values: unknown[]) => {
   const value = values.find((item) => typeof item === 'string' && item.trim().length > 0);
+  return typeof value === 'string' ? value.trim() : undefined;
+};
 
-  return typeof value === 'string' ? value : undefined;
+const normalizeMediaUrl = (value?: string | null) => {
+  if (!value) return null;
+
+  const url = value.trim();
+
+  if (!url) return null;
+
+  const isAlreadyValid =
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('file://') ||
+    url.startsWith('content://') ||
+    url.startsWith('blob:') ||
+    url.startsWith('data:');
+
+  if (isAlreadyValid) {
+    return encodeURI(url);
+  }
+
+  const baseUrl = (api as any)?.defaults?.baseURL;
+
+  if (!baseUrl) {
+    return encodeURI(url);
+  }
+
+  try {
+    return encodeURI(new URL(url, baseUrl).toString());
+  } catch {
+    const cleanBase = String(baseUrl).replace(/\/+$/, '');
+    const cleanPath = url.replace(/^\/+/, '');
+
+    return encodeURI(`${cleanBase}/${cleanPath}`);
+  }
+};
+
+const formatLastSyncTime = (value?: string | number | Date | null) => {
+  if (!value) return 'Not synced yet';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Not synced yet';
+  }
+
+  return date.toLocaleString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const buildProfileData = (authUser: any) => {
   const employeeId = getProfileValue(authUser?.employeeId, authUser?.userId, authUser?.id);
+
   const routeOrTerritory = getProfileValue(
     authUser?.territory,
     authUser?.routeName,
     authUser?.route,
     authUser?.vanId ? `Van ${authUser.vanId}` : undefined,
+  );
+
+  const avatar = normalizeMediaUrl(
+    getProfileValue(
+      authUser?.avatar,
+      authUser?.profileImage,
+      authUser?.profileImageUrl,
+      authUser?.mediaUrls?.profileImage,
+      authUser?.media?.profileImage,
+      authUser?.image,
+    ) || null,
   );
 
   return {
@@ -129,8 +173,7 @@ const buildProfileData = (authUser: any) => {
     phone:
       getProfileValue(authUser?.mobile, authUser?.phone, authUser?.phoneNumber) ||
       DEFAULT_PROFILE_DATA.phone,
-    avatar:
-      getProfileValue(authUser?.avatar, authUser?.profileImage, authUser?.profileImageUrl) || null,
+    avatar,
     role: humanizeRole(getProfileValue(authUser?.role, authUser?.roleId, authUser?.designation)),
     territory: routeOrTerritory || DEFAULT_PROFILE_DATA.territory,
     manager:
@@ -154,10 +197,18 @@ const buildProfileData = (authUser: any) => {
   };
 };
 
-// Profile Header Component
-const ProfileHeader = ({ user, onImagePress, uploading }: any) => {
+const ProfileHeader = ({
+  user,
+  onCameraPress,
+  onGalleryPress,
+  uploading,
+}: {
+  user: any;
+  onCameraPress: () => void;
+  onGalleryPress: () => void;
+  uploading: boolean;
+}) => {
   const { colors } = useTheme();
-  const logout = useAuthStore((s) => s.logout);
 
   return (
     <LinearGradient
@@ -172,11 +223,7 @@ const ProfileHeader = ({ user, onImagePress, uploading }: any) => {
       }}
     >
       <View style={{ alignItems: 'center' }}>
-        <TouchableOpacity
-          onPress={onImagePress}
-          disabled={uploading}
-          style={{ position: 'relative', marginBottom: 16, opacity: uploading ? 0.65 : 1 }}
-        >
+        <View style={{ position: 'relative', marginBottom: 12, opacity: uploading ? 0.65 : 1 }}>
           <View
             style={{
               width: 100,
@@ -187,17 +234,25 @@ const ProfileHeader = ({ user, onImagePress, uploading }: any) => {
               alignItems: 'center',
               borderWidth: 3,
               borderColor: 'white',
+              overflow: 'hidden',
             }}
           >
             {user.avatar ? (
               <Image
                 source={{ uri: user.avatar }}
+                resizeMode="cover"
                 style={{ width: 94, height: 94, borderRadius: 47 }}
+                onError={() => {
+                  console.warn('Profile image failed to load:', user.avatar);
+                }}
               />
             ) : (
-              <Text style={{ fontSize: 40, color: colors.primary }}>{user.name.charAt(0)}</Text>
+              <Text style={{ fontSize: 40, color: colors.primary }}>
+                {String(user.name || 'U').charAt(0)}
+              </Text>
             )}
           </View>
+
           <View
             style={{
               position: 'absolute',
@@ -215,14 +270,52 @@ const ProfileHeader = ({ user, onImagePress, uploading }: any) => {
           >
             <Ionicons name={uploading ? 'cloud-upload' : 'camera'} size={16} color="white" />
           </View>
-        </TouchableOpacity>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={onCameraPress}
+            disabled={uploading}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              opacity: uploading ? 0.6 : 1,
+            }}
+          >
+            <Ionicons name="camera" size={14} color="white" />
+            <Text style={{ color: 'white', fontSize: 12, marginLeft: 5 }}>Camera</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={onGalleryPress}
+            disabled={uploading}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 20,
+              backgroundColor: 'rgba(255,255,255,0.18)',
+              opacity: uploading ? 0.6 : 1,
+            }}
+          >
+            <Ionicons name="image" size={14} color="white" />
+            <Text style={{ color: 'white', fontSize: 12, marginLeft: 5 }}>Gallery</Text>
+          </TouchableOpacity>
+        </View>
 
         <Text style={{ color: 'white', fontSize: 24, fontWeight: '700', marginBottom: 4 }}>
           {user.name}
         </Text>
+
         <Text style={{ color: 'white', fontSize: 14, opacity: 0.9, marginBottom: 4 }}>
           {user.role}
         </Text>
+
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
           <Ionicons name="location" size={14} color="white" />
           <Text style={{ color: 'white', fontSize: 12, opacity: 0.9, marginLeft: 4 }}>
@@ -234,36 +327,6 @@ const ProfileHeader = ({ user, onImagePress, uploading }: any) => {
   );
 };
 
-// Stat Card Component
-const StatCard = ({ icon, label, value, color }: any) => {
-  const { colors } = useTheme();
-
-  return (
-    <AppCard variant="outlined" padding="sm" style={{ flex: 1 }}>
-      <View style={{ alignItems: 'center' }}>
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: color + '20',
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginBottom: 8,
-          }}
-        >
-          <Ionicons name={icon} size={20} color={color} />
-        </View>
-        <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{value}</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 11, textAlign: 'center' }}>
-          {label}
-        </Text>
-      </View>
-    </AppCard>
-  );
-};
-
-// Info Row Component
 const InfoRow = ({ icon, label, value, onPress }: any) => {
   const { colors } = useTheme();
 
@@ -281,19 +344,20 @@ const InfoRow = ({ icon, label, value, onPress }: any) => {
         <View style={{ width: 32, alignItems: 'center' }}>
           <Ionicons name={icon} size={20} color={colors.textSecondary} />
         </View>
+
         <View style={{ flex: 1, marginLeft: 12 }}>
           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</Text>
           <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '500' }}>
             {value}
           </Text>
         </View>
+
         {onPress && <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />}
       </View>
     </TouchableOpacity>
   );
 };
 
-// Setting Row Component
 const SettingRow = ({ icon, label, value, type = 'toggle', onPress, disabled }: any) => {
   const { colors } = useTheme();
 
@@ -315,9 +379,11 @@ const SettingRow = ({ icon, label, value, type = 'toggle', onPress, disabled }: 
       <View style={{ width: 32, alignItems: 'center' }}>
         <Ionicons name={icon} size={20} color={colors.textSecondary} />
       </View>
+
       <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
         {label}
       </Text>
+
       {type === 'toggle' ? (
         <TouchableOpacity
           activeOpacity={0.8}
@@ -350,83 +416,56 @@ const SettingRow = ({ icon, label, value, type = 'toggle', onPress, disabled }: 
           />
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity onPress={onPress}>
-          <Text style={{ color: colors.primary, fontSize: 14 }}>Change</Text>
+        <TouchableOpacity onPress={onPress} disabled={disabled}>
+          <Text style={{ color: disabled ? colors.textTertiary : colors.primary, fontSize: 14 }}>
+            Change
+          </Text>
         </TouchableOpacity>
       )}
     </View>
   );
 };
 
-// Document Item Component
-const DocumentItem = ({ doc }: any) => {
-  const { colors } = useTheme();
-
-  return (
-    <TouchableOpacity
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-      }}
-    >
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 8,
-          backgroundColor: doc.verified ? colors.success + '20' : colors.warning + '20',
-          justifyContent: 'center',
-          alignItems: 'center',
-          marginRight: 12,
-        }}
-      >
-        <Ionicons
-          name={doc.type === 'pdf' ? 'document-text' : 'image'}
-          size={20}
-          color={doc.verified ? colors.success : colors.warning}
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '500' }}>
-          {doc.name}
-        </Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{doc.size}</Text>
-      </View>
-      {doc.verified ? (
-        <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-      ) : (
-        <View
-          style={{
-            paddingHorizontal: 8,
-            paddingVertical: 2,
-            borderRadius: 12,
-            backgroundColor: colors.warning + '20',
-          }}
-        >
-          <Text style={{ color: colors.warning, fontSize: 10 }}>Pending</Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
-
 export default function ProfileScreen() {
   const { colors, isDark } = useTheme();
+
   const setThemeMode = useThemeStore((s) => s.setMode);
+
   const authUser = useAuthStore((s) => s.user);
   const activeWorkSessionId = useAuthStore((s) => s.workSessionId);
-  const canConfigureOfflineMode = isSalesman(authUser) && authUser?.offlineAccessAllowed === true;
+  const logout = useAuthStore((s) => s.logout);
+  const updateAuthUser = useAuthStore((s) => s.updateUser);
+
   const offlineEnabled = useOfflineStore((state) => state.offlineEnabled);
   const offlineIsConnected = useOfflineStore((state) => state.isConnected);
   const offlineInternetReachable = useOfflineStore((state) => state.isInternetReachable);
   const offlineLastSyncTime = useOfflineStore((state) => state.lastSyncTime);
+  const offlinePendingCount = useOfflineStore((state) => state.pendingCount);
+  const offlineSetupInProgress = useOfflineStore((state) => state.offlineSetupInProgress);
+  const deviceServerUploadVisible = useOfflineStore((state) => state.deviceServerUploadVisible);
+
+  const canConfigureOfflineMode = isSalesman(authUser) && authUser?.offlineAccessAllowed === true;
+
   const automaticOfflineMode = Boolean(
     !offlineEnabled && offlineLastSyncTime && (!offlineIsConnected || !offlineInternetReachable),
   );
-  const effectiveOfflineMode = offlineEnabled || automaticOfflineMode;
+
+  const effectiveOfflineMode =
+    offlineEnabled || automaticOfflineMode || offlineSetupInProgress || deviceServerUploadVisible;
+
+  const offlineLastUpdatedLabel = useMemo(
+    () => formatLastSyncTime(offlineLastSyncTime),
+    [offlineLastSyncTime],
+  );
+
   const profileData = useMemo(() => buildProfileData(authUser), [authUser]);
+
   const [settings, setSettings] = useState(DEFAULT_PROFILE_DATA.settings);
+  const [activeTab, setActiveTab] = useState('profile');
+  const [notificationSyncing, setNotificationSyncing] = useState(false);
+  const [profileImageUploading, setProfileImageUploading] = useState(false);
+  const [offlineSyncing, setOfflineSyncing] = useState(false);
+
   const userData = useMemo(
     () => ({
       ...profileData,
@@ -434,22 +473,10 @@ export default function ProfileScreen() {
     }),
     [profileData, settings],
   );
-  const [activeTab, setActiveTab] = useState('profile'); // 'profile', 'settings', 'docs'
-  const logout = useAuthStore((s) => s.logout);
-  const updateAuthUser = useAuthStore((s) => s.updateUser);
-  const [notificationSyncing, setNotificationSyncing] = useState(false);
-  const [profileImageUploading, setProfileImageUploading] = useState(false);
 
   useEffect(() => {
     setSettings((prev) => ({ ...prev, darkMode: isDark }));
   }, [isDark]);
-
-  // useEffect(() => {
-  //   const ownerId = authUser?.userId || '';
-  //   void isLocationTrackingEnabled(ownerId).then((enabled) =>
-  //     setSettings((previous) => ({ ...previous, locationTracking: enabled })),
-  //   );
-  // }, [authUser?.userId]);
 
   useEffect(() => {
     isPushNotificationsEnabledAsync()
@@ -457,15 +484,24 @@ export default function ProfileScreen() {
       .catch((error) => console.warn('Failed to load push notification setting:', error));
   }, []);
 
+  useEffect(() => {
+    setSettings((previous) => ({
+      ...previous,
+      offlineMode: effectiveOfflineMode,
+    }));
+  }, [effectiveOfflineMode]);
+
   const handleEditProfile = () => {
     router.push('/profile/edit');
   };
 
   const uploadProfileImage = async (uri: string) => {
     const employeeId = authUser?.employeeId || authUser?.userId;
+
     if (!employeeId || profileImageUploading) return;
 
     setProfileImageUploading(true);
+
     try {
       const cleanUri = uri.split('?')[0];
       const extension = cleanUri.split('.').pop()?.toLowerCase() || 'jpg';
@@ -477,89 +513,105 @@ export default function ProfileScreen() {
         const blob = await fetch(uri).then((response) => response.blob());
         formData.append('file', blob, fileName);
       } else {
-        formData.append('file', { uri, name: fileName, type: mimeType } as any);
+        formData.append('file', {
+          uri,
+          name: fileName,
+          type: mimeType,
+        } as any);
       }
+
       formData.append('ownerType', 'EMPLOYEE');
       formData.append('ownerId', employeeId);
       formData.append('mediaType', 'IMAGE');
       formData.append('purpose', 'PROFILE');
       formData.append('title', 'Profile Image');
       formData.append('isPrimary', 'true');
-      const mediaResponse = await api.post<any, FormData>('/media/upload', formData);
+
+      const mediaResponse = await uploadFormData<any>('/media/upload', formData);
       const media = mediaResponse?.data;
+
       if (!mediaResponse?.success || !media?.mediaId || !media?.url) {
         throw new Error(mediaResponse?.message || 'Profile image upload failed');
       }
+
+      const normalizedImageUrl = normalizeMediaUrl(media.url);
 
       const employeeResponse = await api.patch<any>(`/employee/${employeeId}`, {
         profileImageMediaId: media.mediaId,
         profileImageUrl: media.url,
       });
+
       if (!employeeResponse?.success) {
         throw new Error(employeeResponse?.message || 'Could not update employee profile');
       }
 
       await updateAuthUser({
-        avatar: media.url,
-        profileImage: media.url,
-        profileImageUrl: media.url,
+        avatar: normalizedImageUrl || media.url,
+        profileImage: normalizedImageUrl || media.url,
+        profileImageUrl: normalizedImageUrl || media.url,
         profileImageMediaId: media.mediaId,
       });
-      Alert.alert('Profile updated', 'Your profile image was uploaded successfully.');
+
+      toast.success('Profile updated', 'Your profile image was uploaded successfully.');
     } catch (error: any) {
-      Alert.alert('Upload failed', error?.message || 'Unable to upload profile image.');
+      toast.error('Upload failed', error?.message || 'Unable to upload profile image.');
     } finally {
       setProfileImageUploading(false);
     }
   };
 
-  const chooseProfileImage = () => {
-    Alert.alert('Profile image', 'Choose an image source', [
-      {
-        text: 'Camera',
-        onPress: async () => {
-          const permission = await ImagePicker.requestCameraPermissionsAsync();
-          if (!permission.granted) {
-            Alert.alert('Permission required', 'Camera permission is required.');
-            return;
-          }
-          const result = await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
-          if (!result.canceled && result.assets[0]?.uri) {
-            await uploadProfileImage(result.assets[0].uri);
-          }
-        },
-      },
-      {
-        text: 'Gallery',
-        onPress: async () => {
-          const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-          if (!permission.granted) {
-            Alert.alert('Permission required', 'Photo library permission is required.');
-            return;
-          }
-          const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
-          if (!result.canceled && result.assets[0]?.uri) {
-            await uploadProfileImage(result.assets[0].uri);
-          }
-        },
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const handleCameraPress = async () => {
+    if (profileImageUploading) return;
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+
+    if (!permission.granted) {
+      toast.error('Permission required', 'Camera permission is required.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      await uploadProfileImage(result.assets[0].uri);
+    }
+  };
+
+  const handleGalleryPress = async () => {
+    if (profileImageUploading) return;
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      toast.error('Permission required', 'Photo library permission is required.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      await uploadProfileImage(result.assets[0].uri);
+    }
   };
 
   const handleCall = () => {
     if (userData.phone === DEFAULT_PROFILE_DATA.phone) return;
     Linking.openURL(`tel:${userData.phone}`);
+  };
+
+  const handleEmail = () => {
+    if (userData.email === DEFAULT_PROFILE_DATA.email) return;
+    Linking.openURL(`mailto:${userData.email}`);
   };
 
   const handleDarkModeToggle = (value: boolean) => {
@@ -577,6 +629,7 @@ export default function ProfileScreen() {
 
     try {
       await setPushNotificationsEnabledAsync(value);
+
       const deviceId = await getClientDeviceIdAsync();
 
       if (value) {
@@ -585,7 +638,8 @@ export default function ProfileScreen() {
         if (!fcmToken) {
           await setPushNotificationsEnabledAsync(false);
           setSettings((prev) => ({ ...prev, notifications: false }));
-          Alert.alert(
+
+          toast.error(
             'Push Notifications',
             'Permission was not granted or this device cannot receive push notifications.',
           );
@@ -598,7 +652,7 @@ export default function ProfileScreen() {
           throw new Error(response.message || 'Unable to enable push notifications');
         }
 
-        Alert.alert('Push Notifications', 'Push notifications enabled.');
+        toast.success('Push Notifications', 'Push notifications enabled.');
       } else {
         const response = await authService.updatePushToken({ deviceId, fcmToken: null });
 
@@ -606,39 +660,17 @@ export default function ProfileScreen() {
           console.warn('Failed to clear push token:', response.message);
         }
 
-        Alert.alert('Push Notifications', 'Push notifications disabled.');
+        toast.success('Push Notifications', 'Push notifications disabled.');
       }
     } catch (error: any) {
-      const shouldRollback = value;
-
-      if (shouldRollback) {
+      if (value) {
         await setPushNotificationsEnabledAsync(previousValue);
         setSettings((prev) => ({ ...prev, notifications: previousValue }));
       }
 
-      Alert.alert('Push Notifications', error?.message || 'Failed to update push notifications.');
+      toast.error('Push Notifications', error?.message || 'Failed to update push notifications.');
     } finally {
       setNotificationSyncing(false);
-    }
-  };
-
-  const handleMessage = () => {
-    if (userData.phone === DEFAULT_PROFILE_DATA.phone) return;
-    Linking.openURL(`sms:${userData.phone}`);
-  };
-
-  const handleEmail = () => {
-    if (userData.email === DEFAULT_PROFILE_DATA.email) return;
-    Linking.openURL(`mailto:${userData.email}`);
-  };
-
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: `Check out ${userData.name}'s profile - ${userData.role} at our company`,
-      });
-    } catch (error) {
-      console.error(error);
     }
   };
 
@@ -648,77 +680,187 @@ export default function ProfileScreen() {
   };
 
   const handleComingSoon = (feature: string) => {
-    Alert.alert('Coming soon', `${feature} will be available in a future update.`);
+    toast.info('Coming soon', `${feature} will be available in a future update.`);
   };
 
   const handleOfflineModeToggle = async (enabled: boolean) => {
     const ownerId = authUser?.userId || '';
+
+    if (offlineSyncing || offlineSetupInProgress || deviceServerUploadVisible) return;
+
+    /**
+     * =====================================================
+     * ENABLE OFFLINE MODE
+     * =====================================================
+     */
     if (enabled) {
-      const connection = useOfflineStore.getState();
-      if (!connection.isConnected || !connection.isInternetReachable) {
-        Alert.alert(
+      const beforeSyncState = useOfflineStore.getState();
+
+      if (!beforeSyncState.isConnected || !beforeSyncState.isInternetReachable) {
+        toast.error(
           'Internet required',
-          'Connect to the internet first. Offline Mode can be enabled only after its data is prepared.',
+          'Please connect to the internet. Offline Mode can be enabled only after data sync.',
         );
         return;
       }
 
-      // Prepare/refresh the local dataset before changing the preference. This
-      // prevents the UI and request layer from entering Offline Mode while the
-      // first download is still incomplete.
-      if (!connection.lastSyncTime) await syncService.sync();
-      const syncState = useOfflineStore.getState();
-      if (!syncState.lastSyncTime) {
-        Alert.alert(
-          'Offline setup incomplete',
-          syncState.lastError ||
-            'Offline data could not be prepared. Offline Mode was not enabled; please try again while online.',
+      setOfflineSyncing(true);
+      beforeSyncState.setOfflineSetupInProgress(true);
+
+      try {
+        toast.info('Sync started', 'Preparing offline data. Please wait...');
+
+        await syncService.sync();
+
+        const afterSyncState = useOfflineStore.getState();
+
+        if (!afterSyncState.lastSyncTime) {
+          await saveOfflinePreference(ownerId, false);
+
+          setSettings((previous) => ({
+            ...previous,
+            offlineMode: false,
+          }));
+
+          toast.error(
+            'Sync required',
+            afterSyncState.lastError ||
+              'Offline data sync was not completed. Offline Mode was not enabled.',
+          );
+
+          return;
+        }
+
+        await saveOfflinePreference(ownerId, true);
+
+        setSettings((previous) => ({
+          ...previous,
+          offlineMode: true,
+        }));
+
+        toast.success(
+          'Offline enabled',
+          `Data synced successfully. Last updated: ${formatLastSyncTime(
+            afterSyncState.lastSyncTime,
+          )}`,
         );
-        return;
+      } catch (error: any) {
+        await saveOfflinePreference(ownerId, false);
+
+        setSettings((previous) => ({
+          ...previous,
+          offlineMode: false,
+        }));
+
+        toast.error(
+          'Sync failed',
+          error?.message || 'Unable to sync offline data. Offline Mode was not enabled.',
+        );
+      } finally {
+        setOfflineSyncing(false);
+        useOfflineStore.getState().setOfflineSetupInProgress(false);
       }
-      await saveOfflinePreference(ownerId, true);
-      setSettings((previous) => ({ ...previous, offlineMode: true }));
-      Alert.alert(
-        'Offline enabled',
-        syncState.lastError
-          ? `Offline data is ready. ${syncState.lastError}`
-          : 'Offline data is ready to use.',
+
+      return;
+    }
+
+    /**
+     * =====================================================
+     * DISABLE OFFLINE MODE
+     * =====================================================
+     *
+     * New flow:
+     * 1. Immediately disable Offline Mode
+     * 2. Show Device → Server upload screen
+     * 3. Upload pending offline data
+     * 4. Upload pending location data
+     * 5. If upload fails or pending data remains, enable Offline Mode again
+     */
+    const offlineBeforeDisable = useOfflineStore.getState();
+
+    if (!offlineBeforeDisable.isConnected || !offlineBeforeDisable.isInternetReachable) {
+      toast.error(
+        'Internet required',
+        'Please connect to the internet. Device data must be uploaded before disabling Offline Mode.',
       );
       return;
     }
 
-    const offline = useOfflineStore.getState();
-    if ((!offline.isConnected || !offline.isInternetReachable) && offline.pendingCount > 0) {
-      Alert.alert(
-        'Cannot disable offline',
-        'Connect to the internet and synchronize pending work before disabling offline access.',
-      );
-      return;
-    }
+    setOfflineSyncing(true);
 
-    if (offline.pendingCount > 0) {
-      await syncService.sync();
-      const afterSync = useOfflineStore.getState();
-      if (afterSync.pendingCount > 0) {
-        Alert.alert(
-          'Cannot disable offline',
-          afterSync.lastError ||
-            `${afterSync.pendingCount} item(s) are still waiting to sync. Tap the sync banner to retry.`,
-        );
-        return;
-      }
-    }
+    /**
+     * Immediately disable offline mode first.
+     * This prevents HTTP guard from blocking sync/upload APIs.
+     */
     await saveOfflinePreference(ownerId, false);
-    setSettings((previous) => ({ ...previous, offlineMode: false }));
-    void syncPendingLocationUploads();
+
+    useOfflineStore.getState().setOfflineEnabled(false);
+
+    setSettings((previous) => ({
+      ...previous,
+      offlineMode: false,
+    }));
+
+    try {
+      toast.info(
+        'Uploading device data',
+        'Offline Mode is disabled. Uploading pending device data to server...',
+      );
+
+      /**
+       * This method should show Device → Server screen using OfflineSyncGate.
+       */
+      await syncService.uploadDeviceDataBeforeDisableOffline();
+
+      /**
+       * Upload pending location data also.
+       */
+      await syncPendingLocationUploads();
+
+      const remaining = await syncService.getPendingCount();
+
+      if (remaining > 0) {
+        throw new Error(`${remaining} item(s) are still pending. Offline Mode enabled again.`);
+      }
+
+      toast.success(
+        'Offline disabled',
+        'Device data uploaded successfully. Offline Mode is now disabled.',
+      );
+    } catch (error: any) {
+      /**
+       * Upload failed, so enable Offline Mode again.
+       */
+      await saveOfflinePreference(ownerId, true);
+
+      useOfflineStore.getState().setOfflineEnabled(true);
+
+      setSettings((previous) => ({
+        ...previous,
+        offlineMode: true,
+      }));
+
+      toast.error(
+        'Upload failed',
+        error?.message || 'Device data could not be uploaded. Offline Mode enabled again.',
+      );
+    } finally {
+      setOfflineSyncing(false);
+    }
   };
 
   const handleLocationTrackingToggle = async (enabled: boolean) => {
     const ownerId = authUser?.userId || '';
+
     await saveLocationTrackingPreference(ownerId, enabled);
-    setSettings((previous) => ({ ...previous, locationTracking: enabled }));
+
+    setSettings((previous) => ({
+      ...previous,
+      locationTracking: enabled,
+    }));
 
     if (!isSalesman(authUser)) return;
+
     if (enabled && activeWorkSessionId) {
       await startSalesmanBackgroundLocation(authUser);
     } else {
@@ -731,17 +873,17 @@ export default function ProfileScreen() {
       const result = await DocumentPicker.getDocumentAsync({
         type: ['application/pdf', 'image/*'],
       });
+
       if (result.canceled === false) {
-        Alert.alert('Success', 'Document uploaded successfully');
+        toast.success('Success', 'Document uploaded successfully.');
       }
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      toast.error('Upload failed', error?.message || 'Unable to upload document.');
     }
   };
 
   const renderProfileTab = () => (
     <>
-      {/* Personal Information */}
       <AppCard variant="elevated" padding="md" style={{ margin: 16, marginTop: 0 }}>
         <View
           style={{
@@ -754,6 +896,7 @@ export default function ProfileScreen() {
           <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>
             Personal Information
           </Text>
+
           <TouchableOpacity onPress={handleEditProfile}>
             <Text style={{ color: colors.primary, fontSize: 12 }}>Edit</Text>
           </TouchableOpacity>
@@ -765,164 +908,29 @@ export default function ProfileScreen() {
         <InfoRow icon="business" label="Employee ID" value={userData.employeeId} />
         <InfoRow icon="people" label="Manager" value={userData.manager} />
       </AppCard>
-
-      {/* Bank Details */}
-      {/* <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 16 }}>
-        <Text
-          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
-        >
-          Bank Details
-        </Text>
-        <InfoRow icon="card" label="Account Number" value={userData.bankDetails.account} />
-        <InfoRow icon="code" label="IFSC Code" value={userData.bankDetails.ifsc} />
-        <InfoRow icon="business" label="Bank Name" value={userData.bankDetails.bank} />
-      </AppCard> */}
-
-      {/* KYC Details */}
-      {/* <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 30 }}>
-        <Text
-          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
-        >
-          KYC Details
-        </Text>
-        <InfoRow icon="id-card" label="Aadhar Number" value={userData.aadhar} />
-        <InfoRow icon="document" label="PAN Number" value={userData.pan} />
-      </AppCard> */}
-    </>
-  );
-
-  const renderStatsTab = () => (
-    <>
-      {/* Performance Stats */}
-      <AppCard variant="elevated" padding="md" style={{ margin: 16, marginTop: 0 }}>
-        <Text
-          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
-        >
-          Performance Overview
-        </Text>
-
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-          <StatCard
-            icon="calendar"
-            label="Total Visits"
-            value={userData.stats.totalVisits}
-            color="#4158D0"
-          />
-          <StatCard
-            icon="cart"
-            label="Total Orders"
-            value={userData.stats.totalOrders}
-            color="#C850C0"
-          />
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-          <StatCard
-            icon="cash"
-            label="Collections"
-            value={userData.stats.totalCollections}
-            color="#11998e"
-          />
-          <StatCard
-            icon="trending-up"
-            label="Avg Order"
-            value={userData.stats.avgOrderValue}
-            color="#F37335"
-          />
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <StatCard
-            icon="star"
-            label="CSAT"
-            value={userData.stats.customerSatisfaction.toString()}
-            color="#FF512F"
-          />
-          {/* <StatCard
-            icon="gift"
-            label="Incentives"
-            value={userData.stats.incentivesEarned}
-            color="#8E2DE2"
-          /> */}
-        </View>
-      </AppCard>
-
-      {/* Achievements */}
-      <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 30 }}>
-        <Text
-          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
-        >
-          Achievements & Awards
-        </Text>
-        {userData.achievements.map((achievement: any) => (
-          <View
-            key={achievement.id}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.divider,
-            }}
-          >
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                backgroundColor: colors.warning + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 12,
-              }}
-            >
-              <Ionicons name={achievement.icon as any} size={20} color={colors.warning} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '500' }}>
-                {achievement.title}
-              </Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{achievement.date}</Text>
-            </View>
-            <Ionicons name="ribbon" size={20} color={colors.warning} />
-          </View>
-        ))}
-      </AppCard>
     </>
   );
 
   const renderSettingsTab = () => (
     <>
-      {/* App Settings */}
       <AppCard variant="elevated" padding="md" style={{ margin: 16, marginTop: 0 }}>
         <Text
           style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
         >
           App Settings
         </Text>
+
         <SettingRow
           icon="notifications"
           label="Push Notifications"
           value={userData.settings.notifications}
           onPress={handlePushNotificationsToggle}
+          disabled={notificationSyncing}
         />
-        <SettingRow icon="moon" label="Dark Mode" value={isDark} onPress={handleDarkModeToggle} />
-        {/* <SettingRow
-          icon="finger-print"
-          label="Biometric Login"
-          value={userData.settings.biometricLogin}
-          onPress={(val: boolean) => setSettings((prev) => ({ ...prev, biometricLogin: val }))}
-        /> */}
 
-        {/* <SettingRow
-            icon="location"
-            label="Location Tracking"
-            value={userData.settings.locationTracking}
-            onPress={handleLocationTrackingToggle}
-          /> */}
+        <SettingRow icon="moon" label="Dark Mode" value={isDark} onPress={handleDarkModeToggle} />
       </AppCard>
 
-      {/* Offline mode is supported only for field salesmen. */}
       {canConfigureOfflineMode && (
         <AppCard
           variant="elevated"
@@ -939,14 +947,80 @@ export default function ProfileScreen() {
           >
             Work Preferences
           </Text>
+
           <SettingRow
             icon="cloud-offline"
-            label="Offline Mode"
+            label={
+              offlineSyncing || offlineSetupInProgress || deviceServerUploadVisible
+                ? deviceServerUploadVisible
+                  ? 'Uploading Device Data...'
+                  : 'Syncing Offline Data...'
+                : 'Offline Mode'
+            }
             value={effectiveOfflineMode}
             onPress={handleOfflineModeToggle}
-            disabled={automaticOfflineMode}
+            disabled={
+              automaticOfflineMode ||
+              offlineSyncing ||
+              offlineSetupInProgress ||
+              deviceServerUploadVisible
+            }
           />
-          {effectiveOfflineMode && (
+
+          <View style={{ marginTop: 10 }}>
+            <Text
+              style={{
+                color: offlineLastSyncTime ? colors.textSecondary : colors.error,
+                fontSize: 12,
+                fontWeight: '500',
+              }}
+            >
+              Last updated: {offlineLastUpdatedLabel}
+            </Text>
+
+            {!offlineLastSyncTime && (
+              <Text
+                style={{
+                  color: colors.error,
+                  fontSize: 11,
+                  marginTop: 4,
+                  lineHeight: 16,
+                }}
+              >
+                Please sync data first. Offline Mode cannot be used without synced data.
+              </Text>
+            )}
+
+            {offlinePendingCount > 0 && (
+              <Text
+                style={{
+                  color: colors.warning,
+                  fontSize: 11,
+                  marginTop: 4,
+                  lineHeight: 16,
+                }}
+              >
+                Pending sync: {offlinePendingCount} item(s)
+              </Text>
+            )}
+
+            {(offlineSyncing || offlineSetupInProgress || deviceServerUploadVisible) && (
+              <Text
+                style={{
+                  color: colors.primary,
+                  fontSize: 11,
+                  marginTop: 4,
+                  lineHeight: 16,
+                }}
+              >
+                {deviceServerUploadVisible
+                  ? 'Uploading device data. Offline Mode will disable only after upload succeeds.'
+                  : 'Sync is running. Offline Mode will change only after successful sync.'}
+              </Text>
+            )}
+          </View>
+
+          {offlineEnabled && (
             <View style={{ marginTop: 12, borderRadius: 10, overflow: 'hidden' }}>
               <OfflineStatusBanner />
             </View>
@@ -954,19 +1028,21 @@ export default function ProfileScreen() {
         </AppCard>
       )}
 
-      {/* Account Actions */}
       <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 30 }}>
         <Text
           style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
         >
           Account
         </Text>
+
         <TouchableOpacity onPress={() => router.push('/change-password')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="key" size={20} color={colors.textSecondary} />
+
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
               Change Password
             </Text>
+
             <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
           </View>
         </TouchableOpacity>
@@ -974,9 +1050,11 @@ export default function ProfileScreen() {
         <TouchableOpacity onPress={() => handleComingSoon('Privacy Policy')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="shield" size={20} color={colors.textSecondary} />
+
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
               Privacy Policy
             </Text>
+
             <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
               Coming soon
             </Text>
@@ -986,9 +1064,11 @@ export default function ProfileScreen() {
         <TouchableOpacity onPress={() => handleComingSoon('Terms & Conditions')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="document-text" size={20} color={colors.textSecondary} />
+
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
               Terms & Conditions
             </Text>
+
             <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
               Coming soon
             </Text>
@@ -998,9 +1078,11 @@ export default function ProfileScreen() {
         <TouchableOpacity onPress={() => handleComingSoon('Help Center')}>
           <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12 }}>
             <Ionicons name="help-circle" size={20} color={colors.textSecondary} />
+
             <Text style={{ flex: 1, marginLeft: 12, color: colors.textPrimary, fontSize: 14 }}>
               Help Center
             </Text>
+
             <Text style={{ color: colors.textTertiary, fontSize: 11, fontWeight: '600' }}>
               Coming soon
             </Text>
@@ -1009,7 +1091,12 @@ export default function ProfileScreen() {
 
         <TouchableOpacity onPress={handleLogout} style={{ marginTop: 8 }}>
           <Text
-            style={{ color: colors.error, fontSize: 14, textAlign: 'center', fontWeight: '600' }}
+            style={{
+              color: colors.error,
+              fontSize: 14,
+              textAlign: 'center',
+              fontWeight: '600',
+            }}
           >
             Logout
           </Text>
@@ -1018,95 +1105,16 @@ export default function ProfileScreen() {
     </>
   );
 
-  const renderDocumentsTab = () => (
-    <>
-      <AppCard variant="elevated" padding="md" style={{ margin: 16, marginTop: 0 }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: 16,
-          }}
-        >
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>
-            My Documents
-          </Text>
-          <TouchableOpacity onPress={handleUploadDocument}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="cloud-upload" size={16} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontSize: 12, marginLeft: 4 }}>Upload</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-        {/* 
-        {userData.documents.map((doc) => (
-          <DocumentItem key={doc.id} doc={doc} />
-        ))} */}
-      </AppCard>
-
-      {/* Recent Activity */}
-      <AppCard variant="elevated" padding="md" style={{ marginHorizontal: 16, marginBottom: 30 }}>
-        <Text
-          style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600', marginBottom: 16 }}
-        >
-          Recent Activity
-        </Text>
-        {userData.recentActivity.map((activity: any) => (
-          <View
-            key={activity.id}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: 10,
-              borderBottomWidth: 1,
-              borderBottomColor: colors.divider,
-            }}
-          >
-            <View
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: colors.info + '20',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginRight: 12,
-              }}
-            >
-              <Ionicons name="time" size={16} color={colors.info} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 14 }}>{activity.action}</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{activity.time}</Text>
-            </View>
-          </View>
-        ))}
-      </AppCard>
-    </>
-  );
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* <Header
-        title="Profile"
-        showBack={false}
-        showMenu
-        rightIcon="share"
-        secondRightIcon="call"
-        onRightPress={handleShare}
-        onSecondRightPress={handleCall}
-        elevated
-      /> */}
-
       <ScrollView showsVerticalScrollIndicator={false}>
         <ProfileHeader
           user={userData}
-          onImagePress={chooseProfileImage}
+          onCameraPress={handleCameraPress}
+          onGalleryPress={handleGalleryPress}
           uploading={profileImageUploading}
         />
 
-        {/* Tab Navigation */}
         <View
           style={{
             flexDirection: 'row',
@@ -1120,7 +1128,6 @@ export default function ProfileScreen() {
           {[
             { key: 'profile', label: 'Profile', icon: 'person' },
             { key: 'settings', label: 'Settings', icon: 'settings' },
-            // { key: 'docs', label: 'Documents', icon: 'document' },
           ].map((tab) => (
             <TouchableOpacity
               key={tab.key}
@@ -1132,6 +1139,7 @@ export default function ProfileScreen() {
                 size={20}
                 color={activeTab === tab.key ? colors.primary : colors.textTertiary}
               />
+
               <Text
                 style={{
                   color: activeTab === tab.key ? colors.primary : colors.textTertiary,
@@ -1146,10 +1154,8 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        {/* Tab Content */}
         {activeTab === 'profile' && renderProfileTab()}
         {activeTab === 'settings' && renderSettingsTab()}
-        {/* {activeTab === 'docs' && renderDocumentsTab()} */}
       </ScrollView>
     </View>
   );

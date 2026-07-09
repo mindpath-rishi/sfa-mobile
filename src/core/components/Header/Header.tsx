@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, TextInput, Platform, StatusBar } from 'react-native';
+import { View, Text, Pressable, TextInput, StatusBar } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,11 +10,17 @@ import Animated, {
   withTiming,
   useSharedValue,
   withSequence,
+  withRepeat,
 } from 'react-native-reanimated';
+
 import { useHeaderStyles } from './Header.styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { router } from 'expo-router';
+
+import { useOfflineStore } from '@/core/offline/offline.store';
+import { useAuthStore } from '@/core/store/auth.store';
+import { isSalesman } from '@/core/navigation/role.utils';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -24,8 +30,29 @@ const Header: React.FC = () => {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
+  const user = useAuthStore((state) => state.user);
+
+  const offlineEnabled = useOfflineStore((state) => state.offlineEnabled);
+  const isConnected = useOfflineStore((state) => state.isConnected);
+  const isInternetReachable = useOfflineStore((state) => state.isInternetReachable);
+  const pendingCount = useOfflineStore((state) => state.pendingCount);
+  const isSyncing = useOfflineStore((state) => state.isSyncing);
+  const offlineSetupInProgress = useOfflineStore((state) => state.offlineSetupInProgress);
+
+  const canUseOnlineFeature = isSalesman(user) && user?.offlineAccessAllowed === true;
+
+  const isNetworkOnline = Boolean(isConnected && isInternetReachable);
+  const isOfflineModeActive = Boolean(offlineEnabled || !isNetworkOnline);
+  const isOfflineBusy = Boolean(isSyncing || offlineSetupInProgress);
+
+  const indicatorColor = isOfflineBusy
+    ? colors.warning || '#F59E0B'
+    : isOfflineModeActive
+      ? colors.error || '#EF4444'
+      : colors.success || '#10B981';
+
   /* ============================
-   * SAFE CONFIG (prevents leakage)
+   * SAFE CONFIG
    * ============================ */
   const safeConfig = {
     title: config?.title ?? '',
@@ -34,6 +61,7 @@ const Header: React.FC = () => {
     showBack: config?.showBack ?? false,
     showMenu: config?.showMenu ?? false,
     onBackPress: config?.onBackPress,
+
     showSearch: config?.showSearch ?? false,
     showFilter: config?.showFilter ?? false,
     showSearchBar: config?.showSearchBar ?? false,
@@ -68,6 +96,24 @@ const Header: React.FC = () => {
   const menuButtonScale = useSharedValue(1);
   const filterButtonScale = useSharedValue(1);
   const searchScale = useSharedValue(1);
+  const onlineScale = useSharedValue(1);
+
+  const dotOpacity = useSharedValue(1);
+  const dotScale = useSharedValue(1);
+
+  React.useEffect(() => {
+    dotOpacity.value = withRepeat(
+      withSequence(withTiming(0.25, { duration: 600 }), withTiming(1, { duration: 600 })),
+      -1,
+      true,
+    );
+
+    dotScale.value = withRepeat(
+      withSequence(withTiming(0.85, { duration: 600 }), withTiming(1.15, { duration: 600 })),
+      -1,
+      true,
+    );
+  }, [dotOpacity, dotScale]);
 
   const styles = useHeaderStyles({
     elevated: config.elevated ?? true,
@@ -79,6 +125,7 @@ const Header: React.FC = () => {
   });
 
   const useGradient = safeConfig.useGradient;
+
   const gradientColors = safeConfig.gradientColors || [
     colors.primary,
     colors.primaryDark || '#1E3A8A',
@@ -94,10 +141,12 @@ const Header: React.FC = () => {
 
   const handleBackPress = () => {
     backButtonScale.value = withSequence(withTiming(0.8), withTiming(1));
+
     if (safeConfig.onBackPress) {
       safeConfig.onBackPress();
       return;
     }
+
     router.back();
   };
 
@@ -132,12 +181,21 @@ const Header: React.FC = () => {
     transform: [{ scale: searchScale.value }],
   }));
 
+  const onlineStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: onlineScale.value }],
+  }));
+
+  const blinkingDotStyle = useAnimatedStyle(() => ({
+    opacity: dotOpacity.value,
+    transform: [{ scale: dotScale.value }],
+  }));
+
   const bgColor = config.transparent
     ? 'transparent'
     : safeConfig.backgroundColor || colors.background;
 
   /* ============================
-   * BADGE
+   * BADGES
    * ============================ */
   const renderFilterBadge = () => {
     if (!safeConfig.filterCount) return null;
@@ -163,12 +221,89 @@ const Header: React.FC = () => {
     );
   };
 
+  const renderPendingBadge = () => {
+    if (!pendingCount) return null;
+
+    const badgeText = pendingCount > 99 ? '99+' : String(pendingCount);
+
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          top: -6,
+          right: -8,
+          minWidth: 14,
+          height: 14,
+          borderRadius: 7,
+          paddingHorizontal: 3,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.error || '#EF4444',
+          borderWidth: 1,
+          borderColor: useGradient ? '#fff' : colors.background,
+        }}
+      >
+        <Text
+          style={{
+            color: '#fff',
+            fontSize: 8,
+            fontWeight: '700',
+            lineHeight: 10,
+          }}
+        >
+          {badgeText}
+        </Text>
+      </View>
+    );
+  };
+
+  /* ============================
+   * ONLINE / OFFLINE INDICATOR
+   * ============================ */
+  const renderOnlineOfflineIndicator = () => {
+    if (!canUseOnlineFeature) return null;
+
+    return (
+      <AnimatedPressable
+        onPressIn={() => handlePressIn(onlineScale)}
+        onPressOut={() => handlePressOut(onlineScale)}
+        style={[
+          onlineStyle,
+          {
+            width: 22,
+            height: 34,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginLeft: 4,
+            backgroundColor: 'transparent',
+            borderWidth: 0,
+            position: 'relative',
+          },
+        ]}
+      >
+        <Animated.View
+          style={[
+            blinkingDotStyle,
+            {
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: indicatorColor,
+            },
+          ]}
+        />
+
+        {renderPendingBadge()}
+      </AnimatedPressable>
+    );
+  };
+
   /* ============================
    * HEADER CONTENT
    * ============================ */
   const renderHeaderContent = () => (
     <>
-      {/* LEFT SECTION - Back/Menu Button */}
+      {/* LEFT SECTION */}
       <View style={styles.leftSection}>
         {safeConfig.showBack ? (
           <AnimatedPressable
@@ -193,11 +328,12 @@ const Header: React.FC = () => {
         )}
       </View>
 
-      {/* CENTER SECTION - Search Bar (when enabled) or Title */}
+      {/* CENTER SECTION */}
       {safeConfig.showSearchBar ? (
         <View style={styles.centerSectionWithSearch}>
           <View style={styles.searchContainerInline}>
             <Ionicons name="search" size={20} color={colors.textTertiary} />
+
             <TextInput
               style={styles.searchInputInline}
               placeholder={safeConfig.searchPlaceholder || 'Search...'}
@@ -210,6 +346,7 @@ const Header: React.FC = () => {
                 safeConfig.onSearchPress?.();
               }}
             />
+
             {safeConfig.searchValue && safeConfig.onSearchClear && (
               <Pressable onPress={safeConfig.onSearchClear} style={styles.clearButtonInline}>
                 <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
@@ -224,8 +361,10 @@ const Header: React.FC = () => {
         </View>
       )}
 
-      {/* RIGHT SECTION - Filter and Other Icons */}
+      {/* RIGHT SECTION */}
       <View style={styles.rightSection}>
+        {renderOnlineOfflineIndicator()}
+
         {safeConfig.showSearch && !safeConfig.showSearchBar && (
           <AnimatedPressable
             onPress={handleSearchPress}
@@ -255,7 +394,10 @@ const Header: React.FC = () => {
             onPress={i === 0 ? safeConfig.onRightPress : safeConfig.onRightPress2}
             style={({ pressed }) => [
               styles.buttonBase,
-              { marginLeft: 6, transform: [{ scale: pressed ? 0.95 : 1 }] },
+              {
+                marginLeft: 6,
+                transform: [{ scale: pressed ? 0.95 : 1 }],
+              },
             ]}
           >
             <Feather name={icon as any} size={22} color={useGradient ? '#fff' : colors.surface} />

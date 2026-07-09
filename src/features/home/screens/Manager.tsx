@@ -214,6 +214,21 @@ const getManagerTargetMetric = (target: ManagerTargetResponse | null, metric: Ta
   };
 };
 
+const getManagerUboTargetMetric = (target: ManagerTargetResponse | null) => {
+  const targetValue = Number(target?.uboTarget || 0);
+  const achievedValue = Number(target?.uboAchievement || 0);
+  const remainingValue = Math.max(targetValue - achievedValue, 0);
+
+  const percentage = targetValue > 0 ? clampPercentage((achievedValue / targetValue) * 100) : 0;
+
+  return {
+    targetValue,
+    achievedValue,
+    remainingValue,
+    percentage,
+  };
+};
+
 const clampPercentage = (value: number) => Math.max(0, Math.min(value, 100));
 
 const polarToCartesian = (
@@ -694,7 +709,10 @@ export default function ManagerHomeScreen() {
   );
   const outletPc = managerOrderSummary?.outletSummary?.productivity?.pc ?? callSummary.pc;
   const outletTc = managerOrderSummary?.outletSummary?.productivity?.tc ?? callSummary.tc;
+  // const primaryTargetSnapshot = getManagerTargetMetric(managerTarget, primaryTargetMetric);
   const primaryTargetSnapshot = getManagerTargetMetric(managerTarget, primaryTargetMetric);
+
+  const uboTargetSnapshot = getManagerUboTargetMetric(managerTarget);
   const managerInitials =
     user?.name
       ?.split(' ')
@@ -702,17 +720,19 @@ export default function ManagerHomeScreen() {
       ?.join('')
       ?.toUpperCase()
       ?.slice(0, 2) || 'FM';
+
   const TARGETS = [
     {
       title: 'User wise Primary Category Targets',
       period: getCurrentMonthPeriod(),
       hint: TARGET_NOT_CONFIGURED_HINT,
+      type: 'primary',
     },
     {
       title: 'User Wise Target UBO',
-      period: 'N/A - N/A',
-      percentage: 0,
+      period: getCurrentMonthPeriod(),
       hint: TARGET_NOT_CONFIGURED_HINT,
+      type: 'ubo',
     },
   ];
 
@@ -1010,24 +1030,31 @@ export default function ManagerHomeScreen() {
             getMetricLabel(primaryTargetMetric),
           )}
           {TARGETS.map((target, index) => {
-            const sectionMetric = index === 0 ? primaryTargetMetric : uboTargetMetric;
+            const isPrimaryTarget = target.type === 'primary';
+            const isUboTarget = target.type === 'ubo';
+
+            const sectionMetric = primaryTargetMetric;
             const sectionMetricUnit = getMetricLabel(sectionMetric);
-            const targetMetric =
-              index === 0
-                ? getManagerTargetMetric(managerTarget, sectionMetric)
-                : {
-                    targetValue: 0,
-                    achievedValue: 0,
-                    remainingValue: 0,
-                    percentage: 0,
-                  };
-            const targetMetricValue = `${formatNumber(targetMetric.achievedValue)} ${sectionMetricUnit}`;
-            const targetMetricHint =
-              index === 0 && targetMetric.targetValue > 0
+
+            const targetMetric = isPrimaryTarget
+              ? getManagerTargetMetric(managerTarget, sectionMetric)
+              : uboTargetSnapshot;
+
+            const targetMetricValue = isPrimaryTarget
+              ? `${formatNumber(targetMetric.achievedValue)} ${sectionMetricUnit}`
+              : `${formatNumber(targetMetric.achievedValue)} Outlets`;
+
+            const targetMetricHint = isPrimaryTarget
+              ? targetMetric.targetValue > 0
                 ? targetMetric.remainingValue > 0
                   ? `Only ${formatNumber(targetMetric.remainingValue)} more ${sectionMetricUnit} to achieve your target`
                   : 'Target achieved for selected metric'
-                : target.hint;
+                : target.hint
+              : targetMetric.targetValue > 0
+                ? targetMetric.remainingValue > 0
+                  ? `Only ${formatNumber(targetMetric.remainingValue)} more billed outlets to achieve your UBO target`
+                  : 'UBO target achieved'
+                : 'No UBO target assigned for current month';
 
             const content = (
               <>
@@ -1037,29 +1064,52 @@ export default function ManagerHomeScreen() {
                     <AppText style={styles.cardMeta}>{target.period}</AppText>
                   </View>
                   <Ionicons
-                    name={index === 0 ? 'chevron-forward-circle-outline' : 'stats-chart-outline'}
+                    name={
+                      isPrimaryTarget ? 'chevron-forward-circle-outline' : 'stats-chart-outline'
+                    }
                     size={20}
                     color={colors.primary}
                   />
                 </View>
-                {renderMetricToggle(
-                  sectionMetric,
-                  index === 0 ? setPrimaryTargetMetric : setUboTargetMetric,
-                )}
+
+                {isPrimaryTarget
+                  ? renderMetricToggle(primaryTargetMetric, setPrimaryTargetMetric)
+                  : null}
+
+                {isUboTarget ? (
+                  <View style={styles.metricToggle}>
+                    <View style={[styles.metricToggleItem, styles.metricToggleItemActive]}>
+                      <AppText style={[styles.metricToggleText, styles.metricToggleTextActive]}>
+                        UBO
+                      </AppText>
+                    </View>
+                  </View>
+                ) : null}
+
                 <Gauge
-                  percentage={index === 0 ? targetMetric.percentage : (target.percentage ?? 0)}
-                  value={index === 0 ? targetMetricValue : `0 ${sectionMetricUnit}`}
-                  color={index === 0 ? colors.success : colors.border}
+                  percentage={targetMetric.percentage}
+                  value={targetMetricValue}
+                  color={targetMetric.percentage > 0 ? colors.success : colors.border}
                   colors={colors}
                 />
-                <View style={[styles.targetHint, index === 1 && styles.targetHintMuted]}>
+
+                <View
+                  style={[styles.targetHint, !targetMetric.targetValue && styles.targetHintMuted]}
+                >
                   <Ionicons
-                    name={index === 0 ? 'bulb-outline' : 'information-circle-outline'}
+                    name={
+                      targetMetric.targetValue > 0 ? 'bulb-outline' : 'information-circle-outline'
+                    }
                     size={14}
-                    color={index === 0 ? colors.primaryContrast : colors.textTertiary}
+                    color={
+                      targetMetric.targetValue > 0 ? colors.primaryContrast : colors.textTertiary
+                    }
                   />
                   <AppText
-                    style={[styles.targetHintText, index === 1 && styles.targetHintTextMuted]}
+                    style={[
+                      styles.targetHintText,
+                      !targetMetric.targetValue && styles.targetHintTextMuted,
+                    ]}
                   >
                     {targetMetricHint}
                   </AppText>
@@ -1067,7 +1117,7 @@ export default function ManagerHomeScreen() {
               </>
             );
 
-            if (index === 0) {
+            if (isPrimaryTarget) {
               return (
                 <TouchableOpacity
                   key={target.title}

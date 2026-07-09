@@ -19,9 +19,24 @@ import {
   createManagerTargetsStyles,
 } from '../styles/ManagerTargets.styles';
 
-type TargetUser = UserWiseTargetSummary & {
-  children?: TargetUser[];
+type SpecialUboTargetSummary = {
+  employeeId: string;
+  employeeName: string;
+  target: number;
+  achievement: number;
+  remaining: number;
+  percentage: number;
+  crr: number;
+  rrr: number;
+  elapsedDays?: number;
+  remainingDays?: number;
+  hasTarget?: boolean;
 };
+
+type TargetUser = UserWiseTargetSummary &
+  Partial<SpecialUboTargetSummary> & {
+    children?: TargetUser[];
+  };
 
 type TargetView = 'user' | 'ubo' | 'focused-pack';
 
@@ -30,6 +45,9 @@ type BreakdownRow = {
   name: string;
   target: string;
   achievement: string;
+  remaining?: string;
+  crr?: string;
+  rrr?: string;
 };
 
 const TARGET_USERS: TargetUser[] = [];
@@ -39,6 +57,7 @@ const findUser = (id?: string | string[], users: TargetUser[] = []) => {
 
   for (const user of users) {
     if (user.employeeId === id) return user;
+
     const child = user.children?.find((item) => item.employeeId === id);
     if (child) return child;
   }
@@ -60,11 +79,16 @@ const TARGET_VIEWS: { value: TargetView; label: string }[] = [
 
 const formatMetric = (value: number, metric: TargetMetric) => {
   const unit = METRIC_OPTIONS.find((option) => option.value === metric)?.unit || 'Cases';
-  return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value)} ${unit}`;
+
+  return `${new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 2,
+  }).format(value)} ${unit}`;
 };
 
 const formatCount = (value: number) =>
-  new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+  new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 2,
+  }).format(value);
 
 const getTargetValue = (user: TargetUser, metric: TargetMetric) => {
   if (metric === 'value') return Number(user.targetValue || 0);
@@ -76,6 +100,21 @@ const getAchievementValue = (user: TargetUser, metric: TargetMetric) => {
   if (metric === 'value') return Number(user.achievementValue || 0);
   if (metric === 'tonnage') return Number(user.achievementTonnage || 0);
   return Number(user.achievementCases || 0);
+};
+
+const getUboTargetValue = (user: TargetUser) => Number(user.target || 0);
+
+const getUboAchievementValue = (user: TargetUser) => Number(user.achievement || 0);
+
+const getUboRemainingValue = (user: TargetUser) => Number(user.remaining || 0);
+
+const getUboPercentage = (user: TargetUser) => {
+  if (typeof user.percentage === 'number') return user.percentage;
+
+  const target = getUboTargetValue(user);
+  const achievement = getUboAchievementValue(user);
+
+  return target > 0 ? Math.min((achievement / target) * 100, 100) : 0;
 };
 
 const getRemainingValue = (item: UserPrimaryCategoryTargetSummary, metric: TargetMetric) => {
@@ -133,9 +172,10 @@ function TargetBreakdownModal({
   onClose: () => void;
 }) {
   const styles = createManagerTargetsStyles(colors);
+
   const title =
     view === 'ubo'
-      ? 'UBO by Category'
+      ? 'UBO Target'
       : view === 'focused-pack'
         ? 'Focused Pack by Product'
         : 'Primary Category Targets';
@@ -144,13 +184,16 @@ function TargetBreakdownModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={styles.modalDismissArea} activeOpacity={1} onPress={onClose} />
+
         <View style={[styles.bottomSheet, isWide && styles.bottomSheetWide]}>
           <View style={styles.sheetHandle} />
+
           <View style={styles.sheetHeader}>
             <View style={styles.sheetTitleBlock}>
               <AppText style={styles.sheetTitle}>{title}</AppText>
               <AppText style={styles.sheetSubtitle}>{userName}</AppText>
             </View>
+
             <TouchableOpacity
               style={styles.sheetCloseButton}
               activeOpacity={0.75}
@@ -165,7 +208,9 @@ function TargetBreakdownModal({
           <View style={styles.breakdownHeader}>
             <AppText style={[styles.breakdownHeaderText, styles.breakdownNameColumn]}>Name</AppText>
             <AppText style={styles.breakdownHeaderText}>Target</AppText>
-            <AppText style={styles.breakdownHeaderText}>Achievement</AppText>
+            <AppText style={styles.breakdownHeaderText}>Ach.</AppText>
+            {view === 'ubo' ? <AppText style={styles.breakdownHeaderText}>RRR</AppText> : null}
+            {view === 'ubo' ? <AppText style={styles.breakdownHeaderText}>CRR</AppText> : null}
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} style={styles.breakdownScroll}>
@@ -181,8 +226,17 @@ function TargetBreakdownModal({
                   <AppText style={[styles.breakdownName, styles.breakdownNameColumn]}>
                     {row.name}
                   </AppText>
+
                   <AppText style={styles.breakdownValue}>{row.target}</AppText>
                   <AppText style={styles.breakdownValue}>{row.achievement}</AppText>
+
+                  {view === 'ubo' ? (
+                    <AppText style={styles.breakdownValue}>{row.rrr || '0'}</AppText>
+                  ) : null}
+
+                  {view === 'ubo' ? (
+                    <AppText style={styles.breakdownValue}>{row.crr || '0'}</AppText>
+                  ) : null}
                 </View>
               ))
             ) : (
@@ -215,31 +269,46 @@ function TargetUserCard({
 }) {
   const styles = createManagerTargetsStyles(colors);
   const hasDrillDown = Boolean(onPress);
-  const targetValue = getTargetValue(user, metric);
-  const achievementValue = getAchievementValue(user, metric);
-  const achievementPercentage =
-    targetValue > 0 ? Math.min((achievementValue / targetValue) * 100, 100) : 0;
+  const isUbo = view === 'ubo';
+
+  const targetValue = isUbo ? getUboTargetValue(user) : getTargetValue(user, metric);
+
+  const achievementValue = isUbo ? getUboAchievementValue(user) : getAchievementValue(user, metric);
+
+  const remainingValue = isUbo
+    ? getUboRemainingValue(user)
+    : Math.max(targetValue - achievementValue, 0);
+
+  const achievementPercentage = isUbo
+    ? getUboPercentage(user)
+    : targetValue > 0
+      ? Math.min((achievementValue / targetValue) * 100, 100)
+      : 0;
 
   return (
     <TouchableOpacity style={styles.userCard} activeOpacity={0.82} onPress={onCardPress}>
       <View style={styles.userCardHeader}>
         <View style={styles.cardIdentity}>
           <View style={styles.cardAccent} />
+
           <View style={styles.userTitleWrap}>
             <AppText style={styles.userName}>{user.employeeName}</AppText>
-            {view !== 'ubo' && (
-              <AppText style={styles.userPosition}>
-                {view === 'focused-pack' ? 'Focused Pack' : user.designation || 'User'}
-              </AppText>
-            )}
+
+            <AppText style={styles.userPosition}>
+              {isUbo
+                ? 'Unique Billed Outlets'
+                : view === 'focused-pack'
+                  ? 'Focused Pack'
+                  : user.designation || 'User'}
+            </AppText>
           </View>
         </View>
+
         <View style={styles.headerActions}>
-          {view !== 'ubo' && (
-            <View style={styles.percentBadge}>
-              <AppText style={styles.percentBadgeText}>{achievementPercentage.toFixed(1)}%</AppText>
-            </View>
-          )}
+          <View style={styles.percentBadge}>
+            <AppText style={styles.percentBadgeText}>{achievementPercentage.toFixed(1)}%</AppText>
+          </View>
+
           {hasDrillDown && (
             <TouchableOpacity
               style={styles.drillButton}
@@ -258,34 +327,34 @@ function TargetUserCard({
 
       <View style={styles.performanceBand}>
         <TargetMetricItem
-          label="Target"
-          value={view === 'ubo' ? formatCount(targetValue) : formatMetric(targetValue, metric)}
+          label={isUbo ? 'UBO Target' : 'Target'}
+          value={isUbo ? formatCount(targetValue) : formatMetric(targetValue, metric)}
         />
+
         <View style={styles.metricDivider} />
+
         <TargetMetricItem
-          label="Achievement"
-          value={
-            view === 'ubo' ? formatCount(achievementValue) : formatMetric(achievementValue, metric)
-          }
+          label={isUbo ? 'Billed Outlets' : 'Achievement'}
+          value={isUbo ? formatCount(achievementValue) : formatMetric(achievementValue, metric)}
         />
       </View>
 
-      {view !== 'ubo' && (
-        <>
-          <View style={styles.progressMetaRow}>
-            <AppText style={styles.progressMetaText}>
-              Remaining {formatMetric(Math.max(targetValue - achievementValue, 0), metric)}
-            </AppText>
-          </View>
+      <View style={styles.progressMetaRow}>
+        <AppText style={styles.progressMetaText}>
+          Remaining{' '}
+          {isUbo ? `${formatCount(remainingValue)} Outlets` : formatMetric(remainingValue, metric)}
+        </AppText>
+      </View>
 
-          <View style={styles.cardFooter}>
-            <AppText style={styles.rateLabel}>RRR {user.rrr}</AppText>
-            <View style={styles.footerDot} />
-            <AppText style={styles.rateLabel}>CRR {user.crr}</AppText>
-            <Ionicons name="chevron-forward" size={14} color={colors.textQuaternary} />
-          </View>
-        </>
-      )}
+      <View style={styles.cardFooter}>
+        <AppText style={styles.rateLabel}>RRR {formatCount(Number(user.rrr || 0))}</AppText>
+
+        <View style={styles.footerDot} />
+
+        <AppText style={styles.rateLabel}>CRR {formatCount(Number(user.crr || 0))}</AppText>
+
+        <Ionicons name="chevron-forward" size={14} color={colors.textQuaternary} />
+      </View>
     </TouchableOpacity>
   );
 }
@@ -312,6 +381,7 @@ function CategoryTargetPanel({
           <AppText style={styles.categoryPanelTitle}>Primary Category Targets</AppText>
           <AppText style={styles.categoryPanelSubtitle}>{user.employeeName}</AppText>
         </View>
+
         <AppText style={styles.categoryPanelBadge}>
           {METRIC_OPTIONS.find((item) => item.value === metric)?.label}
         </AppText>
@@ -340,6 +410,7 @@ function CategoryTargetPanel({
                 </AppText>
                 <AppText style={styles.categoryPercent}>{percentage.toFixed(1)}%</AppText>
               </View>
+
               <View style={styles.categoryMetricsGrid}>
                 <TargetMetricItem label="Target" value={formatMetric(target, metric)} />
                 <TargetMetricItem label="Achieved" value={formatMetric(achievement, metric)} />
@@ -360,16 +431,26 @@ export default function ManagerTargetsScreen() {
   const styles = createManagerTargetsStyles(colors);
   const { setHeader } = useHeader();
   const params = useLocalSearchParams<{ userId?: string; date?: string }>();
+
   const [targetUsers, setTargetUsers] = useState<TargetUser[]>(TARGET_USERS);
   const [loading, setLoading] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState<TargetMetric>('cases');
   const [activeView, setActiveView] = useState<TargetView>('user');
+
   const [specialTargets, setSpecialTargets] = useState<
     Record<Exclude<TargetView, 'user'>, TargetUser[]>
-  >({ ubo: [], 'focused-pack': [] });
+  >({
+    ubo: [],
+    'focused-pack': [],
+  });
+
   const [specialTargetsLoaded, setSpecialTargetsLoaded] = useState<
     Record<Exclude<TargetView, 'user'>, boolean>
-  >({ ubo: false, 'focused-pack': false });
+  >({
+    ubo: false,
+    'focused-pack': false,
+  });
+
   const [loadingSpecialTargets, setLoadingSpecialTargets] = useState(false);
   const [breakdownUser, setBreakdownUser] = useState<TargetUser | null>(null);
   const [breakdownView, setBreakdownView] = useState<TargetView>('user');
@@ -380,11 +461,13 @@ export default function ManagerTargetsScreen() {
     () => findUser(params.userId, targetUsers),
     [params.userId, targetUsers],
   );
+
   const users = selectedUser
     ? selectedUser.children?.length
       ? selectedUser.children
       : [selectedUser]
     : targetUsers;
+
   const selectedRouteDate = formatLocalApiDate(new Date());
 
   useFocusEffect(
@@ -418,26 +501,35 @@ export default function ManagerTargetsScreen() {
   const openTargetBreakdown = async (user: TargetUser) => {
     const view = activeView;
     const metric = view === 'ubo' ? 'cases' : selectedMetric;
+
     setBreakdownUser(user);
     setBreakdownView(view);
     setBreakdownRows([]);
     setBreakdownLoading(true);
 
     try {
-      const params = { employeeId: user.employeeId, date: selectedRouteDate };
+      const params = {
+        employeeId: user.employeeId,
+        date: selectedRouteDate,
+      };
 
       if (view === 'ubo') {
         const response = await homeService.getUserUboTargets(params);
+
         setBreakdownRows(
           (response.data || []).map((item) => ({
-            id: item.categoryId,
-            name: item.category,
-            target: formatCount(item.target),
-            achievement: formatCount(item.achievement),
+            id: item.categoryId || item.employeeId || item.id || 'UBO',
+            name: item.category || item.employeeName || item.name || 'Unique Billed Outlets',
+            target: formatCount(Number(item.target || 0)),
+            achievement: formatCount(Number(item.achievement || 0)),
+            remaining: formatCount(Number(item.remaining || 0)),
+            crr: formatCount(Number(item.crr || 0)),
+            rrr: formatCount(Number(item.rrr || 0)),
           })),
         );
       } else if (view === 'focused-pack') {
         const response = await homeService.getUserFocusedPackTargets(params);
+
         setBreakdownRows(
           (response.data || []).map((item) => ({
             id: item.productId,
@@ -462,6 +554,7 @@ export default function ManagerTargetsScreen() {
         );
       } else {
         const response = await homeService.getUserPrimaryCategoryTargets(params);
+
         setBreakdownRows(
           (response.data || []).map((item) => ({
             id: item.categoryId,
@@ -492,7 +585,9 @@ export default function ManagerTargetsScreen() {
     if (activeView === 'user' || specialTargetsLoaded[activeView]) return;
 
     let active = true;
+
     setLoadingSpecialTargets(true);
+
     const request =
       activeView === 'ubo'
         ? homeService.getUboTargetSummary(selectedRouteDate)
@@ -501,11 +596,16 @@ export default function ManagerTargetsScreen() {
     void request
       .then((response) => {
         if (!active) return;
+
         setSpecialTargets((current) => ({
           ...current,
           [activeView]: response.success && Array.isArray(response.data) ? response.data : [],
         }));
-        setSpecialTargetsLoaded((current) => ({ ...current, [activeView]: true }));
+
+        setSpecialTargetsLoaded((current) => ({
+          ...current,
+          [activeView]: true,
+        }));
       })
       .catch((error) => console.warn(`Failed to load ${activeView} targets`, error))
       .finally(() => {
@@ -533,6 +633,7 @@ export default function ManagerTargetsScreen() {
         isWide={isWide}
         onClose={closeTargetBreakdown}
       />
+
       <ScrollView
         contentContainerStyle={[styles.content, isWide && styles.contentWide]}
         showsVerticalScrollIndicator={false}
@@ -576,6 +677,7 @@ export default function ManagerTargetsScreen() {
           <View style={styles.metricToolbar}>
             {METRIC_OPTIONS.map((option) => {
               const selected = selectedMetric === option.value;
+
               return (
                 <TouchableOpacity
                   key={option.value}
@@ -610,7 +712,9 @@ export default function ManagerTargetsScreen() {
                         ? () =>
                             router.push({
                               pathname: '/(drawer)/manager-targets',
-                              params: { userId: user.employeeId },
+                              params: {
+                                userId: user.employeeId,
+                              },
                             })
                         : undefined
                     }
@@ -636,9 +740,9 @@ export default function ManagerTargetsScreen() {
                   colors={colors}
                   metric={activeView === 'ubo' ? 'cases' : selectedMetric}
                   view={activeView}
-                  onCardPress={() => openTargetBreakdown(user)}
+                  onCardPress={() => (activeView === 'ubo' ? () => {} : openTargetBreakdown(user))}
                 />
-              </View>
+              </View> 
             ))
           ) : (
             <View style={styles.fullWidthRow}>

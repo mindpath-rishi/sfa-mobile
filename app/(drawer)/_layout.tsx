@@ -423,18 +423,18 @@ const CustomDrawerContent = (props: any) => {
         useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
 
       if (!vanIdToUse) {
-        toast.error('Van not found. Please start your day first.');
-        return;
+        // toast.error('Van not found. Please start your day first.');
+        const res: any = await vanService.fetchTodayStockSummary(
+          {
+            vanId: vanIdToUse,
+            workSessionId,
+          },
+          { showLoader: false },
+        );
+        setDayEndSummary(res?.data);
+        // return;
       }
 
-      const res: any = await vanService.fetchTodayStockSummary(
-        {
-          vanId: vanIdToUse,
-          workSessionId,
-        },
-        { showLoader: false },
-      );
-      setDayEndSummary(res?.data);
       setShowDayEndSummary(true);
     } catch (error) {
       console.error('Error fetching day end summary:', error);

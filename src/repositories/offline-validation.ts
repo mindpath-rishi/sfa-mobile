@@ -33,6 +33,33 @@ const RULES: EntityRules = {
     startTime: { type: 'date', required: true },
     status: { type: 'string' },
   },
+  vanErpClosing: {
+    stockId: { type: 'string', required: true },
+    date: { type: 'date', required: true },
+    vanId: { type: 'string', required: true },
+    productId: { type: 'string', required: true },
+
+    qtyInCase: { type: 'number', required: true, min: 0 },
+    status: { type: 'string' },
+
+    compCode: { type: 'string' },
+    vanCode: { type: 'string' },
+    itemCode: { type: 'string' },
+
+    qty: { type: 'number', min: 0 },
+    closeDate: { type: 'date' },
+    syncStatus: { type: 'string' },
+    modifiedDate: { type: 'date' },
+    epochTime: { type: 'number' },
+    erpStockId: { type: 'string' },
+    time: { type: 'string' },
+    createdDate: { type: 'date' },
+
+    unitQtyInCase: { type: 'number', min: 1 },
+    piecePrice: { type: 'number', min: 0 },
+    pieceNetWeight: { type: 'number', min: 0 },
+    isDeleted: { type: 'boolean' },
+  },
   routeSessions: {
     routeSessionId: { type: 'string', required: true },
     workSessionId: { type: 'string', required: true },

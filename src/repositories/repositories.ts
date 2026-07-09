@@ -33,4 +33,5 @@ export const repositories = {
   vanDailyStock: new BaseRepository('vanDailyStock'),
   inventoryTransactions: new BaseRepository('inventoryTransactions'),
   mediaUploads: new BaseRepository('mediaUploads'),
+  vanErpClosing: new BaseRepository('vanErpClosing'),
 } as const;

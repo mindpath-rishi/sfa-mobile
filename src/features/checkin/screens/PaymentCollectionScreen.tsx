@@ -28,6 +28,7 @@ import { toast } from '@/core/utils';
 import { AppModal, ConfirmationModal } from '@/core/components';
 import { FlatList } from 'react-native-gesture-handler';
 import { useInvoiceStore } from '@/core/store/invoice.store';
+import { useLoaderStore } from '@/core/loader/loader.store';
 
 type PaymentMode = 'cash' | 'wallet' | 'card' | 'cheque' | 'credit' | 'split';
 
@@ -825,7 +826,7 @@ export default function PaymentCollectionScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = usePaymentCollectionStyles();
-
+  const loader = useLoaderStore();
   const outlet = useOutletStore((s) => s.selectedOutlet);
   const { items, getCartSummary, clearCart } = useCartStore();
   const van = useRouteStore.getState().van;
@@ -976,283 +977,310 @@ export default function PaymentCollectionScreen() {
   };
 
   const confirmPayment = async () => {
-    setIsSubmitting(true);
-
-    const toFixed4 = (val: number) => Number((val || 0).toFixed(4));
-    const totalValue = toFixed4(orderTotal);
-
-    let paidAmount = 0;
-    let pendingAmount = totalValue;
-    let saleType = 'CASH';
-    let paymentMode = selectedMode.toUpperCase();
-    let creditAmountUsed = 0;
-    let otherPaymentsList: SplitPaymentItem[] = [];
-
-    // Handle split payment with multiple modes
-    if (isSplitPayment) {
-      creditAmountUsed = toFixed4(splitPayment.creditAmount);
-      otherPaymentsList = splitPayment.otherPayments.map((p) => ({
-        ...p,
-        amount: toFixed4(p.amount),
-      }));
-      paidAmount = otherPaymentsList.reduce((sum, p) => sum + p.amount, 0);
-
-      pendingAmount = creditAmountUsed > 0 ? toFixed4(creditAmountUsed) : 0;
-      saleType = creditAmountUsed > 0 ? 'CREDIT' : 'CASH';
-      paymentMode = 'SPLIT_MULTIPLE';
-    }
-    // Handle full credit sale
-    else if (isCreditSelected) {
-      paidAmount = 0;
-      pendingAmount = totalValue;
-      saleType = 'CREDIT';
-      paymentMode = 'CREDIT';
-    }
-    // Handle regular payment
-    else {
-      paidAmount = toFixed4(parsedAmount);
-      pendingAmount = toFixed4(totalValue - paidAmount);
-      saleType = pendingAmount > 0 ? 'CREDIT' : 'CASH';
-      paymentMode = selectedMode.toUpperCase();
-    }
-
-    const saleItems = items.map((item) => {
-      const caseQty = item.caseQty || 0;
-      const pieceQty = item.pieceQty || 0;
-      const unitQtyInCase = item.unitQtyInCase || 1;
-      const customerCategoryId = selectedRoute?.customerCategoryId || '';
-      const quantity = caseQty * unitQtyInCase + pieceQty;
-
-      return {
-        productId: item.productId,
-        productName: item.productName,
-        compCode: item.compCode,
-        categoryId: item.categoryId,
-        parentCategoryId: item.parentCategoryId,
-        customerCategoryId,
-        caseQty,
-        pieceQty,
-        quantity,
-        netCases: toFixed4(quantity / unitQtyInCase),
-        unitQtyInCase,
-        casePrice: item.casePrice,
-        caseNetWeight: item.caseNetWeight,
-        pieceNetWeight: item.pieceNetWeight,
-        piecePrice: item.piecePrice,
-        totalNetWeight: caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0),
-        totalValue: caseQty * (item.casePrice || 0) + pieceQty * (item.piecePrice || 0),
-      };
-    });
-
-    const firstSaleItem = saleItems[0];
-    const netCases = toFixed4(saleItems.reduce((sum, item) => sum + item.netCases, 0));
-
-    const totalQty = items.reduce((sum, item) => {
-      const caseQty = item.caseQty || 0;
-      const pieceQty = item.pieceQty || 0;
-      const unitQtyInCase = item.unitQtyInCase || 1;
-      return sum + caseQty * unitQtyInCase + pieceQty;
-    }, 0);
-
-    // Build remark with all payment details
-    let remarkText = paymentDetails;
-    if (isSplitPayment) {
-      const paymentDetailsStr = otherPaymentsList
-        .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
-        .join(', ');
-      if (creditAmountUsed > 0) {
-        remarkText = `${paymentDetails}\nSplit payment: ${creditAmountUsed} credit + ${paymentDetailsStr}`;
-      } else {
-        remarkText = `${paymentDetails}\nSplit payment: ${paymentDetailsStr}`;
-      }
-    }
-
-    let saleVisit = useOutletStore.getState().activeVisit;
-    if (!saleVisit) {
-      const interaction = useOutletStore.getState().activeInteraction;
-      if (
-        !interaction ||
-        !outlet?.customerId ||
-        interaction.customerId !== outlet?.customerId ||
-        !selectedRoute?.routeSessionId ||
-        !selectedRoute?.workSessionId ||
-        !van?.vanId
-      ) {
-        toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
-        setIsSubmitting(false);
-        return;
-      }
-      const visitResponse = await outletService.startVisit({
-        routeSessionId: selectedRoute.routeSessionId,
-        workSessionId: selectedRoute.workSessionId,
-        vanId: van.vanId,
-        outletId: outlet.customerId,
-        visitType: interaction.visitType,
-        interactionId: interaction.interactionId,
-      });
-      if (!visitResponse.success || !visitResponse.data?.visitId) {
-        toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
-        setIsSubmitting(false);
-        return;
-      }
-      const visit = visitResponse.data;
-      saleVisit = {
-        visitId: visit.visitId,
-        outlet,
-        checkInTime: new Date(visit.checkInTime || interaction.arrivalTime),
-        status: 'ACTIVE',
-        routeSessionId: selectedRoute.routeSessionId,
-        customerId: outlet.customerId,
-        visitType: interaction.visitType,
-      };
-      useOutletStore.getState().setActiveVisit(saleVisit);
-      useOutletStore.getState().setActiveInteraction({ ...interaction, status: 'CONVERTED' });
-    }
-
-    const payload: any = {
-      vanId: van?.vanId,
-      vanName: van?.vanNumber || 'Van',
-      compCode: firstSaleItem?.compCode,
-      categoryId: firstSaleItem?.categoryId,
-      parentCategoryId: firstSaleItem?.parentCategoryId,
-      customerId: outlet?.customerId,
-      customerName: outlet?.name || 'test',
-      date: new Date().toISOString(),
-      totalCases: caseDetails.totalCases,
-      netCases,
-      totalPieces: pieceDetails.totalPieces,
-      totalQty,
-      totalWeight: toFixed4(totalNetWeight),
-      totalValue,
-      type: saleType,
-      paymentMode,
-      paidAmount,
-      pendingAmount,
-      remark: remarkText,
-      items: saleItems,
-      visitId: saleVisit.visitId,
-    };
-
-    // Add split payment details if applicable
-    if (isSplitPayment && creditAmountUsed > 0) {
-      payload.splitPayment = {
-        creditAmount: creditAmountUsed,
-        otherPayments: otherPaymentsList,
-      };
-    }
-
-    let response: any;
-    try {
-      response = await saleService.createSale(payload);
-    } catch (error) {
-      console.error('Sale creation failed:', error);
-      toast.error('Error', error instanceof Error ? error.message : 'Failed to create sale');
-      setIsSubmitting(false);
-      setShowConfirm(false);
-      return;
-    }
-
-    if (!response?.success) {
-      toast.error('Error', response?.message || 'Failed to create sale');
-      setIsSubmitting(false);
-      setShowConfirm(false);
-      return;
-    }
-
-    let successMessage = 'Sale created successfully';
-    if (isSplitPayment) {
-      const paymentsStr = otherPaymentsList
-        .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
-        .join(', ');
-      if (creditAmountUsed > 0) {
-        successMessage = `Split payment completed!\nCredit: ${currency}${creditAmountUsed.toFixed(2)}\n${paymentsStr}`;
-      } else {
-        successMessage = `Split payment completed!\n${paymentsStr}`;
-      }
-    } else if (isCreditSelected) {
-      successMessage = 'Credit sale created successfully';
-    }
-
-    toast.success('Success', successMessage);
-
-    const saleId = response?.data?.saleId;
-
-    // Prepare invoice data
-    const invoiceData = {
-      id: saleId,
-      invoiceNumber: saleId,
-      customer: outlet?.name,
-      customerId: outlet?.customerId,
-      date: new Date().toLocaleDateString(),
-      dateTime: new Date().toISOString(),
-      amount: totalValue,
-      currency: currency,
-      paymentMode,
-      paidAmount,
-      pendingAmount,
-      saleType,
-      ...(isSplitPayment && {
-        splitDetails: {
-          creditAmount: creditAmountUsed,
-          otherPayments: otherPaymentsList,
-        },
-      }),
-      items: saleItems.map((item) => ({
-        name: item.productName,
-        quantity: item.quantity,
-        price: item.casePrice,
-        total: item.casePrice * (item.caseQty + item.pieceQty / item.unitQtyInCase),
-        caseQty: item.caseQty,
-        pieceQty: item.pieceQty,
-        unitQtyInCase: item.unitQtyInCase,
-      })),
-      summary: {
-        totalCases: caseDetails.totalCases,
-        totalPieces: pieceDetails.totalPieces,
-        totalQty: totalQty,
-        totalNetWeight: toFixed4(totalNetWeight),
-        subtotal: toFixed4(orderTotal),
-        tax: toFixed4(0),
-        total: totalValue,
-      },
-      van: {
-        id: van?.vanId,
-        name: van?.vanNumber || 'Van',
-        number: van?.vanNumber,
-      },
-      employee: {
-        id: user?.userId,
-        name: user?.name,
-      },
-      paymentDetails: paymentDetails,
-      reference: `ORD-${Date.now()}`,
-      status: pendingAmount > 0 ? (paidAmount > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
-    };
-
-    useInvoiceStore.getState().setLatestInvoice(invoiceData);
+    if (isSubmitting) return;
     setShowConfirm(false);
 
-    // Finish the visit before leaving this screen. In offline mode this writes
-    // COMPLETED to SQLite, allowing My Route's focus refresh to immediately
-    // recalculate visited/not-visited and summary metrics.
-    clearCart();
-    const completedVisit = useOutletStore.getState().activeVisit;
-    if (completedVisit?.visitId) {
-      try {
-        await outletService.completeVisit(completedVisit.visitId);
-        useOutletStore.getState().setActiveVisit(null);
-      } catch (error) {
-        console.error('Error completing visit:', error);
-      }
-    }
+    setIsSubmitting(true);
 
-    router.replace({
-      pathname: '/checkin/shareinvoice',
-      params: {
-        invoiceId: saleId,
+    try {
+      loader.show({ message: 'Preparing sale...' });
+
+      const toFixed4 = (val: number) => Number((val || 0).toFixed(4));
+      const totalValue = toFixed4(orderTotal);
+
+      let paidAmount = 0;
+      let pendingAmount = totalValue;
+      let saleType = 'CASH';
+      let paymentMode = selectedMode.toUpperCase();
+      let creditAmountUsed = 0;
+      let otherPaymentsList: SplitPaymentItem[] = [];
+
+      if (isSplitPayment) {
+        creditAmountUsed = toFixed4(splitPayment.creditAmount);
+        otherPaymentsList = splitPayment.otherPayments.map((p) => ({
+          ...p,
+          amount: toFixed4(p.amount),
+        }));
+        paidAmount = otherPaymentsList.reduce((sum, p) => sum + p.amount, 0);
+
+        pendingAmount = creditAmountUsed > 0 ? toFixed4(creditAmountUsed) : 0;
+        saleType = creditAmountUsed > 0 ? 'CREDIT' : 'CASH';
+        paymentMode = 'SPLIT_MULTIPLE';
+      } else if (isCreditSelected) {
+        paidAmount = 0;
+        pendingAmount = totalValue;
+        saleType = 'CREDIT';
+        paymentMode = 'CREDIT';
+      } else {
+        paidAmount = toFixed4(parsedAmount);
+        pendingAmount = toFixed4(totalValue - paidAmount);
+        saleType = pendingAmount > 0 ? 'CREDIT' : 'CASH';
+        paymentMode = selectedMode.toUpperCase();
+      }
+
+      loader.show({ message: 'Preparing sale items...' });
+
+      const saleItems = items.map((item) => {
+        const caseQty = item.caseQty || 0;
+        const pieceQty = item.pieceQty || 0;
+        const unitQtyInCase = item.unitQtyInCase || 1;
+        const customerCategoryId = selectedRoute?.customerCategoryId || '';
+        const quantity = caseQty * unitQtyInCase + pieceQty;
+
+        return {
+          productId: item.productId,
+          productName: item.productName,
+          compCode: item.compCode,
+          categoryId: item.categoryId,
+          parentCategoryId: item.parentCategoryId,
+          customerCategoryId,
+          caseQty,
+          pieceQty,
+          quantity,
+          netCases: toFixed4(quantity / unitQtyInCase),
+          unitQtyInCase,
+          casePrice: item.casePrice,
+          caseNetWeight: item.caseNetWeight,
+          pieceNetWeight: item.pieceNetWeight,
+          piecePrice: item.piecePrice,
+          totalNetWeight:
+            caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0),
+          totalValue: caseQty * (item.casePrice || 0) + pieceQty * (item.piecePrice || 0),
+        };
+      });
+
+      const firstSaleItem = saleItems[0];
+
+      const netCases = toFixed4(saleItems.reduce((sum, item) => sum + item.netCases, 0));
+
+      const totalQty = items.reduce((sum, item) => {
+        const caseQty = item.caseQty || 0;
+        const pieceQty = item.pieceQty || 0;
+        const unitQtyInCase = item.unitQtyInCase || 1;
+        return sum + caseQty * unitQtyInCase + pieceQty;
+      }, 0);
+
+      let remarkText = paymentDetails;
+
+      if (isSplitPayment) {
+        const paymentDetailsStr = otherPaymentsList
+          .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
+          .join(', ');
+
+        if (creditAmountUsed > 0) {
+          remarkText = `${paymentDetails}\nSplit payment: ${creditAmountUsed} credit + ${paymentDetailsStr}`;
+        } else {
+          remarkText = `${paymentDetails}\nSplit payment: ${paymentDetailsStr}`;
+        }
+      }
+
+      let saleVisit = useOutletStore.getState().activeVisit;
+
+      if (!saleVisit) {
+        loader.show({ message: 'Starting outlet visit...' });
+
+        const interaction = useOutletStore.getState().activeInteraction;
+
+        if (
+          !interaction ||
+          !outlet?.customerId ||
+          interaction.customerId !== outlet?.customerId ||
+          !selectedRoute?.routeSessionId ||
+          !selectedRoute?.workSessionId ||
+          !van?.vanId
+        ) {
+          toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
+          return;
+        }
+
+        const visitResponse = await outletService.startVisit(
+          {
+            routeSessionId: selectedRoute.routeSessionId,
+            workSessionId: selectedRoute.workSessionId,
+            vanId: van.vanId,
+            outletId: outlet.customerId,
+            visitType: interaction.visitType,
+            interactionId: interaction.interactionId,
+          },
+          { showLoader: true },
+        );
+
+        if (!visitResponse.success || !visitResponse.data?.visitId) {
+          toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
+          return;
+        }
+
+        const visit = visitResponse.data;
+
+        saleVisit = {
+          visitId: visit.visitId,
+          outlet,
+          checkInTime: new Date(visit.checkInTime || interaction.arrivalTime),
+          status: 'ACTIVE',
+          routeSessionId: selectedRoute.routeSessionId,
+          customerId: outlet.customerId,
+          visitType: interaction.visitType,
+        };
+
+        useOutletStore.getState().setActiveVisit(saleVisit);
+        useOutletStore.getState().setActiveInteraction({
+          ...interaction,
+          status: 'CONVERTED',
+        });
+      }
+
+      const payload: any = {
+        vanId: van?.vanId,
+        vanName: van?.vanNumber || 'Van',
+        compCode: firstSaleItem?.compCode,
+        categoryId: firstSaleItem?.categoryId,
+        parentCategoryId: firstSaleItem?.parentCategoryId,
         customerId: outlet?.customerId,
-      },
-    });
+        customerName: outlet?.name || 'test',
+        date: new Date().toISOString(),
+        totalCases: caseDetails.totalCases,
+        netCases,
+        totalPieces: pieceDetails.totalPieces,
+        totalQty,
+        totalWeight: toFixed4(totalNetWeight),
+        totalValue,
+        type: saleType,
+        paymentMode,
+        paidAmount,
+        pendingAmount,
+        remark: remarkText,
+        items: saleItems,
+        visitId: saleVisit.visitId,
+      };
+
+      if (isSplitPayment && creditAmountUsed > 0) {
+        payload.splitPayment = {
+          creditAmount: creditAmountUsed,
+          otherPayments: otherPaymentsList,
+        };
+      }
+
+      loader.show({ message: 'Creating sale...' });
+
+      const response: any = await saleService.createSale(payload, {
+        showLoader: false,
+      });
+
+      if (!response?.success) {
+        toast.error('Error', response?.message || 'Failed to create sale');
+        setShowConfirm(false);
+        return;
+      }
+
+      let successMessage = 'Sale created successfully';
+
+      if (isSplitPayment) {
+        const paymentsStr = otherPaymentsList
+          .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
+          .join(', ');
+
+        if (creditAmountUsed > 0) {
+          successMessage = `Split payment completed!\nCredit: ${currency}${creditAmountUsed.toFixed(2)}\n${paymentsStr}`;
+        } else {
+          successMessage = `Split payment completed!\n${paymentsStr}`;
+        }
+      } else if (isCreditSelected) {
+        successMessage = 'Credit sale created successfully';
+      }
+
+      toast.success('Success', successMessage);
+
+      const saleId = response?.data?.saleId;
+
+      loader.show({ message: 'Preparing invoice...' });
+
+      const invoiceData = {
+        id: saleId,
+        invoiceNumber: saleId,
+        customer: outlet?.name,
+        customerId: outlet?.customerId,
+        date: new Date().toLocaleDateString(),
+        dateTime: new Date().toISOString(),
+        amount: totalValue,
+        currency,
+        paymentMode,
+        paidAmount,
+        pendingAmount,
+        saleType,
+        ...(isSplitPayment && {
+          splitDetails: {
+            creditAmount: creditAmountUsed,
+            otherPayments: otherPaymentsList,
+          },
+        }),
+        items: saleItems.map((item) => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.casePrice,
+          total: item.casePrice * (item.caseQty + item.pieceQty / item.unitQtyInCase),
+          caseQty: item.caseQty,
+          pieceQty: item.pieceQty,
+          unitQtyInCase: item.unitQtyInCase,
+        })),
+        summary: {
+          totalCases: caseDetails.totalCases,
+          totalPieces: pieceDetails.totalPieces,
+          totalQty,
+          totalNetWeight: toFixed4(totalNetWeight),
+          subtotal: toFixed4(orderTotal),
+          tax: toFixed4(0),
+          total: totalValue,
+        },
+        van: {
+          id: van?.vanId,
+          name: van?.vanNumber || 'Van',
+          number: van?.vanNumber,
+        },
+        employee: {
+          id: user?.userId,
+          name: user?.name,
+        },
+        paymentDetails,
+        reference: `ORD-${Date.now()}`,
+        status: pendingAmount > 0 ? (paidAmount > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
+      };
+
+      useInvoiceStore.getState().setLatestInvoice(invoiceData);
+      setShowConfirm(false);
+
+      loader.show({ message: 'Completing visit...' });
+
+      clearCart();
+
+      const completedVisit = useOutletStore.getState().activeVisit;
+
+      if (completedVisit?.visitId) {
+        try {
+          await outletService.completeVisit(completedVisit.visitId);
+          useOutletStore.getState().setActiveVisit(null);
+        } catch (error) {
+          console.error('Error completing visit:', error);
+        }
+      }
+
+      router.replace({
+        pathname: '/checkin/shareinvoice',
+        params: {
+          invoiceId: saleId,
+          customerId: outlet?.customerId,
+        },
+      });
+    } catch (error: any) {
+      console.error('Sale creation failed:', error);
+
+      toast.error(
+        'Error',
+        error?.response?.data?.message || error?.message || 'Failed to create sale',
+      );
+    } finally {
+      setIsSubmitting(false);
+      loader.hide();
+    }
   };
 
   const handleSetFullAmount = () => {
