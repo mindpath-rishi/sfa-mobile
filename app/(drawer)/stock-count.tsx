@@ -757,8 +757,8 @@ export default function StockCountScreen({
       <ConfirmationModal
         visible={showSettlementConfirm}
         title="Van Settlement"
-        message="Do you want to settlement of van?"
-        confirmText="Yes, Continue"
+        message="Do you want to view the van settlement?"
+        confirmText="View"
         cancelText="Cancel"
         type="info"
         onCancel={() => {

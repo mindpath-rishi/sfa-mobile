@@ -66,6 +66,17 @@ import {
   startSalesmanBackgroundLocation,
   stopSalesmanBackgroundLocation,
 } from '@/shared/services/location.service';
+import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
+
+type SettlementTopupAlert = {
+  id: string;
+  reference: string;
+  status: 'SUBMITTED' | 'APPROVED';
+  requestedCases?: number;
+  requestedPieces?: number;
+  approvedCases?: number;
+  approvedPieces?: number;
+};
 
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
@@ -131,6 +142,7 @@ export default function SalesExecutiveScreen() {
   const currency = 'K';
   const van = useRouteStore.getState().van;
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
+  const [settlementTopupAlerts, setSettlementTopupAlerts] = useState<SettlementTopupAlert[]>([]);
   const [finalConfirmation, setFinalConfirmation] = useState(false);
   const { setVan } = useRouteStore();
   const { setHeader } = useHeader();
@@ -831,7 +843,48 @@ export default function SalesExecutiveScreen() {
     );
     const res: any = await vanService.fetchTodayStockSummary({ vanId: van?.vanId, workSessionId });
     console.log('Stock Summary before day end:', res);
+    if (!res?.data?.summary) {
+      throw new Error('Day end summary missing');
+    }
     setDayEndSummary(res?.data);
+    return true;
+  };
+
+  const fetchSettlementTopupAlerts = async () => {
+    setSettlementTopupAlerts([]);
+
+    try {
+      const response = await vanService.fetchInventoryTopupRequests({
+        page: 1,
+        limit: 20,
+        vanId: van?.vanId || user?.vanId || (user as any)?.defaultVanId,
+      });
+
+      const topupData = response?.data?.data || response?.data || [];
+      const topups = Array.isArray(topupData) ? topupData : [];
+      const alerts = topups
+        .filter((item: any) =>
+          [TOPUP_STATUS.SUBMITTED, TOPUP_STATUS.APPROVED].includes(item?.status),
+        )
+        .map(
+          (item: any): SettlementTopupAlert => ({
+            id: item.vanInventoryTopupId || item._id,
+            reference: `#${item.reference || item.vanInventoryTopupId?.slice(-8) || item._id}`,
+            status: item.status,
+            requestedCases: Number(item.totalRequestedCases || 0),
+            requestedPieces: Number(item.totalRequestedPieces || 0),
+            approvedCases: Number(item.totalApprovedCases || 0),
+            approvedPieces: Number(item.totalApprovedPieces || 0),
+          }),
+        );
+
+      setSettlementTopupAlerts(alerts);
+      return true;
+    } catch (error) {
+      console.warn('Failed to fetch top-up requests before settlement:', error);
+      setSettlementTopupAlerts([]);
+      return false;
+    }
   };
 
   const handleEndDay = async (carryForwardStock?: boolean) => {
@@ -1111,9 +1164,25 @@ export default function SalesExecutiveScreen() {
     }
   };
 
-  const handleDayEndConfirmation = () => {
-    fetchDayEndSummary();
-    setShowDayEndConfirm(true);
+  const handleDayEndConfirmation = async () => {
+    try {
+      loader.show({ message: 'Loading day end summary...' });
+      await fetchDayEndSummary();
+
+      loader.show({ message: 'Loading top-up details...' });
+      const topupLoaded = await fetchSettlementTopupAlerts();
+      if (!topupLoaded) {
+        toast.error('Failed to load top-up details. Please try again.');
+        return;
+      }
+
+      setShowDayEndConfirm(true);
+    } catch (error) {
+      console.error('Failed to load day end details:', error);
+      toast.error('Failed to load day end details. Please try again.');
+    } finally {
+      loader.hide();
+    }
   };
 
   const renderDashboardSkeleton = () => (
@@ -1464,6 +1533,7 @@ export default function SalesExecutiveScreen() {
       <DayEndSummaryModal
         visible={showDayEndConfirm}
         data={dayEndSummary}
+        topupSettlementAlerts={settlementTopupAlerts}
         onClose={() => setShowDayEndConfirm(false)}
         onProceed={() => {
           setDayEndSummary(false);

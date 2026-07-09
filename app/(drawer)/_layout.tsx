@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { getRoleId } from '@/core/navigation/role.utils';
 import { useLoaderStore } from '@/core/loader/loader.store';
 import { useOfflineStore } from '@/core/offline/offline.store';
+import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
 /* ============================
  * HELPERS
@@ -408,12 +409,54 @@ const CustomDrawerContent = (props: any) => {
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
+  const [settlementTopupAlerts, setSettlementTopupAlerts] = useState<any[]>([]);
   const [showDayEndSummary, setShowDayEndSummary] = useState(false);
   const [showSettlementOptions, setShowSettlementOptions] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
   const [carryForwardStock, setCarryForwardStock] = useState(true);
   const settleInFlightRef = useRef(false);
   const bumpDashboardRefresh = useAppEventsStore((s) => s.bumpDashboardRefresh);
+
+  const fetchSettlementTopupAlerts = useCallback(async () => {
+    setSettlementTopupAlerts([]);
+
+    const vanIdToUse =
+      useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
+
+    if (!vanIdToUse) return false;
+
+    try {
+      const response = await vanService.fetchInventoryTopupRequests({
+        page: 1,
+        limit: 20,
+        vanId: vanIdToUse,
+      });
+
+      const topupData = response?.data?.data || response?.data || [];
+      const topups = Array.isArray(topupData) ? topupData : [];
+      const activeTopupStatuses = [TOPUP_STATUS.SUBMITTED, TOPUP_STATUS.APPROVED];
+      const alerts = topups
+        .filter((item: any) => activeTopupStatuses.includes(item?.status))
+        .map(
+          (item: any) => ({
+            id: item.vanInventoryTopupId || item._id,
+            reference: `#${item.reference || item.vanInventoryTopupId?.slice(-8) || item._id}`,
+            status: item.status,
+            requestedCases: Number(item.totalRequestedCases || 0),
+            requestedPieces: Number(item.totalRequestedPieces || 0),
+            approvedCases: Number(item.totalApprovedCases || 0),
+            approvedPieces: Number(item.totalApprovedPieces || 0),
+          }),
+        );
+
+      setSettlementTopupAlerts(alerts);
+      return true;
+    } catch (error) {
+      console.warn('Failed to fetch top-up requests before settlement:', error);
+      setSettlementTopupAlerts([]);
+      return false;
+    }
+  }, [user]);
 
   const fetchDayEndSummary = useCallback(async () => {
     try {
@@ -422,8 +465,10 @@ const CustomDrawerContent = (props: any) => {
       const vanIdToUse =
         useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
 
-      if (!vanIdToUse) {
+      if (vanIdToUse) {
         // toast.error('Van not found. Please start your day first.');
+
+        // return;
         const res: any = await vanService.fetchTodayStockSummary(
           {
             vanId: vanIdToUse,
@@ -431,10 +476,22 @@ const CustomDrawerContent = (props: any) => {
           },
           { showLoader: false },
         );
+        if (!res?.data?.summary) {
+          toast.error('Failed to load day end summary. Please try again.');
+          return;
+        }
         setDayEndSummary(res?.data);
-        // return;
+      } else {
+        toast.error('Van not found. Please start your day first.');
+        return;
       }
 
+      loader.show({ message: 'Loading top-up details...' });
+      const topupLoaded = await fetchSettlementTopupAlerts();
+      if (!topupLoaded) {
+        toast.error('Failed to load top-up details. Please try again.');
+        return;
+      }
       setShowDayEndSummary(true);
     } catch (error) {
       console.error('Error fetching day end summary:', error);
@@ -442,7 +499,7 @@ const CustomDrawerContent = (props: any) => {
     } finally {
       loader.hide();
     }
-  }, [loader, user, workSessionId]);
+  }, [fetchSettlementTopupAlerts, loader, user, workSessionId]);
 
   const submitSettlement = useCallback(async () => {
     if (settleInFlightRef.current) return;
@@ -499,6 +556,7 @@ const CustomDrawerContent = (props: any) => {
         return;
       }
 
+      await fetchSettlementTopupAlerts();
       setCarryForwardStock(true);
       setShowSettlementConfirm(true);
     } catch (error) {
@@ -507,7 +565,7 @@ const CustomDrawerContent = (props: any) => {
     } finally {
       loader.hide();
     }
-  }, [loader, offline]);
+  }, [fetchSettlementTopupAlerts, loader, offline]);
 
   const filteredRoutes = props.state.routes.filter((route: any) => allowedRoutes.has(route.name));
   const filteredRouteKeys = new Set(filteredRoutes.map((route: any) => route.key));
@@ -579,8 +637,8 @@ const CustomDrawerContent = (props: any) => {
         <ConfirmationModal
           visible={showSettlementConfirm}
           title="Van Settlement"
-          message="Do you want to settlement of van?"
-          confirmText="Yes, Continue"
+          message="Do you want to view the van settlement?"
+          confirmText="View"
           cancelText="Cancel"
           type="info"
           onCancel={() => setShowSettlementConfirm(false)}
@@ -593,6 +651,7 @@ const CustomDrawerContent = (props: any) => {
         <DayEndSummaryModal
           visible={showDayEndSummary}
           data={dayEndSummary}
+          topupSettlementAlerts={settlementTopupAlerts}
           onClose={() => setShowDayEndSummary(false)}
           onProceed={() => {
             setShowDayEndSummary(false);
