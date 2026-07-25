@@ -82,6 +82,7 @@ export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardReloadKey, setDashboardReloadKey] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [dayStarted, setDayStarted] = useState(false);
   const [unifiedModalVisible, setUnifiedModalVisible] = useState(false);
@@ -137,14 +138,12 @@ export default function SalesExecutiveScreen() {
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
   const activeVisit = useOutletStore.getState().activeVisit;
   const clearVisit = useOutletStore((s) => s.clearVisit);
-  const { setSelectedRoute, selectedRoute } = useRouteStore();
+  const { setSelectedRoute, selectedRoute, van, setVan } = useRouteStore();
   const [showDayEndConfirm, setShowDayEndConfirm] = useState<boolean>(false);
   const currency = 'K';
-  const van = useRouteStore.getState().van;
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
   const [settlementTopupAlerts, setSettlementTopupAlerts] = useState<SettlementTopupAlert[]>([]);
   const [finalConfirmation, setFinalConfirmation] = useState(false);
-  const { setVan } = useRouteStore();
   const { setHeader } = useHeader();
   const user = useAuthStore((state) => state.user);
   const { setWorkSessionId, workSessionId } = useAuthStore();
@@ -203,6 +202,7 @@ export default function SalesExecutiveScreen() {
       await Promise.all([getDayStatus(), getVan()]);
     } finally {
       setDashboardLoading(false);
+      setDashboardReloadKey((value) => value + 1);
     }
   }, []);
 
@@ -230,10 +230,13 @@ export default function SalesExecutiveScreen() {
     visitStatus();
   }, [selectedRoute?.routeSessionId]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 2000);
-    void loadDashboard();
+    try {
+      await loadDashboard();
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const handleStartDayPress = () => {
@@ -260,7 +263,7 @@ export default function SalesExecutiveScreen() {
     setSelectedLeaveType(null);
   };
 
-  const handleActivitySelect = (activity: ActivityType) => {
+  const handleActivitySelect = async (activity: ActivityType) => {
     console.log('Selected Activity:', activity);
     if (activity.name === 'Other Work') {
       setShowOtherOptions(true);
@@ -274,7 +277,7 @@ export default function SalesExecutiveScreen() {
       setUnifiedModalType('leave-type');
       setUnifiedModalVisible(true);
     } else if (activity.name === 'Retailing') {
-      getRoutes();
+      await getRoutes();
       setSelectedActivity(activity.name);
       setPendingActivity(activity);
       setUnifiedModalVisible(false);
@@ -409,7 +412,7 @@ export default function SalesExecutiveScreen() {
     setUnifiedModalVisible(true);
   };
 
-  const handleChangeActivity = (activity: ActivityType) => {
+  const handleChangeActivity = async (activity: ActivityType) => {
     if (activity.name === 'Other Work') {
       setSelectedRoute(null);
       setShowChangeOtherOptions(true);
@@ -424,7 +427,7 @@ export default function SalesExecutiveScreen() {
       setUnifiedModalVisible(true);
       setIsChangingActivity(true);
     } else if (activity.name === 'Retailing') {
-      getRoutes();
+      await getRoutes();
       setSelectedActivity(activity.name);
       setPendingActivity(activity);
       setUnifiedModalVisible(false);
@@ -1054,39 +1057,54 @@ export default function SalesExecutiveScreen() {
       const response: any = await homeService.getVanMappedRoutes();
 
       if (response.statusCode === 200) {
+        const routeRows = response?.data?.routes || [];
+        const firstRouteAssignment = routeRows.find((item: any) => item?.vanId || item?.vanName);
         const mappedRouteVan = response?.data
           ? {
-              vanId: response.data.vanId,
-              name: response.data.vanName,
-              vanNumber: response.data.vanNumber || '',
-              capacity: response.data.capacity || '',
+              vanId:
+                response.data.vanId || firstRouteAssignment?.vanId || van?.vanId || user?.vanId,
+              name:
+                response.data.vanName ||
+                firstRouteAssignment?.vanName ||
+                van?.name ||
+                van?.vanName ||
+                (user as any)?.vanName ||
+                'Assigned Van',
+              vanNumber:
+                response.data.vanNumber || firstRouteAssignment?.vanNumber || van?.vanNumber || '',
+              capacity:
+                response.data.capacity ||
+                firstRouteAssignment?.capacity ||
+                (van as any)?.capacity ||
+                '',
             }
           : null;
         if (mappedRouteVan?.vanId) {
           setMappedVan(mappedRouteVan);
-          useRouteStore.getState().setVan(mappedRouteVan);
+          setVan(mappedRouteVan);
         }
 
-        if (response?.data?.routes?.length) {
-          setRoutes(
-            response.data.routes.map((item: any) => ({
-              name: item.route.name,
-              routeId: item.routeId,
+        setRoutes(
+          routeRows.map((item: any) => {
+            const route = item.route || item;
+            return {
+              name: route.name || item.routeName || item.name || 'Route',
+              routeId: item.routeId || route.routeId || route.uuid,
               routeSessionId: item.routeSessionId,
               workSessionId: item.workSessionId,
-              vanId: item.vanId,
-              totalShops: item.route?.outletCount,
-              distance: item.route.distance || 'N/A',
-              stops: item.route?.outletCount || 0,
-              ...getRouteLocationIds({ ...item, route: item.route }),
+              vanId: item.vanId || mappedRouteVan?.vanId,
+              totalShops: route?.outletCount || item.totalShops || item.stops || 0,
+              distance: route?.distance || item.distance || 'N/A',
+              stops: route?.outletCount || item.stops || item.totalShops || 0,
+              ...getRouteLocationIds({ ...item, route }),
               customerCategoryId: getRouteCustomerCategoryId({
                 customerCategoryId: item.customerCategoryId,
                 customerCategory: item.customerCategory,
-                route: item.route,
+                route,
               }),
-            })),
-          );
-        }
+            };
+          }),
+        );
 
         console.log('Routes:', response.data);
       }
@@ -1101,15 +1119,25 @@ export default function SalesExecutiveScreen() {
       const response: any = await homeService.getVan(userId);
 
       if (response.statusCode === 200) {
-        const van = response?.data?.[0] || null;
-        useRouteStore.getState().setVan(van);
-        if (van) {
+        const fallbackVan =
+          van ||
+          (user?.vanId
+            ? {
+                vanId: user.vanId,
+                name: (user as any)?.vanName || 'Assigned Van',
+                vanNumber: (user as any)?.vanNumber || '',
+                capacity: (user as any)?.vanCapacity || '',
+              }
+            : null);
+        const assignedVan = response?.data?.[0] || fallbackVan;
+        setVan(assignedVan);
+        if (assignedVan) {
           setMappedVan({
-            ...van,
-            name: van.name || van.vanName,
+            ...assignedVan,
+            name: assignedVan.name || assignedVan.vanName || 'Assigned Van',
           });
         }
-        console.log('Van set in store:', van);
+        console.log('Van set in store:', assignedVan);
       }
     } catch (error) {
       console.error('Error fetching van:', error);
@@ -1440,6 +1468,7 @@ export default function SalesExecutiveScreen() {
                 )}
 
                 <StatsOverviewSection
+                  key={dashboardReloadKey}
                   employeeId={user?.userId as any}
                   routeCustomerCount={
                     selectedRoute?.totalShops || Number((selectedRoute as any)?.stops || 0)

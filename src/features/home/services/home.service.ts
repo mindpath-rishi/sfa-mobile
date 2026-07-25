@@ -643,7 +643,6 @@
 //   }) => Promise<ApiResponse<ManagerUserRoutePlanResponse>>;
 // }
 
-
 // const isActiveStatusValue = (value: unknown) =>
 //   String(value ?? '').toUpperCase() === 'ACTIVE';
 
@@ -3448,8 +3447,6 @@
 //     }) as Promise<ApiResponse<ManagerUserRoutePlanResponse>>,
 // };
 
-
-
 import { api } from '@/core/network';
 import { uploadFormData } from '@/core/network/upload';
 import type { ApiRequestConfig, ApiResponse } from '@/core/network/api.types';
@@ -4095,9 +4092,7 @@ export interface HomeService {
   }) => Promise<ApiResponse<ManagerUserRoutePlanResponse>>;
 }
 
-
-const isActiveStatusValue = (value: unknown) =>
-  String(value ?? '').toUpperCase() === 'ACTIVE';
+const isActiveStatusValue = (value: unknown) => String(value ?? '').toUpperCase() === 'ACTIVE';
 
 const completeActiveRouteSessions = async ({
   ownerId,
@@ -4416,7 +4411,6 @@ export const homeService: HomeService = {
       );
 
       if (!hasDailyStockForSession) {
-
         /**
          * ======================================================
          * LATEST ERP CLOSING STOCK
@@ -4800,501 +4794,455 @@ export const homeService: HomeService = {
     return { success: true, statusCode: 200, data, offline: true } as ApiResponse<any>;
   },
   createActivity: async (payload) => {
-  const user = useAuthStore.getState().user;
-
-  /**
-   * ======================================================
-   * NON-SALESMAN
-   * ======================================================
-   */
-  if (!isSalesman(user)) {
-    return api.post<any, CreateActivityPayload>('/activity', payload);
-  }
-
-  /**
-   * ======================================================
-   * ONLINE MODE
-   * ======================================================
-   */
-  if (!isOfflineMode()) {
-    const response = await api.post<any, CreateActivityPayload>(
-      '/activity',
-      payload,
-    );
-
-    if (response?.success) return response;
+    const user = useAuthStore.getState().user;
 
     /**
-     * Network reachability can change before listener updates Zustand.
-     * Fall through to SQLite so activity is not lost.
+     * ======================================================
+     * NON-SALESMAN
+     * ======================================================
      */
-    useOfflineStore.getState().setConnection(false, false);
-  }
-
-  /**
-   * ======================================================
-   * OFFLINE MODE
-   * Same behavior as online ActivityService.create()
-   * ======================================================
-   */
-  const ownerId = user?.userId ?? '';
-  const now = new Date().toISOString();
-
-  const workSessionId = String(payload.workSessionId || '');
-  const vanId = String(payload.vanId || user?.vanId || '');
-  const vanName = payload.vanName || user?.vanName;
-
-  if (!ownerId) {
-    throw new Error('User is required for offline activity');
-  }
-
-  if (!workSessionId) {
-    throw new Error('Work session is required. Please start your day first.');
-  }
-
-  if (!vanId) {
-    throw new Error('Van is required for offline activity');
-  }
-
-  const toNumber = (value: unknown, fallback = 0) => {
-    const num = Number(value);
-    return Number.isFinite(num) ? num : fallback;
-  };
-
-  const toTime = (value: unknown) => {
-    const time = value ? new Date(String(value)).getTime() : 0;
-    return Number.isFinite(time) ? time : 0;
-  };
-
-  const loadAll = async (repository: any, maxRecords = 10000) => {
-    const records: Record<string, any>[] = [];
-
-    for (let page = 1; ; page += 1) {
-      const batch = await repository.findAll(ownerId, {
-        page,
-        limit: 200,
-      });
-
-      records.push(...batch);
-
-      if (batch.length < 200 || records.length >= maxRecords) {
-        return records;
-      }
+    if (!isSalesman(user)) {
+      return api.post<any, CreateActivityPayload>('/activity', payload);
     }
-  };
 
-  /**
-   * ======================================================
-   * 1. COMPLETE PREVIOUS ACTIVE ACTIVITIES
-   * Same as backend updateMany({ workSessionId, ACTIVE })
-   * ======================================================
-   */
-  const existingActivities = await loadAll(repositories.activities, 1000);
+    /**
+     * ======================================================
+     * ONLINE MODE
+     * ======================================================
+     */
+    if (!isOfflineMode()) {
+      const response = await api.post<any, CreateActivityPayload>('/activity', payload);
 
-  await Promise.all(
-    existingActivities
-      .filter(
-        (item) =>
-          String(item.workSessionId || '') === workSessionId &&
-          String(item.status ?? '').toUpperCase() === 'ACTIVE' &&
-          item.isDeleted !== true &&
-          !item.deletedAt,
-      )
-      .map((item) =>
-        repositories.activities.update(ownerId, item.uuid, {
-          status: 'COMPLETED',
-          endTime: now,
-        }),
-      ),
-  );
+      if (response?.success) return response;
 
-  /**
-   * ======================================================
-   * 2. COMPLETE PREVIOUS ACTIVE ROUTE SESSIONS
-   * Same as routeSessionService.markCompleted()
-   * ======================================================
-   */
-  const existingRouteSessions = await loadAll(
-    repositories.routeSessions,
-    1000,
-  );
+      /**
+       * Network reachability can change before listener updates Zustand.
+       * Fall through to SQLite so activity is not lost.
+       */
+      useOfflineStore.getState().setConnection(false, false);
+    }
 
-  await Promise.all(
-    existingRouteSessions
-      .filter(
-        (item) =>
-          String(item.workSessionId || '') === workSessionId &&
-          String(item.status ?? '').toUpperCase() === 'ACTIVE' &&
-          item.isDeleted !== true &&
-          !item.deletedAt,
-      )
-      .map((item) =>
-        repositories.routeSessions.update(ownerId, item.uuid, {
-          status: 'COMPLETED',
-          isActive: false,
-          endTime: now,
-        }),
-      ),
-  );
+    /**
+     * ======================================================
+     * OFFLINE MODE
+     * Same behavior as online ActivityService.create()
+     * ======================================================
+     */
+    const ownerId = user?.userId ?? '';
+    const now = new Date().toISOString();
 
-  /**
-   * ======================================================
-   * 3. CREATE NEW ACTIVITY
-   * ======================================================
-   */
-  const activityId = createSchemaId('Activity');
+    const workSessionId = String(payload.workSessionId || '');
+    const vanId = String(payload.vanId || user?.vanId || '');
+    const vanName = payload.vanName || user?.vanName;
 
-  const record = await repositories.activities.create(ownerId, {
-    ...payload,
+    if (!ownerId) {
+      throw new Error('User is required for offline activity');
+    }
 
-    uuid: activityId,
-    activityId,
+    if (!workSessionId) {
+      throw new Error('Work session is required. Please start your day first.');
+    }
 
-    userId: user?.userId,
-    userName: user?.name,
+    if (!vanId) {
+      throw new Error('Van is required for offline activity');
+    }
 
-    vanId,
-    vanName,
+    const toNumber = (value: unknown, fallback = 0) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : fallback;
+    };
 
-    name: payload.name,
-    description: payload.description || '',
+    const toTime = (value: unknown) => {
+      const time = value ? new Date(String(value)).getTime() : 0;
+      return Number.isFinite(time) ? time : 0;
+    };
 
-    startTime: now,
-    status: 'ACTIVE',
-  } as unknown as Record<string, unknown>);
+    const loadAll = async (repository: any, maxRecords = 10000) => {
+      const records: Record<string, any>[] = [];
 
-  /**
-   * ======================================================
-   * 4. CREATE ROUTE SESSION + VAN DAILY STOCK
-   * Only when activity has routeId
-   * ======================================================
-   */
-  if (payload.routeId) {
-    await createOfflineRouteSession({
-      ownerId,
-      user,
-      payload,
-      workSessionId,
+      for (let page = 1; ; page += 1) {
+        const batch = await repository.findAll(ownerId, {
+          page,
+          limit: 200,
+        });
+
+        records.push(...batch);
+
+        if (batch.length < 200 || records.length >= maxRecords) {
+          return records;
+        }
+      }
+    };
+
+    /**
+     * ======================================================
+     * 1. COMPLETE PREVIOUS ACTIVE ACTIVITIES
+     * Same as backend updateMany({ workSessionId, ACTIVE })
+     * ======================================================
+     */
+    const existingActivities = await loadAll(repositories.activities, 1000);
+
+    await Promise.all(
+      existingActivities
+        .filter(
+          (item) =>
+            String(item.workSessionId || '') === workSessionId &&
+            String(item.status ?? '').toUpperCase() === 'ACTIVE' &&
+            item.isDeleted !== true &&
+            !item.deletedAt,
+        )
+        .map((item) =>
+          repositories.activities.update(ownerId, item.uuid, {
+            status: 'COMPLETED',
+            endTime: now,
+          }),
+        ),
+    );
+
+    /**
+     * ======================================================
+     * 2. COMPLETE PREVIOUS ACTIVE ROUTE SESSIONS
+     * Same as routeSessionService.markCompleted()
+     * ======================================================
+     */
+    const existingRouteSessions = await loadAll(repositories.routeSessions, 1000);
+
+    await Promise.all(
+      existingRouteSessions
+        .filter(
+          (item) =>
+            String(item.workSessionId || '') === workSessionId &&
+            String(item.status ?? '').toUpperCase() === 'ACTIVE' &&
+            item.isDeleted !== true &&
+            !item.deletedAt,
+        )
+        .map((item) =>
+          repositories.routeSessions.update(ownerId, item.uuid, {
+            status: 'COMPLETED',
+            isActive: false,
+            endTime: now,
+          }),
+        ),
+    );
+
+    /**
+     * ======================================================
+     * 3. CREATE NEW ACTIVITY
+     * ======================================================
+     */
+    const activityId = createSchemaId('Activity');
+
+    const record = await repositories.activities.create(ownerId, {
+      ...payload,
+
+      uuid: activityId,
+      activityId,
+
+      userId: user?.userId,
+      userName: user?.name,
+
       vanId,
       vanName,
-      nowIso: now,
-      completeExisting: false,
-    });
+
+      name: payload.name,
+      description: payload.description || '',
+
+      startTime: now,
+      status: 'ACTIVE',
+    } as unknown as Record<string, unknown>);
 
     /**
      * ======================================================
-     * 5. CREATE VAN DAILY STOCK
-     *
-     * Same as online:
-     * - If daily stock already exists for workSessionId, do nothing.
-     * - Else use vanErpClosing first.
-     * - If vanErpClosing not found, fallback to stock/inventories.
+     * 4. CREATE ROUTE SESSION + VAN DAILY STOCK
+     * Only when activity has routeId
      * ======================================================
      */
-    const existingDailyStock = await loadAll(
-      repositories.vanDailyStock,
-      10000,
-    );
+    if (payload.routeId) {
+      await createOfflineRouteSession({
+        ownerId,
+        user,
+        payload,
+        workSessionId,
+        vanId,
+        vanName,
+        nowIso: now,
+        completeExisting: false,
+      });
 
-    const hasDailyStockForSession = existingDailyStock.some(
-      (item) =>
-        String(item.workSessionId || '') === workSessionId &&
-        String(item.vanId || '') === vanId &&
-        item.isDeleted !== true &&
-        !item.deletedAt,
-    );
+      /**
+       * ======================================================
+       * 5. CREATE VAN DAILY STOCK
+       *
+       * Same as online:
+       * - If daily stock already exists for workSessionId, do nothing.
+       * - Else use vanErpClosing first.
+       * - If vanErpClosing not found, fallback to stock/inventories.
+       * ======================================================
+       */
+      const existingDailyStock = await loadAll(repositories.vanDailyStock, 10000);
 
-    /**
-     * Important:
-     * Route change inside same work session must not reset stock.
-     */
-    if (!hasDailyStockForSession) {
-      const [erpClosingRecords, stockRecords, productRecords] =
-        await Promise.all([
+      const hasDailyStockForSession = existingDailyStock.some(
+        (item) =>
+          String(item.workSessionId || '') === workSessionId &&
+          String(item.vanId || '') === vanId &&
+          item.isDeleted !== true &&
+          !item.deletedAt,
+      );
+
+      /**
+       * Important:
+       * Route change inside same work session must not reset stock.
+       */
+      if (!hasDailyStockForSession) {
+        const [erpClosingRecords, stockRecords, productRecords] = await Promise.all([
           loadAll(repositories.vanErpClosing, 10000),
           loadAll(repositories.stock, 10000),
           loadAll(repositories.products, 10000),
         ]);
 
-      const productById = new Map(
-        productRecords.map((product) => [
-          String(product.productId),
-          product,
-        ]),
-      );
-
-      /**
-       * ======================================================
-       * PREFER LATEST ERP CLOSING STOCK FOR VAN
-       * Same as backend getLatestOpeningStock(vanId)
-       * ======================================================
-       */
-      const validErpClosing = erpClosingRecords
-        .filter(
-          (item) =>
-            String(item.vanId || '') === vanId &&
-            item.isDeleted !== true &&
-            !item.deletedAt,
-        )
-        .sort((a, b) => {
-          const aTime = toTime(
-            a.date ||
-              a.closeDate ||
-              a.modifiedDate ||
-              a.createdDate ||
-              a.updatedAt ||
-              a.createdAt,
-          );
-
-          const bTime = toTime(
-            b.date ||
-              b.closeDate ||
-              b.modifiedDate ||
-              b.createdDate ||
-              b.updatedAt ||
-              b.createdAt,
-          );
-
-          return bTime - aTime;
-        });
-
-      const latestErpDate = validErpClosing[0]
-        ? String(
-            validErpClosing[0].date ||
-              validErpClosing[0].closeDate ||
-              validErpClosing[0].modifiedDate ||
-              validErpClosing[0].createdDate ||
-              '',
-          ).slice(0, 10)
-        : '';
-
-      const latestErpRows = latestErpDate
-        ? validErpClosing.filter((item) =>
-            String(
-              item.date ||
-                item.closeDate ||
-                item.modifiedDate ||
-                item.createdDate ||
-                '',
-            ).startsWith(latestErpDate),
-          )
-        : [];
-
-      /**
-       * ======================================================
-       * BUILD OPENING STOCK
-       * ERP first, fallback stock second
-       * ======================================================
-       */
-      const openingStocks = latestErpRows.length
-        ? latestErpRows
-            .map((item) => {
-              const productId = String(item.productId || item.itemCode || '');
-              const product = productById.get(productId);
-
-              const unitQtyInCase = Math.max(
-                toNumber(
-                  item.unitQtyInCase ??
-                    item.piecePerCase ??
-                    product?.unitQtyInCase,
-                  1,
-                ),
-                1,
-              );
-
-              /**
-               * ERP can have cases or direct quantity.
-               */
-              const quantity =
-                toNumber(item.quantity) ||
-                toNumber(item.qty) ||
-                toNumber(item.closingQty) ||
-                toNumber(item.closingCases) * unitQtyInCase;
-
-              return {
-                productId,
-                productName:
-                  item.productName ||
-                  item.itemName ||
-                  product?.productName ||
-                  product?.name,
-
-                unitQtyInCase,
-                quantity,
-
-                pieceNetWeight: toNumber(
-                  item.pieceNetWeight ?? product?.pieceNetWeight,
-                ),
-
-                caseNetWeight: toNumber(
-                  item.caseNetWeight ?? product?.caseNetWeight,
-                ),
-
-                piecePrice: toNumber(
-                  item.piecePrice ?? product?.piecePrice,
-                ),
-
-                casePrice: toNumber(
-                  item.casePrice ?? product?.casePrice,
-                ),
-              };
-            })
-            .filter((item) => item.productId && item.quantity > 0)
-        : stockRecords
-            .filter(
-              (item) =>
-                String(item.vanId || '') === vanId &&
-                item.isDeleted !== true &&
-                !item.deletedAt &&
-                toNumber(item.quantity) > 0,
-            )
-            .map((item) => {
-              const product = productById.get(String(item.productId));
-
-              const unitQtyInCase = Math.max(
-                toNumber(item.unitQtyInCase ?? product?.unitQtyInCase, 1),
-                1,
-              );
-
-              const pieceNetWeight = toNumber(
-                item.pieceNetWeight ?? product?.pieceNetWeight,
-              );
-
-              const piecePrice = toNumber(
-                item.piecePrice ?? product?.piecePrice,
-              );
-
-              return {
-                productId: String(item.productId),
-                productName:
-                  item.productName ||
-                  product?.productName ||
-                  product?.name,
-
-                unitQtyInCase,
-                quantity: toNumber(item.quantity),
-
-                pieceNetWeight,
-                caseNetWeight:
-                  toNumber(item.caseNetWeight ?? product?.caseNetWeight) ||
-                  pieceNetWeight * unitQtyInCase,
-
-                piecePrice,
-                casePrice:
-                  toNumber(item.casePrice ?? product?.casePrice) ||
-                  piecePrice * unitQtyInCase,
-              };
-            });
-
-      /**
-       * ======================================================
-       * DEDUPLICATE OPENING STOCK PRODUCT-WISE
-       * Protects local from duplicate vanDailyStock rows.
-       * ======================================================
-       */
-      const stockByProduct = new Map<string, any>();
-
-      for (const stock of openingStocks) {
-        const productId = String(stock.productId || '');
-
-        if (!productId) continue;
-
-        const existing = stockByProduct.get(productId);
-
-        if (existing) {
-          existing.quantity += toNumber(stock.quantity);
-
-          /**
-           * Keep latest non-empty pricing/weight.
-           */
-          existing.unitQtyInCase =
-            stock.unitQtyInCase || existing.unitQtyInCase;
-          existing.pieceNetWeight =
-            stock.pieceNetWeight || existing.pieceNetWeight;
-          existing.caseNetWeight =
-            stock.caseNetWeight || existing.caseNetWeight;
-          existing.piecePrice = stock.piecePrice || existing.piecePrice;
-          existing.casePrice = stock.casePrice || existing.casePrice;
-        } else {
-          stockByProduct.set(productId, { ...stock });
-        }
-      }
-
-      const uniqueOpeningStocks = Array.from(stockByProduct.values());
-
-      /**
-       * ======================================================
-       * CREATE VAN DAILY STOCK ROWS
-       * One product per workSessionId
-       * ======================================================
-       */
-      for (const stock of uniqueOpeningStocks) {
-        const productId = String(stock.productId || '');
-
-        if (!productId) continue;
-
-        /**
-         * Final safety:
-         * Do not create duplicate product row for same workSessionId.
-         */
-        const alreadyExists = existingDailyStock.some(
-          (item) =>
-            String(item.workSessionId || '') === workSessionId &&
-            String(item.vanId || '') === vanId &&
-            String(item.productId || '') === productId &&
-            item.isDeleted !== true &&
-            !item.deletedAt,
+        const productById = new Map(
+          productRecords.map((product) => [String(product.productId), product]),
         );
 
-        if (alreadyExists) continue;
+        /**
+         * ======================================================
+         * PREFER LATEST ERP CLOSING STOCK FOR VAN
+         * Same as backend getLatestOpeningStock(vanId)
+         * ======================================================
+         */
+        const validErpClosing = erpClosingRecords
+          .filter(
+            (item) =>
+              String(item.vanId || '') === vanId && item.isDeleted !== true && !item.deletedAt,
+          )
+          .sort((a, b) => {
+            const aTime = toTime(
+              a.date ||
+                a.closeDate ||
+                a.modifiedDate ||
+                a.createdDate ||
+                a.updatedAt ||
+                a.createdAt,
+            );
 
-        const vanDailyStockId = createSchemaId('VanDailyStock');
+            const bTime = toTime(
+              b.date ||
+                b.closeDate ||
+                b.modifiedDate ||
+                b.createdDate ||
+                b.updatedAt ||
+                b.createdAt,
+            );
 
-        await repositories.vanDailyStock.create(ownerId, {
-          uuid: vanDailyStockId,
-          vanDailyStockId,
+            return bTime - aTime;
+          });
 
-          date: now,
+        const latestErpDate = validErpClosing[0]
+          ? String(
+              validErpClosing[0].date ||
+                validErpClosing[0].closeDate ||
+                validErpClosing[0].modifiedDate ||
+                validErpClosing[0].createdDate ||
+                '',
+            ).slice(0, 10)
+          : '';
 
-          vanId,
-          employeeId: user?.userId,
+        const latestErpRows = latestErpDate
+          ? validErpClosing.filter((item) =>
+              String(
+                item.date || item.closeDate || item.modifiedDate || item.createdDate || '',
+              ).startsWith(latestErpDate),
+            )
+          : [];
 
-          productId,
-          productName: stock.productName,
+        /**
+         * ======================================================
+         * BUILD OPENING STOCK
+         * ERP first, fallback stock second
+         * ======================================================
+         */
+        const openingStocks = latestErpRows.length
+          ? latestErpRows
+              .map((item) => {
+                const productId = String(item.productId || item.itemCode || '');
+                const product = productById.get(productId);
 
-          unitQtyInCase: stock.unitQtyInCase || 1,
+                const unitQtyInCase = Math.max(
+                  toNumber(item.unitQtyInCase ?? item.piecePerCase ?? product?.unitQtyInCase, 1),
+                  1,
+                );
 
-          openingQty: stock.quantity || 0,
-          inQty: 0,
-          outQty: 0,
-          adjustmentQty: 0,
-          closingQty: stock.quantity || 0,
+                /**
+                 * ERP can have cases or direct quantity.
+                 */
+                const quantity =
+                  toNumber(item.quantity) ||
+                  toNumber(item.qty) ||
+                  toNumber(item.closingQty) ||
+                  toNumber(item.closingCases) * unitQtyInCase;
 
-          pieceNetWeight: stock.pieceNetWeight || 0,
-          caseNetWeight: stock.caseNetWeight || 0,
+                return {
+                  productId,
+                  productName:
+                    item.productName || item.itemName || product?.productName || product?.name,
 
-          piecePrice: stock.piecePrice || 0,
-          casePrice: stock.casePrice || 0,
+                  unitQtyInCase,
+                  quantity,
 
-          workSessionId,
+                  pieceNetWeight: toNumber(item.pieceNetWeight ?? product?.pieceNetWeight),
 
-          status: 'DRAFT',
-        } as unknown as Record<string, unknown>);
+                  caseNetWeight: toNumber(item.caseNetWeight ?? product?.caseNetWeight),
+
+                  piecePrice: toNumber(item.piecePrice ?? product?.piecePrice),
+
+                  casePrice: toNumber(item.casePrice ?? product?.casePrice),
+                };
+              })
+              .filter((item) => item.productId && item.quantity > 0)
+          : stockRecords
+              .filter(
+                (item) =>
+                  String(item.vanId || '') === vanId &&
+                  item.isDeleted !== true &&
+                  !item.deletedAt &&
+                  toNumber(item.quantity) > 0,
+              )
+              .map((item) => {
+                const product = productById.get(String(item.productId));
+
+                const unitQtyInCase = Math.max(
+                  toNumber(item.unitQtyInCase ?? product?.unitQtyInCase, 1),
+                  1,
+                );
+
+                const pieceNetWeight = toNumber(item.pieceNetWeight ?? product?.pieceNetWeight);
+
+                const piecePrice = toNumber(item.piecePrice ?? product?.piecePrice);
+
+                return {
+                  productId: String(item.productId),
+                  productName: item.productName || product?.productName || product?.name,
+
+                  unitQtyInCase,
+                  quantity: toNumber(item.quantity),
+
+                  pieceNetWeight,
+                  caseNetWeight:
+                    toNumber(item.caseNetWeight ?? product?.caseNetWeight) ||
+                    pieceNetWeight * unitQtyInCase,
+
+                  piecePrice,
+                  casePrice:
+                    toNumber(item.casePrice ?? product?.casePrice) || piecePrice * unitQtyInCase,
+                };
+              });
+
+        /**
+         * ======================================================
+         * DEDUPLICATE OPENING STOCK PRODUCT-WISE
+         * Protects local from duplicate vanDailyStock rows.
+         * ======================================================
+         */
+        const stockByProduct = new Map<string, any>();
+
+        for (const stock of openingStocks) {
+          const productId = String(stock.productId || '');
+
+          if (!productId) continue;
+
+          const existing = stockByProduct.get(productId);
+
+          if (existing) {
+            existing.quantity += toNumber(stock.quantity);
+
+            /**
+             * Keep latest non-empty pricing/weight.
+             */
+            existing.unitQtyInCase = stock.unitQtyInCase || existing.unitQtyInCase;
+            existing.pieceNetWeight = stock.pieceNetWeight || existing.pieceNetWeight;
+            existing.caseNetWeight = stock.caseNetWeight || existing.caseNetWeight;
+            existing.piecePrice = stock.piecePrice || existing.piecePrice;
+            existing.casePrice = stock.casePrice || existing.casePrice;
+          } else {
+            stockByProduct.set(productId, { ...stock });
+          }
+        }
+
+        const uniqueOpeningStocks = Array.from(stockByProduct.values());
+
+        /**
+         * ======================================================
+         * CREATE VAN DAILY STOCK ROWS
+         * One product per workSessionId
+         * ======================================================
+         */
+        for (const stock of uniqueOpeningStocks) {
+          const productId = String(stock.productId || '');
+
+          if (!productId) continue;
+
+          /**
+           * Final safety:
+           * Do not create duplicate product row for same workSessionId.
+           */
+          const alreadyExists = existingDailyStock.some(
+            (item) =>
+              String(item.workSessionId || '') === workSessionId &&
+              String(item.vanId || '') === vanId &&
+              String(item.productId || '') === productId &&
+              item.isDeleted !== true &&
+              !item.deletedAt,
+          );
+
+          if (alreadyExists) continue;
+
+          const vanDailyStockId = createSchemaId('VanDailyStock');
+
+          await repositories.vanDailyStock.create(ownerId, {
+            uuid: vanDailyStockId,
+            vanDailyStockId,
+
+            date: now,
+
+            vanId,
+            employeeId: user?.userId,
+
+            productId,
+            productName: stock.productName,
+
+            unitQtyInCase: stock.unitQtyInCase || 1,
+
+            openingQty: stock.quantity || 0,
+            inQty: 0,
+            outQty: 0,
+            adjustmentQty: 0,
+            closingQty: stock.quantity || 0,
+
+            pieceNetWeight: stock.pieceNetWeight || 0,
+            caseNetWeight: stock.caseNetWeight || 0,
+
+            piecePrice: stock.piecePrice || 0,
+            casePrice: stock.casePrice || 0,
+
+            workSessionId,
+
+            status: 'DRAFT',
+          } as unknown as Record<string, unknown>);
+        }
       }
     }
-  }
 
-  return {
-    success: true,
-    statusCode: 202,
-    message: 'Activity saved locally',
-    data: {
-      ...record,
-      activityId,
-    },
-    offline: true,
-  } as ApiResponse<any>;
-},
+    return {
+      success: true,
+      statusCode: 202,
+      message: 'Activity saved locally',
+      data: {
+        ...record,
+        activityId,
+      },
+      offline: true,
+    } as ApiResponse<any>;
+  },
   getRoutes: async (vanId) => {
     const user = useAuthStore.getState().user;
     if (!isSalesman(user)) {
@@ -5343,11 +5291,29 @@ export const homeService: HomeService = {
         route: record,
       };
     });
+    const vanRecords = await repositories.vans.findAll(user?.userId ?? '', { limit: 10 });
+    const assignedVan =
+      vanRecords.find((item) => String(item.vanId || '') === String(user?.vanId || '')) ||
+      vanRecords[0] ||
+      null;
+    const firstRouteVan = routes.find((item: any) => item?.vanId || item?.vanName);
 
     return {
       success: true,
       statusCode: 200,
-      data: { vanId: user?.vanId, routes },
+      data: {
+        vanId: user?.vanId || (firstRouteVan as any)?.vanId || assignedVan?.vanId,
+        vanName:
+          (user as any)?.vanName ||
+          (firstRouteVan as any)?.vanName ||
+          assignedVan?.name ||
+          assignedVan?.vanName,
+        vanNumber:
+          (user as any)?.vanNumber || (firstRouteVan as any)?.vanNumber || assignedVan?.vanNumber,
+        capacity:
+          (user as any)?.vanCapacity || (firstRouteVan as any)?.capacity || assignedVan?.capacity,
+        routes,
+      },
       offline: true,
     } as ApiResponse<any>;
   },

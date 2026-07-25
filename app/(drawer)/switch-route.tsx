@@ -95,6 +95,7 @@ export default function Routes() {
   const { setHeader } = useHeader();
   const { selectedRoute, setSelectedRoute, van } = useRouteStore();
   const workSessionId = useAuthStore((state) => state.workSessionId);
+  const user = useAuthStore((state) => state.user);
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const params = useLocalSearchParams<{ route?: string }>();
@@ -425,11 +426,22 @@ export default function Routes() {
 
     setIsSubmitting(true);
     try {
+      const vanId =
+        selectedVanRoute.vanId || van?.vanId || selectedRoute?.vanId || user?.vanId || '';
+
+      if (!vanId) {
+        toast.error('Error', 'Van is required to change route');
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = {
         workSessionId: workSessionId || '',
         routeId: selectedVanRoute.routeId,
         routeName: selectedVanRoute.routeName,
         totalShops: selectedVanRoute.totalShops,
+        vanId,
+        vanName: selectedVanRoute.name || van?.name || van?.vanName || van?.vanNumber,
       };
 
       const response: any = await outletService.changeRoute(payload);
@@ -444,7 +456,7 @@ export default function Routes() {
           workSessionId: workSessionId || '',
           totalShops: selectedVanRoute.totalShops,
           distance: selectedVanRoute.distance || '',
-          vanId: selectedVanRoute.vanId || selectedRoute?.vanId,
+          vanId,
           marketId: selectedVanRoute.marketId || selectedRoute?.marketId,
           provinceId: selectedVanRoute.provinceId || selectedRoute?.provinceId,
           countryId: selectedVanRoute.countryId || selectedRoute?.countryId,
