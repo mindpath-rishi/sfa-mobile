@@ -113,7 +113,7 @@
 //   id: 'van2',
 //   name: 'Van #MH-02-CD-5678',
 //   type: 'Mahindra Pickup',
-//   capacity: '750 kg',
+//   capacity: '750',
 //   registration: 'MH-02-CD-5678',
 // };
 

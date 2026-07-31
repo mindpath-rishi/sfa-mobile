@@ -31,7 +31,7 @@ export default function OrderSummary() {
   const { setHeader } = useHeader();
 
   // Zustand stores
-  const { items, summary, clearCart } = useCartStore();
+  const { items, summary, clearCart, refreshSchemeDiscounts } = useCartStore();
   const outlet = useOutletStore((s) => s.selectedOutlet);
   const van = useRouteStore.getState().van;
   const selectedRoute = useRouteStore.getState().selectedRoute;
@@ -52,6 +52,15 @@ export default function OrderSummary() {
         showMenu: false,
       });
     }, []),
+  );
+
+  // Resolve category/sub-category/product/province/route/van wise schemes for sale mode
+  useFocusEffect(
+    React.useCallback(() => {
+      if (currentMode === 'sales') {
+        refreshSchemeDiscounts();
+      }
+    }, [currentMode, items, refreshSchemeDiscounts]),
   );
 
   // Calculate total weight for top-up mode
@@ -291,6 +300,8 @@ export default function OrderSummary() {
     if (currentMode === 'sales') {
       return {
         total: summary.totalValue,
+        subtotal: summary.totalValue + summary.discountValue,
+        discount: summary.discountValue,
         hasItems,
         mode: currentMode,
       };

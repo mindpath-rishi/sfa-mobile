@@ -27,7 +27,16 @@ type NotificationItem = {
   title: string;
   message: string;
   time: string;
-  type: 'order' | 'route' | 'target' | 'van_change' | 'topup' | 'outlet_approval' | 'system';
+  type:
+    | 'order'
+    | 'route'
+    | 'route_change'
+    | 'target'
+    | 'van_change'
+    | 'stock_unload'
+    | 'topup'
+    | 'outlet_approval'
+    | 'system';
   unread?: boolean;
   data?: Record<string, any>;
 };
@@ -62,7 +71,16 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
     title: item.title,
     message: item.body || item.message || '',
     time: formatRelativeTime(item.createdAt || item.sentAt),
-    type: ['order', 'route', 'target', 'van_change', 'topup', 'outlet_approval'].includes(category)
+    type: [
+      'order',
+      'route',
+      'route_change',
+      'target',
+      'van_change',
+      'stock_unload',
+      'topup',
+      'outlet_approval',
+    ].includes(category)
       ? (category as NotificationItem['type'])
       : 'system',
     unread: !item.isRead,
@@ -75,11 +93,14 @@ const getNotificationIcon = (type: NotificationItem['type']) => {
     case 'order':
       return 'receipt-outline';
     case 'route':
+    case 'route_change':
       return 'map-outline';
     case 'target':
       return 'flag-outline';
     case 'van_change':
       return 'car-outline';
+    case 'stock_unload':
+      return 'archive-outline';
     case 'topup':
       return 'cube-outline';
     case 'outlet_approval':
@@ -117,12 +138,54 @@ const getVanChangeReason = (item: NotificationItem) =>
   String(item.data?.reason || item.data?.vanChangeReason || '').trim();
 
 const getVanChangeStatus = (item: NotificationItem) => {
+  if (String(item.data?.category || '').toLowerCase() !== 'van_change') return '';
+
   const action = String(item.data?.action || '').toUpperCase();
   const status = String(item.data?.vanChangeStatus || item.data?.status || '').toUpperCase();
 
   if (['APPROVED', 'REJECTED'].includes(status)) return status;
   if (['APPROVED', 'REJECTED'].includes(action)) return action;
   return '';
+};
+
+const isPendingRouteChangeApproval = (item: NotificationItem) => {
+  const category = String(item.data?.category || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.status || '').toUpperCase();
+
+  return (
+    category === 'route_change' &&
+    action === 'APPROVAL_REQUIRED' &&
+    (!status || status === 'PENDING')
+  );
+};
+
+const getRouteChangeStatus = (item: NotificationItem) => {
+  if (String(item.data?.category || '').toLowerCase() !== 'route_change') return '';
+
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.status || '').toUpperCase();
+
+  if (['APPROVED', 'REJECTED'].includes(status)) return status;
+  if (['APPROVED', 'REJECTED'].includes(action)) return action;
+  return '';
+};
+
+const isPendingStockUnloadApproval = (item: NotificationItem) => {
+  const category = String(item.data?.category || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.status || '').toUpperCase();
+  return (
+    category === 'stock_unload' &&
+    action === 'APPROVAL_REQUIRED' &&
+    (!status || status === 'PENDING')
+  );
+};
+
+const getStockUnloadStatus = (item: NotificationItem) => {
+  if (String(item.data?.category || '').toLowerCase() !== 'stock_unload') return '';
+  const status = String(item.data?.status || item.data?.action || '').toUpperCase();
+  return ['APPROVED', 'REJECTED'].includes(status) ? status : '';
 };
 
 const isPendingOutletApproval = (item: NotificationItem) =>
@@ -197,7 +260,11 @@ export default function NotificationsScreen() {
   );
 
   const handleNotificationPress = async (item: NotificationItem) => {
-    const target = item.data?.route || item.data?.url;
+    const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
+    const target =
+      item.type === 'stock_unload' && unloadRequestId
+        ? `/stock-unload-detail?unloadRequestId=${encodeURIComponent(String(unloadRequestId))}`
+        : item.data?.route || item.data?.url;
     if (typeof target === 'string' && target.startsWith('/')) {
       router.push(target as never);
     }
@@ -321,6 +388,52 @@ export default function NotificationsScreen() {
     }
   };
 
+  const handleRouteChangeAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
+    const routeChangeRequestId = item.data?.routeChangeRequestId || item.data?.requestId;
+    if (!routeChangeRequestId || processingId) {
+      toast.error('Route change request ID not found');
+      return;
+    }
+
+    setProcessingId(item.id);
+    try {
+      const response =
+        action === 'approve'
+          ? await notificationService.approveRouteChange(String(routeChangeRequestId))
+          : await notificationService.rejectRouteChange(String(routeChangeRequestId));
+
+      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+        toast.error(response?.message || `Failed to ${action} route change`);
+        return;
+      }
+
+      toast.success(action === 'approve' ? 'Route change approved' : 'Route change rejected');
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.id === item.id
+            ? {
+                ...notification,
+                unread: false,
+                data: {
+                  ...notification.data,
+                  action: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                  status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                },
+              }
+            : notification,
+        ),
+      );
+
+      await notificationService.markAsRead(item.id);
+      await loadNotifications(true);
+    } catch (error: any) {
+      console.warn(`Failed to ${action} route change:`, error);
+      toast.error(error?.response?.data?.message || `Failed to ${action} route change`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleOutletAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
     const customerId = String(item.data?.customerId || '');
     const outletVerificationId = String(item.data?.outletVerificationId || '') || undefined;
@@ -360,6 +473,37 @@ export default function NotificationsScreen() {
     } catch (error: any) {
       console.warn(`Failed to ${action} outlet:`, error);
       toast.error(error?.response?.data?.message || `Failed to ${action} outlet`);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleStockUnloadAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
+    const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
+    if (!unloadRequestId || processingId) {
+      toast.error('Stock unload request ID not found');
+      return;
+    }
+
+    setProcessingId(item.id);
+    try {
+      const response =
+        action === 'approve'
+          ? await notificationService.approveStockUnload(String(unloadRequestId))
+          : await notificationService.rejectStockUnload(String(unloadRequestId));
+      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+        toast.error(response?.message || `Failed to ${action} stock unload request`);
+        return;
+      }
+      toast.success(
+        action === 'approve'
+          ? 'Stock unload approved and van stock reset'
+          : 'Stock unload request rejected',
+      );
+      await notificationService.markAsRead(item.id);
+      await loadNotifications(true);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || `Failed to ${action} stock unload request`);
     } finally {
       setProcessingId(null);
     }
@@ -410,6 +554,8 @@ export default function NotificationsScreen() {
             {notifications.map((item) => {
               const vanChangeReason = getVanChangeReason(item);
               const vanChangeStatus = getVanChangeStatus(item);
+              const routeChangeStatus = getRouteChangeStatus(item);
+              const stockUnloadStatus = getStockUnloadStatus(item);
               const topupStatus = getTopupStatus(item);
               const outletApprovalStatus = getOutletApprovalStatus(item);
 
@@ -467,6 +613,33 @@ export default function NotificationsScreen() {
                       {vanChangeReason && (
                         <AppText style={styles.reasonText}>Reason: {vanChangeReason}</AppText>
                       )}
+                      {item.type === 'route_change' && (
+                        <View style={styles.routeChangeDetails}>
+                          {!!item.data?.currentRouteName && (
+                            <AppText style={styles.detailText}>
+                              Current: {item.data.currentRouteName}
+                            </AppText>
+                          )}
+                          {!!item.data?.requestedRouteName && (
+                            <AppText style={styles.detailText}>
+                              Requested: {item.data.requestedRouteName}
+                            </AppText>
+                          )}
+                        </View>
+                      )}
+                      {item.type === 'stock_unload' && (
+                        <View style={styles.routeChangeDetails}>
+                          <AppText style={styles.detailText}>
+                            Salesman: {item.data?.employeeName || item.data?.employeeId || '—'}
+                          </AppText>
+                          <AppText style={styles.detailText}>
+                            Van: {item.data?.vanId || '—'}
+                          </AppText>
+                          <AppText style={styles.detailText}>
+                            Quantity: {Number(item.data?.totalQuantity || 0).toLocaleString()}
+                          </AppText>
+                        </View>
+                      )}
                       {vanChangeStatus && (
                         <AppText
                           style={[
@@ -477,6 +650,32 @@ export default function NotificationsScreen() {
                           ]}
                         >
                           {vanChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                        </AppText>
+                      )}
+                      {routeChangeStatus && (
+                        <AppText
+                          style={[
+                            styles.statusText,
+                            {
+                              color:
+                                routeChangeStatus === 'APPROVED' ? colors.success : colors.error,
+                            },
+                          ]}
+                        >
+                          {routeChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
+                        </AppText>
+                      )}
+                      {stockUnloadStatus && (
+                        <AppText
+                          style={[
+                            styles.statusText,
+                            {
+                              color:
+                                stockUnloadStatus === 'APPROVED' ? colors.success : colors.error,
+                            },
+                          ]}
+                        >
+                          {stockUnloadStatus === 'APPROVED' ? 'Approved' : 'Rejected'}
                         </AppText>
                       )}
                       {topupStatus && (
@@ -527,6 +726,52 @@ export default function NotificationsScreen() {
                       <TouchableOpacity
                         disabled={processingId === item.id}
                         onPress={() => handleVanChangeAction(item, 'approve')}
+                        style={[styles.actionButton, styles.approveButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                          Approve
+                        </AppText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {isPendingRouteChangeApproval(item) && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleRouteChangeAction(item, 'reject')}
+                        style={[styles.actionButton, styles.rejectButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                          Reject
+                        </AppText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleRouteChangeAction(item, 'approve')}
+                        style={[styles.actionButton, styles.approveButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.success }]}>
+                          Approve
+                        </AppText>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {isPendingStockUnloadApproval(item) && (
+                    <View style={styles.actionRow}>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleStockUnloadAction(item, 'reject')}
+                        style={[styles.actionButton, styles.rejectButton]}
+                      >
+                        <AppText style={[styles.actionButtonText, { color: colors.error }]}>
+                          Reject
+                        </AppText>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        disabled={processingId === item.id}
+                        onPress={() => handleStockUnloadAction(item, 'approve')}
                         style={[styles.actionButton, styles.approveButton]}
                       >
                         <AppText style={[styles.actionButtonText, { color: colors.success }]}>
@@ -692,6 +937,7 @@ const createStyles = (colors: any) =>
       paddingLeft: 42,
     },
     outletDetails: { gap: 5, marginTop: 10 },
+    routeChangeDetails: { gap: 4, marginTop: 8 },
     outletName: { color: colors.textPrimary, fontSize: 14, fontWeight: '800' },
     detailText: { color: colors.textSecondary, fontSize: 12, lineHeight: 17 },
     outletImage: { width: 120, height: 82, borderRadius: 8, marginRight: 8, marginTop: 5 },

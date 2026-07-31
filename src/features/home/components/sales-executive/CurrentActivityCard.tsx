@@ -51,9 +51,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
 
   // Timer state
   const [elapsedFormatted, setElapsedFormatted] = useState<string>('00:00');
-  const [elapsedHours, setElapsedHours] = useState<number>(0);
-  const [elapsedMinutes, setElapsedMinutes] = useState<number>(0);
-  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
   // Memoized parsed times
   const parsedStartTime = useMemo(() => parseStartTime(startTime), [startTime]);
@@ -64,11 +61,8 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
 
   // Update timer function
   const updateTimer = useCallback(() => {
-    const { formatted, hours, minutes, seconds } = formatElapsedTime(parsedStartTime);
+    const { formatted } = formatElapsedTime(parsedStartTime);
     setElapsedFormatted(formatted);
-    setElapsedHours(hours);
-    setElapsedMinutes(minutes);
-    setElapsedSeconds(seconds);
   }, [parsedStartTime]);
 
   // Start timer interval
@@ -96,10 +90,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
     if (minutes < 60) return `${minutes}m`;
     return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
   }, [otherWorkParsed]);
-
-  // Determine if activity is overdue (more than 4 hours)
-  const isOverdue = elapsedHours >= 4;
-  const warningColor = isOverdue ? '#FF6B6B' : selectedActivityColor;
 
   // Get status text and color
   const statusConfig = {
@@ -130,7 +120,9 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
         </View>
 
         <View style={styles.timerSection}>
-          <AppText style={[styles.timerText, { color: warningColor }]}>{elapsedFormatted}</AppText>
+          <AppText style={[styles.timerText, { color: selectedActivityColor }]}>
+            {elapsedFormatted}
+          </AppText>
           <AppText style={styles.startTimeText}>since {startTimeStr}</AppText>
         </View>
       </View>
@@ -203,20 +195,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
     );
   };
 
-  // Render warning for overdue activity
-  const renderOverdueWarning = () => {
-    if (!isOverdue) return null;
-
-    return (
-      <View style={styles.warningCard}>
-        <Ionicons name="alert-circle" size={18} color="#FF6B6B" />
-        <AppText style={styles.warningText}>
-          Activity exceeds 4 hours. Consider taking a break or ending this activity.
-        </AppText>
-      </View>
-    );
-  };
-
   return (
     <View style={styles.container}>
       {/* Main Activity Section */}
@@ -228,9 +206,6 @@ export const CurrentActivityCard: React.FC<CurrentActivityCardProps> = ({
         {renderOtherWorkInfo()}
         {/* {renderVanInfo()} */}
       </View>
-
-      {/* Warning Section */}
-      {renderOverdueWarning()}
     </View>
   );
 };

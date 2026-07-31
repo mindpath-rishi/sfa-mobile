@@ -5,6 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { CartItemWithDetails } from '../../types/product.types';
 import { AppText } from '@/core/components';
+import { useCartStore } from '@/core/store/cart.store';
+import { getSchemePreviewFromRecords, type SchemeRecord } from '@/shared/services/scheme.service';
 import { useProductUnitSelectorStyles } from '../../styles/ProductUnitSelector.styles';
 
 interface Props {
@@ -22,6 +24,7 @@ export const ProductUnitSelector: React.FC<Props> = ({
 }) => {
   const { colors } = useTheme();
   const styles = useProductUnitSelectorStyles();
+  const schemeBenefit = useCartStore((state) => state.schemeDiscounts[product.productId]);
 
   const UNITS_PER_CASE = product.unitQtyInCase || 1;
   const casePrice = product.casePrice || 0;
@@ -36,6 +39,29 @@ export const ProductUnitSelector: React.FC<Props> = ({
 
   const totalUnits = caseQuantity * UNITS_PER_CASE + unitQuantity;
   const totalValue = caseQuantity * casePrice + unitQuantity * piecePrice;
+  const schemeDiscount =
+    mode === 'sales' ? Math.min(schemeBenefit?.discountAmount ?? 0, totalValue) : 0;
+  const discountedTotal = Math.max(0, totalValue - schemeDiscount);
+  const schemePreview =
+    mode === 'sales'
+      ? getSchemePreviewFromRecords(
+          (product.applicableSchemes ?? []) as SchemeRecord[],
+          casePrice,
+          piecePrice,
+        )
+      : null;
+  const previewGrossValue =
+    Math.max(schemePreview?.minimumQuantity ?? 0, 1) * Math.max(piecePrice, 0);
+  const previewDiscountRatio =
+    previewGrossValue > 0
+      ? Math.min(Math.max((schemePreview?.discountAmount ?? 0) / previewGrossValue, 0), 1)
+      : 0;
+  const appliedDiscountRatio =
+    totalValue > 0 ? Math.min(Math.max(schemeDiscount / totalValue, 0), 1) : 0;
+  const unitPriceDiscountRatio = appliedDiscountRatio || previewDiscountRatio;
+  const hasDiscountedUnitPrice = mode === 'sales' && unitPriceDiscountRatio > 0;
+  const discountedCasePrice = Math.max(0, casePrice * (1 - unitPriceDiscountRatio));
+  const discountedPiecePrice = Math.max(0, piecePrice * (1 - unitPriceDiscountRatio));
 
   // Stock limits only apply to sales mode
   const isMaxStock = !isUnlimitedMode && totalUnits >= availableStock;
@@ -96,6 +122,8 @@ export const ProductUnitSelector: React.FC<Props> = ({
 
   const formatCurrency = (amount: number) =>
     `K${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  const formatUnitCurrency = (amount: number) =>
+    `K${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   const availableCases = Math.floor(availableStock / UNITS_PER_CASE);
   const remainingPieces = availableStock % UNITS_PER_CASE;
@@ -139,9 +167,21 @@ export const ProductUnitSelector: React.FC<Props> = ({
         <View style={[styles.section, { backgroundColor: colors.background }]}>
           <View style={styles.sectionHeader}>
             <AppText style={[styles.sectionTitle, { color: colors.textPrimary }]}>Cases</AppText>
-            <AppText style={[styles.sectionPrice, { color: colors.primary }]}>
-              {formatCurrency(casePrice)}
-            </AppText>
+            <View style={styles.sectionPriceStack}>
+              {hasDiscountedUnitPrice && (
+                <AppText style={[styles.originalSectionPrice, { color: colors.textTertiary }]}>
+                  {formatUnitCurrency(casePrice)}
+                </AppText>
+              )}
+              <AppText
+                style={[
+                  styles.sectionPrice,
+                  { color: hasDiscountedUnitPrice ? colors.success : colors.primary },
+                ]}
+              >
+                {formatUnitCurrency(hasDiscountedUnitPrice ? discountedCasePrice : casePrice)}
+              </AppText>
+            </View>
           </View>
           <View style={styles.quantityControls}>
             <TouchableOpacity
@@ -192,9 +232,21 @@ export const ProductUnitSelector: React.FC<Props> = ({
         <View style={[styles.section, { backgroundColor: colors.background }]}>
           <View style={styles.sectionHeader}>
             <AppText style={[styles.sectionTitle, { color: colors.textPrimary }]}>Pieces</AppText>
-            <AppText style={[styles.sectionPrice, { color: colors.warning }]}>
-              {formatCurrency(piecePrice)}
-            </AppText>
+            <View style={styles.sectionPriceStack}>
+              {hasDiscountedUnitPrice && (
+                <AppText style={[styles.originalSectionPrice, { color: colors.textTertiary }]}>
+                  {formatUnitCurrency(piecePrice)}
+                </AppText>
+              )}
+              <AppText
+                style={[
+                  styles.sectionPrice,
+                  { color: hasDiscountedUnitPrice ? colors.success : colors.warning },
+                ]}
+              >
+                {formatUnitCurrency(hasDiscountedUnitPrice ? discountedPiecePrice : piecePrice)}
+              </AppText>
+            </View>
           </View>
           <View style={styles.quantityControls}>
             <TouchableOpacity
@@ -267,10 +319,29 @@ export const ProductUnitSelector: React.FC<Props> = ({
           )}
         </View>
         <View style={styles.totalValueContainer}>
-          <AppText style={[styles.totalLabel, { color: colors.textSecondary }]}>Total:</AppText>
-          <AppText style={[styles.totalValue, { color: colors.primary }]}>
-            {formatCurrency(totalValue)}
+          <AppText style={[styles.totalLabel, { color: colors.textSecondary }]}>
+            {schemeDiscount > 0 ? 'Discounted:' : 'Total:'}
           </AppText>
+          <View style={styles.totalPriceStack}>
+            {schemeDiscount > 0 && (
+              <AppText style={[styles.originalTotalValue, { color: colors.textTertiary }]}>
+                {formatCurrency(totalValue)}
+              </AppText>
+            )}
+            <AppText
+              style={[
+                styles.totalValue,
+                { color: schemeDiscount > 0 ? colors.success : colors.primary },
+              ]}
+            >
+              {formatCurrency(discountedTotal)}
+            </AppText>
+            {schemeDiscount > 0 && (
+              <AppText style={[styles.discountSavings, { color: colors.success }]}>
+                Save {formatCurrency(schemeDiscount)}
+              </AppText>
+            )}
+          </View>
         </View>
       </View>
     </View>

@@ -68,7 +68,7 @@ const findUser = (id?: string | string[], users: TargetUser[] = []) => {
 const METRIC_OPTIONS: { value: TargetMetric; label: string; unit: string }[] = [
   { value: 'cases', label: 'Cases', unit: 'Cases' },
   { value: 'value', label: 'Value', unit: 'Value' },
-  { value: 'tonnage', label: 'Tonnage', unit: 'Tonnage' },
+  { value: 'tonnage', label: 'KG', unit: 'KG' },
 ];
 
 const TARGET_VIEWS: { value: TargetView; label: string }[] = [
@@ -299,7 +299,7 @@ function TargetUserCard({
                 ? 'Unique Billed Outlets'
                 : view === 'focused-pack'
                   ? 'Focused Pack'
-                  : user.designation || 'User'}
+                  : user.position || 'User'}
             </AppText>
           </View>
         </View>
@@ -742,7 +742,7 @@ export default function ManagerTargetsScreen() {
                   view={activeView}
                   onCardPress={() => (activeView === 'ubo' ? () => {} : openTargetBreakdown(user))}
                 />
-              </View> 
+              </View>
             ))
           ) : (
             <View style={styles.fullWidthRow}>

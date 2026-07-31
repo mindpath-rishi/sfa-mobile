@@ -55,7 +55,7 @@ import { DayEndSummaryModal } from '../components/models/DayEndSummaryModal';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { DayEndConfirmationModal } from '@/shared/components/models/DayEndConfirmationModal';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { leaveService } from '@/features/leave/services/leave.service';
@@ -66,6 +66,7 @@ import {
   startSalesmanBackgroundLocation,
   stopSalesmanBackgroundLocation,
 } from '@/shared/services/location.service';
+import { validateSelfieFace } from '@/shared/services/face-detection.service';
 import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
 type SettlementTopupAlert = {
@@ -130,7 +131,8 @@ export default function SalesExecutiveScreen() {
 
   const cameraRef = useRef<any>(null);
   const dayStartWithVanChangeRef = useRef(false);
-  const handledApprovedVanChangeSessionRef = useRef<string | null>(null);
+  const handledApprovedVanChangeRequestRef = useRef<string | null>(null);
+  const completedApprovedVanChangeRequestRef = useRef<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [filteredOtherWorkOptions, setFilteredOtherWorkOptions] =
     useState<OtherWorkOption[]>(OTHER_WORK_OPTIONS);
@@ -143,6 +145,7 @@ export default function SalesExecutiveScreen() {
   const currency = 'K';
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
   const [settlementTopupAlerts, setSettlementTopupAlerts] = useState<SettlementTopupAlert[]>([]);
+  const [pendingStockUnloadRequest, setPendingStockUnloadRequest] = useState<any>(null);
   const [finalConfirmation, setFinalConfirmation] = useState(false);
   const { setHeader } = useHeader();
   const user = useAuthStore((state) => state.user);
@@ -174,12 +177,17 @@ export default function SalesExecutiveScreen() {
     return base.filter((o) => o.name !== currentActivity);
   }, [currentActivity, filteredOtherWorkOptions, isChangingActivity]);
 
-  const greeting = (() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  })();
+  const currentHour = new Date().getHours();
+  const greeting =
+    currentHour < 12 ? 'Good morning' : currentHour < 17 ? 'Good afternoon' : 'Good evening';
+  const greetingIcon: React.ComponentProps<typeof Ionicons>['name'] =
+    currentHour < 12 ? 'sunny-outline' : currentHour < 17 ? 'partly-sunny-outline' : 'moon-outline';
+  const salespersonName = user?.name || user?.employeeName || 'Sales Executive';
+  const greetingMessage = !dayStarted
+    ? 'Ready to start your day?'
+    : currentActivity
+      ? `Currently working on ${currentActivity}`
+      : 'Your workday is in progress';
 
   // Format van display info
   const vanDisplayInfo = useMemo(() => {
@@ -199,18 +207,21 @@ export default function SalesExecutiveScreen() {
     if (showSkeleton) setDashboardLoading(true);
 
     try {
-      await Promise.all([getDayStatus(), getVan()]);
+      await Promise.all([getDayStatus(), getVan(), getPendingStockUnloadRequest()]);
     } finally {
       setDashboardLoading(false);
       setDashboardReloadKey((value) => value + 1);
     }
   }, []);
 
-  useEffect(() => {
-    void loadDashboard(true);
-  }, [loadDashboard]);
+  const isFirstDashboardRefreshTick = useRef(true);
 
   useEffect(() => {
+    if (isFirstDashboardRefreshTick.current) {
+      isFirstDashboardRefreshTick.current = false;
+      return;
+    }
+
     setDayStarted(false);
     setCurrentActivity(null);
     setStartTime(null);
@@ -221,7 +232,7 @@ export default function SalesExecutiveScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      void loadDashboard();
+      void loadDashboard(true);
     }, [loadDashboard]),
   );
 
@@ -324,7 +335,7 @@ export default function SalesExecutiveScreen() {
 
   const fetchAvailableVans = async () => {
     try {
-      const response: any = await homeService.getVans({ limit: 50, page: 1 });
+      const response: any = await homeService.getVanChangeOptions();
 
       if (response?.statusCode === 200) {
         const data = response?.data || [];
@@ -404,12 +415,13 @@ export default function SalesExecutiveScreen() {
   };
 
   const openApprovedVanRouteSelection = async () => {
-    await getRoutes();
     setSelectedActivity('Retailing');
     setPendingActivity(ACTIVITY_TYPES.find((activity) => activity.name === 'Retailing') || null);
     setIsChangingActivity(true);
+    setRoutes([]);
     setUnifiedModalType('route-selection');
     setUnifiedModalVisible(true);
+    await getRoutes();
   };
 
   const handleChangeActivity = async (activity: ActivityType) => {
@@ -450,6 +462,8 @@ export default function SalesExecutiveScreen() {
 
   const handleChangeRouteSelect = (route: Route) => {
     setSelectedRoute(route);
+    completedApprovedVanChangeRequestRef.current = handledApprovedVanChangeRequestRef.current;
+    setVanChangeApprovedRoutePrompt(false);
     setUnifiedModalVisible(false);
     setLoadSummaryVisible(true);
   };
@@ -528,11 +542,29 @@ export default function SalesExecutiveScreen() {
     setCameraVisible(true);
   };
 
-  const handleCaptureImage = async (photo: any) => {
+  const handleCaptureImage = async (photo: any): Promise<boolean | string> => {
     if (photo && photo.uri) {
+      const faceValidation = await validateSelfieFace(photo.uri);
+
+      if (!faceValidation.valid) {
+        let message: string;
+        if (faceValidation.reason === 'no-face') {
+          message = 'No face detected. Please keep your face clearly visible and retake.';
+        } else if (faceValidation.reason === 'multiple-faces') {
+          message = 'Multiple faces detected. Only one person should be visible.';
+        } else if (faceValidation.reason === 'module-missing') {
+          message =
+            'Face verification isn’t available in this app build. Please use the installed app build, not Expo Go.';
+        } else {
+          message = 'Unable to verify your face. Please retake the selfie.';
+        }
+        toast.error(message);
+        return message;
+      }
+
       setUserPhoto(photo.uri);
       setCameraVisible(false);
-      if (isChangingActivity) return;
+      if (isChangingActivity) return true;
 
       if (dayStartWithVanChangeRef.current) {
         dayStartWithVanChangeRef.current = false;
@@ -541,7 +573,7 @@ export default function SalesExecutiveScreen() {
           forceVanChangePending: true,
           photoUri: photo.uri,
         });
-        return;
+        return true;
       }
 
       if (selectedRoute) {
@@ -549,9 +581,11 @@ export default function SalesExecutiveScreen() {
       } else {
         handleStartDay({ photoUri: photo.uri });
       }
+      return true;
     } else {
       console.error('No photo captured');
       toast.error('Failed to capture photo');
+      return 'Failed to capture photo. Please try again.';
     }
   };
 
@@ -712,6 +746,9 @@ export default function SalesExecutiveScreen() {
 
         if (!isVanChangePending) {
           toast.success('Your day successfully started.');
+          if (selectedActivity === 'Retailing' && selectedRoute) {
+            router.push('/route');
+          }
         }
       } else {
         setVanChangeRequestPending(false);
@@ -780,7 +817,10 @@ export default function SalesExecutiveScreen() {
         setCurrentActivity(activityName);
         setStartTime(new Date().toISOString());
         toast.success(`Activity changed to ${activityName}`);
-        void getDayStatus();
+        await getDayStatus();
+        if (activityName === 'Retailing' && activityRoute) {
+          router.push('/route');
+        }
       }
     } catch (error) {
       console.error('Error changing activity:', error);
@@ -902,7 +942,11 @@ export default function SalesExecutiveScreen() {
 
       if (response.success) {
         await stopSalesmanBackgroundLocation();
-        toast.success('Your day successfully completed');
+        toast.success(
+          carryForwardStock
+            ? 'Your day successfully completed'
+            : 'Day completed. Stock unload request submitted for approval.',
+        );
         setDayStarted(false);
         setWorkSessionId('');
         setCurrentActivity(null);
@@ -915,7 +959,9 @@ export default function SalesExecutiveScreen() {
         setSelectedActivityColor('#4158D0');
         setSelectedActivityIcon('storefront');
         useRouteStore.getState().setSelectedRoute(null);
-        await getDayStatus();
+        await Promise.all([getDayStatus(), getPendingStockUnloadRequest()]);
+      } else {
+        toast.error(response.message || 'Failed to complete day');
       }
     } catch (error) {
       console.error('Error completing day:', error);
@@ -1016,21 +1062,28 @@ export default function SalesExecutiveScreen() {
             : '',
         );
 
-        const hasStartedRetailing =
-          data?.vanChangeActionTaken ?? data?.activeActivity?.name?.includes('Retailing');
+        const hasStartedRetailingWithApprovedVan =
+          data?.vanChangeActionTaken ??
+          (data?.activeActivity?.name?.includes('Retailing') &&
+            String(data?.activeActivity?.vanId || '') === String(data?.requestedVanId || ''));
+        const hasSelectedRouteForApprovedVan =
+          Boolean(data?.selectedRoute) &&
+          String(data?.selectedRoute?.vanId || '') === String(data?.requestedVanId || '');
+        const approvedRequestKey =
+          data.vanChangeRequestId || `${data.workSessionId}:${data.requestedVanId || data.vanId}`;
+        const routeSelectionHandledLocally =
+          completedApprovedVanChangeRequestRef.current === approvedRequestKey;
         const shouldPromptApprovedVanRoute =
-          data?.vanChangeRequiresAction ??
-          (data?.vanChangeStatus === 'APPROVED' && !hasStartedRetailing);
+          !hasSelectedRouteForApprovedVan &&
+          !routeSelectionHandledLocally &&
+          (data?.vanChangeRequiresAction ??
+            (data?.vanChangeStatus === 'APPROVED' && !hasStartedRetailingWithApprovedVan));
 
         if (!shouldPromptApprovedVanRoute) {
           setVanChangeApprovedRoutePrompt(false);
         }
 
-        if (
-          shouldPromptApprovedVanRoute &&
-          handledApprovedVanChangeSessionRef.current !== data.workSessionId
-        ) {
-          handledApprovedVanChangeSessionRef.current = data.workSessionId;
+        if (shouldPromptApprovedVanRoute) {
           setVanChangePendingBanner(false);
           setVanChangeRequestPending(false);
           setPendingVanChangeName('');
@@ -1041,8 +1094,12 @@ export default function SalesExecutiveScreen() {
             name: data.vanName || data.requestedVanName || mappedVan?.name,
           });
           await getVan();
-          await openApprovedVanRouteSelection();
-          toast.success('Van change approved. Please select a route.');
+
+          if (handledApprovedVanChangeRequestRef.current !== approvedRequestKey) {
+            handledApprovedVanChangeRequestRef.current = approvedRequestKey;
+            await openApprovedVanRouteSelection();
+            toast.success('Van change approved. Please select a route.');
+          }
         }
       } else {
         void stopSalesmanBackgroundLocation();
@@ -1077,6 +1134,15 @@ export default function SalesExecutiveScreen() {
                 firstRouteAssignment?.capacity ||
                 (van as any)?.capacity ||
                 '',
+              provinceId:
+                response.data.provinceId ||
+                firstRouteAssignment?.provinceId ||
+                (van as any)?.provinceId,
+              categoryIds:
+                response.data.categoryIds ||
+                firstRouteAssignment?.categoryIds ||
+                (van as any)?.categoryIds ||
+                [],
             }
           : null;
         if (mappedRouteVan?.vanId) {
@@ -1141,6 +1207,17 @@ export default function SalesExecutiveScreen() {
       }
     } catch (error) {
       console.error('Error fetching van:', error);
+    }
+  };
+
+  const getPendingStockUnloadRequest = async () => {
+    try {
+      const response = await homeService.getPendingStockUnloadRequest();
+      if (response.statusCode === 200) {
+        setPendingStockUnloadRequest(response.data || null);
+      }
+    } catch (error) {
+      console.error('Error fetching pending stock unload request:', error);
     }
   };
 
@@ -1309,15 +1386,45 @@ export default function SalesExecutiveScreen() {
           ) : (
             <>
               {/* Header Row with Greeting and Badge */}
-              <View style={styles.heroHeaderRow}>
-                <View style={styles.heroTextBlock}>
-                  <AppText style={styles.heroEyebrow}>{greeting}</AppText>
+              <LinearGradient
+                colors={[colors.surface, colors.primary + '0A']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  styles.heroHeaderRow,
+                  {
+                    borderColor: colors.primary + '18',
+                    shadowColor: colors.shadow,
+                  },
+                ]}
+              >
+                <View style={styles.heroGreetingBlock}>
+                  <View
+                    style={[
+                      styles.greetingIconContainer,
+                      { backgroundColor: colors.primary + '12' },
+                    ]}
+                  >
+                    <Ionicons name={greetingIcon} size={22} color={colors.primary} />
+                  </View>
+                  <View style={styles.heroTextBlock}>
+                    <AppText style={styles.heroEyebrow}>{greeting}</AppText>
+                    <AppText style={styles.heroTitle} numberOfLines={1}>
+                      {salespersonName}
+                    </AppText>
+                    <AppText style={styles.heroSubtitle} numberOfLines={1}>
+                      {greetingMessage}
+                    </AppText>
+                  </View>
                 </View>
 
                 <View
                   style={[
                     styles.heroBadge,
-                    { backgroundColor: colors.surface, borderColor: colors.border },
+                    {
+                      backgroundColor: dayStarted ? colors.success + '10' : colors.warning + '10',
+                      borderColor: dayStarted ? colors.success + '30' : colors.warning + '30',
+                    },
                   ]}
                 >
                   <Ionicons
@@ -1334,7 +1441,7 @@ export default function SalesExecutiveScreen() {
                     {dayStarted ? 'On Duty' : 'Idle'}
                   </AppText>
                 </View>
-              </View>
+              </LinearGradient>
 
               {/* Full Width Van Info Card - Moved outside heroTextBlock */}
               <View style={styles.vanInfoCard}>
@@ -1358,20 +1465,6 @@ export default function SalesExecutiveScreen() {
                     <AppText style={styles.vanInfoName} numberOfLines={1}>
                       {vanDisplayInfo?.combinedLabel || 'No van assigned'}
                     </AppText>
-                    {vanChangeApprovedRoutePrompt && (
-                      <TouchableOpacity
-                        activeOpacity={0.75}
-                        style={[
-                          styles.selectRouteButton,
-                          { backgroundColor: colors.primary + '12' },
-                        ]}
-                        onPress={openApprovedVanRouteSelection}
-                      >
-                        <AppText style={[styles.selectRouteButtonText, { color: colors.primary }]}>
-                          Select Route
-                        </AppText>
-                      </TouchableOpacity>
-                    )}
                   </View>
                   {van?.registrationNumber && (
                     <View style={styles.vanRegistrationRow}>
@@ -1384,11 +1477,55 @@ export default function SalesExecutiveScreen() {
                   {van?.capacity && (
                     <View style={styles.vanCapacityRow}>
                       <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
-                      <AppText style={styles.vanCapacityText}>Capacity: {van.capacity} kg</AppText>
+                      <AppText style={styles.vanCapacityText}>
+                        Capacity: {van.capacity} Cases
+                      </AppText>
                     </View>
                   )}
                 </View>
               </View>
+
+              {vanChangeApprovedRoutePrompt && (
+                <View
+                  style={[
+                    styles.approvedVanBanner,
+                    {
+                      backgroundColor: colors.success + '0D',
+                      borderColor: colors.success + '35',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[styles.approvedVanIcon, { backgroundColor: colors.success + '18' }]}
+                  >
+                    <MaterialCommunityIcons
+                      name="truck-check-outline"
+                      size={22}
+                      color={colors.success}
+                    />
+                  </View>
+                  <View style={styles.approvedVanContent}>
+                    <AppText style={[styles.approvedVanTitle, { color: colors.textPrimary }]}>
+                      Van change approved
+                    </AppText>
+                    <AppText style={[styles.approvedVanSubtitle, { color: colors.textSecondary }]}>
+                      Select a route to continue retailing with the new van.
+                    </AppText>
+                  </View>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={[styles.approvedVanAction, { backgroundColor: colors.success }]}
+                    onPress={() => void openApprovedVanRouteSelection()}
+                  >
+                    <AppText
+                      style={[styles.approvedVanActionText, { color: colors.primaryContrast }]}
+                    >
+                      Select Route
+                    </AppText>
+                    <Ionicons name="arrow-forward" size={15} color={colors.primaryContrast} />
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {vanChangePendingBanner && (
                 <View
@@ -1423,6 +1560,49 @@ export default function SalesExecutiveScreen() {
                     </AppText>
                   </TouchableOpacity>
                 </View>
+              )}
+
+              {!!pendingStockUnloadRequest && (
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    router.push(
+                      `/stock-unload-detail?unloadRequestId=${encodeURIComponent(
+                        String(pendingStockUnloadRequest.unloadRequestId),
+                      )}` as never,
+                    )
+                  }
+                  style={[
+                    styles.stockUnloadPendingBanner,
+                    {
+                      backgroundColor: colors.warning + '0D',
+                      borderColor: colors.warning + '40',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.stockUnloadPendingIcon,
+                      { backgroundColor: colors.warning + '18' },
+                    ]}
+                  >
+                    <Ionicons name="time-outline" size={22} color={colors.warning} />
+                  </View>
+                  <View style={styles.pendingBannerContent}>
+                    <AppText
+                      style={[styles.stockUnloadPendingTitle, { color: colors.textPrimary }]}
+                    >
+                      Stock unload request pending
+                    </AppText>
+                    <AppText
+                      style={[styles.stockUnloadPendingMessage, { color: colors.textSecondary }]}
+                    >
+                      If your request is approved before 12:00 AM tonight, your stock will be reset.
+                      Otherwise, it will be carried forward to the next day.
+                    </AppText>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.warning} />
+                </TouchableOpacity>
               )}
 
               <View style={styles.dashboardContent}>
@@ -1468,11 +1648,11 @@ export default function SalesExecutiveScreen() {
                 )}
 
                 <StatsOverviewSection
-                  key={dashboardReloadKey}
                   employeeId={user?.userId as any}
                   routeCustomerCount={
                     selectedRoute?.totalShops || Number((selectedRoute as any)?.stops || 0)
                   }
+                  refreshSignal={dashboardReloadKey}
                 />
 
                 <TodayActivitiesSection activities={todayActivities} />
@@ -1541,9 +1721,12 @@ export default function SalesExecutiveScreen() {
         cameraRef={cameraRef}
         onClose={handleCancelCamera}
         onCapture={handleCaptureImage}
+        closeOnCapture={false}
         onError={(error) => console.error('Camera error:', error)}
-        title="Take a Selfie to Start"
+        title="Center your face and take a selfie"
         allowCameraSwitch={false}
+        showFaceGuide={true}
+        showPreview={true}
         cameraProps={{
           facing: 'front',
           quality: 0.8,
@@ -1603,25 +1786,55 @@ const createStyles = (colors: any) =>
     },
     heroHeaderRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
-      marginBottom: 16,
+      marginBottom: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      borderRadius: 16,
+      borderWidth: 1,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.07,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    heroGreetingBlock: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 11,
+    },
+    greetingIconContainer: {
+      width: 46,
+      height: 46,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     heroTextBlock: {
       flex: 1,
+      minWidth: 0,
     },
     heroEyebrow: {
-      fontSize: 14,
-      fontWeight: '400',
+      fontSize: 11,
+      fontWeight: '600',
       color: colors.textSecondary,
-      marginBottom: 4,
+      letterSpacing: 0.2,
+      marginBottom: 1,
     },
     heroTitle: {
-      fontSize: 24,
-      fontWeight: '700',
+      fontSize: 19,
+      lineHeight: 23,
+      fontWeight: '800',
       color: colors.textPrimary,
-      marginBottom: 0,
+    },
+    heroSubtitle: {
+      marginTop: 2,
+      fontSize: 11,
+      lineHeight: 15,
+      color: colors.textTertiary,
     },
     // Full Width Van Info Card Styles
     vanInfoCard: {
@@ -1685,14 +1898,46 @@ const createStyles = (colors: any) =>
       gap: 10,
       marginBottom: 4,
     },
-    selectRouteButton: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 8,
+    approvedVanBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 12,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderRadius: 14,
     },
-    selectRouteButtonText: {
-      fontSize: 12,
-      fontWeight: '700',
+    approvedVanIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    approvedVanContent: {
+      flex: 1,
+      minWidth: 0,
+    },
+    approvedVanTitle: {
+      fontSize: 13,
+      fontWeight: '800',
+      marginBottom: 2,
+    },
+    approvedVanSubtitle: {
+      fontSize: 11,
+      lineHeight: 15,
+    },
+    approvedVanAction: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 11,
+      paddingVertical: 9,
+      borderRadius: 10,
+    },
+    approvedVanActionText: {
+      fontSize: 11,
+      fontWeight: '800',
     },
     vanRegistrationRow: {
       flexDirection: 'row',
@@ -1721,13 +1966,13 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       gap: 6,
       paddingHorizontal: 10,
-      paddingVertical: 6,
+      paddingVertical: 7,
       borderRadius: 20,
       borderWidth: 1,
     },
     heroBadgeText: {
       fontSize: 11,
-      fontWeight: '600',
+      fontWeight: '700',
     },
     pendingBanner: {
       flexDirection: 'row',
@@ -1741,6 +1986,32 @@ const createStyles = (colors: any) =>
     },
     pendingBannerContent: {
       flex: 1,
+    },
+    stockUnloadPendingBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      borderRadius: 14,
+      borderWidth: 1,
+      marginBottom: 16,
+    },
+    stockUnloadPendingIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stockUnloadPendingTitle: {
+      fontSize: 15,
+      fontWeight: '800',
+      marginBottom: 4,
+    },
+    stockUnloadPendingMessage: {
+      fontSize: 13,
+      lineHeight: 19,
     },
     pendingBannerTitle: {
       fontSize: 16,

@@ -174,7 +174,7 @@ const buildProfileData = (authUser: any) => {
       getProfileValue(authUser?.mobile, authUser?.phone, authUser?.phoneNumber) ||
       DEFAULT_PROFILE_DATA.phone,
     avatar,
-    role: humanizeRole(getProfileValue(authUser?.role, authUser?.roleId, authUser?.designation)),
+    role: humanizeRole(getProfileValue(authUser?.role, authUser?.roleId, authUser?.position)),
     territory: routeOrTerritory || DEFAULT_PROFILE_DATA.territory,
     manager:
       getProfileValue(

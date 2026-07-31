@@ -43,6 +43,32 @@ export const notificationService = {
       ApiResponse<any>
     >,
 
+  approveRouteChange: (routeChangeRequestId: string) =>
+    api.patch<any>(`/route-change-request/${routeChangeRequestId}/approve`, {}) as Promise<
+      ApiResponse<any>
+    >,
+
+  rejectRouteChange: (routeChangeRequestId: string) =>
+    api.patch<any>(`/route-change-request/${routeChangeRequestId}/reject`, {}) as Promise<
+      ApiResponse<any>
+    >,
+
+  approveStockUnload: (unloadRequestId: string) =>
+    api.patch<any>(`/stock-unload-request/${unloadRequestId}/approve`, {}) as Promise<
+      ApiResponse<any>
+    >,
+
+  rejectStockUnload: (unloadRequestId: string) =>
+    api.patch<any>(`/stock-unload-request/${unloadRequestId}/reject`, {}) as Promise<
+      ApiResponse<any>
+    >,
+
+  getStockUnloadDetail: (unloadRequestId: string) =>
+    api.get<any>(`/stock-unload-request/${unloadRequestId}`, {
+      cache: false,
+      showLoader: false,
+    }) as Promise<ApiResponse<any>>,
+
   acceptTopup: (topupId: string) =>
     api.patch<any>(`/van-inventory-topup/${topupId}/accept`, {}) as Promise<ApiResponse<any>>,
 

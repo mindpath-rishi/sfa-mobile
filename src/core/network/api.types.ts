@@ -10,6 +10,8 @@ export type ApiRequestConfig = {
   cache?: boolean;
   /** Optional per-request timeout override in milliseconds. */
   timeoutMs?: number;
+  /** Abort a delayed request if another user signs in before it is sent. */
+  expectedUserId?: string;
 };
 
 export type ApiResponse<T> = {

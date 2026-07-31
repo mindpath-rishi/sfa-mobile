@@ -90,6 +90,7 @@ export const ENTITY_TABLES = {
   salesmen: 'salesmen',
   stock: 'stock',
   promotions: 'promotions',
+  schemes: 'schemes',
   orders: 'orders',
   orderItems: 'order_items',
   collections: 'collections',
@@ -136,6 +137,7 @@ export const MASTER_ENTITIES: EntityName[] = [
   'salesmen',
   'stock',
   'promotions',
+  'schemes',
   'targets',
   'vanDailyStock',
 

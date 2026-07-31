@@ -1716,6 +1716,16 @@ const normalizeFilterText = (value: unknown) =>
     .trim()
     .toLowerCase();
 
+const hasNoOrderInLast30Days = (outlet: Outlet) => {
+  if (!outlet.lastOrderDate) return true;
+
+  const lastOrderTime = new Date(outlet.lastOrderDate).getTime();
+  if (Number.isNaN(lastOrderTime)) return true;
+
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+  return lastOrderTime < thirtyDaysAgo;
+};
+
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -1742,7 +1752,7 @@ if (Platform.OS !== 'web') {
 }
 
 // ============= QUICK FILTER TYPES =============
-type QuickFilterType = 'all' | 'visited' | 'not_visited' | 'no_order';
+type QuickFilterType = 'all' | 'visited' | 'not_visited' | 'no_order' | 'no_order_30d';
 
 type RouteAccessMessage = {
   icon: string;
@@ -2099,6 +2109,7 @@ export default function RouteScreen() {
       (o) => o.visitStatus === 'NOT_VISITED' || !o.visitStatus,
     ).length;
     const noOrderCount = outlets.filter((o) => !o.hasSale && o.visitStatus === 'COMPLETED').length;
+    const noOrder30DaysCount = outlets.filter(hasNoOrderInLast30Days).length;
 
     // Use API summary data for totals
     const totalOrderValue = routeSummary.totalOrderValue;
@@ -2111,6 +2122,7 @@ export default function RouteScreen() {
       activeCount,
       notVisitedCount,
       noOrderCount,
+      noOrder30DaysCount,
       productiveCalls,
       lpsc,
       totalOrderValue,
@@ -2284,6 +2296,9 @@ export default function RouteScreen() {
           filtered = filtered.filter(
             (outlet) => !outlet.hasSale && outlet.visitStatus === 'COMPLETED',
           );
+          break;
+        case 'no_order_30d':
+          filtered = filtered.filter(hasNoOrderInLast30Days);
           break;
       }
     }
@@ -2483,7 +2498,7 @@ export default function RouteScreen() {
       const activeActivityName = data?.activeActivity?.name || data?.currentActivity?.name || '';
       const normalizedActivityName = activeActivityName.trim().toLowerCase();
       const isDayActive = response?.statusCode === 200 && data?.status === 'ACTIVE';
-      const resolvedRoute = activeRoute ?? data?.selectedRoute ?? null;
+      const resolvedRoute = data?.selectedRoute ?? activeRoute ?? null;
 
       if (data?.workSessionId && data.status === 'ACTIVE') {
         setWorkSessionId(data.workSessionId);
@@ -2883,6 +2898,12 @@ export default function RouteScreen() {
         count: summaryStats.noOrderCount,
         icon: 'cash-outline',
       },
+      {
+        key: 'no_order_30d',
+        label: 'No Order 30d',
+        count: summaryStats.noOrder30DaysCount,
+        icon: 'calendar-outline',
+      },
       { key: 'all', label: 'All', count: summaryStats.totalOutlets, icon: 'apps' },
     ];
 
@@ -2940,6 +2961,7 @@ export default function RouteScreen() {
     summaryStats.visitedCount,
     summaryStats.notVisitedCount,
     summaryStats.noOrderCount,
+    summaryStats.noOrder30DaysCount,
     quickFilter,
     colors,
     styles,

@@ -32,6 +32,63 @@ export const useCameraModalStyles = () => {
       height: '100%',
     } as ViewStyle,
 
+    // Face guide overlay (circle/oval frame for selfies)
+    faceGuideContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 5,
+    } as ViewStyle,
+
+    // Darkened mask around the oval cut-out, built from 3 stacked rows
+    faceGuideMaskTop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: height / 2 - (width * 0.72 * 1.3) / 2,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    } as ViewStyle,
+
+    faceGuideMaskBottom: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: height / 2 - (width * 0.72 * 1.3) / 2,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    } as ViewStyle,
+
+    faceGuideMaskRow: {
+      flexDirection: 'row',
+      height: width * 0.72 * 1.3,
+    } as ViewStyle,
+
+    faceGuideMaskSide: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    } as ViewStyle,
+
+    faceGuideCutout: {
+      width: width * 0.72,
+      height: width * 0.72 * 1.3,
+      borderRadius: (width * 0.72) / 2,
+      backgroundColor: 'transparent',
+    } as ViewStyle,
+
+    faceGuideOval: {
+      position: 'absolute',
+      width: width * 0.72,
+      height: width * 0.72 * 1.3,
+      borderRadius: (width * 0.72) / 2,
+      borderWidth: 3,
+      borderColor: colors.primary,
+    } as ViewStyle,
+
     // Overlay for custom controls
     cameraOverlay: {
       position: 'absolute',
@@ -53,33 +110,83 @@ export const useCameraModalStyles = () => {
       zIndex: 10,
     } as ViewStyle,
 
+    // Round glass (blurred) icon button used for close / flip
+    roundGlassButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+    } as ViewStyle,
+
     // Bottom controls container
     bottomControls: {
       alignItems: 'center',
       marginBottom: utils.spacing[4],
     } as ViewStyle,
 
-    // Camera instruction text
+    // Camera instruction pill
     cameraInstruction: {
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: utils.spacing[4],
     } as ViewStyle,
 
+    instructionPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: utils.spacing[5],
+      paddingVertical: utils.spacing[2],
+      borderRadius: 999,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+    } as ViewStyle,
+
+    instructionIcon: {
+      marginRight: utils.spacing[2],
+    } as ViewStyle,
+
     instructionText: {
       color: 'white',
-      fontSize: utils.fontSize.xl,
+      fontSize: utils.fontSize.md,
       fontWeight: utils.getFontWeight('600'),
-      letterSpacing: 2,
-      textShadowColor: 'rgba(0,0,0,0.5)',
-      textShadowOffset: { width: 0, height: 2 },
-      textShadowRadius: 4,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      paddingHorizontal: utils.spacing[4],
-      paddingVertical: utils.spacing[2],
-      // borderRadius: utils.radius.lg,
-      overflow: 'hidden',
+      letterSpacing: 0.3,
     } as TextStyle,
+
+    errorPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: utils.spacing[5],
+      paddingVertical: utils.spacing[2],
+      borderRadius: 999,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,107,107,0.5)',
+      maxWidth: width * 0.85,
+    } as ViewStyle,
+
+    errorPillText: {
+      color: '#FF6B6B',
+      fontSize: utils.fontSize.sm,
+      fontWeight: utils.getFontWeight('600'),
+      flexShrink: 1,
+    } as TextStyle,
+
+    // Bottom gradient scrim behind the capture button
+    bottomScrim: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingTop: utils.spacing[16],
+      paddingBottom: utils.spacing[8],
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+    } as ViewStyle,
 
     // Capture button
     captureContainer: {
@@ -88,10 +195,10 @@ export const useCameraModalStyles = () => {
     } as ViewStyle,
 
     captureButton: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: 'rgba(255,255,255,0.3)',
+      width: 78,
+      height: 78,
+      borderRadius: 39,
+      backgroundColor: 'rgba(255,255,255,0.15)',
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 3,
@@ -99,12 +206,10 @@ export const useCameraModalStyles = () => {
     } as ViewStyle,
 
     captureButtonInner: {
-      width: 65,
-      height: 65,
-      borderRadius: 32.5,
+      width: 62,
+      height: 62,
+      borderRadius: 31,
       backgroundColor: 'white',
-      borderWidth: 2,
-      borderColor: colors.primary,
     } as ViewStyle,
 
     captureButtonDisabled: {
@@ -114,48 +219,6 @@ export const useCameraModalStyles = () => {
 
     captureButtonPressed: {
       transform: [{ scale: 0.92 }],
-    } as ViewStyle,
-
-    // Close button
-    closeButton: {
-      position: 'absolute',
-      top: Platform.OS === 'ios' ? utils.spacing[12] : utils.spacing[8],
-      left: utils.spacing[4],
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 10,
-    } as ViewStyle,
-
-    // Flip camera button
-    flipButton: {
-      position: 'absolute',
-      top: Platform.OS === 'ios' ? utils.spacing[12] : utils.spacing[8],
-      right: utils.spacing[4],
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 10,
-    } as ViewStyle,
-
-    // Flash button
-    flashButton: {
-      position: 'absolute',
-      top: Platform.OS === 'ios' ? utils.spacing[12] : utils.spacing[8],
-      right: utils.spacing[12],
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 10,
     } as ViewStyle,
 
     // Loading overlay
@@ -311,6 +374,86 @@ export const useCameraModalStyles = () => {
       backgroundColor: colors.primary,
       borderRadius: 2,
     } as ViewStyle,
+
+    // Photo preview (retake / use photo)
+    previewContainer: {
+      flex: 1,
+      backgroundColor: 'black',
+    } as ViewStyle,
+
+    previewImage: {
+      flex: 1,
+      width: '100%',
+      height: '100%',
+    } as ViewStyle,
+
+    previewHeader: {
+      position: 'absolute',
+      top: Platform.OS === 'ios' ? utils.spacing[12] : utils.spacing[8],
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      zIndex: 10,
+    } as ViewStyle,
+
+    previewHeaderPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: utils.spacing[5],
+      paddingVertical: utils.spacing[2],
+      borderRadius: 999,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.25)',
+    } as ViewStyle,
+
+    previewScrim: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingTop: utils.spacing[16],
+      paddingBottom: utils.spacing[10],
+      paddingHorizontal: utils.spacing[6],
+    } as ViewStyle,
+
+    previewActions: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: utils.spacing[4],
+    } as ViewStyle,
+
+    previewButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: utils.spacing[6],
+      paddingVertical: utils.spacing[3],
+      borderRadius: 30,
+      gap: utils.spacing[2],
+      minWidth: 140,
+    } as ViewStyle,
+
+    retakeButton: {
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.6)',
+    } as ViewStyle,
+
+    usePhotoButton: {
+      backgroundColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    } as ViewStyle,
+
+    previewButtonText: {
+      color: 'white',
+      fontSize: utils.fontSize.md,
+      fontWeight: utils.getFontWeight('600'),
+    } as TextStyle,
   }));
 
   return styleGenerator(colors);

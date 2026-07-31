@@ -93,9 +93,8 @@ const ESTIMATED_TIME_PER_OUTLET = 5;
 export default function Routes() {
   const { colors } = useTheme();
   const { setHeader } = useHeader();
-  const { selectedRoute, setSelectedRoute, van } = useRouteStore();
+  const { selectedRoute, van } = useRouteStore();
   const workSessionId = useAuthStore((state) => state.workSessionId);
-  const user = useAuthStore((state) => state.user);
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const params = useLocalSearchParams<{ route?: string }>();
@@ -426,64 +425,43 @@ export default function Routes() {
 
     setIsSubmitting(true);
     try {
-      const vanId =
-        selectedVanRoute.vanId || van?.vanId || selectedRoute?.vanId || user?.vanId || '';
-
-      if (!vanId) {
-        toast.error('Error', 'Van is required to change route');
-        setIsSubmitting(false);
-        return;
-      }
-
       const payload = {
         workSessionId: workSessionId || '',
         routeId: selectedVanRoute.routeId,
         routeName: selectedVanRoute.routeName,
         totalShops: selectedVanRoute.totalShops,
-        vanId,
-        vanName: selectedVanRoute.name || van?.name || van?.vanName || van?.vanNumber,
+        customerCategoryId: selectedVanRoute.customerCategoryId,
       };
 
-      const response: any = await outletService.changeRoute(payload);
+      const response: any = await outletService.requestRouteChange(payload);
 
-      if ([200, 201, 202].includes(Number(response.statusCode))) {
-        setSelectedRoute({
-          routeId: selectedVanRoute.routeId,
-          name: selectedVanRoute.routeName,
-          routeName: selectedVanRoute.routeName,
-          routeCode: selectedVanRoute.routeCode,
-          routeSessionId: response.data?.routeSessionId || selectedVanRoute.routeSessionId,
-          workSessionId: workSessionId || '',
-          totalShops: selectedVanRoute.totalShops,
-          distance: selectedVanRoute.distance || '',
-          vanId,
-          marketId: selectedVanRoute.marketId || selectedRoute?.marketId,
-          provinceId: selectedVanRoute.provinceId || selectedRoute?.provinceId,
-          countryId: selectedVanRoute.countryId || selectedRoute?.countryId,
-          customerCategoryId:
-            selectedVanRoute.customerCategoryId || selectedRoute?.customerCategoryId,
-        });
-
+      if (response?.success !== false && [200, 201, 202].includes(Number(response.statusCode))) {
         if (!isWeb) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
 
-        toast.success('Success', `Route changed to "${selectedVanRoute.routeName}"`);
+        toast.success(
+          'Request sent',
+          `Your manager will review the change to "${selectedVanRoute.routeName}"`,
+        );
         setTimeout(() => {
-          router.push('/route');
-        }, 500);
+          router.replace('/(drawer)/(tabs)/home');
+        }, 800);
       } else {
         if (!isWeb) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
-        toast.error('Error', response.message || 'Failed to change route');
+        toast.error('Error', response.message || 'Failed to request route change');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to change route:', error);
       if (!isWeb) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      toast.error('Error', 'Failed to change route. Please try again.');
+      toast.error(
+        'Error',
+        error?.response?.data?.message || 'Failed to request route change. Please try again.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -788,6 +766,12 @@ export default function Routes() {
             contentContainerStyle={[styles.scrollContainer, styles.reviewScrollContainer]}
           >
             <View style={styles.reviewSection}>
+              <View style={styles.approvalNotice}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.warning} />
+                <AppText style={styles.approvalNoticeText}>
+                  Your current route remains active until your manager approves this request.
+                </AppText>
+              </View>
               <View style={styles.routeChangeCard}>
                 <View style={styles.routeChangeRow}>
                   <View style={[styles.routeMarker, styles.currentRouteMarker]}>
@@ -905,7 +889,7 @@ export default function Routes() {
           activeOpacity={0.8}
         >
           <AppText style={styles.nextButtonText}>
-            {isLastStep ? (isSubmitting ? 'Submitting...' : 'Submit') : 'Next'}
+            {isLastStep ? (isSubmitting ? 'Sending...' : 'Request Change') : 'Next'}
           </AppText>
           <Ionicons
             name={isLastStep ? 'checkmark-outline' : 'arrow-forward-outline'}
@@ -1183,6 +1167,23 @@ const getStyles = (colors: any, insets: any) =>
     },
     reviewScrollContainer: {
       paddingTop: 16,
+    },
+    approvalNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.warning + '35',
+      backgroundColor: colors.warning + '0D',
+    },
+    approvalNoticeText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+      fontWeight: '600',
     },
     reviewSectionTitle: {
       color: colors.textSecondary,

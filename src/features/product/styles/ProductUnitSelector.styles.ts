@@ -33,7 +33,7 @@ export const useProductUnitSelectorStyles = () => {
 
     lowStockBadge: {
       paddingHorizontal: utils.spacing[1],
-      paddingVertical: utils.spacing[0.25],
+      paddingVertical: utils.spacing[0.5],
       borderRadius: utils.borderRadius.xs,
     } as ViewStyle,
 
@@ -86,6 +86,15 @@ export const useProductUnitSelectorStyles = () => {
     sectionPrice: {
       fontSize: utils.fontSize.xs,
       fontWeight: utils.getFontWeight('bold'),
+    } as TextStyle,
+
+    sectionPriceStack: {
+      alignItems: 'flex-end',
+    } as ViewStyle,
+
+    originalSectionPrice: {
+      fontSize: utils.fontSize.xs,
+      textDecorationLine: 'line-through',
     } as TextStyle,
 
     quantityControls: {
@@ -151,13 +160,27 @@ export const useProductUnitSelectorStyles = () => {
       gap: utils.spacing[1],
     } as ViewStyle,
 
+    totalPriceStack: {
+      alignItems: 'flex-end',
+    } as ViewStyle,
+
     totalLabel: {
       fontSize: utils.fontSize.xs,
+    } as TextStyle,
+
+    originalTotalValue: {
+      fontSize: utils.fontSize.xs,
+      textDecorationLine: 'line-through',
     } as TextStyle,
 
     totalValue: {
       fontWeight: utils.getFontWeight('bold'),
       fontSize: utils.fontSize.sm,
+    } as TextStyle,
+
+    discountSavings: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: utils.getFontWeight('semibold'),
     } as TextStyle,
   }));
 

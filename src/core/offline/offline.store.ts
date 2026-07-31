@@ -37,6 +37,7 @@ type OfflineState = {
 
   setDeviceServerUploadVisible: (visible: boolean, message?: string | null) => void;
   setDeviceServerUploadMessage: (message: string | null) => void;
+  resetUserSyncState: () => void;
 };
 
 export const useOfflineStore = create<OfflineState>((set) => ({
@@ -98,6 +99,23 @@ export const useOfflineStore = create<OfflineState>((set) => ({
   setDeviceServerUploadMessage: (message) =>
     set({
       deviceServerUploadMessage: message,
+    }),
+
+  /**
+   * Sync status is device memory, not user data. Clear it whenever sync is
+   * initialised for an authenticated user so an error/overlay from the
+   * previous account cannot be displayed for the new account.
+   */
+  resetUserSyncState: () =>
+    set({
+      pendingCount: 0,
+      isSyncing: false,
+      lastSyncTime: null,
+      lastError: null,
+      offlineEnabled: false,
+      offlineSetupInProgress: false,
+      deviceServerUploadVisible: false,
+      deviceServerUploadMessage: null,
     }),
 }));
 

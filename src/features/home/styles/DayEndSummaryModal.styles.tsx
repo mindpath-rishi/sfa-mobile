@@ -290,6 +290,150 @@ export const useDayEndSummaryModalStyles = () => {
       fontWeight: '800',
     } as TextStyle,
 
+    unacceptedStockBackdrop: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      zIndex: 100,
+      elevation: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+      backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    } as ViewStyle,
+
+    unacceptedStockCard: {
+      width: '100%',
+      maxWidth: 420,
+      padding: 20,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.warning + '45',
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    unacceptedStockEyebrow: {
+      alignSelf: 'center',
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      marginBottom: 12,
+      backgroundColor: colors.warning + '18',
+      color: colors.warning,
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1,
+    } as TextStyle,
+
+    unacceptedStockIcon: {
+      alignSelf: 'center',
+      width: 64,
+      height: 64,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+      backgroundColor: colors.warning + '16',
+    } as ViewStyle,
+
+    unacceptedStockTitle: {
+      color: colors.textPrimary,
+      fontSize: 20,
+      lineHeight: 25,
+      fontWeight: '900',
+      textAlign: 'center',
+      marginBottom: 8,
+    } as TextStyle,
+
+    unacceptedStockDescription: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: 'center',
+      marginBottom: 16,
+    } as TextStyle,
+
+    unacceptedStockMetrics: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 14,
+    } as ViewStyle,
+
+    unacceptedStockMetric: {
+      flex: 1,
+      alignItems: 'center',
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 4,
+      backgroundColor: colors.background,
+    } as ViewStyle,
+
+    unacceptedStockMetricValue: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '900',
+      marginBottom: 2,
+    } as TextStyle,
+
+    unacceptedStockMetricLabel: {
+      color: colors.textSecondary,
+      fontSize: 10,
+      fontWeight: '700',
+    } as TextStyle,
+
+    unacceptedStockNote: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      borderRadius: 12,
+      padding: 11,
+      marginBottom: 18,
+      backgroundColor: colors.warning + '10',
+    } as ViewStyle,
+
+    unacceptedStockNoteText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+    } as TextStyle,
+
+    unacceptedStockActions: {
+      gap: 9,
+    } as ViewStyle,
+
+    unacceptedStockReviewButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 46,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+    } as ViewStyle,
+
+    unacceptedStockReviewText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '800',
+    } as TextStyle,
+
+    unacceptedStockEndButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.error + '70',
+      backgroundColor: colors.error + '08',
+    } as ViewStyle,
+
+    unacceptedStockEndText: {
+      color: colors.error,
+      fontSize: 13,
+      fontWeight: '800',
+    } as TextStyle,
+
     // ============================
     // Tab Bar
     // ============================

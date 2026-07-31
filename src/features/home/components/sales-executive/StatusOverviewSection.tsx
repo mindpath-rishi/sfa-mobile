@@ -12,6 +12,8 @@ type Props = {
   employeeId: string;
   routeCustomerCount?: number;
   onRefresh?: () => void;
+  /** Bump this value to force a re-fetch of stats without remounting the component. */
+  refreshSignal?: number | string;
 };
 
 interface StatsData {
@@ -43,6 +45,7 @@ export const StatsOverviewSection: React.FC<Props> = ({
   employeeId,
   routeCustomerCount,
   onRefresh,
+  refreshSignal,
 }) => {
   const { colors } = useTheme();
   const styles = useStatsOverviewSectionStyles();
@@ -136,7 +139,8 @@ export const StatsOverviewSection: React.FC<Props> = ({
 
   useEffect(() => {
     fetchStats();
-  }, [fetchStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchStats, refreshSignal]);
 
   const handleRefresh = useCallback(async () => {
     await fetchStats(true);

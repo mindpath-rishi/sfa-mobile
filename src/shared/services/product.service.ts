@@ -4,6 +4,8 @@ import { isSalesman } from '@/core/navigation/role.utils';
 import { isOfflineMode } from '@/core/offline/offline.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
+import { getApplicableSchemeRecords } from '@/shared/services/scheme.service';
+import { getVanCategoryIds, useRouteStore } from '@/core/store/route.store';
 
 /* ================= TYPES ================= */
 
@@ -14,8 +16,14 @@ export interface FetchProductParams {
   categoryIds?: string;
   brandIds?: string;
   customerCategoryId?: string;
-  includeUnpricedProducts?: boolean;
+  includeUnpricedProducts?: boolean | string;
+  status?: 'ACTIVE' | 'INACTIVE';
+  inStockOnly?: boolean | string;
+  minPrice?: string;
   vanId?: string;
+  routeId?: string;
+  provinceId?: string;
+  includeSchemes?: boolean | string;
 }
 
 /* ================= SERVICE ================= */
@@ -51,9 +59,6 @@ export const productService: ProductService = {
       ...params,
       ...(customerCategoryId ? { customerCategoryId } : {}),
     };
-    // The online product endpoint does not accept vanId; it is used only to
-    // select the correct downloaded inventory row below.
-    delete requestParams.vanId;
     if (!customerCategoryId) delete requestParams.customerCategoryId;
     const user = useAuthStore.getState().user;
     if (!isSalesman(user) || !isOfflineMode()) {
@@ -92,13 +97,27 @@ export const productService: ProductService = {
     const categoryIds = new Set(params.categoryIds?.split(',').filter(Boolean) ?? []);
     const brandIds = new Set(params.brandIds?.split(',').filter(Boolean) ?? []);
     const query = params.searchText?.trim().toLocaleLowerCase();
+    const includeUnpricedProducts = String(params.includeUnpricedProducts) === 'true';
+    const requireStock = String(params.inStockOnly) === 'true';
+    const minimumPrice = Number(params.minPrice ?? 0);
+    const vanCategoryIds = new Set(getVanCategoryIds(useRouteStore.getState().van));
     const filteredProducts = allProducts.filter((product) => {
+      const price = priceByProduct.get(product.productId);
+      const inventory = inventoryForProduct(product.productId);
       if (
-        customerCategoryId &&
-        !params.includeUnpricedProducts &&
-        !priceByProduct.has(product.productId)
+        params.vanId &&
+        (!vanCategoryIds.size ||
+          (!vanCategoryIds.has(String(product.categoryId)) &&
+            !vanCategoryIds.has(String(product.parentCategoryId))))
       )
         return false;
+      if (params.status && product.status !== params.status) return false;
+      if (customerCategoryId && !includeUnpricedProducts && !price) return false;
+      const casePrice = Number(price?.casePriceInclVat ?? product.casePrice ?? 0);
+      const piecePrice = Number(price?.piecePriceInclVat ?? product.piecePrice ?? 0);
+      if (minimumPrice > 0 && (casePrice < minimumPrice || piecePrice <= 0)) return false;
+      const availableStock = Number(inventory?.quantity ?? product.stock ?? 0);
+      if (requireStock && availableStock <= 0) return false;
       if (
         categoryIds.size &&
         !categoryIds.has(product.categoryId) &&
@@ -120,17 +139,27 @@ export const productService: ProductService = {
     });
     const start = (params.page - 1) * params.limit;
     const data = filteredProducts.slice(start, start + params.limit);
-    const products = data.map((product) => {
-      const price = priceByProduct.get(product.productId);
-      const inventory = inventoryForProduct(product.productId);
-      return {
-        ...product,
-        casePrice: price?.casePriceInclVat ?? product.casePrice,
-        piecePrice: price?.piecePriceInclVat ?? product.piecePrice,
-        stock: inventory?.quantity ?? product.stock ?? 0,
-        inventory,
-      };
-    });
+    const products = await Promise.all(
+      data.map(async (product) => {
+        const price = priceByProduct.get(product.productId);
+        const inventory = inventoryForProduct(product.productId);
+        return {
+          ...product,
+          casePrice: price?.casePriceInclVat ?? product.casePrice,
+          piecePrice: price?.piecePriceInclVat ?? product.piecePrice,
+          stock: inventory?.quantity ?? product.stock ?? 0,
+          inventory,
+          applicableSchemes:
+            String(params.includeSchemes) === 'true'
+              ? await getApplicableSchemeRecords({
+                  productId: product.productId,
+                  categoryId: product.categoryId,
+                  parentCategoryId: product.parentCategoryId,
+                })
+              : [],
+        };
+      }),
+    );
     return {
       success: true,
       statusCode: 200,

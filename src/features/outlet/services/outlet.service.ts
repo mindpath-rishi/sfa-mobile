@@ -83,6 +83,7 @@ export interface OutletService {
   ): Promise<ApiResponse<any>>;
   getVisitHistory(payload: any): Promise<ApiResponse<any>>;
   changeRoute(payload: any): Promise<ApiResponse<any>>;
+  requestRouteChange(payload: any): Promise<ApiResponse<any>>;
 }
 
 /**
@@ -251,6 +252,9 @@ export const outletService: OutletService = {
       const getOrderVisitId = (order: Record<string, any>) =>
         String(order.visitId ?? order.shopVisitId ?? '');
 
+      const getOrderOutletId = (order: Record<string, any>) =>
+        String(order.customerId ?? order.outletId ?? '');
+
       const getNonSaleVisitId = (item: Record<string, any>) =>
         String(item.visitId ?? item.shopVisitId ?? '');
 
@@ -299,8 +303,8 @@ export const outletService: OutletService = {
       }
 
       const sortedOrders = [...orders].sort((a, b) => {
-        const aTime = getTime(a.createdAt);
-        const bTime = getTime(b.createdAt);
+        const aTime = getTime(a.date ?? a.orderDate ?? a.createdAt);
+        const bTime = getTime(b.date ?? b.orderDate ?? b.createdAt);
 
         return bTime - aTime;
       });
@@ -318,15 +322,21 @@ export const outletService: OutletService = {
        * Latest order is used only for row display.
        */
       const ordersByVisit = new Map<string, any[]>();
+      const latestOrderByOutlet = new Map<string, any>();
 
       for (const order of sortedOrders) {
         const visitId = getOrderVisitId(order);
+        const outletId = getOrderOutletId(order);
 
-        if (!visitId) continue;
+        if (outletId && !latestOrderByOutlet.has(outletId)) {
+          latestOrderByOutlet.set(outletId, order);
+        }
 
-        const existing = ordersByVisit.get(visitId) ?? [];
-        existing.push(order);
-        ordersByVisit.set(visitId, existing);
+        if (visitId) {
+          const existing = ordersByVisit.get(visitId) ?? [];
+          existing.push(order);
+          ordersByVisit.set(visitId, existing);
+        }
       }
 
       /**
@@ -371,6 +381,7 @@ export const outletService: OutletService = {
         );
 
         const latestSale = saleOrders[0];
+        const latestHistoricalOrder = latestOrderByOutlet.get(outletId);
         const latestNonSale = nonSaleItems[0];
 
         const isVisited = outletVisits.length > 0;
@@ -412,6 +423,11 @@ export const outletService: OutletService = {
 
           hasSale,
           sale: latestSale,
+          lastOrderDate:
+            latestHistoricalOrder?.date ??
+            latestHistoricalOrder?.orderDate ??
+            latestHistoricalOrder?.createdAt ??
+            null,
 
           hasNonSale,
           isNonSale,
@@ -711,5 +727,18 @@ export const outletService: OutletService = {
       } as ApiResponse<any>;
     }
     return api.post<any>(`route-session`, payload) as Promise<ApiResponse<any>>;
+  },
+
+  requestRouteChange: async (payload: any) => {
+    const user = useAuthStore.getState().user;
+    if (isSalesman(user) && isOfflineMode()) {
+      return {
+        success: false,
+        statusCode: 409,
+        message: 'Route change approval requires an internet connection',
+      } as ApiResponse<any>;
+    }
+
+    return api.post<any>('route-change-request', payload) as Promise<ApiResponse<any>>;
   },
 };

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, TouchableOpacity, Modal, FlatList, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, TouchableOpacity, Modal, FlatList, ScrollView, Pressable } from 'react-native';
 import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,12 +7,15 @@ import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useUnifiedActionModalStyles } from '../../styles/UnifiedActionModal.styles';
 
-const VAN_CHANGE_REASONS = [
-  'Mapped van unavailable',
-  'Vehicle breakdown',
-  'Route requirement',
-  'Stock/loading issue',
-  'Other operational reason',
+const VAN_CHANGE_REASONS: Array<{
+  label: string;
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+}> = [
+  { label: 'Mapped van unavailable', icon: 'truck-remove-outline' },
+  { label: 'Vehicle breakdown', icon: 'car-wrench' },
+  { label: 'Route requirement', icon: 'map-marker-path' },
+  { label: 'Stock/loading issue', icon: 'package-variant-closed' },
+  { label: 'Other operational reason', icon: 'dots-horizontal-circle-outline' },
 ];
 
 export type ModalType =
@@ -107,6 +110,12 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
   const [isReasonDropdownOpen, setIsReasonDropdownOpen] = useState(false);
 
   const isVanSelectionValid = Boolean(selectedVan) && Boolean(vanChangeNote?.trim());
+
+  useEffect(() => {
+    if (!visible || modalType !== 'van-selection') {
+      setIsReasonDropdownOpen(false);
+    }
+  }, [modalType, visible]);
 
   const getModalTitle = () => {
     if (modalType === 'leave-type') {
@@ -247,6 +256,15 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
   const renderVanSelectionModal = () => (
     <View style={styles.vanSelectionContent}>
       <View style={styles.vanSelectionBody}>
+        {isReasonDropdownOpen && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close reason dropdown"
+            onPress={() => setIsReasonDropdownOpen(false)}
+            style={styles.dropdownDismissLayer}
+          />
+        )}
+
         <View style={styles.modalHeader}>
           <View>
             <AppText style={[styles.titleSmall, { color: colors.textPrimary }]}>Select Van</AppText>
@@ -264,54 +282,105 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
         </View>
 
         <View style={styles.reasonContainer}>
-          <AppText style={[styles.reasonLabel, { color: colors.textSecondary }]}>
-            Reason for van change
-          </AppText>
+          <View style={styles.reasonLabelRow}>
+            <AppText style={[styles.reasonLabel, { color: colors.textSecondary }]}>
+              Reason for van change
+            </AppText>
+            <View style={[styles.requiredBadge, { backgroundColor: colors.primary + '12' }]}>
+              <AppText style={[styles.requiredBadgeText, { color: colors.primary }]}>
+                Required
+              </AppText>
+            </View>
+          </View>
           <TouchableOpacity
             onPress={() => setIsReasonDropdownOpen((open) => !open)}
             style={[
               styles.reasonDropdownButton,
-              { borderColor: colors.border, backgroundColor: colors.surface },
+              {
+                borderColor: isReasonDropdownOpen || vanChangeNote ? colors.primary : colors.border,
+                backgroundColor: isReasonDropdownOpen ? colors.primary + '08' : colors.surface,
+              },
             ]}
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Select reason for van change"
+            accessibilityState={{ expanded: isReasonDropdownOpen }}
           >
-            <AppText
+            <View style={styles.reasonDropdownValue}>
+              <MaterialCommunityIcons
+                name="text-box-outline"
+                size={19}
+                color={vanChangeNote ? colors.primary : colors.textTertiary}
+              />
+              <AppText
+                style={[
+                  styles.reasonDropdownText,
+                  { color: vanChangeNote ? colors.textPrimary : colors.textTertiary },
+                ]}
+                numberOfLines={1}
+              >
+                {vanChangeNote || 'Choose a reason'}
+              </AppText>
+            </View>
+            <View
               style={[
-                styles.reasonDropdownText,
-                { color: vanChangeNote ? colors.textPrimary : colors.textTertiary },
+                styles.reasonChevron,
+                { backgroundColor: isReasonDropdownOpen ? colors.primary + '14' : 'transparent' },
               ]}
-              numberOfLines={1}
             >
-              {vanChangeNote || 'Select reason'}
-            </AppText>
-            <Ionicons
-              name={isReasonDropdownOpen ? 'chevron-up' : 'chevron-down'}
-              size={18}
-              color={colors.textSecondary}
-            />
+              <Ionicons
+                name={isReasonDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                size={17}
+                color={isReasonDropdownOpen ? colors.primary : colors.textSecondary}
+              />
+            </View>
           </TouchableOpacity>
 
           {isReasonDropdownOpen && (
-            <View style={[styles.reasonDropdownMenu, { borderColor: colors.border }]}>
-              {VAN_CHANGE_REASONS.map((reason) => {
-                const isSelected = vanChangeNote === reason;
+            <View
+              style={[
+                styles.reasonDropdownMenu,
+                { borderColor: colors.border, backgroundColor: colors.card },
+              ]}
+            >
+              {VAN_CHANGE_REASONS.map((reason, index) => {
+                const isSelected = vanChangeNote === reason.label;
                 return (
                   <TouchableOpacity
-                    key={reason}
-                    onPress={() => handleVanReasonSelect(reason)}
+                    key={reason.label}
+                    onPress={() => handleVanReasonSelect(reason.label)}
                     style={[
                       styles.reasonDropdownOption,
+                      index === VAN_CHANGE_REASONS.length - 1 && styles.reasonDropdownOptionLast,
                       isSelected && { backgroundColor: colors.primary + '12' },
                     ]}
                     activeOpacity={0.75}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
                   >
+                    <View
+                      style={[
+                        styles.reasonOptionIcon,
+                        {
+                          backgroundColor: isSelected
+                            ? colors.primary + '18'
+                            : colors.backgroundTertiary,
+                        },
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={reason.icon}
+                        size={18}
+                        color={isSelected ? colors.primary : colors.textSecondary}
+                      />
+                    </View>
                     <AppText
                       style={[
                         styles.reasonDropdownOptionText,
                         { color: isSelected ? colors.primary : colors.textPrimary },
                       ]}
                     >
-                      {reason}
+                      {reason.label}
                     </AppText>
                     {isSelected && (
                       <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
@@ -336,6 +405,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           data={vans}
           keyExtractor={(item: any) => item.vanId || item.id}
           showsVerticalScrollIndicator={false}
+          onScrollBeginDrag={() => setIsReasonDropdownOpen(false)}
           style={styles.vanList}
           contentContainerStyle={styles.vanListContainer}
           renderItem={({ item }: { item: any }) => {

@@ -137,7 +137,7 @@ const formatNumber = (value: number) =>
 const METRIC_OPTIONS: { value: TargetMetric; label: string; unit: string }[] = [
   { value: 'cases', label: 'Cases', unit: 'Cases' },
   { value: 'value', label: 'Value', unit: 'Value' },
-  { value: 'tonnage', label: 'Tonnage', unit: 'Tonnage' },
+  { value: 'tonnage', label: 'KG', unit: 'KG' },
 ];
 const TARGET_NOT_CONFIGURED_HINT = 'Target has not been configured for this period';
 

@@ -199,6 +199,7 @@ const RULES: EntityRules = {
     categoryId: { type: 'string', required: true },
     parentCategoryId: { type: 'string', required: true },
     customerCategoryId: { type: 'string', required: true },
+    isFocusedPack: { type: 'string' },
     quantity: { type: 'number', required: true, min: 0 },
     netCases: { type: 'number', required: true, min: 0 },
     piecePrice: { type: 'number', required: true, min: 0 },

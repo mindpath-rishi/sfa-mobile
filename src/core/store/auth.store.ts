@@ -175,7 +175,8 @@ type AuthUser = {
   phone?: string;
   employeeId?: string;
   employeeName?: string;
-  designation?: string;
+  position?: string;
+  positionId?: string;
   role?: string;
   roleId?: string;
   route?: string;

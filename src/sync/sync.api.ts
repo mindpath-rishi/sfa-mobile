@@ -20,13 +20,19 @@ export type UploadResult = {
 };
 
 export const syncApi = {
-  upload: (operations: UploadOperation[]) =>
+  upload: (operations: UploadOperation[], expectedUserId: string) =>
     api.post<{ results: UploadResult[] }, { operations: UploadOperation[] }>(
-      '/sync/upload', { operations }, { showLoader: false },
+      '/sync/upload',
+      { operations },
+      { showLoader: false, expectedUserId },
     ),
-  download: (lastSync: string | null, cursor?: string) =>
+  download: (lastSync: string | null, cursor: string | undefined, expectedUserId: string) =>
     api.get<{ records: DownloadRecord[]; cursor?: string; hasMore: boolean; serverTime: string }>(
-      '/sync/download', { params: { lastSync: lastSync ?? undefined, cursor }, showLoader: false },
+      '/sync/download',
+      {
+        params: { lastSync: lastSync ?? undefined, cursor },
+        showLoader: false,
+        expectedUserId,
+      },
     ),
 };
-

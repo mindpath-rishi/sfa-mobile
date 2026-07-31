@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { registerStoreReset } from './reset.store';
+import { storage, StorageKeys } from '@/core/storage';
+import { repositories } from '@/repositories';
 
 /* ======================================================
  * TYPES
@@ -10,6 +12,10 @@ export type Van = {
   name?: string;
   vanName?: string;
   vanNumber?: string;
+  provinceId?: unknown;
+  province?: unknown;
+  market?: unknown;
+  categoryIds?: unknown;
 };
 
 export type Route = {
@@ -76,6 +82,23 @@ const resolveRelatedId = (value: unknown, key: string): string | undefined => {
   return resolveEntityId(candidate, [key]);
 };
 
+export const getVanProvinceId = (van?: Partial<Van> | null): string | undefined =>
+  resolveEntityId(van?.provinceId, ['provinceId']) ||
+  resolveEntityId(van?.province, ['provinceId']) ||
+  resolveRelatedId(van?.market, 'provinceId');
+
+export const getVanCategoryIds = (van?: Partial<Van> | null): string[] => {
+  if (!Array.isArray(van?.categoryIds)) return [];
+
+  return [
+    ...new Set(
+      van.categoryIds
+        .map((category) => resolveEntityId(category, ['categoryId']))
+        .filter((categoryId): categoryId is string => Boolean(categoryId)),
+    ),
+  ];
+};
+
 export const getRouteLocationIds = (route?: Partial<Route> | null) => {
   const nestedRoute = route?.route;
   return {
@@ -127,6 +150,8 @@ export const getRouteCustomerCategoryId = (route?: Partial<Route> | null): strin
 type RouteStore = {
   van: Van | null;
   selectedRoute: Route | null;
+  hydrated: boolean;
+  hydrate: (ownerId?: string) => Promise<void>;
 
   /* ================= VAN ================= */
   setVan: (van: Van | null) => void;
@@ -146,6 +171,7 @@ type RouteStore = {
 const initialState = {
   van: null,
   selectedRoute: null,
+  hydrated: false,
 };
 
 /* ======================================================
@@ -153,51 +179,123 @@ const initialState = {
  * ====================================================== */
 
 export const useRouteStore = create<RouteStore>((set, get) => {
+  const mergeDefined = (...sources: (Partial<Route> | null | undefined)[]) => {
+    const result: Record<string, unknown> = {};
+    for (const source of sources) {
+      if (!source) continue;
+      for (const [key, value] of Object.entries(source)) {
+        if (value !== undefined && value !== null && value !== '') {
+          result[key] = value;
+        }
+      }
+    }
+    return result as Route;
+  };
+
+  const normalizeRoute = (route: Route | null, currentRoute?: Route | null) => {
+    if (!route) return null;
+
+    const isSameRoute = Boolean(
+      route.routeId && currentRoute?.routeId && route.routeId === currentRoute.routeId,
+    );
+    const mergedRoute = {
+      ...(isSameRoute ? currentRoute : {}),
+      ...route,
+    } as Route;
+    const locationIds = getRouteLocationIds(mergedRoute);
+
+    return {
+      ...mergedRoute,
+      ...locationIds,
+      customerCategoryId:
+        getRouteCustomerCategoryId(mergedRoute) || currentRoute?.customerCategoryId,
+    };
+  };
+
+  const persist = () =>
+    storage.setItem(
+      StorageKeys.SELECTED_ROUTE,
+      JSON.stringify({
+        selectedRoute: get().selectedRoute,
+        van: get().van,
+      }),
+    );
+
+  const clearPersistedRoute = () => {
+    void storage.removeItem(StorageKeys.SELECTED_ROUTE);
+  };
+
   // 🔥 AUTO REGISTER FOR GLOBAL RESET
   registerStoreReset('route', () => {
     set(initialState);
+    clearPersistedRoute();
   });
 
   return {
     ...initialState,
 
+    hydrate: async (ownerId) => {
+      try {
+        const value = await storage.getItem(StorageKeys.SELECTED_ROUTE);
+        if (!value) {
+          set({ hydrated: true });
+          return;
+        }
+
+        const stored = JSON.parse(value) as {
+          selectedRoute?: Route | null;
+          van?: Van | null;
+        };
+        const storedRoute = stored.selectedRoute ?? null;
+        const routeMaster =
+          ownerId && storedRoute?.routeId
+            ? ((
+                await repositories.routes.findAll(ownerId, {
+                  search: storedRoute.routeId,
+                  limit: 200,
+                })
+              ).find((route) => String(route.routeId ?? '') === String(storedRoute.routeId)) ??
+              null)
+            : null;
+        const selectedRoute = storedRoute
+          ? normalizeRoute(mergeDefined(storedRoute, routeMaster as Partial<Route> | null))
+          : null;
+        set({
+          selectedRoute,
+          van: stored.van ?? null,
+          hydrated: true,
+        });
+        if (selectedRoute) void persist();
+      } catch {
+        set({ hydrated: true });
+      }
+    },
+
     /* ================= RESET ================= */
 
     reset: () => {
       set(initialState);
+      clearPersistedRoute();
     },
 
     resetRouteStore: () => {
       set(initialState);
+      clearPersistedRoute();
     },
 
     /* ================= VAN ================= */
 
     setVan: (van) => {
       set({ van });
+      void persist();
     },
 
     /* ================= ROUTE ================= */
 
     setSelectedRoute: (route) => {
       const currentRoute = get().selectedRoute;
-      const isSameRoute = Boolean(
-        route?.routeId && currentRoute?.routeId && route.routeId === currentRoute.routeId,
-      );
-      const mergedRoute = route
-        ? ({ ...(isSameRoute ? currentRoute : {}), ...route } as Route)
-        : null;
-      const locationIds = getRouteLocationIds(mergedRoute);
-      set({
-        selectedRoute: mergedRoute
-          ? {
-              ...mergedRoute,
-              ...locationIds,
-              customerCategoryId:
-                getRouteCustomerCategoryId(mergedRoute) || currentRoute?.customerCategoryId,
-            }
-          : null,
-      });
+      set({ selectedRoute: normalizeRoute(route, currentRoute) });
+      void persist();
     },
   };
 });

@@ -795,11 +795,17 @@ import { ProductCard } from '../components/product';
 import { FilterModal } from '@/shared/components/models/Filter.modal';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
 import { useCartStore } from '@/core/store/cart.store';
-import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
+import {
+  getRouteCustomerCategoryId,
+  getVanCategoryIds,
+  getVanProvinceId,
+  useRouteStore,
+} from '@/core/store/route.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { categoryService } from '@/shared/services/category.service';
 import { productService } from '@/shared/services/product.service';
 import { toast } from '@/shared/utils/toast';
+import { toBusinessId } from '@/shared/utils/business-id.utils';
 import { ProductsScreenRef, ProductsScreenProps } from '../types/product.types';
 import { EmptyState } from '@/core/components/EmptyState';
 
@@ -839,10 +845,19 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   const styles = useProductsScreenStyles();
   const { setHeader } = useHeader();
   const { setOpenProductFilterHandler, resetProductsFilterCount } = useFilterContext();
-  const { items, addItems, clearCart } = useCartStore();
+  const { items, addItems, clearCart, refreshSchemeDiscounts, schemeDiscounts } = useCartStore();
   const customerCategoryId = useRouteStore((state) =>
     getRouteCustomerCategoryId(state.selectedRoute),
   );
+  const selectedRouteId = useRouteStore((state) => state.selectedRoute?.routeId);
+  const selectedVanId = useRouteStore((state) => state.selectedRoute?.vanId ?? state.van?.vanId);
+  const vanCategoryIds = useRouteStore((state) => state.van?.categoryIds);
+  const mappedVanCategoryIds = useMemo(
+    () => getVanCategoryIds({ categoryIds: vanCategoryIds }),
+    [vanCategoryIds],
+  );
+  const selectedProvinceId = useRouteStore((state) => getVanProvinceId(state.van));
+  const routeHydrated = useRouteStore((state) => state.hydrated);
   const insets = useSafeAreaInsets();
 
   const { mode = 'sales', onCartUpdate, onSubmit } = props;
@@ -878,13 +893,24 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         acc.totalItems += caseQty + pieceQty;
         acc.totalWeight +=
           caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0);
-        acc.totalValue += caseQty * item.casePrice + pieceQty * item.piecePrice;
+        const grossValue = caseQty * item.casePrice + pieceQty * item.piecePrice;
+        const schemeDiscount = Math.min(
+          schemeDiscounts[item.productId]?.discountAmount ?? 0,
+          grossValue,
+        );
+        acc.totalValue += mode === 'sales' ? grossValue - schemeDiscount : grossValue;
 
         return acc;
       },
       { totalUnits: 0, totalValue: 0, totalItems: 0, totalWeight: 0 },
     );
-  }, [items]);
+  }, [items, mode, schemeDiscounts]);
+
+  useEffect(() => {
+    if (mode === 'sales') {
+      void refreshSchemeDiscounts();
+    }
+  }, [items, mode, refreshSchemeDiscounts]);
 
   const productsWithCart = useMemo(() => {
     return products.map((product) => {
@@ -925,6 +951,8 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
 
   const fetchProducts = useCallback(
     async (page: number = 1, shouldAppend: boolean = false, isSearch: boolean = false) => {
+      if (!routeHydrated) return;
+
       try {
         if (isSearch || (page === 1 && !shouldAppend)) {
           setIsLoading(true);
@@ -938,6 +966,11 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         let categoryIds = filters.categories.map((c) => c.categoryId);
         if (selectedCategory) {
           categoryIds = [selectedCategory.categoryId];
+        }
+        if (mappedVanCategoryIds.length) {
+          categoryIds = categoryIds.length
+            ? categoryIds.filter((categoryId) => mappedVanCategoryIds.includes(categoryId))
+            : mappedVanCategoryIds;
         }
 
         const params: any = mapFiltersToParams(
@@ -957,21 +990,42 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         const latestRoute = useRouteStore.getState().selectedRoute;
         const resolvedCustomerCategoryId = getRouteCustomerCategoryId(latestRoute);
 
-        if (latestRoute?.vanId) params.vanId = latestRoute.vanId;
+        const resolvedVanId = latestRoute?.vanId ?? useRouteStore.getState().van?.vanId;
+        if (resolvedVanId) params.vanId = resolvedVanId;
 
-        if (!resolvedCustomerCategoryId) {
-          setProducts([]);
-          setTotalCount(0);
-          setHasMore(false);
-          toast.error(
-            'Customer category missing',
-            'No customer category is configured for the selected route. Products cannot be displayed.',
-          );
-          throw new Error('Customer category is required to fetch products');
-        }
-        params.customerCategoryId = resolvedCustomerCategoryId;
         if (mode === 'topup') {
+          if (!resolvedCustomerCategoryId) {
+            setProducts([]);
+            setTotalCount(0);
+            setHasMore(false);
+            setCurrentPage(page);
+            if (page === 1) {
+              toast.error(
+                'Products unavailable',
+                'The selected route does not have a customer category.',
+              );
+            }
+            return;
+          }
+
+          params.customerCategoryId = resolvedCustomerCategoryId;
+          params.includeUnpricedProducts = 'false';
+          params.status = 'ACTIVE';
+          params.minPrice = '0.0001';
+        } else {
+          if (resolvedCustomerCategoryId) {
+            params.customerCategoryId = resolvedCustomerCategoryId;
+          }
+          const provinceId = getVanProvinceId(useRouteStore.getState().van);
+          params.includeSchemes = 'true';
+          params.routeId = latestRoute?.routeId;
+          params.provinceId = provinceId;
+          // A customer-category price overrides the product master price when
+          // available. Products with a valid base price must remain saleable
+          // when that category has no dedicated price-list row.
           params.includeUnpricedProducts = true;
+          params.inStockOnly = 'true';
+          params.minPrice = '0.0001';
         }
 
         const response = await productService.fetchProducts(params);
@@ -993,7 +1047,19 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
         if (shouldAppend) setIsLoadingMore(false);
       }
     },
-    [searchQuery, filters, selectedCategory, quickFilter, customerCategoryId, mode],
+    [
+      searchQuery,
+      filters,
+      selectedCategory,
+      quickFilter,
+      customerCategoryId,
+      selectedRouteId,
+      selectedVanId,
+      mappedVanCategoryIds,
+      selectedProvinceId,
+      mode,
+      routeHydrated,
+    ],
   );
 
   const fetchCategories = useCallback(async () => {
@@ -1006,14 +1072,19 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
       });
       if (response?.success) {
         // Keep the check-in selector parent-only even with legacy cached data.
+        const mappedCategoryIds = new Set(mappedVanCategoryIds);
         setCategoriesList(
-          (response.data ?? []).filter((category: any) => category.type === 'PARENT'),
+          (response.data ?? []).filter(
+            (category: any) =>
+              category.type === 'PARENT' &&
+              (!mappedCategoryIds.size || mappedCategoryIds.has(String(category.categoryId))),
+          ),
         );
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
     }
-  }, []);
+  }, [mappedVanCategoryIds]);
 
   const handleCategorySelect = useCallback(
     (category: any) => {
@@ -1072,8 +1143,17 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           caseNetWeight: product.caseNetWeight,
           pieceNetWeight: product.pieceNetWeight,
           compCode: product.compCode ?? product.companyCode ?? product.comp_code,
-          categoryId: product.categoryId,
-          parentCategoryId: product.parentCategoryId,
+          categoryId: toBusinessId(product.categoryId ?? product.productCategoryId, [
+            'categoryId',
+            'productCategoryId',
+          ]),
+          parentCategoryId: toBusinessId(product.parentCategoryId, [
+            'parentCategoryId',
+            'categoryId',
+            'productCategoryId',
+          ]),
+          isFocusedPack: product.isFocusedPack === 'Y' ? 'Y' : 'N',
+          applicableSchemes: product.applicableSchemes ?? [],
         },
       ]);
     },
@@ -1169,11 +1249,8 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   }, [searchQuery, filters, quickFilter, calculateActiveFilterCount, setHeader]);
 
   useEffect(() => {
-    const initialize = async () => {
-      await Promise.all([fetchProducts(1, false), fetchCategories()]);
-    };
-    initialize();
-  }, []);
+    void fetchCategories();
+  }, [fetchCategories]);
 
   useEffect(() => {
     const timer = setTimeout(() => {

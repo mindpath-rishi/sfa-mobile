@@ -1061,7 +1061,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                     styles={styles}
                   />
                   <CallSummaryCard
-                    label="Tonnage"
+                    label="KG"
                     value={managerStats.callSummary.qtyTonnage ?? 0}
                     styles={styles}
                   />

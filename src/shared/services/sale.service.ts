@@ -5,10 +5,25 @@ import { isOfflineMode } from '@/core/offline/offline.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
 import { createSchemaId } from '@/utils/uuid';
+import { toBusinessId } from '@/shared/utils/business-id.utils';
 
 /* ======================================================
  * TYPES
  * ====================================================== */
+
+export interface AppliedSaleScheme {
+  schemeId: string;
+  schemeName: string;
+  schemeType: string;
+  minimumQuantity: number;
+  discountPercent?: number;
+  discountValue?: number;
+  buyQty?: number;
+  discountAmount: number;
+  freeQty: number;
+  freeProductId?: string;
+  freeProductName?: string;
+}
 
 export interface CreateSalePayload {
   vanId: string;
@@ -25,6 +40,11 @@ export interface CreateSalePayload {
   totalQty: number;
   totalWeight: number;
   totalValue: number;
+  subtotal?: number;
+  schemeIds?: string[];
+  schemeNames?: string[];
+  schemeDiscountAmount?: number;
+  schemes?: AppliedSaleScheme[];
   type: 'CASH' | 'CREDIT';
   paymentMode: string;
   paidAmount: number;
@@ -34,10 +54,11 @@ export interface CreateSalePayload {
   items: Array<{
     productId: string;
     productName?: string;
-    compCode?: string;
+    compCode: string;
     categoryId?: string;
     parentCategoryId?: string;
     customerCategoryId: string;
+    isFocusedPack?: string;
     caseQty: number;
     pieceQty: number;
     quantity: number;
@@ -46,7 +67,19 @@ export interface CreateSalePayload {
     caseNetWeight?: number;
     pieceNetWeight?: number;
     totalNetWeight: number;
+    grossValue?: number;
     totalValue: number;
+    schemeId?: string;
+    schemeName?: string;
+    schemeType?: string;
+    schemeMinimumQuantity?: number;
+    schemeDiscountPercent?: number;
+    schemeDiscountValue?: number;
+    schemeBuyQty?: number;
+    schemeDiscountAmount?: number;
+    schemeFreeQty?: number;
+    schemeFreeProductId?: string;
+    schemeFreeProductName?: string;
     unitQtyInCase: number;
     netCases?: number;
   }>;
@@ -79,6 +112,11 @@ const isToday = (value: unknown) => {
 /** Keep offline records consistent with the calculations applied by SaleService.create. */
 const calculateSalePayload = (payload: CreateSalePayload): CreateSalePayload => {
   const items = payload.items.map((item) => {
+    const compCode = String(item.compCode ?? '').trim();
+    if (!compCode) {
+      throw new Error(`Company code is required for ${item.productName || item.productId}`);
+    }
+
     const caseQty = Number(item.caseQty) || 0;
     const pieceQty = Number(item.pieceQty) || 0;
     const unitQtyInCase = Number(item.unitQtyInCase) || 1;
@@ -86,9 +124,24 @@ const calculateSalePayload = (payload: CreateSalePayload): CreateSalePayload => 
     const piecePrice = Number(item.piecePrice ?? casePrice / unitQtyInCase) || 0;
     const pieceNetWeight = Number(item.pieceNetWeight) || 0;
     const quantity = caseQty * unitQtyInCase + pieceQty;
+    const grossValue = toFixed4(caseQty * casePrice + pieceQty * piecePrice);
+    const schemeDiscountAmount = toFixed4(
+      Math.min(Math.max(Number(item.schemeDiscountAmount) || 0, 0), grossValue),
+    );
 
     return {
       ...item,
+      compCode,
+      categoryId: toBusinessId(item.categoryId, ['categoryId', 'productCategoryId']),
+      parentCategoryId: toBusinessId(item.parentCategoryId, [
+        'parentCategoryId',
+        'categoryId',
+        'productCategoryId',
+      ]),
+      customerCategoryId: toBusinessId(item.customerCategoryId, [
+        'customerCategoryId',
+        'categoryId',
+      ]),
       caseQty,
       pieceQty,
       unitQtyInCase,
@@ -97,13 +150,35 @@ const calculateSalePayload = (payload: CreateSalePayload): CreateSalePayload => 
       quantity,
       netCases: toFixed4(quantity / unitQtyInCase),
       totalNetWeight: toFixed4(quantity * pieceNetWeight),
-      totalValue: toFixed4(caseQty * casePrice + pieceQty * piecePrice),
+      grossValue,
+      schemeDiscountAmount,
+      totalValue: toFixed4(grossValue - schemeDiscountAmount),
     };
   });
 
   const totalValue = toFixed4(items.reduce((sum, item) => sum + item.totalValue, 0));
   const paidAmount = toFixed4(Number(payload.paidAmount) || 0);
   const pendingAmount = toFixed4(totalValue - paidAmount);
+  const schemesById = new Map<string, AppliedSaleScheme>();
+
+  for (const item of items) {
+    if (!item.schemeId || !item.schemeName || !item.schemeType) continue;
+
+    const existing = schemesById.get(item.schemeId);
+    schemesById.set(item.schemeId, {
+      schemeId: item.schemeId,
+      schemeName: item.schemeName,
+      schemeType: item.schemeType,
+      minimumQuantity: Math.max(Number(item.schemeMinimumQuantity) || 0, 0),
+      discountPercent: item.schemeDiscountPercent,
+      discountValue: item.schemeDiscountValue,
+      buyQty: item.schemeBuyQty,
+      discountAmount: toFixed4((existing?.discountAmount ?? 0) + (item.schemeDiscountAmount ?? 0)),
+      freeQty: (existing?.freeQty ?? 0) + Math.max(Number(item.schemeFreeQty) || 0, 0),
+      freeProductId: item.schemeFreeProductId || existing?.freeProductId,
+      freeProductName: item.schemeFreeProductName || existing?.freeProductName,
+    });
+  }
 
   return {
     ...payload,
@@ -112,6 +187,21 @@ const calculateSalePayload = (payload: CreateSalePayload): CreateSalePayload => 
     totalPieces: items.reduce((sum, item) => sum + item.pieceQty, 0),
     totalQty: items.reduce((sum, item) => sum + item.quantity, 0),
     totalWeight: toFixed4(items.reduce((sum, item) => sum + item.totalNetWeight, 0)),
+    subtotal: toFixed4(items.reduce((sum, item) => sum + (item.grossValue ?? 0), 0)),
+    schemeIds: Array.from(
+      new Set(
+        items.map((item) => item.schemeId).filter((value): value is string => Boolean(value)),
+      ),
+    ),
+    schemeNames: Array.from(
+      new Set(
+        items.map((item) => item.schemeName).filter((value): value is string => Boolean(value)),
+      ),
+    ),
+    schemeDiscountAmount: toFixed4(
+      items.reduce((sum, item) => sum + (item.schemeDiscountAmount ?? 0), 0),
+    ),
+    schemes: Array.from(schemesById.values()),
     totalValue,
     netCases: toFixed4(items.reduce((sum, item) => sum + (item.netCases ?? 0), 0)),
     paidAmount,
@@ -126,7 +216,9 @@ const toOnlineSalePayload = (payload: CreateSalePayload) => {
   const { netCases: _netCases, ...sale } = payload;
   return {
     ...sale,
-    items: payload.items.map(({ netCases: _itemNetCases, ...item }) => item),
+    items: payload.items.map(
+      ({ netCases: _itemNetCases, isFocusedPack: _itemIsFocusedPack, ...item }) => item,
+    ),
   };
 };
 
@@ -213,7 +305,7 @@ export const saleService: SaleService = {
   //     ...calculatedPayload,
   //     uuid: saleId,
   //     saleId,
-  //     employees: [{ employeeId: user?.userId, employeeName: user?.name, role: user?.role }],
+  //     employees: [{ employeeId: user?.userId, employeeName: user?.name, positionId: user?.positionId }],
   //   } as unknown as Record<string, unknown>);
   //   // Expo SQLite uses one connection here. Starting multiple repository
   //   // transactions with Promise.all causes intermittent "transaction within a
@@ -457,7 +549,7 @@ export const saleService: SaleService = {
   //       {
   //         employeeId: user?.userId,
   //         employeeName: user?.name,
-  //         role: user?.role,
+  //         positionId: user?.positionId,
   //       },
   //     ],
   //   } as unknown as Record<string, unknown>);
@@ -541,17 +633,21 @@ export const saleService: SaleService = {
   //   } as ApiResponse<any>;
   // },
   createSale: async (payload: CreateSalePayload, { showLoader }: { showLoader: boolean }) => {
-    const calculatedPayload = payload;
+    const calculatedPayload = calculateSalePayload(payload);
     const user = useAuthStore.getState().user;
+    const shouldCreateOfflineSale =
+      isSalesman(user) && user?.offlineAccessAllowed === true && isOfflineMode();
 
     /**
      * ======================================================
      * ONLINE MODE
      * ======================================================
      */
-    // if (!isSalesman(user) || !isOfflineMode()) {
-    //   return api.post<any>('/sales', calculatedPayload, showLoader ? { showLoader } : undefined);
-    // }
+    if (!shouldCreateOfflineSale) {
+      return api.post<any>('/sales', toOnlineSalePayload(calculatedPayload), {
+        showLoader,
+      });
+    }
 
     /**
      * ======================================================
@@ -560,6 +656,7 @@ export const saleService: SaleService = {
      */
     const ownerId = user?.userId ?? '';
     const employeeId = user?.userId ?? '';
+    const positionId = user?.positionId ?? '';
     const vanId = String(calculatedPayload.vanId || '');
     const saleDate = calculatedPayload.date || new Date().toISOString();
 
@@ -567,6 +664,10 @@ export const saleService: SaleService = {
 
     if (!ownerId) {
       throw new Error('User is required for offline sale');
+    }
+
+    if (!positionId) {
+      throw new Error('User position is required for offline sale');
     }
 
     if (!vanId) {
@@ -720,7 +821,16 @@ export const saleService: SaleService = {
         {
           employeeId: user?.userId,
           employeeName: user?.name,
-          role: user?.role,
+          positionId,
+        },
+      ],
+      positionHierarchy: [
+        {
+          level: 1,
+          positionId,
+          positionName: user?.position || positionId,
+          employeeId,
+          employeeName: user?.name,
         },
       ],
     } as unknown as Record<string, unknown>);

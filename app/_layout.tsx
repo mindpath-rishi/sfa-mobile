@@ -296,6 +296,8 @@ import { HeaderProvider } from '@/shared/contexts/HeaderContext';
 import { useThemeStore } from '@/core/store/theme.store';
 import { useLanguageStore } from '@/core/store/language.store';
 import { useAuthStore } from '@/core/store/auth.store';
+import { useCartStore } from '@/core/store/cart.store';
+import { useRouteStore } from '@/core/store/route.store';
 import { useGlobalErrorStore } from '@/core/store/error.store';
 
 import AppErrorScreen from '@/core/screens/error/Error';
@@ -346,6 +348,8 @@ export default function RootLayout() {
   const { hydrate: hydrateLanguage, hydrated: languageHydrated } = useLanguageStore();
 
   const { hydrate: hydrateAuth, isHydrated: authHydrated, accessToken: token } = useAuthStore();
+  const hydrateCart = useCartStore((state) => state.hydrate);
+  const hydrateRoute = useRouteStore((state) => state.hydrate);
 
   const authUser = useAuthStore((state) => state.user);
   const workSessionId = useAuthStore((state) => state.workSessionId);
@@ -382,8 +386,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (!authHydrated || !authUser?.userId) return;
 
+    void (async () => {
+      await hydrateRoute(authUser.userId);
+      await hydrateCart();
+    })();
     void initialiseOffline();
-  }, [authHydrated, authUser?.userId]);
+  }, [authHydrated, authUser?.userId, hydrateCart, hydrateRoute]);
 
   useEffect(() => {
     if (!token) return;

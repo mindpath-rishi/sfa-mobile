@@ -38,6 +38,7 @@ type NotificationType =
   | 'target'
   | 'system'
   | 'van_change'
+  | 'stock_unload'
   | 'topup'
   | 'outlet_approval';
 
@@ -99,6 +100,7 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
     'route',
     'target',
     'van_change',
+    'stock_unload',
     'topup',
     'outlet_approval',
   ].includes(category)
@@ -123,6 +125,7 @@ const ICON_MAP: Record<NotificationType, string> = {
   route: 'map-outline',
   target: 'flag-outline',
   van_change: 'car-outline',
+  stock_unload: 'archive-outline',
   topup: 'cube-outline',
   outlet_approval: 'storefront-outline',
   system: 'checkmark-circle-outline',
@@ -133,6 +136,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   route: 'Route',
   target: 'Target',
   van_change: 'Van Change',
+  stock_unload: 'Stock Unload',
   topup: 'Top-up',
   outlet_approval: 'Outlet Approval',
   system: 'System',
@@ -177,6 +181,24 @@ const getVanChangeStatusLabel = (status: string) => {
   if (status === 'APPROVED') return 'Approved';
   if (status === 'CANCELLED') return 'Cancelled';
   return 'Rejected';
+};
+
+const isPendingStockUnloadApproval = (item: NotificationItem) => {
+  const category = String(item.data?.category || item.category || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.status || '').toUpperCase();
+  return (
+    category === 'stock_unload' &&
+    action === 'APPROVAL_REQUIRED' &&
+    (!status || status === 'PENDING')
+  );
+};
+
+const getStockUnloadStatus = (item: NotificationItem) => {
+  const category = String(item.data?.category || item.category || '').toLowerCase();
+  if (category !== 'stock_unload') return '';
+  const status = String(item.data?.status || item.data?.action || '').toUpperCase();
+  return ['APPROVED', 'REJECTED'].includes(status) ? status : '';
 };
 
 const isPendingTopupAcceptance = (item: NotificationItem) => {
@@ -273,6 +295,7 @@ function NotificationDetail({
   const { user } = useAuthStore();
   const isManager = isManagerRole(user?.role ?? user?.roleId);
   const isVanChange = isPendingVanChangeApproval(item);
+  const isStockUnload = isPendingStockUnloadApproval(item);
   const isTopupAcceptance = isPendingTopupAcceptance(item);
   const isOutletApproval = isPendingOutletApproval(item);
   const isApprovingThis = processing?.id === item.id && processing?.action === 'approve';
@@ -280,6 +303,35 @@ function NotificationDetail({
   const vanChangeStatus = getVanChangeStatus(item);
   const topupStatus = getTopupStatus(item);
   const outletApprovalStatus = getOutletApprovalStatus(item);
+  const stockUnloadStatus = getStockUnloadStatus(item);
+  const [unloadItems, setUnloadItems] = useState<any[]>([]);
+  const [unloadItemsLoading, setUnloadItemsLoading] = useState(false);
+
+  useEffect(() => {
+    const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
+    if (item.type !== 'stock_unload' || !unloadRequestId) {
+      setUnloadItems([]);
+      return;
+    }
+
+    let active = true;
+    setUnloadItemsLoading(true);
+    notificationService
+      .getStockUnloadDetail(String(unloadRequestId))
+      .then((response) => {
+        if (active) setUnloadItems(response?.data?.items || []);
+      })
+      .catch(() => {
+        if (active) setUnloadItems([]);
+      })
+      .finally(() => {
+        if (active) setUnloadItemsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [item.data?.requestId, item.data?.unloadRequestId, item.type]);
 
   // Metadata rows extracted from item.data
   const metaRows: { label: string; value: string }[] = [];
@@ -314,6 +366,23 @@ function NotificationDetail({
     }
     if (item.data.workSessionId)
       metaRows.push({ label: 'Session ID', value: String(item.data.workSessionId) });
+    if (item.data.unloadRequestId)
+      metaRows.push({ label: 'Unload Request', value: String(item.data.unloadRequestId) });
+    if (item.data.employeeName || item.data.employeeId)
+      metaRows.push({
+        label: 'Salesman',
+        value: String(item.data.employeeName || item.data.employeeId),
+      });
+    if (item.data.vanId) metaRows.push({ label: 'Van', value: String(item.data.vanId) });
+    if (item.data.totalQuantity !== undefined)
+      metaRows.push({ label: 'Quantity', value: String(item.data.totalQuantity) });
+    if (item.data.totalCases !== undefined)
+      metaRows.push({ label: 'Cases', value: String(item.data.totalCases) });
+    if (stockUnloadStatus)
+      metaRows.push({
+        label: 'Unload Status',
+        value: stockUnloadStatus === 'APPROVED' ? 'Approved' : 'Rejected',
+      });
     if (item.data.routeCode) metaRows.push({ label: 'Route', value: item.data.routeCode });
     if (item.data.orderId) metaRows.push({ label: 'Order ID', value: String(item.data.orderId) });
     if (item.data.outletName)
@@ -411,6 +480,51 @@ function NotificationDetail({
           </View>
         )}
 
+        {item.type === 'stock_unload' && (
+          <View style={[styles.section, { backgroundColor: colors.surface }]}>
+            <AppText style={[styles.sectionLabel, { color: colors.textTertiary }]}>
+              Item-wise stock
+            </AppText>
+            {unloadItemsLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : unloadItems.length ? (
+              unloadItems.map((stockItem, index) => (
+                <View
+                  key={`${stockItem.productId}-${index}`}
+                  style={[
+                    styles.unloadItem,
+                    index < unloadItems.length - 1 && {
+                      borderBottomColor: colors.borderLight,
+                      borderBottomWidth: 1,
+                    },
+                  ]}
+                >
+                  <View style={styles.unloadItemName}>
+                    <AppText style={[styles.unloadProductName, { color: colors.textPrimary }]}>
+                      {stockItem.productName || stockItem.productId}
+                    </AppText>
+                    <AppText style={{ color: colors.textTertiary, fontSize: 11 }}>
+                      {stockItem.productId}
+                    </AppText>
+                  </View>
+                  <View style={styles.unloadQuantity}>
+                    <AppText style={[styles.unloadQuantityValue, { color: colors.primary }]}>
+                      {Number(stockItem.quantity || 0).toLocaleString()}
+                    </AppText>
+                    <AppText style={{ color: colors.textTertiary, fontSize: 10 }}>
+                      {Number(stockItem.cases || 0)} cases · {Number(stockItem.pieces || 0)} pieces
+                    </AppText>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <AppText style={{ color: colors.textSecondary, fontSize: 12 }}>
+                No item snapshot is available for this request.
+              </AppText>
+            )}
+          </View>
+        )}
+
         {isOutletApproval && !!item.data?.imageUrls?.length && (
           <View style={[styles.section, { backgroundColor: colors.surface }]}>
             <AppText style={[styles.sectionLabel, { color: colors.textTertiary }]}>
@@ -441,7 +555,9 @@ function NotificationDetail({
         )}
 
         {/* Approval/acceptance actions */}
-        {((isManager && isVanChange) || isTopupAcceptance || isOutletApproval) && (
+        {((isManager && (isVanChange || isStockUnload)) ||
+          isTopupAcceptance ||
+          isOutletApproval) && (
           <View style={[styles.section, { backgroundColor: colors.surface }]}>
             <AppText style={[styles.sectionLabel, { color: colors.textTertiary }]}>
               Action Required
@@ -451,7 +567,9 @@ function NotificationDetail({
                 ? 'This approved top-up is waiting for your acceptance. Accepting will add the approved quantity to your van stock.'
                 : isOutletApproval
                   ? 'Review the outlet details, images, and registered location before approving or rejecting it.'
-                  : 'This van change request is pending your approval. Please review the details above before taking action.'}
+                  : isStockUnload
+                    ? 'Approving this request will unload all current van stock. Rejecting it will leave the stock unchanged.'
+                    : 'This van change request is pending your approval. Please review the details above before taking action.'}
             </AppText>
             <View style={styles.approvalButtons}>
               <Pressable
@@ -656,6 +774,17 @@ const createDetailStyles = (colors: any, insets: { top: number; bottom: number }
       justifyContent: 'center',
       gap: 8,
     },
+    unloadItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 10,
+      gap: 12,
+    },
+    unloadItemName: { flex: 1 },
+    unloadProductName: { fontSize: 13, fontWeight: '700' },
+    unloadQuantity: { alignItems: 'flex-end' },
+    unloadQuantityValue: { fontSize: 16, fontWeight: '900' },
   });
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
@@ -667,6 +796,7 @@ const FILTER_OPTIONS = [
   'Route',
   'Target',
   'Van Change',
+  'Stock Unload',
   'Top-up',
   'Outlet Approval',
   'System',
@@ -872,6 +1002,39 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
       return;
     }
 
+    if (isPendingStockUnloadApproval(item)) {
+      const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
+      if (!unloadRequestId || processing) {
+        toast.error('Stock unload request ID not found');
+        return;
+      }
+
+      setProcessing({ id: item.id, action });
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveStockUnload(String(unloadRequestId))
+            : await notificationService.rejectStockUnload(String(unloadRequestId));
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} stock unload request`);
+          return;
+        }
+        toast.success(
+          action === 'approve'
+            ? 'Stock unload approved and van stock reset'
+            : 'Stock unload request rejected',
+        );
+        await notificationService.markAsRead(item.id);
+        navigateBack();
+        loadNotifications();
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || `Failed to ${action} stock unload request`);
+      } finally {
+        setProcessing(null);
+      }
+      return;
+    }
+
     const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
     if (!vanChangeRequestId || processing) {
       toast.error('Van change request ID not found');
@@ -996,6 +1159,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                 <View style={styles.list}>
                   {filteredNotifications.map((item) => {
                     const isVanChange = isPendingVanChangeApproval(item);
+                    const isStockUnload = isPendingStockUnloadApproval(item);
                     const isTopupAcceptance = isPendingTopupAcceptance(item);
                     const isOutletApproval = isPendingOutletApproval(item);
                     const vanChangeReason = getVanChangeReason(item);
@@ -1076,7 +1240,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                             </View>
 
                             {/* Inline approval actions — managers only */}
-                            {isManager && isVanChange && (
+                            {isManager && (isVanChange || isStockUnload) && (
                               <View style={styles.inlineActions}>
                                 <Pressable
                                   disabled={!!processing}

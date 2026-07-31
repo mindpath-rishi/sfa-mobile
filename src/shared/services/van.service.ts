@@ -6,6 +6,8 @@ import { repositories } from '@/repositories';
 import { isToday } from 'date-fns';
 
 export interface VanService {
+  updateBreakdown: (payload: { vanIds: string[]; reason: string }) => Promise<ApiResponse<any>>;
+  fetchAllVans: (params?: Record<string, any>) => Promise<ApiResponse<any>>;
   fetchVanStocks: (vanId: string | undefined, params: any) => Promise<ApiResponse<any>>;
   createInventoryTopupRequest: (payload: any) => Promise<ApiResponse<any>>;
   fetchInventoryTopupRequests: (payload: any) => Promise<ApiResponse<any>>;
@@ -17,6 +19,16 @@ export interface VanService {
 }
 
 export const vanService: VanService = {
+  updateBreakdown: (payload) =>
+    api.patch<any>('/van/breakdown', payload, {
+      cache: false,
+    }) as Promise<ApiResponse<any>>,
+  fetchAllVans: (params = {}) =>
+    api.get<any>('/van', {
+      params,
+      cache: false,
+      showLoader: false,
+    }) as Promise<ApiResponse<any>>,
   // fetchVanStocks: async (vanId: string | undefined, params) => {
   //   const user = useAuthStore.getState().user;
   //   if (!isSalesman(user) || !isOfflineMode()) {

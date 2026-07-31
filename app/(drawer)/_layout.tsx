@@ -66,6 +66,7 @@ const MANAGER_DRAWER_ROUTES = new Set([
   'team-coverage',
   'beat-o-meter',
   'survey-analytics',
+  'breakdown-update',
 ]);
 
 const SHARED_TAB_ROUTES = new Set(['home', 'profile']);
@@ -437,17 +438,15 @@ const CustomDrawerContent = (props: any) => {
       const activeTopupStatuses = [TOPUP_STATUS.SUBMITTED, TOPUP_STATUS.APPROVED];
       const alerts = topups
         .filter((item: any) => activeTopupStatuses.includes(item?.status))
-        .map(
-          (item: any) => ({
-            id: item.vanInventoryTopupId || item._id,
-            reference: `#${item.reference || item.vanInventoryTopupId?.slice(-8) || item._id}`,
-            status: item.status,
-            requestedCases: Number(item.totalRequestedCases || 0),
-            requestedPieces: Number(item.totalRequestedPieces || 0),
-            approvedCases: Number(item.totalApprovedCases || 0),
-            approvedPieces: Number(item.totalApprovedPieces || 0),
-          }),
-        );
+        .map((item: any) => ({
+          id: item.vanInventoryTopupId || item._id,
+          reference: `#${item.reference || item.vanInventoryTopupId?.slice(-8) || item._id}`,
+          status: item.status,
+          requestedCases: Number(item.totalRequestedCases || 0),
+          requestedPieces: Number(item.totalRequestedPieces || 0),
+          approvedCases: Number(item.totalApprovedCases || 0),
+          approvedPieces: Number(item.totalApprovedPieces || 0),
+        }));
 
       setSettlementTopupAlerts(alerts);
       return true;
@@ -514,7 +513,11 @@ const CustomDrawerContent = (props: any) => {
       });
       if (response?.success || response?.statusCode === 200) {
         loader.show({ message: 'Finalizing settlement...' });
-        toast.success('Your day successfully completed');
+        toast.success(
+          carryForwardStock
+            ? 'Your day successfully completed'
+            : 'Day completed. Stock unload request submitted for approval.',
+        );
         setShowFinalConfirm(false);
         setShowSettlementOptions(false);
         setShowDayEndSummary(false);
@@ -858,8 +861,16 @@ export default function DrawerLayout() {
       backgroundColor: colors.primary,
     },
 
+    'breakdown-update': {
+      title: 'Breakdown Update',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
     'switch-route': {
-      title: 'Routes',
+      title: 'Change Route',
       showMenu: false,
       showFilter: false,
       showBack: true,
@@ -1039,6 +1050,11 @@ export default function DrawerLayout() {
           focusedIcon: 'clipboard-text-search',
           unfocusedIcon: 'clipboard-text-search-outline',
         },
+        'breakdown-update': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'car-wrench',
+          unfocusedIcon: 'car-wrench',
+        },
         checkin: {
           component: MaterialCommunityIcons,
           focusedIcon: 'clipboard-check',
@@ -1059,6 +1075,7 @@ export default function DrawerLayout() {
 
   return (
     <Drawer
+      initialRouteName="(tabs)"
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={({ route }) => ({
         header: () => {
@@ -1102,6 +1119,14 @@ export default function DrawerLayout() {
       />
 
       <Drawer.Screen
+        name="switch-route"
+        options={{
+          title: 'Change Route',
+          drawerLabel: 'Change Route',
+        }}
+      />
+
+      <Drawer.Screen
         name="my-pocket"
         options={{
           title: 'My Pocket MIS',
@@ -1135,14 +1160,6 @@ export default function DrawerLayout() {
         }}
       />
 
-      <Drawer.Screen
-        name="switch-route"
-        options={{
-          title: 'Routes',
-          drawerLabel: 'Routes',
-        }}
-      />
-
       {/* Collection Screen - Hidden from drawer */}
       <Drawer.Screen
         name="collection"
@@ -1157,6 +1174,15 @@ export default function DrawerLayout() {
         name="notifications"
         options={{
           title: 'Notifications',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+
+      <Drawer.Screen
+        name="stock-unload-detail"
+        options={{
+          title: 'Stock Unload Details',
           drawerLabel: () => null,
           drawerItemStyle: { display: 'none' },
         }}
@@ -1216,6 +1242,14 @@ export default function DrawerLayout() {
         options={{
           title: 'Survey Analytics',
           drawerLabel: 'Survey Analytics',
+        }}
+      />
+
+      <Drawer.Screen
+        name="breakdown-update"
+        options={{
+          title: 'Breakdown Update',
+          drawerLabel: 'Breakdown Update',
         }}
       />
 

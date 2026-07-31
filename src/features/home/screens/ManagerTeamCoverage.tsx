@@ -306,7 +306,7 @@ export default function ManagerTeamCoverageScreen() {
         items: (teamCoverage.userList || []).map((user, index) => ({
           id: user.employeeId || `user-${index}`,
           title: user.name || user.employeeId || 'Unnamed user',
-          subtitle: user.designationId || user.employeeId,
+          subtitle: user.positionId || user.employeeId,
           meta: user.mobile,
           icon: 'account-outline' as MCIconName,
         })),
@@ -318,16 +318,13 @@ export default function ManagerTeamCoverageScreen() {
         title: 'Vans',
         count: teamCoverage.vans ?? 0,
         items: (teamCoverage.vanList || []).map((van, index) => {
-          const associatedUsers = van.associatedUsers?.length
-            ? `${formatNumber(van.associatedUsers.length)} users`
-            : undefined;
           const routeCount = formatOptionalNumber(van.routeCount);
 
           return {
             id: van.vanId || van.vanNumber || `van-${index}`,
             title: van.name || van.vanNumber || van.vanId || 'Unnamed van',
             subtitle: [van.vanNumber, van.driverName].filter(Boolean).join(' · '),
-            meta: routeCount ? `${routeCount} routes` : associatedUsers,
+            meta: routeCount ? `${routeCount} routes` : undefined,
             icon: 'van-passenger' as MCIconName,
           };
         }),

@@ -13,7 +13,7 @@ import { createManagerBeatOMeterStyles } from '../styles/ManagerBeatOMeter.style
 const INITIAL_BEAT_O_METER: ManagerBeatOMeterResponse = {
   employeeId: '',
   employeeName: 'Manager',
-  designation: 'Manager',
+  position: 'Manager',
   totalOutlets: 0,
   summary: {
     visitedOutlets: 0,

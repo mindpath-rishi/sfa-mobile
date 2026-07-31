@@ -26,6 +26,7 @@ import { toast } from '../utils';
 
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   showLoader?: boolean;
+  expectedUserId?: string;
 }
 
 /* ======================================================
@@ -90,7 +91,15 @@ const getToken = async (): Promise<string | null> => {
 httpClient.interceptors.request.use(
   async (config: CustomAxiosRequestConfig): Promise<CustomAxiosRequestConfig> => {
     try {
+      if (config.expectedUserId && useAuthStore.getState().user?.userId !== config.expectedUserId) {
+        throw new axios.CanceledError('Request cancelled because the authenticated user changed');
+      }
+
       const token = await getToken();
+
+      if (config.expectedUserId && useAuthStore.getState().user?.userId !== config.expectedUserId) {
+        throw new axios.CanceledError('Request cancelled because the authenticated user changed');
+      }
 
       if (token) {
         if (isTokenExpired(token)) {
@@ -106,6 +115,8 @@ httpClient.interceptors.request.use(
 
       return config;
     } catch (error) {
+      if (axios.isCancel(error)) throw error;
+
       logger.error('Request interceptor error', { error });
       return config;
     }
@@ -122,6 +133,17 @@ httpClient.interceptors.response.use(
     return response;
   },
   (error: AxiosError) => {
+    if (axios.isCancel(error)) {
+      return Promise.resolve({
+        data: {
+          success: false,
+          message: 'Request cancelled because the authenticated user changed',
+          data: null,
+          statusCode: 409,
+        },
+      } as AxiosResponse<ApiResponse<unknown>>);
+    }
+
     const appError = errorHandler(error);
 
     if (error.response?.status === 401) {
@@ -210,6 +232,7 @@ export const apiRequest = async <TResponse, TBody = unknown>(
     headers: config?.headers,
     timeout: config?.timeoutMs,
     showLoader: config?.showLoader !== false,
+    expectedUserId: config?.expectedUserId,
   } as CustomAxiosRequestConfig);
 
   const response = res.data;

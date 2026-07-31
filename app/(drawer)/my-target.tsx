@@ -1119,14 +1119,14 @@ type TargetDashboardData = {
 };
 
 const metricOptions: { value: TargetMetric; label: string; icon: string }[] = [
-  { value: 'tonnage', label: 'Tonnage', icon: 'weight' },
+  { value: 'tonnage', label: 'KG', icon: 'weight' },
   { value: 'cases', label: 'Cases', icon: 'cube-outline' },
   { value: 'value', label: 'Value', icon: 'cash-outline' },
 ];
 
 const metricLabels: Record<TargetMetric, string> = {
   cases: 'Cases',
-  tonnage: 'Tonnage',
+  tonnage: 'KG',
   value: 'Value',
 };
 

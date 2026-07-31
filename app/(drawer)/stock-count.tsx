@@ -24,6 +24,7 @@ import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSummaryModal';
 import { ConfirmationModal } from '@/core/components';
 import { useLoaderStore } from '@/core/loader/loader.store';
+import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
 const LIMIT = 15;
 
@@ -87,6 +88,7 @@ export default function StockCountScreen({
   const [detailItems, setDetailItems] = useState<any[]>([]);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
+  const [settlementTopupAlerts, setSettlementTopupAlerts] = useState<any[]>([]);
   const [showDayEndSummary, setShowDayEndSummary] = useState(false);
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [showSettlementOptions, setShowSettlementOptions] = useState(false);
@@ -113,6 +115,7 @@ export default function StockCountScreen({
   });
 
   const handleEndDayFromSettlement = useCallback(async () => {
+    setSettlementTopupAlerts([]);
     try {
       loader.show({ message: 'Loading van settlement summary...' });
 
@@ -127,6 +130,29 @@ export default function StockCountScreen({
         { showLoader: false },
       );
       setDayEndSummary(res?.data);
+
+      const topupResponse = await vanService.fetchInventoryTopupRequests({
+        page: 1,
+        limit: 20,
+        vanId: vanIdToUse,
+      });
+      const topupData = topupResponse?.data?.data || topupResponse?.data || [];
+      const topups = Array.isArray(topupData) ? topupData : [];
+      setSettlementTopupAlerts(
+        topups
+          .filter((item: any) =>
+            [TOPUP_STATUS.SUBMITTED, TOPUP_STATUS.APPROVED].includes(item?.status),
+          )
+          .map((item: any) => ({
+            id: item.vanInventoryTopupId || item._id,
+            reference: `#${item.reference || item.vanInventoryTopupId?.slice(-8) || item._id}`,
+            status: item.status,
+            requestedCases: Number(item.totalRequestedCases || 0),
+            requestedPieces: Number(item.totalRequestedPieces || 0),
+            approvedCases: Number(item.totalApprovedCases || 0),
+            approvedPieces: Number(item.totalApprovedPieces || 0),
+          })),
+      );
       setShowDayEndSummary(true);
     } catch (error) {
       console.error('Error fetching day end summary:', error);
@@ -147,7 +173,11 @@ export default function StockCountScreen({
       });
       if (response?.success || response?.statusCode === 200) {
         loader.show({ message: 'Finalizing settlement...' });
-        toast.success('Your day successfully completed' as any);
+        toast.success(
+          (carryForwardStock
+            ? 'Your day successfully completed'
+            : 'Day completed. Stock unload request submitted for approval.') as any,
+        );
         setShowFinalConfirm(false);
         setShowSettlementOptions(false);
         setShowDayEndSummary(false);
@@ -747,6 +777,7 @@ export default function StockCountScreen({
       <DayEndSummaryModal
         visible={showDayEndSummary}
         data={dayEndSummary}
+        topupSettlementAlerts={settlementTopupAlerts}
         onClose={() => setShowDayEndSummary(false)}
         onProceed={() => {
           setShowDayEndSummary(false);

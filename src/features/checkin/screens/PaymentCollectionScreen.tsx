@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import { usePaymentCollectionStyles } from '../styles/PaymentCollection.styles';
 import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { useCartStore } from '@/core/store/cart.store';
-import { useRouteStore } from '@/core/store/route.store';
+import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
 import { saleService } from '@/shared/services/sale.service';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { useAuthStore } from '@/core/store/auth.store';
@@ -29,6 +29,7 @@ import { AppModal, ConfirmationModal } from '@/core/components';
 import { FlatList } from 'react-native-gesture-handler';
 import { useInvoiceStore } from '@/core/store/invoice.store';
 import { useLoaderStore } from '@/core/loader/loader.store';
+import { toBusinessId } from '@/shared/utils/business-id.utils';
 
 type PaymentMode = 'cash' | 'wallet' | 'card' | 'cheque' | 'credit' | 'split';
 
@@ -828,7 +829,8 @@ export default function PaymentCollectionScreen() {
   const styles = usePaymentCollectionStyles();
   const loader = useLoaderStore();
   const outlet = useOutletStore((s) => s.selectedOutlet);
-  const { items, getCartSummary, clearCart } = useCartStore();
+  const { items, getCartSummary, clearCart, refreshSchemeDiscounts, schemeDiscounts } =
+    useCartStore();
   const van = useRouteStore.getState().van;
   const selectedRoute = useRouteStore((s) => s.selectedRoute);
   const user = useAuthStore((s) => s.user);
@@ -837,7 +839,24 @@ export default function PaymentCollectionScreen() {
   const [showSplitPaymentModal, setShowSplitPaymentModal] = useState(false);
   const activeVisit = useOutletStore.getState().activeVisit;
 
-  const { total: orderTotal, totalNetWeight, caseDetails, pieceDetails } = getCartSummary();
+  // Re-resolve category/sub-category/product/province/route/van wise schemes in case
+  // cart contents changed since the sales summary screen last refreshed them.
+  useEffect(() => {
+    refreshSchemeDiscounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  const {
+    subtotal: orderSubtotal,
+    total: orderTotal,
+    discount: orderDiscount,
+    totalNetWeight,
+    caseDetails,
+    pieceDetails,
+  } = getCartSummary();
+  const appliedSchemeNames = Array.from(
+    new Set(Object.values(schemeDiscounts).map((benefit) => benefit.schemeName)),
+  );
 
   // const params = useLocalSearchParams<{
   //   customerName?: string;
@@ -858,6 +877,10 @@ export default function PaymentCollectionScreen() {
 
   const [selectedMode, setSelectedMode] = useState<PaymentMode>('cash');
   const [amount, setAmount] = useState(orderTotal.toString());
+
+  useEffect(() => {
+    setAmount(orderTotal.toString());
+  }, [orderTotal]);
   const [paymentDetails, setPaymentDetails] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCreditInfo, setShowCreditInfo] = useState(true);
@@ -1024,16 +1047,26 @@ export default function PaymentCollectionScreen() {
         const caseQty = item.caseQty || 0;
         const pieceQty = item.pieceQty || 0;
         const unitQtyInCase = item.unitQtyInCase || 1;
-        const customerCategoryId = selectedRoute?.customerCategoryId || '';
+        const customerCategoryId = getRouteCustomerCategoryId(selectedRoute);
+        const categoryId = toBusinessId(item.categoryId, ['categoryId', 'productCategoryId']);
+        const parentCategoryId = toBusinessId(item.parentCategoryId, [
+          'parentCategoryId',
+          'categoryId',
+          'productCategoryId',
+        ]);
         const quantity = caseQty * unitQtyInCase + pieceQty;
+        const grossValue = caseQty * (item.casePrice || 0) + pieceQty * (item.piecePrice || 0);
+        const benefit = schemeDiscounts[item.productId];
+        const discountAmount = toFixed4(Math.min(benefit?.discountAmount ?? 0, grossValue));
 
         return {
           productId: item.productId,
           productName: item.productName,
           compCode: item.compCode,
-          categoryId: item.categoryId,
-          parentCategoryId: item.parentCategoryId,
+          categoryId,
+          parentCategoryId,
           customerCategoryId,
+          isFocusedPack: item.isFocusedPack === 'Y' ? 'Y' : 'N',
           caseQty,
           pieceQty,
           quantity,
@@ -1045,7 +1078,19 @@ export default function PaymentCollectionScreen() {
           piecePrice: item.piecePrice,
           totalNetWeight:
             caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0),
-          totalValue: caseQty * (item.casePrice || 0) + pieceQty * (item.piecePrice || 0),
+          grossValue: toFixed4(grossValue),
+          totalValue: toFixed4(grossValue - discountAmount),
+          schemeId: benefit?.schemeId,
+          schemeName: benefit?.schemeName,
+          schemeType: benefit?.schemeType,
+          schemeMinimumQuantity: benefit?.minimumQuantity,
+          schemeDiscountPercent: benefit?.discountPercent,
+          schemeDiscountValue: benefit?.discountValue,
+          schemeBuyQty: benefit?.buyQty,
+          schemeDiscountAmount: discountAmount || undefined,
+          schemeFreeQty: benefit?.freeQty,
+          schemeFreeProductId: benefit?.freeProductId,
+          schemeFreeProductName: benefit?.freeProductName,
         };
       });
 
@@ -1143,6 +1188,16 @@ export default function PaymentCollectionScreen() {
         totalPieces: pieceDetails.totalPieces,
         totalQty,
         totalWeight: toFixed4(totalNetWeight),
+        subtotal: toFixed4(orderSubtotal),
+        schemeIds: Array.from(
+          new Set(
+            Object.values(schemeDiscounts)
+              .map((benefit) => benefit.schemeId)
+              .filter(Boolean),
+          ),
+        ),
+        schemeNames: appliedSchemeNames,
+        schemeDiscountAmount: toFixed4(orderDiscount),
         totalValue,
         type: saleType,
         paymentMode,
@@ -1227,7 +1282,8 @@ export default function PaymentCollectionScreen() {
           totalPieces: pieceDetails.totalPieces,
           totalQty,
           totalNetWeight: toFixed4(totalNetWeight),
-          subtotal: toFixed4(orderTotal),
+          subtotal: toFixed4(orderSubtotal),
+          discount: toFixed4(orderDiscount),
           tax: toFixed4(0),
           total: totalValue,
         },
@@ -1452,6 +1508,46 @@ export default function PaymentCollectionScreen() {
                     {totalNetWeight.toFixed(3)} kg
                   </Text>
                 </View>
+                <View style={styles.summaryDivider} />
+              </>
+            )}
+
+            {orderDiscount > 0 && (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Subtotal</Text>
+                  <Text style={styles.summaryValue}>
+                    {currency} {orderSubtotal.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Ionicons name="pricetag" size={14} color={colors.success} />
+                    <Text style={[styles.summaryLabel, { color: colors.success }]}>
+                      Scheme savings
+                    </Text>
+                  </View>
+                  <Text style={[styles.summaryValue, { color: colors.success, fontWeight: '700' }]}>
+                    − {currency} {orderDiscount.toFixed(2)}
+                  </Text>
+                </View>
+                {appliedSchemeNames.map((schemeName) => (
+                  <View
+                    key={schemeName}
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: 3,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: colors.success + '12',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.success }}>
+                      Applied: {schemeName}
+                    </Text>
+                  </View>
+                ))}
                 <View style={styles.summaryDivider} />
               </>
             )}

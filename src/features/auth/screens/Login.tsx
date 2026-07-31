@@ -249,7 +249,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
         mobile: profile?.mobile || profile?.phone || resData.user.mobile || resData.user.phone,
         employeeId: profile?.employeeId || resData.user.employeeId || resData.user.profileId,
         employeeName: profile?.employeeName,
-        designation: profile?.designation,
+        position: profile?.position,
         role: profile?.role || resData.user.role,
         roleId: profile?.roleId || profile?.role || resData.user.roleId || resData.user.role,
         route: profile?.route,

@@ -1,6 +1,13 @@
 // DayEndSummaryModal.tsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, TouchableOpacity, FlatList, Animated, SafeAreaView, ScrollView } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  FlatList,
+  Animated,
+  SafeAreaView,
+  ScrollView,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { AppModal, AppText, SearchBar } from '@/core/components';
@@ -99,6 +106,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
 
   const [activeTab, setActiveTab] = useState<'overview' | 'products'>('overview');
   const [productSearch, setProductSearch] = useState('');
+  const [showUnacceptedStockConfirm, setShowUnacceptedStockConfirm] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
 
   const formatCurrency = useCallback((value: number) => {
@@ -110,14 +118,32 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
     return `${cases}C ${pieces}P`;
   }, []);
 
-  const formatTonnage = useCallback((weightInKg: number) => {
+  const formatWeightKg = useCallback((weightInKg: number) => {
     if (!weightInKg) return '-';
-    return `${(weightInKg / 1000).toFixed(3)} T`;
+    return `${weightInKg.toFixed(2)} KG`;
   }, []);
 
   const submittedTopups = topupSettlementAlerts.filter((item) => item.status === 'SUBMITTED');
   const approvedTopups = topupSettlementAlerts.filter((item) => item.status === 'APPROVED');
+  const approvedTopupCases = approvedTopups.reduce(
+    (total, item) => total + Number(item.approvedCases || 0),
+    0,
+  );
+  const approvedTopupPieces = approvedTopups.reduce(
+    (total, item) => total + Number(item.approvedPieces || 0),
+    0,
+  );
   const totalAttentionTopups = submittedTopups.length + approvedTopups.length;
+  const handleProceed = () => {
+    if (!onProceed) return;
+
+    if (!approvedTopups.length) {
+      onProceed();
+      return;
+    }
+
+    setShowUnacceptedStockConfirm(true);
+  };
   const filteredProducts = useMemo(() => {
     const query = productSearch.trim().toLowerCase();
     if (!query) return data?.products || [];
@@ -134,6 +160,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
     } else {
       fadeAnim.setValue(0);
+      setShowUnacceptedStockConfirm(false);
     }
   }, [visible, fadeAnim]);
 
@@ -292,8 +319,8 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     color="#F59E0B"
                   />
                   <SummaryTile
-                    label="Closing tonnage"
-                    value={formatTonnage(closing.weight)}
+                    label="Closing KG"
+                    value={formatWeightKg(closing.weight)}
                     helper="Final van load"
                     icon="weight-kilogram"
                     color="#6366F1"
@@ -425,7 +452,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     Stock
                   </AppText>
                   <AppText style={[styles.financialHeaderWeight, { color: colors.textSecondary }]}>
-                    Tonnage
+                    KG
                   </AppText>
                   <AppText style={[styles.financialHeaderValue, { color: colors.textSecondary }]}>
                     Value
@@ -450,7 +477,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                       {formatStock(stat.cases, stat.pieces)}
                     </AppText>
                     <AppText style={[styles.financialWeightText, { color: stat.color }]}>
-                      {formatTonnage(stat.weight)}
+                      {formatWeightKg(stat.weight)}
                     </AppText>
                     <AppText style={[styles.financialValueText, { color: stat.color }]}>
                       {stat.value > 0 ? formatCurrency(stat.value) : '-'}
@@ -588,7 +615,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
           </TouchableOpacity>
           {onProceed && (
             <TouchableOpacity
-              onPress={onProceed}
+              onPress={handleProceed}
               style={[styles.proceedButton, { backgroundColor: colors.primary }]}
             >
               <AppText style={styles.proceedButtonText}>Confirm Day End</AppText>
@@ -596,6 +623,72 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
           )}
         </View>
       </SafeAreaView>
+
+      {showUnacceptedStockConfirm && (
+        <View style={styles.unacceptedStockBackdrop}>
+          <View style={styles.unacceptedStockCard}>
+            <AppText style={styles.unacceptedStockEyebrow}>ACTION REQUIRED</AppText>
+            <View style={styles.unacceptedStockIcon}>
+              <MaterialCommunityIcons name="package-variant" size={34} color={colors.warning} />
+            </View>
+            <AppText style={styles.unacceptedStockTitle}>
+              Approved stock awaits acceptance
+            </AppText>
+            <AppText style={styles.unacceptedStockDescription}>
+              This approved quantity has not yet been accepted into your van inventory.
+            </AppText>
+
+            <View style={styles.unacceptedStockMetrics}>
+              <View style={styles.unacceptedStockMetric}>
+                <AppText style={styles.unacceptedStockMetricValue}>
+                  {approvedTopups.length}
+                </AppText>
+                <AppText style={styles.unacceptedStockMetricLabel}>
+                  {approvedTopups.length === 1 ? 'Request' : 'Requests'}
+                </AppText>
+              </View>
+              <View style={styles.unacceptedStockMetric}>
+                <AppText style={styles.unacceptedStockMetricValue}>{approvedTopupCases}</AppText>
+                <AppText style={styles.unacceptedStockMetricLabel}>Cases</AppText>
+              </View>
+              <View style={styles.unacceptedStockMetric}>
+                <AppText style={styles.unacceptedStockMetricValue}>{approvedTopupPieces}</AppText>
+                <AppText style={styles.unacceptedStockMetricLabel}>Pieces</AppText>
+              </View>
+            </View>
+
+            <View style={styles.unacceptedStockNote}>
+              <MaterialCommunityIcons
+                name="information-outline"
+                size={18}
+                color={colors.warning}
+              />
+              <AppText style={styles.unacceptedStockNoteText}>
+                If you end the day now, this approved quantity will not be included in today&apos;s
+                van stock.
+              </AppText>
+            </View>
+
+            <View style={styles.unacceptedStockActions}>
+              <TouchableOpacity
+                onPress={() => setShowUnacceptedStockConfirm(false)}
+                style={styles.unacceptedStockReviewButton}
+              >
+                <AppText style={styles.unacceptedStockReviewText}>Review Approved Stock</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowUnacceptedStockConfirm(false);
+                  onProceed?.();
+                }}
+                style={styles.unacceptedStockEndButton}
+              >
+                <AppText style={styles.unacceptedStockEndText}>End Day Anyway</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </AppModal>
   );
 };

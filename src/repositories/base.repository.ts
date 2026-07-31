@@ -42,6 +42,10 @@ const addToQueue = async (
   payload: Record<string, unknown>,
 ) => {
   const now = new Date().toISOString();
+  // Kept only in the queue payload (the server strips ownerId). This provides
+  // an immutable ownership marker even if the authenticated account changes
+  // while an asynchronous repository operation is finishing.
+  const queuePayload = { ...payload, ownerId };
   const existing = await database.getFirstAsync<{ id: string; operation: SyncOperation }>(
     `SELECT id, operation FROM sync_queue
      WHERE owner_id = ? AND entity = ? AND record_id = ? AND status IN ('PENDING', 'FAILED')`,
@@ -55,7 +59,7 @@ const addToQueue = async (
       `UPDATE sync_queue SET operation = ?, payload = ?, status = 'PENDING', error = NULL,
        retry_count = 0, next_retry_at = NULL, updated_at = ? WHERE id = ?`,
       finalOperation,
-      JSON.stringify(payload),
+      JSON.stringify(queuePayload),
       now,
       existing.id,
     );
@@ -70,7 +74,7 @@ const addToQueue = async (
     entity,
     recordId,
     operation,
-    JSON.stringify(payload),
+    JSON.stringify(queuePayload),
     now,
     now,
   );

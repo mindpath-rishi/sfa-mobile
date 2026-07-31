@@ -1,4 +1,3 @@
-
 // import { getDatabase } from '@/database';
 // import type { EntityName } from '@/database/entities';
 // import { isSalesman } from '@/core/navigation/role.utils';
@@ -673,8 +672,6 @@
 //     await this.sync();
 //   },
 // };
-
-
 
 // // import { getDatabase } from '@/database';
 // // import type { EntityName } from '@/database/entities';
@@ -1351,8 +1348,7 @@
 // //   },
 // // };
 
-
-import { getDatabase } from '@/database';
+import { ENTITY_TABLES, getDatabase, withTransaction } from '@/database';
 import type { EntityName } from '@/database/entities';
 import { isSalesman } from '@/core/navigation/role.utils';
 import {
@@ -1400,6 +1396,56 @@ type QueueRow = {
   updated_at: string;
 };
 
+const OWNER_FIELDS_BY_ENTITY: Partial<Record<EntityName, string[]>> = {
+  routeSessions: ['userId', 'employeeId'],
+  orders: ['employeeId', 'userId'],
+  collections: ['employeeId', 'userId'],
+  attendance: ['userId', 'employeeId'],
+  activities: ['userId', 'employeeId'],
+  visits: ['employeeId', 'userId'],
+  interactions: ['employeeId', 'userId'],
+  nonSales: ['employeeId', 'userId'],
+  leaves: ['userId', 'employeeId'],
+  surveys: ['employeeId', 'userId'],
+  expenses: ['employeeId', 'userId'],
+  returns: ['employeeId', 'userId'],
+  complaints: ['employeeId', 'userId'],
+  vanDailyStock: ['employeeId', 'userId'],
+  inventoryTransactions: ['employeeId', 'userId'],
+};
+
+const payloadOwnerId = (item: QueueRow) => {
+  let payload: Record<string, unknown>;
+
+  try {
+    payload = JSON.parse(item.payload) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+
+  const queueOwnerMarker = String(payload.ownerId ?? '').trim();
+  const candidates = [
+    ...(queueOwnerMarker ? [queueOwnerMarker] : []),
+    ...(OWNER_FIELDS_BY_ENTITY[item.entity] ?? [])
+      .map((field) => String(payload[field] ?? '').trim())
+      .filter(Boolean),
+  ];
+
+  if (item.entity === 'orders' && Array.isArray(payload.employees)) {
+    for (const employee of payload.employees) {
+      if (!employee || typeof employee !== 'object') continue;
+
+      const employeeId = String((employee as Record<string, unknown>).employeeId ?? '').trim();
+
+      if (employeeId) candidates.push(employeeId);
+    }
+  }
+
+  const uniqueCandidates = [...new Set(candidates)];
+
+  return uniqueCandidates.length === 1 ? uniqueCandidates[0] : null;
+};
+
 const ownerId = () => useAuthStore.getState().user?.userId ?? '';
 
 const enabled = () =>
@@ -1407,14 +1453,10 @@ const enabled = () =>
   useAuthStore.getState().user?.offlineAccessAllowed === true;
 
 let activeSync: Promise<void> | null = null;
+let activeSyncOwnerId: string | null = null;
 let syncRequestedWhileActive = false;
 
-const log = async (
-  operation: string,
-  entity: string,
-  status: string,
-  error?: string,
-) => {
+const log = async (operation: string, entity: string, status: string, error?: string) => {
   const database = await getDatabase();
 
   await database.runAsync(
@@ -1448,30 +1490,30 @@ const updatePendingCount = async () => {
   useOfflineStore.getState().setPendingCount(await pendingCount());
 };
 
-const getSetting = async (key: string) => {
+const getSetting = async (key: string, settingOwnerId = ownerId()) => {
   const database = await getDatabase();
 
   return database.getFirstAsync<{ value: string }>(
     'SELECT value FROM settings WHERE owner_id = ? AND key = ?',
-    ownerId(),
+    settingOwnerId,
     key,
   );
 };
 
-const setSetting = async (key: string, value: string) => {
+const setSetting = async (key: string, value: string, settingOwnerId = ownerId()) => {
   const database = await getDatabase();
 
   await database.runAsync(
     `INSERT INTO settings(key, owner_id, value, updated_at) VALUES (?, ?, ?, ?)
      ON CONFLICT(key, owner_id) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     key,
-    ownerId(),
+    settingOwnerId,
     value,
     new Date().toISOString(),
   );
 };
 
-const nextBatch = async () => {
+const nextBatch = async (batchOwnerId = ownerId()) => {
   const database = await getDatabase();
   const now = new Date().toISOString();
 
@@ -1483,11 +1525,61 @@ const nextBatch = async () => {
        AND (next_retry_at IS NULL OR next_retry_at <= ?)
      ORDER BY created_at ASC
      LIMIT ?`,
-    ownerId(),
+    batchOwnerId,
     MAX_RETRIES,
     now,
     BATCH_SIZE,
   );
+};
+
+const moveQueueItemToPayloadOwner = async (item: QueueRow, correctOwnerId: string) => {
+  const table = ENTITY_TABLES[item.entity];
+  const now = new Date().toISOString();
+
+  await withTransaction(async (database) => {
+    const existingQueueItem = await database.getFirstAsync<{ id: string }>(
+      `SELECT id FROM sync_queue
+       WHERE owner_id = ?
+         AND entity = ?
+         AND record_id = ?
+         AND status IN ('PENDING', 'FAILED')
+         AND id != ?
+       LIMIT 1`,
+      correctOwnerId,
+      item.entity,
+      item.record_id,
+      item.id,
+    );
+
+    await database.runAsync(
+      `UPDATE ${table}
+       SET owner_id = ?, updated_at = ?
+       WHERE uuid = ? AND owner_id = ?`,
+      correctOwnerId,
+      now,
+      item.record_id,
+      item.owner_id,
+    );
+
+    if (existingQueueItem) {
+      await database.runAsync('DELETE FROM sync_queue WHERE id = ?', item.id);
+    } else {
+      await database.runAsync(
+        `UPDATE sync_queue
+         SET owner_id = ?,
+             status = 'PENDING',
+             retry_count = 0,
+             next_retry_at = NULL,
+             error = NULL,
+             updated_at = ?
+         WHERE id = ? AND owner_id = ?`,
+        correctOwnerId,
+        now,
+        item.id,
+        item.owner_id,
+      );
+    }
+  });
 };
 
 const resetRetryableFailedItems = async () => {
@@ -1594,8 +1686,7 @@ const uploadMediaItem = async (item: QueueRow) => {
   }
 
   const extension = payload.extension || 'jpg';
-  const mimeType =
-    extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+  const mimeType = extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
 
   const fileName = `outlet-${payload.customerId}-${Date.now()}.${extension}`;
   const formData = new FormData();
@@ -1644,16 +1735,37 @@ const deleteQueuedMediaFile = async (item: QueueRow) => {
   }
 };
 
-const upload = async () => {
+const upload = async (uploadOwnerId = ownerId()) => {
   const database = await getDatabase();
   const mediaWarnings: string[] = [];
 
   while (true) {
-    const batch = await nextBatch();
+    if (!uploadOwnerId || ownerId() !== uploadOwnerId) return mediaWarnings;
+
+    const batch = await nextBatch(uploadOwnerId);
 
     if (!batch.length) return mediaWarnings;
+    if (ownerId() !== uploadOwnerId) return mediaWarnings;
 
-    const ids = batch.map((item) => item.id);
+    const validBatch: QueueRow[] = [];
+
+    for (const item of batch) {
+      const recordOwnerId = payloadOwnerId(item);
+
+      if (recordOwnerId && recordOwnerId !== uploadOwnerId) {
+        await moveQueueItemToPayloadOwner(item, recordOwnerId);
+        continue;
+      }
+
+      validBatch.push(item);
+    }
+
+    if (!validBatch.length) {
+      await updatePendingCount();
+      continue;
+    }
+
+    const ids = validBatch.map((item) => item.id);
 
     await database.runAsync(
       `UPDATE sync_queue
@@ -1666,10 +1778,15 @@ const upload = async () => {
 
     await updatePendingCount();
 
-    const mediaItems = batch.filter((item) => item.entity === 'mediaUploads');
-    const regularItems = batch.filter(
-      (item) => item.entity !== 'mediaUploads',
-    );
+    // Authentication can change while SQLite is resolving a batch. Never send
+    // one salesman's rows with another salesman's newly installed token.
+    if (ownerId() !== uploadOwnerId) {
+      await resetToPending(validBatch);
+      return mediaWarnings;
+    }
+
+    const mediaItems = validBatch.filter((item) => item.entity === 'mediaUploads');
+    const regularItems = validBatch.filter((item) => item.entity !== 'mediaUploads');
 
     const operations: UploadOperation[] = regularItems.map((item) => ({
       queueId: item.id,
@@ -1685,10 +1802,19 @@ const upload = async () => {
       let response;
 
       try {
-        response = await syncApi.upload(operations);
+        if (ownerId() !== uploadOwnerId) {
+          await resetToPending(validBatch);
+          return mediaWarnings;
+        }
+
+        response = await syncApi.upload(operations, uploadOwnerId);
+
+        if (ownerId() !== uploadOwnerId) {
+          await resetToPending(validBatch);
+          return mediaWarnings;
+        }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Upload request failed';
+        const message = error instanceof Error ? error.message : 'Upload request failed';
 
         for (const item of regularItems) {
           await markFailed(item, message);
@@ -1712,14 +1838,11 @@ const upload = async () => {
       }
 
       for (const item of regularItems) {
-        const result = response.data.results.find(
-          (entry) => entry.queueId === item.id,
-        );
+        const result = response.data.results.find((entry) => entry.queueId === item.id);
 
         if (!result?.success) {
           const message =
-            result?.error ??
-            (result?.conflict ? 'VERSION_CONFLICT' : 'Upload failed');
+            result?.error ?? (result?.conflict ? 'VERSION_CONFLICT' : 'Upload failed');
 
           await markFailed(item, message);
 
@@ -1731,9 +1854,7 @@ const upload = async () => {
         const repository = repositories[item.entity];
 
         if (!repository) {
-          const message = `Missing local repository for uploaded entity: ${String(
-            item.entity,
-          )}`;
+          const message = `Missing local repository for uploaded entity: ${String(item.entity)}`;
 
           await markFailed(item, message);
 
@@ -1743,7 +1864,7 @@ const upload = async () => {
         }
 
         await repository.markSynced(
-          ownerId(),
+          uploadOwnerId,
           item.record_id,
           result.serverId,
           result.version,
@@ -1759,12 +1880,19 @@ const upload = async () => {
      * A photo failure must remain retryable and visible, but must not prevent
      * master-data download or the initial offline dataset from becoming available.
      */
-    for (const item of mediaItems) {
+    for (let mediaIndex = 0; mediaIndex < mediaItems.length; mediaIndex += 1) {
+      const item = mediaItems[mediaIndex];
+
+      if (ownerId() !== uploadOwnerId) {
+        await resetToPending(mediaItems.slice(mediaIndex));
+        return mediaWarnings;
+      }
+
       try {
         const serverId = await uploadMediaItem(item);
 
         await repositories.mediaUploads.markSynced(
-          ownerId(),
+          uploadOwnerId,
           item.record_id,
           serverId,
           1,
@@ -1774,8 +1902,7 @@ const upload = async () => {
         await markQueueItemSynced(item);
         await deleteQueuedMediaFile(item);
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Media upload failed';
+        const message = error instanceof Error ? error.message : 'Media upload failed';
 
         await markFailed(item, message);
 
@@ -1791,14 +1918,20 @@ const upload = async () => {
   }
 };
 
-const download = async () => {
-  const setting = await getSetting(LAST_SYNC_KEY);
+const download = async (downloadOwnerId = ownerId()) => {
+  if (!downloadOwnerId || ownerId() !== downloadOwnerId) return;
+
+  const setting = await getSetting(LAST_SYNC_KEY, downloadOwnerId);
 
   let cursor: string | undefined;
   let serverTime: string | undefined;
 
   do {
-    const response = await syncApi.download(setting?.value ?? null, cursor);
+    if (ownerId() !== downloadOwnerId) return;
+
+    const response = await syncApi.download(setting?.value ?? null, cursor, downloadOwnerId);
+
+    if (ownerId() !== downloadOwnerId) return;
 
     if (!response.success || !response.data) {
       throw new Error(response.message ?? 'Download failed');
@@ -1819,15 +1952,13 @@ const download = async () => {
       }
 
       try {
-        await repository.upsertRemote(ownerId(), record);
+        await repository.upsertRemote(downloadOwnerId, record);
       } catch (error) {
         await log(
           'DOWNLOAD',
           String(record.entity),
           'FAILED',
-          error instanceof Error
-            ? error.message
-            : 'Failed to save remote record',
+          error instanceof Error ? error.message : 'Failed to save remote record',
         );
 
         throw error;
@@ -1846,7 +1977,9 @@ const download = async () => {
 
   const watermark = serverTime ?? new Date().toISOString();
 
-  await setSetting(LAST_SYNC_KEY, watermark);
+  if (ownerId() !== downloadOwnerId) return;
+
+  await setSetting(LAST_SYNC_KEY, watermark, downloadOwnerId);
 
   useOfflineStore.getState().setLastSyncTime(watermark);
 };
@@ -1873,6 +2006,7 @@ export const syncService = {
   async uploadDeviceDataBeforeDisableOffline() {
     if (!enabled() || !ownerId()) return 0;
 
+    const uploadOwnerId = ownerId();
     const state = useOfflineStore.getState();
 
     const queuedBeforeUpload = await pendingCount();
@@ -1907,7 +2041,7 @@ export const syncService = {
     state.setLastError(null);
 
     try {
-      const mediaWarnings = await upload();
+      const mediaWarnings = await upload(uploadOwnerId);
 
       if (mediaWarnings.length) {
         state.setLastError(`Media pending — ${mediaWarnings.join('; ')}`);
@@ -1929,8 +2063,7 @@ export const syncService = {
 
       return queuedBeforeUpload;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Device data upload failed';
+      const message = error instanceof Error ? error.message : 'Device data upload failed';
 
       useOfflineStore.getState().setLastError(message);
 
@@ -1943,6 +2076,7 @@ export const syncService = {
   },
 
   async uploadPendingBeforeSettlement() {
+    const uploadOwnerId = ownerId();
     const queuedBeforeUpload = await pendingCount();
 
     if (!queuedBeforeUpload) return 0;
@@ -1967,16 +2101,13 @@ export const syncService = {
       state.setLastError(null);
 
       try {
-        const warnings = await upload();
+        const warnings = await upload(uploadOwnerId);
 
         if (warnings.length) {
           state.setLastError(`Media pending — ${warnings.join('; ')}`);
         }
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : 'Pending entry upload failed';
+        const message = error instanceof Error ? error.message : 'Pending entry upload failed';
 
         state.setLastError(message);
 
@@ -2001,6 +2132,13 @@ export const syncService = {
   },
 
   async initialise() {
+    /**
+     * Queue rows/settings are scoped by owner_id, but Zustand sync status is
+     * shared in memory. Reset it before hydrating the logged-in owner so a
+     * previous salesman's error or pending count cannot leak into this session.
+     */
+    useOfflineStore.getState().resetUserSyncState();
+
     await hydrateOfflinePreference(ownerId());
 
     if (useAuthStore.getState().user?.offlineAccessAllowed !== true) {
@@ -2036,7 +2174,19 @@ export const syncService = {
   async sync() {
     if (!enabled() || !ownerId()) return;
 
+    const syncOwnerId = ownerId();
+
     if (activeSync) {
+      if (activeSyncOwnerId !== syncOwnerId) {
+        await activeSync;
+
+        if (enabled() && ownerId() === syncOwnerId) {
+          await this.sync();
+        }
+
+        return;
+      }
+
       syncRequestedWhileActive = true;
 
       const runningSync = activeSync;
@@ -2052,6 +2202,7 @@ export const syncService = {
       return;
     }
 
+    activeSyncOwnerId = syncOwnerId;
     activeSync = (async () => {
       const state = useOfflineStore.getState();
 
@@ -2061,9 +2212,11 @@ export const syncService = {
       state.setLastError(null);
 
       try {
-        const mediaWarnings = await upload();
+        const mediaWarnings = await upload(syncOwnerId);
 
-        await download();
+        if (ownerId() !== syncOwnerId) return;
+
+        await download(syncOwnerId);
 
         /**
          * Important:
@@ -2079,19 +2232,23 @@ export const syncService = {
           state.setLastError(`Media pending — ${mediaWarnings.join('; ')}`);
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Synchronization failed';
+        const message = error instanceof Error ? error.message : 'Synchronization failed';
+
+        if (ownerId() !== syncOwnerId) return;
 
         useOfflineStore.getState().setLastError(message);
 
         await log('SYNC', 'ALL', 'FAILED', message);
       } finally {
+        if (ownerId() !== syncOwnerId) return;
+
         useOfflineStore.getState().setSyncing(false);
 
         await updatePendingCount();
       }
     })().finally(() => {
       activeSync = null;
+      activeSyncOwnerId = null;
 
       if (syncRequestedWhileActive) {
         syncRequestedWhileActive = false;

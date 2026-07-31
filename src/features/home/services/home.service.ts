@@ -97,7 +97,7 @@
 // export interface UserWiseTargetSummary {
 //   employeeId: string;
 //   employeeName: string;
-//   designation?: string;
+//   position?: string;
 //   targetCases: number;
 //   achievementCases: number;
 //   remainingCases: number;
@@ -218,7 +218,7 @@
 //     employeeId?: string;
 //     name?: string;
 //     mobile?: string;
-//     designationId?: string;
+//     positionId?: string;
 //   }>;
 //   vanList?: Array<{
 //     vanId?: string;
@@ -251,7 +251,7 @@
 // export interface ManagerBeatOMeterResponse {
 //   employeeId?: string;
 //   employeeName?: string;
-//   designation?: string;
+//   position?: string;
 //   totalOutlets?: number;
 //   summary?: {
 //     visitedOutlets?: number;
@@ -3546,7 +3546,7 @@ export type ManagerTargetResponse = {
 export interface UserWiseTargetSummary {
   employeeId: string;
   employeeName: string;
-  designation?: string;
+  position?: string;
   targetCases: number;
   achievementCases: number;
   remainingCases: number;
@@ -3667,7 +3667,7 @@ export interface ManagerTeamCoverageResponse {
     employeeId?: string;
     name?: string;
     mobile?: string;
-    designationId?: string;
+    positionId?: string;
   }>;
   vanList?: Array<{
     vanId?: string;
@@ -3676,7 +3676,6 @@ export interface ManagerTeamCoverageResponse {
     driverName?: string;
     capacity?: number;
     warehouseId?: string;
-    associatedUsers?: string[];
     routeCount?: number;
   }>;
   outletList?: Array<{
@@ -3700,7 +3699,7 @@ export interface ManagerTeamCoverageResponse {
 export interface ManagerBeatOMeterResponse {
   employeeId?: string;
   employeeName?: string;
-  designation?: string;
+  position?: string;
   totalOutlets?: number;
   summary?: {
     visitedOutlets?: number;
@@ -3972,6 +3971,8 @@ export interface HomeService {
   getVanMappedRoutes: () => Promise<ApiResponse<any>>;
   getVan: (userId: string) => Promise<ApiResponse<any>>;
   getVans: (params?: { limit?: number; page?: number }) => Promise<ApiResponse<any>>;
+  getVanChangeOptions: () => Promise<ApiResponse<any>>;
+  getPendingStockUnloadRequest: () => Promise<ApiResponse<any>>;
   dayComplete(
     carryForwardStock:
       | any
@@ -4722,7 +4723,12 @@ export const homeService: HomeService = {
         : undefined;
     const routeId = String(activeRouteSession?.routeId ?? legacyRetailingRouteId ?? '');
     const routeRecord = routeId
-      ? await repositories.routes.findById(user?.userId ?? '', routeId)
+      ? ((
+          await repositories.routes.findAll(user?.userId ?? '', {
+            search: routeId,
+            limit: 200,
+          })
+        ).find((route) => String(route.routeId ?? '') === routeId) ?? null)
       : null;
     const selectedRoute = routeId
       ? {
@@ -5344,6 +5350,11 @@ export const homeService: HomeService = {
       offline: true,
     } as ApiResponse<any>;
   },
+  getPendingStockUnloadRequest: () =>
+    api.get<any>('/stock-unload-request/me/pending', {
+      cache: false,
+      showLoader: false,
+    }),
   dayComplete: async (carryForwardStock, config) => {
     const pendingEntries = await syncService.getPendingCount();
     if (pendingEntries > 0) {
@@ -5368,6 +5379,14 @@ export const homeService: HomeService = {
 
     const user = useAuthStore.getState().user;
     if (isSalesman(user) && isOfflineMode()) {
+      if (payload.carryForwardStock !== true) {
+        return {
+          success: false,
+          statusCode: 503,
+          message: 'Connect to the internet to submit a stock unload request for approval.',
+          data: null,
+        } as ApiResponse<any>;
+      }
       const workSessionId = useAuthStore.getState().workSessionId;
       if (!workSessionId)
         return {
@@ -5441,6 +5460,10 @@ export const homeService: HomeService = {
 
     return response;
   },
+  getVanChangeOptions: () =>
+    api.get<any>('/van/change-options', {
+      showLoader: false,
+    }) as Promise<ApiResponse<any>>,
   cancelVanChangeRequest: (vanChangeRequestId: string) =>
     api.patch<any>(`/van-change-request/${vanChangeRequestId}/cancel`, {}) as Promise<
       ApiResponse<any>
@@ -5741,7 +5764,7 @@ export const homeService: HomeService = {
       0,
     );
     const targetTonnage = targets.reduce(
-      (sum: number, item: any) => sum + Number(item.targetTonnage || 0),
+      (sum: number, item: any) => sum + Number(item.targetTonnage || 0) * 1000,
       0,
     );
     const targetValue = targets.reduce(
@@ -5754,7 +5777,7 @@ export const homeService: HomeService = {
       0,
     );
     const achievedTonnage = sales.reduce(
-      (sum: number, item: any) => sum + Number(item.totalWeight || 0) / 1000,
+      (sum: number, item: any) => sum + Number(item.totalWeight || 0),
       0,
     );
     const achievedValue = sales.reduce(
@@ -5771,7 +5794,7 @@ export const homeService: HomeService = {
       0,
     );
     const lmtdTargetTonnage = lmtdTargets.reduce(
-      (sum: number, item: any) => sum + Number(item.targetTonnage || 0),
+      (sum: number, item: any) => sum + Number(item.targetTonnage || 0) * 1000,
       0,
     );
     const lmtdTargetValue = lmtdTargets.reduce(
@@ -5784,7 +5807,7 @@ export const homeService: HomeService = {
       0,
     );
     const lmtdAchievedTonnage = lmtdSales.reduce(
-      (sum: number, item: any) => sum + Number(item.totalWeight || 0) / 1000,
+      (sum: number, item: any) => sum + Number(item.totalWeight || 0),
       0,
     );
     const lmtdAchievedValue = lmtdSales.reduce(
@@ -5871,7 +5894,7 @@ export const homeService: HomeService = {
       (selectedAchievementPercentage - lmtdAchievementPercentage).toFixed(2),
     );
 
-    const selectedDecimalPlaces = normalizedMetric === 'tonnage' ? 3 : 2;
+    const selectedDecimalPlaces = 2;
 
     const activityDayMap = new Map<string, any>();
     const visitDayMap = new Map<string, any>();
@@ -5946,7 +5969,7 @@ export const homeService: HomeService = {
       }
 
       existing.cases += Number(item.netCases || item.totalCases || 0);
-      existing.tonnage += Number(item.totalWeight || 0) / 1000;
+      existing.tonnage += Number(item.totalWeight || 0);
       existing.netValue += Number(item.totalValue || 0);
 
       if (!existing.firstPcTime || saleDate < new Date(existing.firstPcTime)) {

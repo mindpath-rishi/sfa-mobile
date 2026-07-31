@@ -16,6 +16,7 @@ export const repositories = {
   salesmen: new BaseRepository('salesmen'),
   stock: new BaseRepository('stock'),
   promotions: new BaseRepository('promotions'),
+  schemes: new BaseRepository('schemes'),
   orders: new BaseRepository('orders'),
   orderItems: new BaseRepository('orderItems'),
   collections: new BaseRepository('collections'),
