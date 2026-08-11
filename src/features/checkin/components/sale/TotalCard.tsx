@@ -4,6 +4,8 @@ import { useTheme } from '@/shared/hooks/useTheme';
 
 interface TotalsCardProps {
   total: number;
+  subtotal?: number;
+  discount?: number;
   hasItems: boolean;
   mode?: 'sales' | 'topup';
   showWeight?: boolean;
@@ -12,6 +14,8 @@ interface TotalsCardProps {
 
 export const TotalsCard: React.FC<TotalsCardProps> = ({
   total,
+  subtotal = total,
+  discount = 0,
   hasItems,
   mode = 'sales',
   showWeight,
@@ -45,6 +49,29 @@ export const TotalsCard: React.FC<TotalsCardProps> = ({
           <Text style={{ fontSize: 12, fontWeight: '500', color: colors.warning }}>
             {totalWeight.toFixed(2)} kg
           </Text>
+        </View>
+      )}
+
+      {mode === 'sales' && discount > 0 && (
+        <View style={{ paddingHorizontal: 12, paddingTop: 9, gap: 7 }}>
+          <View
+            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>Subtotal</Text>
+            <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+              K{subtotal.toLocaleString()}
+            </Text>
+          </View>
+          <View
+            style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.success }}>
+              Scheme savings
+            </Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>
+              − K{discount.toLocaleString()}
+            </Text>
+          </View>
         </View>
       )}
 

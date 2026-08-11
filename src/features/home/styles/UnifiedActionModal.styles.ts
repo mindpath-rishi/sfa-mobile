@@ -1,7 +1,10 @@
 // UnifiedActionModal.styles.ts
 import { StyleSheet } from 'react-native';
+import { useTheme } from '@/shared/hooks/useTheme';
 
 export const useUnifiedActionModalStyles = () => {
+  const { colors } = useTheme();
+
   return StyleSheet.create({
     modalOverlay: {
       flex: 1,
@@ -10,17 +13,21 @@ export const useUnifiedActionModalStyles = () => {
     },
 
     bottomModalContent: {
+      backgroundColor: colors.surface,
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
       paddingHorizontal: 20,
       paddingTop: 8,
       paddingBottom: 28,
       maxHeight: '85%',
-      shadowColor: '#000',
+      shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: -4 },
       shadowOpacity: 0.15,
       shadowRadius: 12,
       elevation: 10,
+    },
+    vanSelectionModalContent: {
+      height: '85%',
     },
 
     // Drag Indicator
@@ -32,7 +39,7 @@ export const useUnifiedActionModalStyles = () => {
       width: 48,
       height: 5,
       borderRadius: 3,
-      backgroundColor: '#E5E7EB',
+      backgroundColor: colors.border,
     },
 
     // Icon
@@ -52,12 +59,14 @@ export const useUnifiedActionModalStyles = () => {
       fontWeight: '800',
       textAlign: 'center',
       marginBottom: 4,
-      letterSpacing: -0.3,
+      letterSpacing: 0,
+      color: colors.textPrimary,
     },
     titleSmall: {
       fontSize: 18,
       fontWeight: '700',
-      letterSpacing: -0.3,
+      letterSpacing: 0,
+      color: colors.textPrimary,
     },
 
     questionText: {
@@ -67,6 +76,7 @@ export const useUnifiedActionModalStyles = () => {
       lineHeight: 20,
       paddingHorizontal: 20,
       opacity: 0.7,
+      color: colors.textSecondary,
     },
 
     // Options Container
@@ -77,16 +87,16 @@ export const useUnifiedActionModalStyles = () => {
     optionItem: {
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: '#E5E7EB',
+      borderColor: colors.border,
       padding: 14,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.card,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
     },
     optionItemSelected: {
-      borderColor: '#3B82F6',
-      backgroundColor: '#EFF6FF',
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '18',
       borderWidth: 1.5,
     },
     optionContent: {
@@ -108,15 +118,16 @@ export const useUnifiedActionModalStyles = () => {
     optionTitle: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#1F2937',
+      color: colors.textPrimary,
       marginBottom: 2,
     },
     optionDescription: {
       fontSize: 12,
       opacity: 0.6,
+      color: colors.textSecondary,
     },
     optionTextSelected: {
-      color: '#3B82F6',
+      color: colors.primary,
     },
 
     // Error
@@ -127,13 +138,13 @@ export const useUnifiedActionModalStyles = () => {
       gap: 6,
       marginBottom: 16,
       paddingVertical: 8,
-      backgroundColor: '#FEF2F2',
+      backgroundColor: colors.errorLight,
       borderRadius: 10,
     },
     errorText: {
       fontSize: 12,
       fontWeight: '500',
-      color: '#EF4444',
+      color: colors.error,
     },
 
     // Buttons
@@ -147,12 +158,14 @@ export const useUnifiedActionModalStyles = () => {
       paddingVertical: 14,
       borderRadius: 14,
       borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     cancelButtonText: {
       fontSize: 14,
       fontWeight: '600',
+      color: colors.textPrimary,
     },
     submitButton: {
       flex: 1.5,
@@ -169,7 +182,7 @@ export const useUnifiedActionModalStyles = () => {
     submitButtonText: {
       fontSize: 14,
       fontWeight: '700',
-      color: '#FFFFFF',
+      color: colors.primaryContrast,
       letterSpacing: 0.3,
     },
 
@@ -193,10 +206,12 @@ export const useUnifiedActionModalStyles = () => {
       fontSize: 22,
       fontWeight: '700',
       marginBottom: 4,
+      color: colors.textPrimary,
     },
     routeHeaderSubtitle: {
       fontSize: 13,
       lineHeight: 18,
+      color: colors.textSecondary,
     },
     routeCloseButton: {
       padding: 4,
@@ -248,11 +263,28 @@ export const useUnifiedActionModalStyles = () => {
     // Van Selection
     reasonContainer: {
       marginBottom: 16,
+      position: 'relative',
+      zIndex: 30,
+    },
+    reasonLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
     },
     reasonLabel: {
       fontSize: 12,
       fontWeight: '600',
-      marginBottom: 8,
+    },
+    requiredBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 999,
+    },
+    requiredBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.2,
     },
     reasonInput: {
       borderWidth: 1,
@@ -262,6 +294,97 @@ export const useUnifiedActionModalStyles = () => {
       minHeight: 46,
       textAlignVertical: 'top',
       fontSize: 14,
+    },
+    reasonDropdownButton: {
+      minHeight: 50,
+      borderWidth: 1,
+      borderRadius: 14,
+      paddingLeft: 14,
+      paddingRight: 8,
+      paddingVertical: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    reasonDropdownValue: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    reasonDropdownText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    reasonChevron: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    reasonDropdownMenu: {
+      position: 'absolute',
+      top: 76,
+      left: 0,
+      right: 0,
+      borderWidth: 1,
+      borderRadius: 14,
+      backgroundColor: colors.card,
+      overflow: 'hidden',
+      zIndex: 40,
+      elevation: 12,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+    },
+    reasonDropdownOption: {
+      minHeight: 50,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.divider,
+    },
+    reasonDropdownOptionLast: {
+      borderBottomWidth: 0,
+    },
+    reasonOptionIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    reasonDropdownOptionText: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    vanSelectionContent: {
+      flex: 1,
+    },
+    vanSelectionBody: {
+      flex: 1,
+      minHeight: 0,
+    },
+    dropdownDismissLayer: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 20,
+    },
+    vanList: {
+      flex: 1,
+    },
+    vanSelectionFooter: {
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.divider,
+      backgroundColor: colors.surface,
     },
     vanListContainer: {
       paddingBottom: 8,
@@ -274,7 +397,7 @@ export const useUnifiedActionModalStyles = () => {
       alignItems: 'center',
       justifyContent: 'space-between',
       marginBottom: 10,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.card,
     },
     vanItemLeft: {
       flexDirection: 'row',
@@ -326,13 +449,13 @@ export const useUnifiedActionModalStyles = () => {
       paddingVertical: 12,
       paddingHorizontal: 4,
       borderBottomWidth: 1,
-      borderBottomColor: '#F0F0F0',
+      borderBottomColor: colors.divider,
     },
     routeNumberBadge: {
       width: 28,
       height: 28,
       borderRadius: 14,
-      backgroundColor: '#F3F4F6',
+      backgroundColor: colors.backgroundTertiary,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: 10,
@@ -340,7 +463,7 @@ export const useUnifiedActionModalStyles = () => {
     routeNumberText: {
       fontSize: 12,
       fontWeight: '600',
-      color: '#6B7280',
+      color: colors.textSecondary,
     },
     routeIconImproved: {
       width: 48,
@@ -374,7 +497,7 @@ export const useUnifiedActionModalStyles = () => {
       width: 3,
       height: 3,
       borderRadius: 1.5,
-      backgroundColor: '#D1D5DB',
+      backgroundColor: colors.border,
       marginHorizontal: 8,
     },
     routeSelectIndicator: {
@@ -408,7 +531,7 @@ export const useUnifiedActionModalStyles = () => {
       borderRadius: 14,
       marginBottom: 20,
       gap: 10,
-      backgroundColor: '#F0FDF4',
+      backgroundColor: colors.successLight,
     },
     infoText: {
       fontSize: 13,
@@ -422,7 +545,7 @@ export const useUnifiedActionModalStyles = () => {
       alignItems: 'center',
       paddingVertical: 14,
       borderBottomWidth: 1,
-      borderBottomColor: '#F3F4F6',
+      borderBottomColor: colors.divider,
     },
     modalItemIcon: {
       width: 52,
@@ -451,7 +574,7 @@ export const useUnifiedActionModalStyles = () => {
       paddingVertical: 14,
       marginTop: 12,
       gap: 8,
-      backgroundColor: '#F3F4F6',
+      backgroundColor: colors.backgroundTertiary,
       borderRadius: 14,
     },
     backButtonText: {

@@ -63,7 +63,7 @@ export const usePaymentCollectionStyles = () => {
 
     paymentModeSelected: {
       borderColor: colors.primary,
-      backgroundColor: colors.primary + '5',
+      backgroundColor: colors.primary + '18',
     } as ViewStyle,
 
     paymentModeLeft: {
@@ -162,7 +162,7 @@ export const usePaymentCollectionStyles = () => {
     } as ViewStyle,
 
     collectButtonText: {
-      color: 'white',
+      color: colors.primaryContrast,
       fontSize: 16,
       fontWeight: '600',
     } as TextStyle,
@@ -403,7 +403,7 @@ export const usePaymentCollectionStyles = () => {
       paddingVertical: 12,
     },
     modalAmountDisplay: {
-      backgroundColor: '#F5F5F5',
+      backgroundColor: colors.backgroundSecondary,
       borderRadius: 8,
       padding: 12,
       marginBottom: 8,
@@ -427,8 +427,8 @@ export const usePaymentCollectionStyles = () => {
       gap: 12,
     },
     modalPaymentOptionSelected: {
-      borderColor: 'primary',
-      backgroundColor: 'primary',
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '18',
     },
     modalPaymentText: {
       flex: 1,
@@ -460,20 +460,21 @@ export const usePaymentCollectionStyles = () => {
     modalConfirmText: {
       fontSize: 16,
       fontWeight: '500',
-      color: '#FFFFFF',
+      color: colors.primaryContrast,
     },
     // Add these styles to your existing styles object
     modalDivider: {
       height: 1,
-      backgroundColor: '#E0E0E0',
+      backgroundColor: colors.divider,
       marginVertical: 16,
     },
     paymentMethodContainer: {
       marginBottom: 16,
       padding: 12,
       borderWidth: 1,
-      borderColor: '#E0E0E0',
+      borderColor: colors.border,
       borderRadius: 8,
+      backgroundColor: colors.surface,
     },
     paymentMethodHeader: {
       flexDirection: 'row',
@@ -495,9 +496,10 @@ export const usePaymentCollectionStyles = () => {
       alignItems: 'center',
       padding: 10,
       borderWidth: 1,
-      borderColor: '#E0E0E0',
+      borderColor: colors.border,
       borderRadius: 8,
       gap: 8,
+      backgroundColor: colors.card,
     },
     paymentMethodMode: {
       flex: 1,
@@ -508,9 +510,10 @@ export const usePaymentCollectionStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: 1,
-      borderColor: '#E0E0E0',
+      borderColor: colors.border,
       borderRadius: 8,
       paddingHorizontal: 10,
+      backgroundColor: colors.card,
     },
     paymentAmountField: {
       flex: 1,
@@ -523,7 +526,7 @@ export const usePaymentCollectionStyles = () => {
       justifyContent: 'center',
       padding: 12,
       borderWidth: 1,
-      borderColor: '#E0E0E0',
+      borderColor: colors.border,
       borderRadius: 8,
       borderStyle: 'dashed',
       gap: 8,
@@ -536,7 +539,7 @@ export const usePaymentCollectionStyles = () => {
     splitSummary: {
       marginTop: 16,
       padding: 12,
-      backgroundColor: '#F5F5F5',
+      backgroundColor: colors.backgroundSecondary,
       borderRadius: 8,
     },
     splitSummaryTitle: {
@@ -551,7 +554,7 @@ export const usePaymentCollectionStyles = () => {
     },
     splitSummaryLabel: {
       fontSize: 12,
-      color: '#666',
+      color: colors.textSecondary,
     },
     splitSummaryValue: {
       fontSize: 12,
@@ -559,7 +562,7 @@ export const usePaymentCollectionStyles = () => {
     },
     splitSummaryDivider: {
       height: 1,
-      backgroundColor: '#E0E0E0',
+      backgroundColor: colors.divider,
       marginVertical: 8,
     },
     splitSummaryTotal: {
@@ -572,7 +575,7 @@ export const usePaymentCollectionStyles = () => {
       marginBottom: 20,
       paddingBottom: 16,
       borderBottomWidth: 1,
-      borderBottomColor: '#E0E0E0',
+      borderBottomColor: colors.divider,
     },
     creditToggle: {
       flex: 1,
@@ -581,14 +584,14 @@ export const usePaymentCollectionStyles = () => {
       justifyContent: 'center',
       padding: 12,
       borderWidth: 1,
-      borderColor: '#E0E0E0',
+      borderColor: colors.border,
       borderRadius: 8,
       gap: 8,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.card,
     },
     creditToggleActive: {
-      borderColor: 'primary',
-      backgroundColor: 'primary10',
+      borderColor: colors.primary,
+      backgroundColor: colors.primary + '18',
     },
     creditToggleText: {
       fontSize: 14,
@@ -601,7 +604,7 @@ export const usePaymentCollectionStyles = () => {
       alignItems: 'center',
       marginBottom: 16,
       padding: 12,
-      backgroundColor: '#F0F8FF',
+      backgroundColor: colors.infoLight,
       borderRadius: 8,
     },
     remainingAmount: {
@@ -612,7 +615,7 @@ export const usePaymentCollectionStyles = () => {
     modePickerContainer: {
       width: '85%',
       maxHeight: '70%',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
       borderRadius: 12,
       padding: 16,
       alignSelf: 'center',
@@ -624,7 +627,7 @@ export const usePaymentCollectionStyles = () => {
       marginBottom: 16,
       paddingBottom: 12,
       borderBottomWidth: 1,
-      borderBottomColor: '#E0E0E0',
+      borderBottomColor: colors.divider,
     },
     modePickerTitle: {
       fontSize: 18,

@@ -1,9 +1,7 @@
 export type LeaveType = 'WEEK_OFF' | 'HOLIDAY';
 
 export type ApplyLeavePayload = {
-  leaveType: LeaveType;
-  date: string; // YYYY-MM-DD
+  type: LeaveType;
   userId?: string;
-  note?: string;
+  userName?: string;
 };
-

@@ -51,10 +51,12 @@ export const useProductCardStyles = () => {
       lineHeight: 15,
     } as TextStyle,
 
-    productMeta: {
-      fontSize: 11,
-      fontWeight: '400',
-      color: colors.textSecondary,
+    productCategory: {
+      fontSize: 10,
+      fontWeight: '500',
+      color: colors.textTertiary,
+      lineHeight: 14,
+      marginTop: 1,
     } as TextStyle,
 
     // Info Row
@@ -90,11 +92,19 @@ export const useProductCardStyles = () => {
     // Scheme
     schemeContainer: {
       marginTop: 0,
+      alignSelf: 'flex-start',
+      paddingHorizontal: utils.spacing[1],
+      paddingVertical: utils.spacing[0.5],
+      borderRadius: utils.borderRadius.xs,
+      backgroundColor: colors.success + '12',
+      borderWidth: 0.5,
+      borderColor: colors.success + '35',
     } as ViewStyle,
 
     schemeText: {
       fontSize: 11,
-      fontWeight: '500',
+      fontWeight: '600',
+      color: colors.success,
     } as TextStyle,
   }));
 

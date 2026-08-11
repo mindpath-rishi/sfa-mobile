@@ -10,11 +10,13 @@ interface Props {
 
 export const OutletAvatar: React.FC<Props> = ({ outlet }) => {
   const styles = useOutletAvatarStyles();
+  const primaryImage = outlet.images?.find((image) => image.isPrimary) || outlet.images?.[0];
+  const imageUri = outlet.avatar || primaryImage?.urls?.small || primaryImage?.url;
 
   return (
     <View style={styles.container}>
-      {outlet.avatar ? (
-        <Image source={{ uri: outlet.avatar }} style={styles.avatar} />
+      {imageUri ? (
+        <Image source={{ uri: imageUri }} style={styles.avatar} />
       ) : (
         <AppText style={styles.initials}>{outlet.name.charAt(0)}</AppText>
       )}

@@ -69,4 +69,5 @@ export interface StockProductItemProps {
   opacityAnim: any;
   colors: any;
   styles: any;
+  onPress?: (item: StockItem) => void;
 }

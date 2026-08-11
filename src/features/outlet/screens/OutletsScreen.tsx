@@ -16,6 +16,7 @@ import { useOutletStore } from '@/core/store/outlet.store';
 import { toast } from '@/shared/utils/toast';
 import { useRouteStore } from '@/core/store/route.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { PageSkeleton } from '@/shared/components/PageSkeleton';
 
 const LIMIT = 10;
 
@@ -72,6 +73,8 @@ export default function OutletsScreen() {
         options: [
           { id: 'ACTIVE', label: 'Active' },
           { id: 'INACTIVE', label: 'Inactive' },
+          { id: 'VERIFICATION_PENDING', label: 'Verification Pending' },
+          { id: 'REJECTED', label: 'Rejected' },
         ],
         selectedIds: filters.status,
       },
@@ -117,7 +120,6 @@ export default function OutletsScreen() {
 
   const getRouteOutlets = async (pageNumber = 1, isRefresh = false) => {
     try {
-      console.log(route, '===============route=============');
       if (!route?.routeId) return;
 
       const payload = {
@@ -132,15 +134,15 @@ export default function OutletsScreen() {
       const response: ApiResponse<any> = await outletService.getRouteOutlets(payload);
 
       if (response.statusCode === 200) {
-        const newData = response.data || [];
+        const newData = Array.isArray(response.data) ? response.data : response.data?.data || [];
 
         setRouteOutlets((prev) => (isRefresh ? newData : [...prev, ...newData]));
 
         setHasMore(newData.length === LIMIT);
         setPage(pageNumber);
       }
-    } catch (e) {
-      console.log('Pagination error:', e);
+    } catch (error) {
+      console.warn('Failed to load route outlets:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -151,11 +153,7 @@ export default function OutletsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // ✅ Only run when screen comes into focus
       getRouteOutlets(1, true);
-
-      // optional cleanup (not required here)
-      return () => {};
     }, [route]),
   );
 
@@ -257,7 +255,9 @@ export default function OutletsScreen() {
         <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
       </View>
 
-      {routeOutlets.length === 0 && !loading ? (
+      {loading && routeOutlets.length === 0 ? (
+        <PageSkeleton rows={6} />
+      ) : routeOutlets.length === 0 ? (
         <EmptyState
           title="No items found"
           description="Try adjusting your filters"

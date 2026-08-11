@@ -1,16 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Alert, BackHandler } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BackHandler, ScrollView, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useTheme } from '@/shared/hooks/useTheme';
-import { AppButton, SectionHeader } from '@/core/components';
-import { BottomBar } from '../components/nonsale/BottomBar';
-import { SelectedCategoryBadge } from '../components/nonsale/SelectedItemBadge';
-import { ReasonCard } from '../components/nonsale/ReasonCard';
-import { EmptyState } from '@/core/components/EmptyState';
-import { nonSaleService } from '@/features/outlet/services/non-sale.service';
-import { useOutletStore } from '@/core/store/outlet.store';
 
-export const FURTHER_REASONS: Record<string, Array<{ id: string; label: string }>> = {
+import { AppButton, SectionHeader } from '@/core/components';
+import { EmptyState } from '@/core/components/EmptyState';
+import { useLoaderStore } from '@/core/loader/loader.store';
+import { useAuthStore } from '@/core/store/auth.store';
+import { useOutletStore } from '@/core/store/outlet.store';
+import { useRouteStore } from '@/core/store/route.store';
+import { toast } from '@/core/utils';
+import { useTheme } from '@/shared/hooks/useTheme';
+import { outletService } from '@/features/outlet/services/outlet.service';
+import { nonSaleService } from '@/features/outlet/services/non-sale.service';
+
+import { BottomBar } from '../components/nonsale/BottomBar';
+import { ReasonCard } from '../components/nonsale/ReasonCard';
+import { SelectedCategoryBadge } from '../components/nonsale/SelectedItemBadge';
+
+type FurtherReason = {
+  id: string;
+  label: string;
+};
+
+export const FURTHER_REASONS: Record<string, FurtherReason[]> = {
   product: [
     { id: 'out_of_stock', label: 'Product Out of Stock' },
     { id: 'expired', label: 'Product Expired' },
@@ -54,72 +66,213 @@ export const FURTHER_REASONS: Record<string, Array<{ id: string; label: string }
   ],
 };
 
+const waitForUi = () => new Promise((resolve) => setTimeout(resolve, 50));
+
 export const NonSaleFinalScreen: React.FC = () => {
   const { colors } = useTheme();
   const params = useLocalSearchParams();
 
-  const [selectedReason, setSelectedReason] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const activeVisit = useOutletStore((s) => s.activeVisit);
+  const selectedOutlet = useOutletStore((s) => s.selectedOutlet);
+  const activeInteraction = useOutletStore((s) => s.activeInteraction);
   const clearVisit = useOutletStore((s) => s.clearVisit);
 
-  // Extract data from params
-  const customer = {
-    id: (params.customerId as string) || '16295',
-    name: (params.customerName as string) || 'Zombela',
-    address: params.customerAddress as string,
-    phone: params.customerPhone as string,
-    route: params.customerRoute as string,
-  };
+  const van = useRouteStore((s) => s.van);
+  const selectedRoute = useRouteStore((s) => s.selectedRoute);
+  const user = useAuthStore((s) => s.user);
 
-  const categoryTitle = (params.categoryTitle as string) || 'SHOP RELATED ISSUE';
-  const categoryColor = (params.categoryColor as string) || '#FFEAA7';
-  const categoryIcon = (params.categoryIcon as string) || 'storefront-outline';
-  const categoryId = (params.categoryId as string) || 'shop';
-  const reasonId = params.reasonId as string;
-  const reasonLabel = params.reasonLabel as string;
+  const showLoader = useLoaderStore((s) => s.show);
+  const hideLoader = useLoaderStore((s) => s.hide);
 
-  const specificReasons = reasonId
-    ? FURTHER_REASONS[categoryId]?.filter((r) => r.id === reasonId) || []
-    : [];
+  const submitLockRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Set default selected reason
+  const categoryTitle = useMemo(
+    () => (params.categoryTitle as string) || 'SHOP RELATED ISSUE',
+    [params.categoryTitle],
+  );
+
+  const categoryColor = useMemo(
+    () => (params.categoryColor as string) || '#FFEAA7',
+    [params.categoryColor],
+  );
+
+  const categoryIcon = useMemo(
+    () => (params.categoryIcon as string) || 'storefront-outline',
+    [params.categoryIcon],
+  );
+
+  const categoryId = useMemo(() => (params.categoryId as string) || 'shop', [params.categoryId]);
+
+  const reasonId = useMemo(() => params.reasonId as string | undefined, [params.reasonId]);
+
+  const reasonLabel = useMemo(() => (params.reasonLabel as string) || '', [params.reasonLabel]);
+
+  const specificReasons = useMemo(() => {
+    if (!reasonId) return [];
+
+    return FURTHER_REASONS[categoryId]?.filter((reason) => reason.id === reasonId) ?? [];
+  }, [categoryId, reasonId]);
+
+  const defaultReasonId = specificReasons[0]?.id ?? null;
+  const [selectedReason, setSelectedReason] = useState<string | null>(defaultReasonId);
+
   useEffect(() => {
-    if (specificReasons.length > 0 && !selectedReason) {
-      setSelectedReason(specificReasons[0].id);
-    }
-  }, [specificReasons, selectedReason]);
+    setSelectedReason(defaultReasonId);
+  }, [defaultReasonId]);
 
-  // Handle hardware back button
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.back();
-      return true;
-    });
-    return () => backHandler.remove();
+  const handleBack = useCallback(() => {
+    router.back();
   }, []);
 
-  const handleBack = () => {
-    router.back();
-  };
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
 
-  const handleSubmit = async () => {
-    console.log('==============active visit===========', activeVisit);
-    const payload: any = {
-      visitId: activeVisit?.visitId,
-      vanId: activeVisit?.visitId,
-      outletId: activeVisit?.outlet?.customerId,
-      reasonId: reasonId,
-      reasonCategoryId: categoryId,
-      // routeSessionId: activeVisit?.routeSessionId,
-      remark: '',
-    };
-    const response = await nonSaleService.markNonSale(payload);
-    if (response.success) {
+    return () => backHandler.remove();
+  }, [handleBack]);
+
+  const handleSubmit = useCallback(async () => {
+    if (submitLockRef.current || isSubmitting) return;
+
+    const finalReasonId = selectedReason || reasonId;
+
+    if (!finalReasonId || specificReasons.length === 0) {
+      toast.error('Reason required', 'Please select a valid No Sale reason.');
+      return;
+    }
+
+    submitLockRef.current = true;
+    setIsSubmitting(true);
+
+    try {
+      let visit = activeVisit;
+
+      if (!visit) {
+        const canStartVisit =
+          selectedOutlet?.customerId &&
+          activeInteraction &&
+          activeInteraction.customerId === selectedOutlet.customerId &&
+          selectedRoute?.routeSessionId &&
+          selectedRoute.workSessionId &&
+          van?.vanId;
+
+        if (!canStartVisit) {
+          toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
+          return;
+        }
+
+        showLoader({ message: 'Starting outlet visit...' });
+        await waitForUi();
+
+        const visitResponse = await outletService.startVisit(
+          {
+            routeSessionId: selectedRoute.routeSessionId,
+            workSessionId: selectedRoute.workSessionId,
+            vanId: van.vanId,
+            outletId: selectedOutlet.customerId,
+            visitType: activeInteraction.visitType,
+            interactionId: activeInteraction.interactionId,
+          },
+          { showLoader: false },
+        );
+
+        if (!visitResponse.success || !visitResponse.data?.visitId) {
+          toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
+          return;
+        }
+
+        visit = {
+          visitId: visitResponse.data.visitId,
+          outlet: selectedOutlet,
+          checkInTime: new Date(visitResponse.data.checkInTime || activeInteraction.arrivalTime),
+          status: 'ACTIVE',
+          routeSessionId: selectedRoute.routeSessionId,
+          customerId: selectedOutlet.customerId,
+          visitType: activeInteraction.visitType,
+        };
+
+        const outletStore = useOutletStore.getState();
+
+        outletStore.setActiveVisit(visit);
+        outletStore.setActiveInteraction({
+          ...activeInteraction,
+          status: 'CONVERTED',
+        });
+      }
+
+      const payload: any = {
+        visitId: visit.visitId,
+        vanId: van?.vanId ?? user?.vanId,
+        outletId: visit.outlet.customerId,
+        reasonId: finalReasonId,
+        reasonCategoryId: categoryId,
+        remark: reasonLabel,
+      };
+
+      showLoader({ message: 'Saving no sale...' });
+      await waitForUi();
+
+      const response = await nonSaleService.markNonSale(payload);
+
+      if (!response.success) {
+        toast.error('No Sale failed', response.message || 'Unable to save No Sale data.');
+        return;
+      }
+
+      /**
+       * Online no-sale creation already completes the visit on backend.
+       * Offline records need separate local visit completion.
+       */
+      if (response.offline) {
+        showLoader({ message: 'Completing outlet visit...' });
+        await waitForUi();
+
+        const completionResponse = await outletService.completeVisit(visit.visitId);
+
+        if (!completionResponse.success) {
+          toast.error(
+            'Visit completion failed',
+            completionResponse.message || 'No Sale was saved, but the local visit was not closed.',
+          );
+          return;
+        }
+      }
+
+      showLoader({ message: 'Updating route...' });
+      await waitForUi();
+
       clearVisit();
       router.replace('/route');
+    } catch (error) {
+      toast.error(
+        'No Sale failed',
+        error instanceof Error ? error.message : 'Unable to save No Sale data.',
+      );
+    } finally {
+      submitLockRef.current = false;
+      setIsSubmitting(false);
+      hideLoader();
     }
-  };
+  }, [
+    activeInteraction,
+    activeVisit,
+    categoryId,
+    clearVisit,
+    hideLoader,
+    isSubmitting,
+    reasonId,
+    reasonLabel,
+    selectedOutlet,
+    selectedReason,
+    selectedRoute,
+    showLoader,
+    specificReasons.length,
+    user?.vanId,
+    van?.vanId,
+  ]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -154,7 +307,7 @@ export const NonSaleFinalScreen: React.FC = () => {
           title="Submit No Sale Reason"
           onPress={handleSubmit}
           loading={isSubmitting}
-          disabled={!selectedReason || specificReasons.length === 0}
+          disabled={!selectedReason || specificReasons.length === 0 || isSubmitting}
           size="large"
         />
       </BottomBar>

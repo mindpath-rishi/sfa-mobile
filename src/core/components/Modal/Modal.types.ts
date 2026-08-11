@@ -12,105 +12,77 @@ export type StatusBarStyle = 'light-content' | 'dark-content' | 'default';
 export type Orientation = 'portrait' | 'landscape';
 
 export interface ModalProps {
-  /** Controls modal visibility */
   visible: boolean;
-  /** Callback when modal is closed */
   onClose: () => void;
-  /** Modal content */
-  children: any;
-  /** Modal title */
-  title?: string;
-  /** Modal size */
-  size?: ModalSize;
-  /** Modal position on screen */
-  position?: ModalPosition;
-  /** Animation type */
-  animation?: ModalAnimation;
-  /** Show close button in header */
-  showCloseButton?: boolean;
-  /** Show modal header */
-  showHeader?: boolean;
-  /** Show backdrop */
-  showBackdrop?: boolean;
-  /** Close modal when backdrop is pressed */
-  closeOnBackdropPress?: boolean;
-  /** Close on escape key (web only) */
-  closeOnEscape?: boolean;
-  /** Allow modal to be dismissed */
-  dismissible?: boolean;
-  /** Custom backdrop color */
-  backdropColor?: string;
-  /** Backdrop opacity (0-1) */
-  backdropOpacity?: number;
-  /** Animation duration in ms */
-  animationDuration?: number;
-  /** Custom z-index */
-  zIndex?: number;
-  /** Container style */
-  style?: ViewStyle;
-  /** Content style */
-  contentStyle?: ViewStyle;
-  /** Header style */
-  headerStyle?: ViewStyle;
-  /** Title style */
-  titleStyle?: TextStyle;
-  /** Close button style */
-  closeButtonStyle?: ViewStyle;
-  /** Test ID for testing */
-  testID?: string;
-  /** Accessibility label */
-  accessibilityLabel?: string;
-  /** Callback when modal is opened */
-  onOpen?: () => void;
-  /** Callback when modal is closed */
-  onCloseComplete?: () => void;
+  children?: React.ReactNode;
 
-  // New props from the component
-  /** Custom close icon */
-  closeIcon?: any;
-  /** Hide status bar when modal is open */
-  hideStatusBar?: boolean;
-  /** Status bar style */
-  statusBarStyle?: StatusBarStyle;
-  /** Enable swipe to close */
-  swipeToClose?: boolean;
-  /** Swipe threshold for closing */
-  swipeThreshold?: number;
-  /** Swipe direction */
-  swipeDirection?: SwipeDirection;
-  /** Enable keyboard avoiding */
-  keyboardAvoiding?: boolean;
-  /** Keyboard offset */
-  keyboardOffset?: number;
-  /** Make content scrollable */
-  scrollable?: boolean;
-  /** ScrollView props */
-  scrollViewProps?: ScrollViewProps;
-  /** Show loading state */
-  loading?: boolean;
-  /** Loading text */
-  loadingText?: string;
-  /** Custom loading indicator */
-  loadingIndicator?: any;
-  /** Hide close button */
-  hideCloseButton?: boolean;
-  /** Close button position */
-  closeButtonPosition?: CloseButtonPosition;
-  /** Backdrop transition duration */
-  backdropTransitionDuration?: number;
-  /** Modal transition duration */
-  modalTransitionDuration?: number;
-  /** Callback when swipe is complete */
-  onSwipeComplete?: () => void;
-  /** Callback on orientation change */
-  onOrientationChange?: (orientation: Orientation) => void;
-  /** Supported orientations */
-  supportedOrientations?: Orientation[];
-  /** Callback when modal is shown */
+  title?: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
+  position?: 'center' | 'top' | 'bottom' | 'left' | 'right';
+  animation?: 'none' | 'scale' | 'slide';
+
+  showCloseButton?: boolean;
+  showHeader?: boolean;
+  showBackdrop?: boolean;
+  closeOnBackdropPress?: boolean;
+  closeOnEscape?: boolean;
+  dismissible?: boolean;
+
+  backdropColor?: string;
+  backdropOpacity?: number;
+  animationDuration?: number;
+  zIndex?: number;
+
+  style?: any;
+  contentStyle?: any;
+  headerStyle?: any;
+  titleStyle?: any;
+  closeButtonStyle?: any;
+
+  testID?: string;
+  accessibilityLabel?: string;
+
+  onOpen?: () => void;
+  onCloseComplete?: () => void;
   onShow?: () => void;
-  /** Hardware acceleration for Android */
+
+  closeIcon?: React.ReactNode;
+  hideStatusBar?: boolean;
+  statusBarStyle?: 'default' | 'light-content' | 'dark-content';
+
+  /**
+   * New props
+   */
+  transparent?: boolean;
+  statusBarColor?: string;
+  statusBarTranslucent?: boolean;
+
+  swipeDirection?: 'up' | 'down' | 'left' | 'right';
+
+  keyboardAvoiding?: boolean;
+  keyboardOffset?: number;
+
+  scrollable?: boolean;
+  scrollViewProps?: any;
+
+  loading?: boolean;
+  loadingText?: string;
+  loadingIndicator?: React.ReactNode;
+
+  hideCloseButton?: boolean;
+  closeButtonPosition?: 'left' | 'right';
+
+  backdropTransitionDuration?: number;
+  modalTransitionDuration?: number;
+
+  onSwipeComplete?: () => void;
+  onOrientationChange?: (orientation: 'portrait' | 'landscape') => void;
+
+  supportedOrientations?: Array<
+    'portrait' | 'portrait-upside-down' | 'landscape' | 'landscape-left' | 'landscape-right'
+  >;
+
   hardwareAccelerated?: boolean;
-  /** Presentation style for iOS */
   presentationStyle?: 'fullScreen' | 'pageSheet' | 'formSheet' | 'overFullScreen';
 }
 

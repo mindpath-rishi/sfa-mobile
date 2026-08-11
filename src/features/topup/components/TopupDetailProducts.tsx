@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, FlatList, Dimensions } from 'react-native';
+import { View, FlatList } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
 import { createTopupDetailStyles } from '../styles/topupDetail.styles';
@@ -62,16 +62,20 @@ export const TopupDetailProducts: React.FC<ProductsProps> = ({ items, colors }) 
         {/* Single line: Req: 1C,1P → App: 1C,1P */}
         <View style={styles.productSingleLine}>
           <View style={styles.productReqSection}>
-            <MaterialCommunityIcons name="cube-outline" size={10} color={colors.textTertiary} />
+            <AppText style={styles.productFlowLabel}>REQUESTED</AppText>
+            <MaterialCommunityIcons name="cube-outline" size={13} color={colors.warning} />
             <AppText style={styles.productReqText}>{requestedShort}</AppText>
             <AppText style={styles.productPriceText}>{formatCurrency(requestedValue)}</AppText>
           </View>
 
           {hasApproved && (
             <>
-              <Ionicons name="arrow-forward" size={10} color={colors.textTertiary} />
+              <Ionicons name="arrow-forward" size={14} color={colors.textTertiary} />
               <View style={styles.productAppSection}>
-                <MaterialCommunityIcons name="check-circle" size={10} color={colors.success} />
+                <AppText style={[styles.productFlowLabel, { color: colors.success }]}>
+                  APPROVED
+                </AppText>
+                <MaterialCommunityIcons name="check-circle" size={13} color={colors.success} />
                 <AppText style={[styles.productAppText, { color: colors.success }]}>
                   {approvedShort}
                 </AppText>

@@ -36,9 +36,43 @@ export interface Outlet {
   creditDays?: number;
   distance?: string | number;
   avatar?: string | null;
+  images?: OutletImage[];
   tags?: string[];
   recentActivity?: Activity[];
   contacts?: Contact[];
+  lastVisitedAt?: string;
+  summary?: OutletSummary;
+}
+
+export interface OutletImage {
+  mediaId?: string;
+  url: string;
+  urls?: {
+    small?: string;
+    medium?: string;
+    large?: string;
+    original?: string;
+  };
+  title?: string;
+  altText?: string;
+  purpose?: string;
+  isPrimary?: boolean;
+}
+
+export interface OutletSummary {
+  mtd?: {
+    orderValue?: number;
+    orderQuantity?: number;
+    orderCount?: number;
+  };
+  last5Orders?: {
+    avgOrderValue?: number;
+    avgOrderQuantity?: number;
+    avgLPC?: number;
+    orders?: unknown[];
+  };
+  lastOrderDate?: string | null;
+  lastVisitDate?: string | null;
 }
 
 export interface Address {
@@ -71,4 +105,4 @@ export interface FilterOption {
 }
 
 export type ViewMode = 'grid' | 'list';
-export type OutletStatus = 'ACTIVE' | 'INACTIVE';
+export type OutletStatus = 'VERIFICATION_PENDING' | 'REJECTED' | 'ACTIVE' | 'INACTIVE';

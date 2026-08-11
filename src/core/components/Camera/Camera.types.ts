@@ -142,8 +142,13 @@ export interface CameraModalProps {
   visible: boolean;
   /** Callback when modal is closed */
   onClose: () => void;
-  /** Callback when photo is captured */
-  onCapture?: (photo: CameraCapturedPhoto) => void;
+  /**
+   * Callback when photo is captured. Return `false` (or resolve to `false`) to reject the photo
+   * and let the user retake it, optionally passing a message to show inline on the camera screen.
+   */
+  onCapture?: (
+    photo: CameraCapturedPhoto,
+  ) => void | boolean | string | Promise<void | boolean | string>;
   /** Callback when camera error occurs */
   onError?: (error: CameraError) => void;
   /** Modal title */
@@ -158,8 +163,14 @@ export interface CameraModalProps {
   closeOnCapture?: boolean;
   /** Whether to auto-focus camera when modal opens */
   autoFocusOnMount?: boolean;
+  /** Whether the user can switch between front and back cameras */
+  allowCameraSwitch?: boolean;
   /** Camera ref for external control */
   cameraRef?: React.RefObject<CameraRef>;
+  /** Show a circular face-guide overlay on top of the camera preview (useful for selfies) */
+  showFaceGuide?: boolean;
+  /** Show a preview of the captured photo with Retake/Use Photo actions before confirming capture */
+  showPreview?: boolean;
   /** Camera component props */
   cameraProps?: Omit<CameraProps, 'onCapture' | 'onError' | 'visible'>;
   /** Modal component props */
@@ -194,7 +205,7 @@ export interface GalleryPickerProps {
 
 // Default props
 export const DEFAULT_CAMERA_PROPS: Partial<CameraProps> = {
-  facing: 'front',
+  facing: 'back',
   flash: 'off',
   ratio: '16:9',
   quality: 0.8,

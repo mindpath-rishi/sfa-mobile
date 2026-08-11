@@ -23,6 +23,8 @@ import { homeService } from '@/features/home/services/home.service';
 import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSummaryModal';
 import { ConfirmationModal } from '@/core/components';
+import { useLoaderStore } from '@/core/loader/loader.store';
+import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
 const LIMIT = 15;
 
@@ -86,14 +88,16 @@ export default function StockCountScreen({
   const [detailItems, setDetailItems] = useState<any[]>([]);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
+  const [settlementTopupAlerts, setSettlementTopupAlerts] = useState<any[]>([]);
   const [showDayEndSummary, setShowDayEndSummary] = useState(false);
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [showSettlementOptions, setShowSettlementOptions] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
   const [carryForwardStock, setCarryForwardStock] = useState(true);
   const hasPromptedSettlementRef = useRef(false);
+  const loader = useLoaderStore();
 
-  const { user } = useAuthStore();
+  const { user, workSessionId } = useAuthStore();
   const { selectedRoute: route } = useRouteStore();
   const { setHeader } = useHeader();
   const {
@@ -111,39 +115,83 @@ export default function StockCountScreen({
   });
 
   const handleEndDayFromSettlement = useCallback(async () => {
+    setSettlementTopupAlerts([]);
     try {
+      loader.show({ message: 'Loading van settlement summary...' });
+
       const vanIdToUse = vanId || user?.vanId || useRouteStore.getState().van?.vanId;
       if (!vanIdToUse) {
         toast.error('Van not found. Please start your day first.' as any);
         return;
       }
 
-      const res: any = await vanService.fetchTodayStockSummary({ vanId: vanIdToUse });
+      const res: any = await vanService.fetchTodayStockSummary(
+        { vanId: vanIdToUse, workSessionId },
+        { showLoader: false },
+      );
       setDayEndSummary(res?.data);
+
+      const topupResponse = await vanService.fetchInventoryTopupRequests({
+        page: 1,
+        limit: 20,
+        vanId: vanIdToUse,
+      });
+      const topupData = topupResponse?.data?.data || topupResponse?.data || [];
+      const topups = Array.isArray(topupData) ? topupData : [];
+      setSettlementTopupAlerts(
+        topups
+          .filter((item: any) =>
+            [TOPUP_STATUS.SUBMITTED, TOPUP_STATUS.APPROVED].includes(item?.status),
+          )
+          .map((item: any) => ({
+            id: item.vanInventoryTopupId || item._id,
+            reference: `#${item.reference || item.vanInventoryTopupId?.slice(-8) || item._id}`,
+            status: item.status,
+            requestedCases: Number(item.totalRequestedCases || 0),
+            requestedPieces: Number(item.totalRequestedPieces || 0),
+            approvedCases: Number(item.totalApprovedCases || 0),
+            approvedPieces: Number(item.totalApprovedPieces || 0),
+          })),
+      );
       setShowDayEndSummary(true);
     } catch (error) {
       console.error('Error fetching day end summary:', error);
       toast.error('Failed to load day end summary. Please try again.' as any);
+    } finally {
+      loader.hide();
     }
-  }, [user?.vanId, vanId]);
+  }, [loader, user?.vanId, vanId, workSessionId]);
 
   const submitDayEnd = useCallback(async () => {
     try {
-      const response: any = await homeService.dayComplete(carryForwardStock as any);
+      setShowFinalConfirm(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      loader.show({ message: 'Completing van settlement...' });
+
+      const response: any = await homeService.dayComplete(carryForwardStock as any, {
+        showLoader: false,
+      });
       if (response?.success || response?.statusCode === 200) {
-        toast.success('Your day successfully completed' as any);
+        loader.show({ message: 'Finalizing settlement...' });
+        toast.success(
+          (carryForwardStock
+            ? 'Your day successfully completed'
+            : 'Day completed. Stock unload request submitted for approval.') as any,
+        );
         setShowFinalConfirm(false);
         setShowSettlementOptions(false);
         setShowDayEndSummary(false);
-        router.replace('/(drawer)/(tabs)');
+        router.replace('/(drawer)/(tabs)/home');
         return;
       }
       toast.error((response?.message || 'Failed to complete day') as any);
     } catch (error) {
       console.error('Error completing day:', error);
       toast.error('Failed to complete day. Please try again.' as any);
+    } finally {
+      loader.hide();
     }
-  }, [carryForwardStock]);
+  }, [carryForwardStock, loader]);
 
   const handleCreateStockCount = useCallback(() => {
     router.push('/stock-count/create');
@@ -209,7 +257,7 @@ export default function StockCountScreen({
     sections.push({
       id: 'dateRange',
       title: 'Date Range',
-      type: 'range',
+      type: 'date',
       rangeValue: {
         min: filters.dateRange.start,
         max: filters.dateRange.end,
@@ -729,6 +777,7 @@ export default function StockCountScreen({
       <DayEndSummaryModal
         visible={showDayEndSummary}
         data={dayEndSummary}
+        topupSettlementAlerts={settlementTopupAlerts}
         onClose={() => setShowDayEndSummary(false)}
         onProceed={() => {
           setShowDayEndSummary(false);
@@ -739,8 +788,8 @@ export default function StockCountScreen({
       <ConfirmationModal
         visible={showSettlementConfirm}
         title="Van Settlement"
-        message="Do you want to settlement of van?"
-        confirmText="Yes, Continue"
+        message="Do you want to view the van settlement?"
+        confirmText="View"
         cancelText="Cancel"
         type="info"
         onCancel={() => {

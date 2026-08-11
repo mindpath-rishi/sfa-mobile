@@ -18,6 +18,10 @@ export const OutletStatusBadge: React.FC<Props> = ({ status }) => {
         return colors.success;
       case 'INACTIVE':
         return colors.warning;
+      case 'VERIFICATION_PENDING':
+        return '#F59E0B';
+      case 'REJECTED':
+        return colors.error;
       default:
         return colors.textSecondary;
     }
@@ -25,7 +29,13 @@ export const OutletStatusBadge: React.FC<Props> = ({ status }) => {
 
   return (
     <View style={[styles.container, { backgroundColor: getStatusColor(status) + '20' }]}>
-      <Text style={[styles.text, { color: getStatusColor(status) }]}>{status}</Text>
+      <Text style={[styles.text, { color: getStatusColor(status) }]}>
+        {status === 'VERIFICATION_PENDING'
+          ? 'Verification Pending'
+          : status === 'REJECTED'
+            ? 'Rejected'
+            : status}
+      </Text>
     </View>
   );
 };

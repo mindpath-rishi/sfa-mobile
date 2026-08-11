@@ -16,6 +16,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
       helperText,
       successText,
       icon,
+      iconColor,
       secureTextEntry = false,
       required = false,
       success = false,
@@ -33,6 +34,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
       size = 'medium',
       variant = 'outlined',
       multiline = false,
+      placeholderTextColor,
       ...props
     },
     ref,
@@ -74,11 +76,12 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
     }, []);
 
     const getIconColor = () => {
+      if (iconColor && !hasError && !isValid) return iconColor;
       if (isDisabled) return colors.textTertiary;
       if (hasError) return colors.error;
       if (isValid) return colors.success;
       if (isFocused) return colors.primary;
-      return colors.textTertiary;
+      return colors.textSecondary;
     };
 
     const renderLeftIcon = () => {
@@ -108,7 +111,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
             <Ionicons
               name="close-circle"
               size={20}
-              color={hasError ? colors.error : colors.textTertiary}
+              color={hasError ? colors.error : iconColor ?? colors.textSecondary}
             />
           </Pressable>,
         );
@@ -127,7 +130,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
             <Ionicons
               name={secure ? 'eye-off' : 'eye'}
               size={20}
-              color={isDisabled ? colors.textTertiary : colors.textSecondary}
+              color={isDisabled ? colors.textTertiary : iconColor ?? colors.textSecondary}
             />
           </Pressable>,
         );
@@ -186,7 +189,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
             variant={variant}
             multiline={multiline}
             style={styles.input}
-            placeholderTextColor={colors.placeholder}
+            placeholderTextColor={placeholderTextColor ?? colors.textSecondary}
           />
 
           {renderRightIcon()}

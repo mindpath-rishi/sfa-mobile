@@ -50,7 +50,7 @@ export const ASSIGNED_VAN: Van = {
   vanId: 'van2',
   name: 'Van #MH-02-CD-5678',
   // vanNumber: 'Mahindra Pickup',
-  capacity: '750 kg',
+  capacity: '750',
   vanNumber: 'MH-02-CD-5678',
 };
 

@@ -55,12 +55,32 @@ export type RouteGuardRule =
  * Any route not listed is public.
  */
 export const routeGuards: Partial<Record<AppRoute, RouteGuardRule>> = {
-  '/(tabs)/home': {
+  '/(drawer)/(tabs)/home': {
     type: 'LEVEL',
     allowedLevels: ['USER', 'ADMIN', 'SUPER_ADMIN'],
   },
 
-  '/(tabs)/settings': {
+  '/(drawer)/(tabs)/daily-summary': {
+    type: 'LEVEL',
+    allowedLevels: ['USER', 'ADMIN', 'SUPER_ADMIN'],
+  },
+
+  '/(drawer)/(tabs)/daily-summary/users': {
+    type: 'LEVEL',
+    allowedLevels: ['USER', 'ADMIN', 'SUPER_ADMIN'],
+  },
+
+  '/(drawer)/(tabs)/daily-summary/[userId]': {
+    type: 'LEVEL',
+    allowedLevels: ['USER', 'ADMIN', 'SUPER_ADMIN'],
+  },
+
+  '/(drawer)/(tabs)/daily-summary/[userId]/order/[activityId]': {
+    type: 'LEVEL',
+    allowedLevels: ['USER', 'ADMIN', 'SUPER_ADMIN'],
+  },
+
+  '/(drawer)/(tabs)/settings': {
     type: 'RBAC_ANY',
     anyPermissions: ['VIEW_SETTINGS', 'EDIT_SETTINGS'],
   },

@@ -6,6 +6,7 @@ export interface FormFieldProps extends Omit<InputProps, 'error'> {
   errorText?: string;
   helperText?: string;
   icon?: React.ComponentProps<typeof Ionicons>['name'];
+  iconColor?: string;
   secureTextEntry?: boolean;
   required?: boolean;
   success?: boolean;

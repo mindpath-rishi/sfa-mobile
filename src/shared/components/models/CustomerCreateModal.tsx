@@ -1,5 +1,5 @@
 // components/customer/CustomerCreateModal.tsx
-import React, { useState, useCallback, useRef, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   TextInput,
@@ -10,18 +10,33 @@ import {
   Image,
   Keyboard,
   FlatList,
+  Alert,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as NavigationBar from 'expo-navigation-bar';
 import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCustomerCreateStyles } from '@/shared/styles/CustomerCreateModal.styles';
 import CameraModal from '@/core/components/Camera/CameraModal';
-import { useRouteStore } from '@/core/store/route.store';
+import {
+  getRouteCustomerCategoryId,
+  getRouteLocationIds,
+  useRouteStore,
+} from '@/core/store/route.store';
+import {
+  customerMasterService,
+  CustomerDropdownOption,
+} from '@/shared/services/customer-master.service';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import LoaderOverlay from '@/core/screens/LoaderOverlay';
+import { useLoaderStore } from '@/core/loader/loader.store';
 
 interface CustomerCreateModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: CustomerData, photo?: string) => void;
+  onSubmit: (data: CustomerData, photos?: string[]) => void | Promise<void>;
   loading?: boolean;
 }
 
@@ -60,7 +75,6 @@ interface FormSection {
   fields: FormField[];
 }
 
-// Dropdown Modal Component
 const DropdownModal = ({
   visible,
   onClose,
@@ -89,6 +103,8 @@ const DropdownModal = ({
       animation="slide"
       showCloseButton={true}
       closeOnBackdropPress={true}
+      transparent={true}
+      statusBarTranslucent={false}
     >
       <FlatList
         data={options}
@@ -112,6 +128,7 @@ const DropdownModal = ({
             >
               {item.name}
             </AppText>
+
             {selectedValue === item.id && (
               <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
             )}
@@ -209,22 +226,6 @@ const FORM_SECTIONS: FormSection[] = [
     description: 'Set market position and geographic details',
     icon: 'map',
     fields: [
-      // {
-      //   key: 'marketId',
-      //   label: 'Market',
-      //   type: 'dropdown',
-      //   icon: 'stats-chart-outline',
-      //   placeholder: 'Select market',
-      //   required: true,
-      // },
-      // {
-      //   key: 'provinceId',
-      //   label: 'Province',
-      //   type: 'dropdown',
-      //   icon: 'map-outline',
-      //   placeholder: 'Select province',
-      //   required: true,
-      // },
       {
         key: 'segmentation',
         label: 'Segment',
@@ -235,69 +236,13 @@ const FORM_SECTIONS: FormSection[] = [
       },
     ],
   },
-  // {
-  //   title: 'Credit Terms',
-  //   description: 'Configure credit limit and payment terms',
-  //   icon: 'card',
-  //   fields: [
-  //     {
-  //       key: 'creditLimit',
-  //       label: 'Credit Limit (ZMW)',
-  //       type: 'number',
-  //       icon: 'card-outline',
-  //       placeholder: '0.00',
-  //       required: false,
-  //     },
-  //     {
-  //       key: 'creditDays',
-  //       label: 'Credit Days',
-  //       type: 'number',
-  //       icon: 'calendar-outline',
-  //       placeholder: '30',
-  //       required: false,
-  //     },
-  //   ],
-  // },
 ];
 
-const dropdownOptions = {
-  customerCategoryId: [
-    { id: 'CAT001', name: 'Retail' },
-    { id: 'CAT002', name: 'Wholesale' },
-    { id: 'CAT003', name: 'Distributor' },
-  ],
-  channelId: [
-    { id: 'CH001', name: 'Van Sale' },
-    { id: 'CH002', name: 'Retail' },
-  ],
-  customerTypeId: [
-    { id: 'TYPE001', name: 'Regular' },
-    { id: 'TYPE002', name: 'Premium' },
-    { id: 'TYPE003', name: 'VIP' },
-  ],
-  // marketId: [
-  //   { id: 'MKT001', name: 'Urban' },
-  //   { id: 'MKT002', name: 'Rural' },
-  //   { id: 'MKT003', name: 'Semi-Urban' },
-  // ],
-  // provinceId: [
-  //   { id: 'PROV001', name: 'Lusaka' },
-  //   { id: 'PROV002', name: 'Copperbelt' },
-  //   { id: 'PROV003', name: 'Southern' },
-  // ],
-  segmentation: [
-    { id: 'A', name: 'A' },
-    { id: 'A-', name: 'A-' },
-    { id: 'A+', name: 'A+' },
-
-    { id: 'B', name: 'B' },
-    { id: 'B-', name: 'B-' },
-    { id: 'B+', name: 'B+' },
-
-    { id: 'C', name: 'C' },
-    { id: 'C-', name: 'C-' },
-    { id: 'C+', name: 'C+' },
-  ],
+const fallbackDropdownOptions = {
+  customerCategoryId: [],
+  channelId: [],
+  customerTypeId: [],
+  segmentation: [],
 };
 
 export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
@@ -306,23 +251,30 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   onSubmit,
   loading = false,
 }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useCustomerCreateStyles();
+
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRefs = useRef<{ [key: string]: TextInput | null }>({});
+  const submittingRef = useRef(false);
+
+  const selectedRoute = useRouteStore((state) => state.selectedRoute);
+  const routeLocationIds = getRouteLocationIds(selectedRoute);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
-  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
-  const selectedRoute = useRouteStore((state) => state.selectedRoute);
 
-  // Dropdown state
+  const [dropdownOptions, setDropdownOptions] =
+    useState<Record<string, CustomerDropdownOption[]>>(fallbackDropdownOptions);
+
   const [activeDropdown, setActiveDropdown] = useState<{
     visible: boolean;
     field: string | null;
-    options: DropdownOption[];
+    options: CustomerDropdownOption[];
     title: string;
   }>({
     visible: false,
@@ -336,15 +288,15 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     ownerName: '',
     phoneNumber: '',
     address: { line1: '', line2: '' },
-    customerCategoryId: 'CAT001',
-    channelId: 'CH001',
-    customerTypeId: 'TYPE001',
-    marketId: selectedRoute?.marketId || 'TJJJJJJ',
-    provinceId: selectedRoute?.provinceId || 'TESTPRO',
+    customerCategoryId: getRouteCustomerCategoryId(selectedRoute) || '',
+    channelId: '',
+    customerTypeId: '',
+    marketId: routeLocationIds.marketId || '',
+    provinceId: routeLocationIds.provinceId || '',
     segmentation: '',
     creditLimit: 0,
     creditDays: 0,
-    countryId: 'ZAMBIA',
+    countryId: routeLocationIds.countryId || '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -353,24 +305,97 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   const totalSteps = FORM_SECTIONS.length;
   const isLastStep = currentStep === totalSteps - 1;
 
+  useEffect(() => {
+    if (!visible) return;
+
+    const latestRouteLocationIds = getRouteLocationIds(selectedRoute);
+
+    setFormData((previous) => ({
+      ...previous,
+      customerCategoryId: getRouteCustomerCategoryId(selectedRoute) || '',
+      marketId: latestRouteLocationIds.marketId || '',
+      provinceId: latestRouteLocationIds.provinceId || '',
+      countryId: latestRouteLocationIds.countryId || '',
+    }));
+
+    customerMasterService
+      .getCreateCustomerDropdowns()
+      .then((options) => setDropdownOptions(options))
+      .catch((error) => console.warn('Failed to load customer dropdowns:', error));
+  }, [selectedRoute, visible]);
+
+  useEffect(() => {
+    if (!loading) {
+      submittingRef.current = false;
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible || !loading) return;
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+
+    return () => subscription.remove();
+  }, [loading, visible]);
+
+  useEffect(() => {
+    if (visible) return;
+
+    Keyboard.dismiss();
+    submittingRef.current = false;
+    setActiveDropdown((previous) => ({ ...previous, visible: false }));
+  }, [visible]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !visible) return;
+
+    void NavigationBar.setBackgroundColorAsync(colors.surface).catch(() => undefined);
+    void NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch(() => undefined);
+
+    return () => {
+      void NavigationBar.setBackgroundColorAsync(colors.background + '00').catch(() => undefined);
+      void NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch(() => undefined);
+    };
+  }, [colors.background, colors.surface, isDark, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const subscription = Keyboard.addListener('keyboardDidHide', () => {
+      setFocusedField(null);
+    });
+
+    return () => subscription.remove();
+  }, [visible]);
+
   const validateField = useCallback((field: FormField, value: any): string => {
-    if (field.required && !value) {
+    if (field.required && (value === undefined || value === null || String(value).trim() === '')) {
       return `${field.label} is required`;
     }
+
     if (field.key === 'phoneNumber' && value) {
       const phoneRegex = /^[0-9]{10,15}$/;
+
       if (!phoneRegex.test(value.replace(/\s/g, ''))) {
         return 'Invalid phone number (10-15 digits)';
       }
     }
+
     return '';
   }, []);
 
   const validateCurrentSection = useCallback((): boolean => {
     const newErrors: Record<string, string> = {};
 
+    setTouchedFields((previous) => {
+      const touched = new Set(previous);
+      currentSection.fields.forEach((field) => touched.add(field.key));
+      return touched;
+    });
+
     for (const field of currentSection.fields) {
       let value: any;
+
       if (field.key === 'addressLine1') {
         value = formData.address.line1;
       } else if (field.key === 'addressLine2') {
@@ -380,32 +405,47 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       }
 
       const error = validateField(field, value);
+
       if (error) {
         newErrors[field.key] = error;
       }
     }
 
     setErrors(newErrors);
+
     return Object.keys(newErrors).length === 0;
   }, [currentSection, formData, validateField]);
 
   const handleNext = () => {
-    if (validateCurrentSection()) {
-      setCurrentStep((prev) => Math.min(prev + 1, totalSteps - 1));
-      setTimeout(() => scrollViewRef.current?.scrollTo({ y: 0, animated: true }), 100);
-    }
+    if (!validateCurrentSection()) return;
+
+    setCurrentStep((prev) => Math.min(prev + 1, totalSteps - 1));
+
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
   };
 
   const handleBack = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 0));
-    setTimeout(() => scrollViewRef.current?.scrollTo({ y: 0, animated: true }), 100);
+
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }, 100);
   };
 
   const handleSubmit = () => {
-    // if (validateCurrentSection()) {
+    if (loading || submittingRef.current || !validateCurrentSection()) return;
+
+    submittingRef.current = true;
+    useLoaderStore.getState().show({ message: 'Preparing customer creation…' });
+
     Keyboard.dismiss();
-    onSubmit(formData, capturedPhoto || undefined);
-    // }
+
+    void onSubmit(
+      { ...formData, segmentation: formData.segmentation.trim() },
+      capturedPhotos.length ? capturedPhotos : undefined,
+    );
   };
 
   const updateField = (key: string, value: any) => {
@@ -431,11 +471,15 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   const handleFieldSubmit = (nextFieldKey?: string) => {
     if (nextFieldKey && inputRefs.current[nextFieldKey]) {
       inputRefs.current[nextFieldKey]?.focus();
+      return;
     }
+
+    Keyboard.dismiss();
   };
 
-  const openDropdown = (fieldKey: string, options: any[], title: string) => {
+  const openDropdown = (fieldKey: string, options: CustomerDropdownOption[], title: string) => {
     Keyboard.dismiss();
+
     setActiveDropdown({
       visible: true,
       field: fieldKey,
@@ -453,50 +497,63 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       updateField(activeDropdown.field, value);
       setTouchedFields((prev) => new Set(prev).add(activeDropdown.field!));
     }
+
     closeDropdown();
   };
 
   const handlePhotoCapture = (photoUri: string) => {
-    setCapturedPhoto(photoUri);
+    setCapturedPhotos((previous) => [...previous, photoUri]);
     setShowCamera(false);
   };
 
-  const handleRemovePhoto = () => {
+  const handleRemovePhoto = (photoUri: string) => {
     Alert.alert('Remove Photo', 'Are you sure you want to remove this photo?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => setCapturedPhoto(null) },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => setCapturedPhotos((previous) => previous.filter((uri) => uri !== photoUri)),
+      },
     ]);
   };
 
   const resetForm = () => {
+    const latestRouteLocationIds = getRouteLocationIds(selectedRoute);
+
     setCurrentStep(0);
-    setCapturedPhoto(null);
+    setCapturedPhotos([]);
+
     setFormData({
       name: '',
       ownerName: '',
       phoneNumber: '',
       address: { line1: '', line2: '' },
-      customerCategoryId: '',
-      channelId: 'CH002',
+      customerCategoryId: getRouteCustomerCategoryId(selectedRoute) || '',
+      channelId: '',
       customerTypeId: '',
-      marketId: '',
-      provinceId: 'PROV001',
+      marketId: latestRouteLocationIds.marketId || '',
+      provinceId: latestRouteLocationIds.provinceId || '',
       segmentation: '',
       creditLimit: 0,
       creditDays: 0,
+      countryId: latestRouteLocationIds.countryId || '',
     });
+
     setErrors({});
     setTouchedFields(new Set());
     setFocusedField(null);
   };
 
   const handleClose = () => {
+    if (loading) return;
+
     resetForm();
     onClose();
   };
 
   const renderFormField = (field: FormField, index: number, fields: FormField[]) => {
     let value: any;
+
     if (field.key === 'addressLine1') {
       value = formData.address.line1;
     } else if (field.key === 'addressLine2') {
@@ -513,8 +570,9 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     const nextFieldKey = nextField?.key;
 
     if (field.type === 'dropdown') {
-      const options = dropdownOptions[field.key as keyof typeof dropdownOptions];
-      const selectedOption = options?.find((opt) => opt.id === value);
+      const options = dropdownOptions[field.key as keyof typeof dropdownOptions] || [];
+      const selectedOption = options.find((opt) => opt.id === value);
+      const isRouteCategory = field.key === 'customerCategoryId' && Boolean(value);
 
       return (
         <View key={field.key} style={styles.fieldContainer}>
@@ -524,20 +582,31 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
               {field.required && <AppText style={styles.requiredBadge}>*</AppText>}
             </AppText>
           </View>
+
           <TouchableOpacity
             style={[
               styles.dropdownField,
               isFocused && styles.fieldFocused,
               error && isTouched && styles.fieldError,
             ]}
-            onPress={() => openDropdown(field.key, options, `Select ${field.label}`)}
+            onPress={() =>
+              !isRouteCategory && openDropdown(field.key, options, `Select ${field.label}`)
+            }
+            disabled={isRouteCategory || loading}
           >
             <Ionicons name={field.icon} size={18} color={colors.textSecondary} />
+
             <AppText style={[styles.dropdownFieldText, !value && styles.placeholderText]}>
-              {selectedOption?.name || field.placeholder}
+              {selectedOption?.name || (isRouteCategory ? value : field.placeholder)}
             </AppText>
-            <Ionicons name="chevron-down" size={16} color={colors.textTertiary} />
+
+            <Ionicons
+              name={isRouteCategory ? 'lock-closed-outline' : 'chevron-down'}
+              size={16}
+              color={colors.textTertiary}
+            />
           </TouchableOpacity>
+
           {error && isTouched && <AppText style={styles.errorMessage}>{error}</AppText>}
         </View>
       );
@@ -550,10 +619,12 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             {field.label}
             {field.required && <AppText style={styles.requiredBadge}>*</AppText>}
           </AppText>
+
           {isTouched && !error && value && (
             <Ionicons name="checkmark-circle" size={16} color={colors.success} />
           )}
         </View>
+
         <View
           style={[
             styles.inputField,
@@ -562,6 +633,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
           ]}
         >
           <Ionicons name={field.icon} size={18} color={colors.textSecondary} />
+
           <TextInput
             ref={(ref) => {
               inputRefs.current[field.key] = ref;
@@ -589,6 +661,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             editable={!loading}
           />
         </View>
+
         {error && isTouched && <AppText style={styles.errorMessage}>{error}</AppText>}
       </View>
     );
@@ -598,51 +671,63 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     <View style={styles.photoSectionContainer}>
       <View style={styles.photoSectionHeader}>
         <Ionicons name="camera" size={20} color={colors.primary} />
+
         <View style={styles.photoSectionTitleContainer}>
-          <AppText style={styles.photoSectionTitle}>Customer Photo</AppText>
-          <AppText style={styles.photoSectionDescription}>Optional profile picture</AppText>
+          <AppText style={styles.photoSectionTitle}>Customer Photos</AppText>
+          <AppText style={styles.photoSectionDescription}>Add one or more optional photos</AppText>
         </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.photoCard, capturedPhoto && styles.photoCardFilled]}
-        onPress={() => setShowCamera(true)}
-        activeOpacity={0.9}
-      >
-        {capturedPhoto ? (
-          <View style={styles.photoPreviewContainer}>
-            <Image source={{ uri: capturedPhoto }} style={styles.photoPreview} />
-            <View style={styles.photoActions}>
-              <TouchableOpacity
-                style={[styles.photoActionButton, styles.photoRetakeButton]}
-                onPress={() => setShowCamera(true)}
-              >
-                <Ionicons name="camera-reverse-outline" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.photoActionButton, styles.photoRemoveButton]}
-                onPress={handleRemovePhoto}
-              >
-                <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
+      <View style={styles.photoSourceActions}>
+        <TouchableOpacity
+          style={styles.photoSourceButton}
+          onPress={() => setShowCamera(true)}
+          disabled={loading}
+        >
+          <Ionicons name="camera-outline" size={20} color={colors.primary} />
+          <AppText style={styles.photoSourceButtonText}>Take photo</AppText>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.photoGrid}>
+        {capturedPhotos.map((photoUri, index) => (
+          <View key={`${photoUri}-${index}`} style={[styles.photoCard, styles.photoCardFilled]}>
+            <View style={styles.photoPreviewContainer}>
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+
+              <View style={styles.photoActions}>
+                <TouchableOpacity
+                  style={[styles.photoActionButton, styles.photoRemoveButton]}
+                  onPress={() => handleRemovePhoto(photoUri)}
+                  disabled={loading}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <View style={styles.photoPlaceholderIcon}>
-              <Ionicons name="camera-outline" size={32} color={colors.primary} />
+        ))}
+
+        {capturedPhotos.length === 0 && (
+          <View style={styles.photoCard}>
+            <View style={styles.photoPlaceholder}>
+              <View style={styles.photoPlaceholderIcon}>
+                <Ionicons name="images-outline" size={32} color={colors.primary} />
+              </View>
+
+              <AppText style={styles.photoPlaceholderTitle}>No photos yet</AppText>
+              <AppText style={styles.photoPlaceholderText}>Use either option above</AppText>
             </View>
-            <AppText style={styles.photoPlaceholderTitle}>Take Photo</AppText>
-            <AppText style={styles.photoPlaceholderText}>Tap to add customer photo</AppText>
           </View>
         )}
-      </TouchableOpacity>
+      </View>
     </View>
   );
 
   const renderSummary = () => (
     <View style={styles.summaryContainer}>
       <AppText style={styles.summaryTitle}>Summary</AppText>
+
       <View style={styles.summaryGrid}>
         <View style={styles.summaryItem}>
           <AppText style={styles.summaryLabel}>Business Name</AppText>
@@ -650,23 +735,28 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             {formData.name || '—'}
           </AppText>
         </View>
+
         <View style={styles.summaryItem}>
           <AppText style={styles.summaryLabel}>Owner</AppText>
           <AppText style={styles.summaryValue} numberOfLines={1}>
             {formData.ownerName || '—'}
           </AppText>
         </View>
+
         <View style={styles.summaryItem}>
           <AppText style={styles.summaryLabel}>Phone</AppText>
           <AppText style={styles.summaryValue} numberOfLines={1}>
             {formData.phoneNumber || '—'}
           </AppText>
         </View>
+
         <View style={styles.summaryItem}>
           <AppText style={styles.summaryLabel}>Category</AppText>
           <AppText style={styles.summaryValue} numberOfLines={1}>
-            {dropdownOptions.customerCategoryId.find((c) => c.id === formData.customerCategoryId)
-              ?.name || '—'}
+            {dropdownOptions.customerCategoryId?.find((c) => c.id === formData.customerCategoryId)
+              ?.name ||
+              formData.customerCategoryId ||
+              '—'}
           </AppText>
         </View>
       </View>
@@ -678,17 +768,36 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
       <AppModal
         visible={visible}
         onClose={handleClose}
-        title={`Create Customer - ${currentSection.title}`}
+        title={`Create Outlet - ${currentSection.title}`}
         size="full"
         position="bottom"
         animation="slide"
-        showCloseButton={true}
+        showCloseButton={!loading}
+        hideCloseButton={loading}
+        dismissible={!loading}
         closeOnBackdropPress={!loading}
+        transparent={false}
+        statusBarColor={colors.primary}
+        statusBarStyle="light-content"
+        statusBarTranslucent={false}
+        keyboardAvoiding={Platform.OS === 'ios'}
         contentStyle={{ padding: 0, flex: 1 }}
-        style={{ flex: 1 }}
+        headerStyle={{
+          backgroundColor: colors.primary,
+          borderBottomColor: colors.primary,
+        }}
+        titleStyle={{ color: '#FFFFFF' }}
+        closeButtonStyle={{ backgroundColor: 'rgba(255,255,255,0.18)' }}
+        closeIcon={<Ionicons name="close" size={19} color="#FFFFFF" />}
+        style={{
+          flex: 1,
+          width: '100%',
+          maxHeight: '100%',
+          borderRadius: 0,
+          backgroundColor: colors.primary,
+        }}
       >
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-          {/* Progress Bar */}
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
               <View
@@ -698,6 +807,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
                 ]}
               />
             </View>
+
             <View style={styles.progressText}>
               <AppText style={styles.progressLabel}>
                 Step {currentStep + 1} of {totalSteps}
@@ -705,40 +815,37 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
             </View>
           </View>
 
-          {/* Form Content */}
           <ScrollView
             ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
             style={{ flex: 1 }}
           >
-            {/* Section Header */}
             <View style={styles.sectionHeader}>
               <Ionicons name={currentSection.icon} size={28} color={colors.primary} />
+
               <View style={styles.sectionTitleContainer}>
                 <AppText style={styles.sectionTitle}>{currentSection.title}</AppText>
                 <AppText style={styles.sectionDescription}>{currentSection.description}</AppText>
               </View>
             </View>
 
-            {/* Form Fields */}
             <View style={styles.fieldsContainer}>
               {currentSection.fields.map((field, index, fields) =>
                 renderFormField(field, index, fields),
               )}
             </View>
 
-            {/* Photo Section on Last Step */}
             {isLastStep && renderPhotoSection()}
 
-            {/* Summary on Last Step */}
             {isLastStep && renderSummary()}
 
             <View style={{ height: 40 }} />
           </ScrollView>
 
-          {/* Footer Actions */}
           <View style={styles.footerContainer}>
             <View style={styles.footerActions}>
               {currentStep > 0 && (
@@ -751,6 +858,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
                   <AppText style={styles.secondaryButtonText}>Back</AppText>
                 </TouchableOpacity>
               )}
+
               <TouchableOpacity
                 style={[
                   styles.actionButton,
@@ -767,18 +875,22 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
                 ) : (
                   <>
                     <AppText style={styles.primaryButtonText}>
-                      {isLastStep ? 'Create Customer' : 'Next'}
+                      {isLastStep ? 'Create Outlet' : 'Next'}
                     </AppText>
+
                     {!isLastStep && <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />}
                   </>
                 )}
               </TouchableOpacity>
             </View>
           </View>
+
+          <LoaderOverlay />
+
+          <Toast position="top" topOffset={insets.top + 12} />
         </View>
       </AppModal>
 
-      {/* Dropdown Modal */}
       <DropdownModal
         visible={activeDropdown.visible}
         onClose={closeDropdown}
@@ -792,12 +904,12 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
         title={activeDropdown.title}
       />
 
-      {/* Camera Modal */}
       <CameraModal
         visible={showCamera}
         onClose={() => setShowCamera(false)}
         onCapture={(photo) => handlePhotoCapture(photo.uri)}
         title="CAPTURE CUSTOMER PHOTO"
+        cameraProps={{ facing: 'back' }}
       />
     </>
   );

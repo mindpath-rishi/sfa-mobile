@@ -39,12 +39,13 @@ export interface TopupItem {
   approvedWeight: number;
   approvedValue: number;
   unitQtyInCase: number;
-  vanInventoryTopupId: string
+  vanInventoryTopupId: string;
 }
 
 export interface Topup {
   _id: string;
   vanInventoryTopupId: string;
+  reference?: string;
   vanId: string;
   vanName: string;
   employeeId: string;
@@ -62,9 +63,15 @@ export interface Topup {
   totalApprovedWeight: number;
   totalApprovedValue: number;
   remark?: string;
+  rejectedReason?: string;
   status: TopupStatusType;
   approvedByName?: string;
   approvedAt?: string;
+  acceptedAt?: string;
+  acceptedBy?: string;
+  declinedAt?: string;
+  declinedBy?: string;
+  declinedReason?: string;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;

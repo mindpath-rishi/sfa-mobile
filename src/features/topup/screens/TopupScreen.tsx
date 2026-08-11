@@ -1,7 +1,6 @@
 // app/topup/index.tsx
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { View, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -12,6 +11,8 @@ import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useFilterContext } from '@/shared/contexts/FilterContext';
 import { FilterSection } from '@/shared/types/filter.types';
 import { useAuthStore } from '@/core/store/auth.store';
+import { useRouteStore } from '@/core/store/route.store';
+import { SearchBar } from '@/core/components';
 import {
   PAGINATION,
   DEBOUNCE_DELAY,
@@ -19,11 +20,13 @@ import {
   DEFAULT_FILTERS,
   FILTER_SECTIONS,
   HEADER,
+  SEARCH,
   TOPUP_STATUS_OPTIONS,
 } from '../constants/topup.constants';
 import { useTopupStyles } from '../styles/topupScreen.styles';
 import { Topup } from '../types/topup.types';
 import { TopupList } from '../components/TopupList';
+import { useOfflineStore } from '@/core/offline/offline.store';
 
 interface TopupScreenProps {
   vanId?: string;
@@ -35,11 +38,14 @@ interface TopupScreenProps {
 export default function TopupScreen({
   vanId,
   hideFAB = false,
+  hideSearch = false,
   hideFilters = false,
 }: TopupScreenProps) {
   const { colors } = useTheme();
   const { user } = useAuthStore();
+  const van = useRouteStore((state) => state.van);
   const styles = useTopupStyles();
+  const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);
 
   const { setHeader } = useHeader();
   const { updateTopupFilterCount, resetTopupFilterCount, setOpenTopupFilterHandler } =
@@ -55,6 +61,8 @@ export default function TopupScreen({
 
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const vanName = van?.vanName || van?.name || van?.vanNumber || 'Van';
+  const hasFocusedOnce = useRef(false);
 
   /* -------------------- API -------------------- */
   const getTopups = async (
@@ -74,8 +82,7 @@ export default function TopupScreen({
       const payload: any = {
         page: pageNumber,
         limit: PAGINATION.LIMIT,
-        vanId: vanId || user?.vanId,
-        employeeId: user?.userId,
+        vanId: vanId || van?.vanId || user?.vanId || (user as any)?.defaultVanId,
       };
 
       if (searchQuery) payload.searchText = searchQuery;
@@ -243,24 +250,12 @@ export default function TopupScreen({
 
   /* -------------------- Create Topup -------------------- */
   const handleCreateTopup = () => {
+    if (offline) {
+      toast.error('Top-up requests are unavailable offline. Please reconnect and try again.');
+      return;
+    }
     router.push('/topup/create');
   };
-
-  /* -------------------- Search Handlers -------------------- */
-  const handleSearchClear = useCallback(() => {
-    setSearchQuery('');
-    setLoading(true);
-    setTopups([]);
-    getTopups(PAGINATION.DEFAULT_PAGE, false, true);
-  }, []);
-
-  const handleSearchSubmit = useCallback(() => {
-    if (searchQuery.trim()) {
-      setLoading(true);
-      setTopups([]);
-      getTopups(PAGINATION.DEFAULT_PAGE, false, true);
-    }
-  }, [searchQuery]);
 
   /* -------------------- Filter Count -------------------- */
   const activeFilterCount = useMemo(() => {
@@ -288,35 +283,44 @@ export default function TopupScreen({
     };
   }, [hideFilters, setOpenTopupFilterHandler]);
 
-  // Update header configuration with search bar (no scroll toggle)
+  // Update header title. Search stays fixed in the page content.
   useFocusEffect(
     useCallback(() => {
       setHeader({
-        title: 'Top-up Requests',
+        title: `${vanName} Top-up`,
         showBack: true,
-        showSearchBar: true,
-        searchPlaceholder: 'Search by reference, van...',
-        searchValue: searchQuery,
-        onSearchChange: setSearchQuery,
-        onSearchClear: handleSearchClear,
-        onSearchPress: handleSearchSubmit,
-        autoFocusSearch: false,
+        showSearch: false,
         showFilter: false,
         filterCount: activeFilterCount,
         filterActive: activeFilterCount > 0,
         onFilterPress: () => setShowFilters(true),
-        rightIcon: HEADER.RIGHT_ICON,
-        onRightPress: handleCreateTopup,
-        elevated: true,
-        centeredTitle: false,
-        size: 'sm',
-        showBorder: false,
+        rightIcon: offline ? undefined : HEADER.RIGHT_ICON,
+        onRightPress: offline ? undefined : handleCreateTopup,
+        backgroundColor: colors.primary,
       });
-    }, [searchQuery, activeFilterCount]),
+      if (hasFocusedOnce.current) {
+        getTopups(PAGINATION.DEFAULT_PAGE, true);
+      } else {
+        hasFocusedOnce.current = true;
+      }
+    }, [activeFilterCount, colors.primary, offline, setHeader, vanName]),
   );
 
   return (
     <View style={styles.container}>
+      {!hideSearch && (
+        <View style={styles.fixedSearchContainer}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={SEARCH.PLACEHOLDER}
+            clearable
+            debounceDelay={0}
+            loading={loading && topups.length > 0}
+          />
+        </View>
+      )}
+
       <TopupList
         data={topups}
         loading={loading}

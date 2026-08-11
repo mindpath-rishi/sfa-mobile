@@ -13,6 +13,7 @@ const Input = forwardRef<TextInput, CoreInputProps>(
       variant = 'outlined',
       multiline = false,
       editable = true,
+      placeholderTextColor,
       ...props
     },
     ref,
@@ -33,7 +34,7 @@ const Input = forwardRef<TextInput, CoreInputProps>(
         ref={ref}
         {...props}
         style={[styles.input, multiline && styles.inputMultiline, style]}
-        placeholderTextColor={colors.placeholder}
+        placeholderTextColor={placeholderTextColor ?? colors.textSecondary}
         selectionColor={colors.primary}
         keyboardAppearance={mode === 'dark' ? 'dark' : 'light'}
         multiline={multiline}

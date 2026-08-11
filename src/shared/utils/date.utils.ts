@@ -35,6 +35,14 @@ export const formatApiDate = (date: string | Date | null | undefined): string =>
   return formatDate(date, DATE_FORMATS.API, '');
 };
 
+export const formatLocalApiDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
 export const formatTimeOnly = (date: string | Date | null | undefined): string => {
   return formatDate(date, DATE_FORMATS.TIME_ONLY, '');
 };

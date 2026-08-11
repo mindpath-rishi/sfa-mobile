@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>SFA</string>
+    <string>Sales Stream</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -28,7 +28,7 @@
         <key>CFBundleURLSchemes</key>
         <array>
           <string>expojwttabsultimate</string>
-          <string>com.anonymous.expojwttabstemplateultimate</string>
+          <string>com.Sales Stream.app</string>
         </array>
       </dict>
     </array>
@@ -78,14 +78,14 @@
     <string>Allow $(PRODUCT_NAME) to access your camera</string>
     <key>NSContactsUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your contacts</string>
-    <key>NSFaceIDUsageDescription</key>
+    <key>NSales StreamceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to use Face ID</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>Allow Sales Stream to capture salesman location while the work day is active.</string>
     <key>NSLocationAlwaysUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>Allow Sales Stream to capture salesman location while the work day is active.</string>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <string>Allow Sales Stream to capture your location for day and visit tracking.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
@@ -105,6 +105,7 @@
     <key>UIBackgroundModes</key>
     <array>
       <string>fetch</string>
+      <string>location</string>
     </array>
     <key>UILaunchStoryboardName</key>
     <string>SplashScreen</string>

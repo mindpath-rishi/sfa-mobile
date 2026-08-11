@@ -1,5 +1,5 @@
 // styles/CustomerCreateModal.styles.ts
-import { ViewStyle, TextStyle } from 'react-native';
+import { ViewStyle, TextStyle, ImageStyle } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 
@@ -194,6 +194,35 @@ export const useCustomerCreateStyles = () => {
       marginBottom: utils.spacing[6],
     } as ViewStyle,
 
+    photoSourceActions: {
+      flexDirection: 'row',
+      gap: utils.spacing[2],
+      marginBottom: utils.spacing[3],
+    } as ViewStyle,
+
+    photoSourceButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: utils.spacing[2],
+      paddingVertical: utils.spacing[3],
+      borderWidth: 1,
+      borderColor: colors.primary,
+      borderRadius: utils.borderRadius.lg,
+      backgroundColor: `${colors.primary}08`,
+    } as ViewStyle,
+
+    photoSourceButtonText: {
+      color: colors.primary,
+      fontSize: utils.fontSize.sm,
+      fontWeight: '600',
+    } as TextStyle,
+
+    photoGrid: {
+      gap: utils.spacing[3],
+    } as ViewStyle,
+
     photoCard: {
       borderRadius: utils.borderRadius.xl,
       overflow: 'hidden',
@@ -221,7 +250,7 @@ export const useCustomerCreateStyles = () => {
       borderRadius: 70,
       borderWidth: 3,
       borderColor: colors.primary,
-    } as ViewStyle,
+    } as ImageStyle,
 
     photoActions: {
       flexDirection: 'row',

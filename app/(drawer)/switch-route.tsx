@@ -1,2490 +1,31 @@
-// import React, { useState, useEffect, useCallback, useRef } from 'react';
-// import {
-//   View,
-//   ScrollView,
-//   TouchableOpacity,
-//   ActivityIndicator,
-//   TextInput,
-//   RefreshControl,
-//   StyleSheet,
-//   Platform,
-//   Dimensions,
-//   Animated,
-//   Easing,
-//   FlatList,
-// } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-// import { Ionicons } from '@expo/vector-icons';
-// import { LinearGradient } from 'expo-linear-gradient';
-// import { router, useFocusEffect } from 'expo-router';
-// import * as Haptics from 'expo-haptics';
-// import Toast from 'react-native-toast-message';
-// import { useTheme } from '@/shared/hooks/useTheme';
-// import { AppText } from '@/core/components';
-// import { EmptyState } from '@/core/components/EmptyState'; // Import EmptyState component
-// import { useHeader } from '@/shared/contexts/HeaderContext';
-// import { useRouteStore } from '@/core/store/route.store';
-// import { useAuthStore } from '@/core/store/auth.store';
-// import { homeService } from '@/features/home/services/home.service';
-// import { outletService } from '@/features/outlet/services/outlet.service';
-
-// const { width } = Dimensions.get('window');
-// const isWeb = Platform.OS === 'web';
-
-// // Toast helper
-// const toast = {
-//   success: (title: string, message?: string) =>
-//     Toast.show({ type: 'success', text1: title, text2: message }),
-//   error: (title: string, message?: string) =>
-//     Toast.show({ type: 'error', text1: title, text2: message }),
-//   info: (title: string, message?: string) =>
-//     Toast.show({ type: 'info', text1: title, text2: message }),
-// };
-
-// // ============================================================================
-// // Types
-// // ============================================================================
-
-// interface VanRoute {
-//   routeId: string;
-//   routeName: string;
-//   routeCode?: string;
-//   routeSessionId: string;
-//   workSessionId: string;
-//   vanId: string;
-//   name: string;
-//   totalShops: number;
-//   distance: string;
-//   stops: number;
-// }
-
-// interface RouteOutlet {
-//   outletId: string;
-//   outletName: string;
-//   outletCode?: string;
-//   address: string;
-//   phoneNumber: string;
-//   ownerName: string;
-//   customerType?: string;
-//   visitStatus: 'PENDING' | 'VISITED' | 'SKIPPED' | 'NOT_VISITED' | 'ACTIVE';
-//   visitOrder: number;
-//   distance?: number;
-//   sequence: number;
-//   isVisited: boolean;
-//   hasSale: boolean;
-//   geoTag?: {
-//     lat: number;
-//     lng: number;
-//   };
-// }
-
-// interface ChangeRouteSummary {
-//   currentRoute: VanRoute | null;
-//   newRoute: VanRoute | null;
-//   outletsToVisit: RouteOutlet[];
-//   totalOutlets: number;
-//   estimatedTime: string;
-// }
-
-// // ============================================================================
-// // Constants
-// // ============================================================================
-
-// const ROUTE_OUTLETS_LIMIT = 100;
-// const ESTIMATED_TIME_PER_OUTLET = 5;
-
-// // ============================================================================
-// // Main Component
-// // ============================================================================
-
-// export default function ChangeRoute() {
-//   const { colors } = useTheme();
-//   const { setHeader } = useHeader();
-//   const { selectedRoute, setSelectedRoute, van } = useRouteStore();
-//   const workSessionId = useAuthStore((state) => state.workSessionId);
-//   // Animation refs
-//   const fadeInAnim = useRef(new Animated.Value(0)).current;
-
-//   // State
-//   const [routes, setRoutes] = useState<VanRoute[]>([]);
-//   const [selectedVanRoute, setSelectedVanRoute] = useState<VanRoute | null>(null);
-//   const [outlets, setOutlets] = useState<RouteOutlet[]>([]);
-//   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
-//   const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
-//   const [isSubmitting, setIsSubmitting] = useState(false);
-//   const [refreshing, setRefreshing] = useState(false);
-//   const [currentStep, setCurrentStep] = useState<'routes' | 'outlets' | 'confirmation'>('routes');
-//   const [searchQuery, setSearchQuery] = useState('');
-//   const [hasValidSession, setHasValidSession] = useState(true);
-
-//   // Refs
-//   const routeIdRef = useRef<string>('');
-//   const isDataLoadedRef = useRef(false);
-//   const isMountedRef = useRef(true);
-
-//   // ==========================================================================
-//   // Session Validation
-//   // ==========================================================================
-
-//   const validateWorkSession = useCallback((): boolean => {
-//     console.log('Validating work session. Current workSessionId:', workSessionId);
-//     if (!workSessionId) {
-//       setHasValidSession(false);
-//       // toast.error(
-//       //   'Work Session Required',
-//       //   'Please start your work day before changing routes. This ensures proper tracking of your activities.',
-//       // );
-//       return false;
-//     }
-//     setHasValidSession(true);
-//     return true;
-//   }, [workSessionId]);
-
-//   // Check session on focus
-//   useFocusEffect(
-//     useCallback(() => {
-//       console.log('Checking work session on focus. Current workSessionId:', workSessionId);
-//       if (!workSessionId) {
-//         setHasValidSession(false);
-//       } else {
-//         setHasValidSession(true);
-//       }
-//     }, [workSessionId]),
-//   );
-
-//   // ==========================================================================
-//   // Lifecycle
-//   // ==========================================================================
-
-//   useFocusEffect(
-//     React.useCallback(() => {
-//       setHeader({
-//         title: 'Change Route',
-//         showBack: true,
-//         showMenu: false,
-//       });
-
-//       startAnimations();
-
-//       return () => {
-//         isMountedRef.current = false;
-//       };
-//     }, []),
-//   );
-
-//   useFocusEffect(
-//     useCallback(() => {
-//       if (validateWorkSession()) {
-//         setCurrentStep('routes');
-//         fetchRoutes();
-//       }
-//     }, []),
-//   );
-
-//   const startAnimations = () => {
-//     Animated.timing(fadeInAnim, {
-//       toValue: 1,
-//       duration: 400,
-//       useNativeDriver: true,
-//     }).start();
-//   };
-
-//   // ==========================================================================
-//   // Data Fetching
-//   // ==========================================================================
-
-//   const fetchRoutes = useCallback(async () => {
-//     if (!validateWorkSession()) {
-//       setIsLoadingRoutes(false);
-//       return;
-//     }
-
-//     setIsLoadingRoutes(true);
-//     try {
-//       const response: any = await homeService.getVanMappedRoutes();
-
-//       if (response.statusCode === 200 && response?.data?.routes?.length) {
-//         const transformedRoutes = response.data.routes.map((item: any) => ({
-//           routeId: item.routeId,
-//           routeName: item.route.name,
-//           routeCode: item.route.code || '',
-//           routeSessionId: item.routeSessionId,
-//           workSessionId: item.workSessionId,
-//           vanId: item.vanId,
-//           name: item.route.name,
-//           totalShops: item.route?.outletCount || 0,
-//           distance: item.route.distance || 'N/A',
-//           stops: item.route?.outletCount || 0,
-//         }));
-
-//         // Filter out the current route from the list
-//         const filteredRoutes = transformedRoutes.filter(
-//           (route: VanRoute) => route.routeId !== selectedRoute?.routeId,
-//         );
-//         setRoutes(filteredRoutes);
-//       } else {
-//         setRoutes([]);
-//       }
-//     } catch (error) {
-//       console.error('Failed to fetch routes:', error);
-//       if (isMountedRef.current) {
-//         toast.error('Error', 'Failed to load routes. Please try again.');
-//       }
-//     } finally {
-//       setIsLoadingRoutes(false);
-//     }
-//   }, [selectedRoute?.routeId, workSessionId, validateWorkSession]);
-
-//   const fetchRouteOutlets = useCallback(
-//     async (route: VanRoute) => {
-//       if (!validateWorkSession()) {
-//         setIsLoadingOutlets(false);
-//         return;
-//       }
-
-//       const currentRouteId = route.routeId;
-//       if (!currentRouteId) return;
-
-//       routeIdRef.current = currentRouteId;
-//       isDataLoadedRef.current = false;
-//       setIsLoadingOutlets(true);
-
-//       const payload = {
-//         routeId: currentRouteId,
-//         page: 1,
-//         limit: ROUTE_OUTLETS_LIMIT,
-//         filters: [],
-//         searchText: '',
-//         routeSessionId: route.routeSessionId,
-//         workSessionId: workSessionId,
-//       };
-
-//       try {
-//         const response = await outletService.getRouteOutlets(payload);
-
-//         if (response.statusCode === 200) {
-//           const outletsData = response.data?.data || [];
-//           const transformedOutlets = transformOutletsData(outletsData);
-//           setOutlets(transformedOutlets);
-//           isDataLoadedRef.current = true;
-//         } else {
-//           setOutlets([]);
-//           toast.error('Error', 'Failed to load outlets for this route');
-//         }
-//       } catch (error) {
-//         console.error('Error fetching route outlets:', error);
-//         if (isMountedRef.current) {
-//           toast.error('Error', 'Failed to load outlets for this route');
-//         }
-//       } finally {
-//         setIsLoadingOutlets(false);
-//       }
-//     },
-//     [workSessionId, validateWorkSession],
-//   );
-
-//   // ==========================================================================
-//   // Data Transformers
-//   // ==========================================================================
-
-//   const transformOutletsData = (outletsData: any[]): RouteOutlet[] => {
-//     return outletsData.map((outlet: any, index: number) => ({
-//       outletId: outlet.customerId || outlet._id,
-//       outletName: outlet.name,
-//       outletCode: outlet.code || '',
-//       address: outlet.address?.line1 || outlet.address || '',
-//       phoneNumber: outlet.phoneNumber,
-//       ownerName: outlet.ownerName,
-//       customerType: outlet.customerType,
-//       visitStatus: getVisitStatus(outlet),
-//       visitOrder: outlet.sequence || index + 1,
-//       distance: outlet.distance || 0,
-//       sequence: outlet.sequence || index + 1,
-//       isVisited: outlet.isVisited || false,
-//       hasSale: outlet.hasSale || false,
-//       geoTag: outlet.geoTag,
-//     }));
-//   };
-
-//   const getVisitStatus = (outlet: any): RouteOutlet['visitStatus'] => {
-//     if (outlet.visitStatus === 'VISITED') return 'VISITED';
-//     if (outlet.visitStatus === 'SKIPPED') return 'SKIPPED';
-//     if (outlet.visitStatus === 'ACTIVE') return 'ACTIVE';
-//     return 'PENDING';
-//   };
-
-//   // ==========================================================================
-//   // Event Handlers
-//   // ==========================================================================
-
-//   const handleRouteSelect = async (route: VanRoute) => {
-//     if (!validateWorkSession()) return;
-
-//     console.log('Selected route:', route);
-//     if (!isWeb) {
-//       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-//     }
-//     setSelectedVanRoute(route);
-//     await fetchRouteOutlets(route);
-//     setCurrentStep('outlets');
-//   };
-
-//   const handleProceedToConfirmation = () => {
-//     if (!validateWorkSession()) return;
-
-//     if (!isWeb) {
-//       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-//     }
-//     setCurrentStep('confirmation');
-//   };
-
-//   const handleSubmitChange = async () => {
-//     if (!validateWorkSession()) return;
-
-//     if (!selectedVanRoute) {
-//       toast.error('Error', 'Please select a route first');
-//       return;
-//     }
-
-//     setIsSubmitting(true);
-//     try {
-//       const payload = {
-//         workSessionId: workSessionId,
-//         routeId: selectedVanRoute.routeId,
-//         routeName: selectedVanRoute.routeName,
-//         totalShops: selectedVanRoute.totalShops,
-//       };
-
-//       const response: any = await outletService.changeRoute(payload);
-
-//       if (response.statusCode === 200 || response.statusCode === 201) {
-//         // Update the selected route in store with the new session
-//         setSelectedRoute({
-//           ...selectedRoute,
-//           routeId: selectedVanRoute.routeId,
-//           routeName: selectedVanRoute.routeName,
-//           routeCode: selectedVanRoute.routeCode,
-//           routeSessionId: response.data?.routeSessionId || selectedVanRoute.routeSessionId,
-//           workSessionId: workSessionId,
-//           totalShops: selectedVanRoute.totalShops,
-//         });
-
-//         if (!isWeb) {
-//           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-//         }
-
-//         toast.success('Success', `Route changed to "${selectedVanRoute.routeName}"`);
-//         setCurrentStep('routes');
-//         // Navigate after a short delay
-//         setTimeout(() => {
-//           router.push('/route');
-//         }, 500);
-//       } else {
-//         if (!isWeb) {
-//           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-//         }
-//         toast.error('Error', response.message || 'Failed to change route');
-//       }
-//     } catch (error) {
-//       console.error('Failed to change route:', error);
-//       if (!isWeb) {
-//         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-//       }
-//       toast.error('Error', 'Failed to change route. Please try again.');
-//     } finally {
-//       setIsSubmitting(false);
-//     }
-//   };
-
-//   const onRefresh = async () => {
-//     if (!validateWorkSession()) {
-//       setRefreshing(false);
-//       return;
-//     }
-
-//     setRefreshing(true);
-//     routeIdRef.current = '';
-//     isDataLoadedRef.current = false;
-//     await fetchRoutes();
-//     if (selectedVanRoute) {
-//       await fetchRouteOutlets(selectedVanRoute);
-//     }
-//     setRefreshing(false);
-//   };
-
-//   const handleGoBack = () => {
-//     if (currentStep === 'confirmation') {
-//       setCurrentStep('outlets');
-//     } else if (currentStep === 'outlets') {
-//       setCurrentStep('routes');
-//       setSearchQuery('');
-//       setSelectedVanRoute(null);
-//       setOutlets([]);
-//     } else {
-//       router.back();
-//     }
-//   };
-
-//   // ==========================================================================
-//   // Helper Functions
-//   // ==========================================================================
-
-//   const getVisitStatusColor = (status: string): string => {
-//     const statusColors: Record<string, string> = {
-//       VISITED: colors.success,
-//       SKIPPED: colors.warning,
-//       PENDING: colors.textTertiary,
-//       NOT_VISITED: colors.textTertiary,
-//       ACTIVE: colors.primary,
-//     };
-//     return statusColors[status] || colors.textTertiary;
-//   };
-
-//   const getVisitStatusIcon = (status: string, isVisited: boolean): string => {
-//     if (isVisited) return 'checkmark-circle';
-//     if (status === 'SKIPPED') return 'close-circle';
-//     return 'time-outline';
-//   };
-
-//   const calculateEstimatedTime = (outletCount: number): string => {
-//     const minutes = Math.ceil(outletCount * ESTIMATED_TIME_PER_OUTLET);
-//     if (minutes < 60) return `${minutes} min`;
-//     const hours = Math.floor(minutes / 60);
-//     const remainingMinutes = minutes % 60;
-//     return `${hours}h ${remainingMinutes}m`;
-//   };
-
-//   // Filter out current route from search results as well
-//   const filteredRoutes = routes.filter((route) =>
-//     route.routeName.toLowerCase().includes(searchQuery.toLowerCase()),
-//   );
-
-//   const styles = getStyles(colors);
-
-//   // ==========================================================================
-//   // No Session View using EmptyState Component
-//   // ==========================================================================
-
-//   const renderNoSessionView = () => (
-//     <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//       <ScrollView
-//         contentContainerStyle={styles.emptyStateContainer}
-//         showsVerticalScrollIndicator={false}
-//       >
-//         <EmptyState
-//           title="Work Day Not Started"
-//           message="You need to start your work day before you can change routes. This helps us track your activities accurately and maintain proper records."
-//           icon="alert-circle-outline"
-//           actionLabel="Start Work Day"
-//           onAction={() => {
-//             if (!isWeb) {
-//               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-//             }
-//             router.push('/work-session');
-//           }}
-//           secondaryActionLabel="Contact Support"
-//           onSecondaryAction={() => {
-//             toast.info('Contact Support', 'Please contact your supervisor for assistance');
-//           }}
-//         />
-//       </ScrollView>
-//     </Animated.View>
-//   );
-
-//   // ==========================================================================
-//   // Render Methods
-//   // ==========================================================================
-
-//   const renderRouteCard = (route: VanRoute) => (
-//     <TouchableOpacity
-//       key={route.routeId}
-//       style={styles.routeCard}
-//       onPress={() => handleRouteSelect(route)}
-//       activeOpacity={0.7}
-//     >
-//       <View style={styles.routeCardInner}>
-//         <View style={styles.routeIconSection}>
-//           <LinearGradient
-//             colors={[colors.primary + '20', colors.primary + '10']}
-//             style={styles.routeIcon}
-//           >
-//             <Ionicons name="map-outline" size={24} color={colors.primary} />
-//           </LinearGradient>
-//         </View>
-
-//         <View style={styles.routeContent}>
-//           <AppText style={styles.routeName} numberOfLines={2}>
-//             {route.routeName}
-//           </AppText>
-//           <View style={styles.routeMetaRow}>
-//             <View style={styles.routeMetaItem}>
-//               <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
-//               <AppText style={styles.routeMetaText}>{route.totalShops} outlets</AppText>
-//             </View>
-//             {route.distance !== 'N/A' && (
-//               <View style={styles.routeMetaItem}>
-//                 <Ionicons name="navigate-outline" size={12} color={colors.textSecondary} />
-//                 <AppText style={styles.routeMetaText}>{route.distance}</AppText>
-//               </View>
-//             )}
-//           </View>
-//         </View>
-
-//         <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-//       </View>
-//     </TouchableOpacity>
-//   );
-
-//   // Outlet rendered as a simple list item (not card)
-//   const renderOutletItem = ({ item, index }: { item: RouteOutlet; index: number }) => {
-//     const statusColor = getVisitStatusColor(item.visitStatus);
-//     const statusIcon = getVisitStatusIcon(item.visitStatus, item.isVisited);
-//     const statusText = item.isVisited ? 'VISITED' : item.visitStatus;
-
-//     return (
-//       <View style={styles.outletListItem}>
-//         <View style={styles.outletListLeft}>
-//           <View style={styles.outletListNumber}>
-//             <AppText style={styles.outletListNumberText}>{item.visitOrder || index + 1}</AppText>
-//           </View>
-//           <View style={styles.outletListInfo}>
-//             <AppText style={styles.outletListName} numberOfLines={1}>
-//               {item.outletName}
-//             </AppText>
-//             <AppText style={styles.outletListAddress} numberOfLines={1}>
-//               {item.address}
-//             </AppText>
-//           </View>
-//         </View>
-//         <View style={[styles.outletListStatus, { backgroundColor: statusColor + '15' }]}>
-//           <Ionicons name={statusIcon as any} size={12} color={statusColor} />
-//           <AppText style={[styles.outletListStatusText, { color: statusColor }]}>
-//             {statusText}
-//           </AppText>
-//         </View>
-//       </View>
-//     );
-//   };
-
-//   const renderRoutesList = () => (
-//     <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//       <ScrollView
-//         showsVerticalScrollIndicator={false}
-//         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-//         contentContainerStyle={styles.scrollContainer}
-//       >
-//         <View style={styles.searchContainer}>
-//           <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
-//           <TextInput
-//             style={styles.searchInput}
-//             placeholder="Search routes..."
-//             placeholderTextColor={colors.textTertiary}
-//             value={searchQuery}
-//             onChangeText={setSearchQuery}
-//           />
-//         </View>
-
-//         {isLoadingRoutes ? (
-//           <View style={styles.centerContainer}>
-//             <ActivityIndicator size="large" color={colors.primary} />
-//             <AppText style={styles.loadingText}>Loading routes...</AppText>
-//           </View>
-//         ) : filteredRoutes.length === 0 ? (
-//           <EmptyState
-//             title={searchQuery ? 'No Routes Found' : 'No Routes Available'}
-//             // message={
-//             //   searchQuery
-//             //     ? `No routes match "${searchQuery}"`
-//             //     : 'Contact your supervisor for available routes'
-//             // }
-//             icon="map-outline"
-//           />
-//         ) : (
-//           <View style={styles.routesGrid}>
-//             {filteredRoutes.map((route) => renderRouteCard(route))}
-//           </View>
-//         )}
-//       </ScrollView>
-//     </Animated.View>
-//   );
-
-//   const renderOutletsList = () => (
-//     <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//       <View style={styles.routeInfoCard}>
-//         <View style={styles.routeInfoIcon}>
-//           <Ionicons name="map-outline" size={20} color={colors.primary} />
-//         </View>
-//         <View style={styles.routeInfoContent}>
-//           <AppText style={styles.routeInfoName}>{selectedVanRoute?.routeName}</AppText>
-//           <AppText style={styles.routeInfoCount}>
-//             {outlets.length} outlets · {calculateEstimatedTime(outlets.length)}
-//           </AppText>
-//         </View>
-//       </View>
-
-//       {isLoadingOutlets ? (
-//         <View style={styles.centerContainer}>
-//           <ActivityIndicator size="large" color={colors.primary} />
-//           <AppText style={styles.loadingText}>Loading outlets...</AppText>
-//         </View>
-//       ) : outlets.length === 0 ? (
-//         <EmptyState
-//           title="No Outlets Found"
-//           message="No outlets are available for this route"
-//           icon="business-outline"
-//         />
-//       ) : (
-//         <FlatList
-//           data={outlets}
-//           keyExtractor={(item) => item.outletId}
-//           renderItem={renderOutletItem}
-//           showsVerticalScrollIndicator={false}
-//           contentContainerStyle={styles.outletsListContainer}
-//           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-//         />
-//       )}
-//     </Animated.View>
-//   );
-
-//   const renderConfirmation = () => {
-//     const summary: ChangeRouteSummary = {
-//       currentRoute: selectedRoute as any,
-//       newRoute: selectedVanRoute,
-//       outletsToVisit: outlets.filter((o) => o.isVisited === false),
-//       totalOutlets: outlets.length,
-//       estimatedTime: calculateEstimatedTime(outlets.length),
-//     };
-
-//     return (
-//       <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//         <ScrollView
-//           showsVerticalScrollIndicator={false}
-//           contentContainerStyle={styles.scrollContainer}
-//         >
-//           {/* Confirmation Header */}
-//           <View style={styles.confirmationHeader}>
-//             <View style={styles.confirmationIconContainer}>
-//               <Ionicons name="swap-horizontal" size={48} color={colors.primary} />
-//             </View>
-//             <AppText style={styles.confirmationTitle}>Review Route Change</AppText>
-//             <AppText style={styles.confirmationSubtitle}>
-//               Please review the details before confirming
-//             </AppText>
-//           </View>
-
-//           {/* Current Route Card */}
-//           <View style={styles.comparisonSection}>
-//             <View style={[styles.comparisonCard, styles.currentRouteCard]}>
-//               <View style={styles.comparisonBadge}>
-//                 <Ionicons name="checkmark-circle-outline" size={14} color={colors.textSecondary} />
-//                 <AppText style={styles.comparisonBadgeText}>Current</AppText>
-//               </View>
-//               <AppText style={styles.comparisonRouteName}>
-//                 {summary.currentRoute?.routeName || 'No route'}
-//               </AppText>
-//               <View style={styles.comparisonStats}>
-//                 <View style={styles.comparisonStat}>
-//                   <Ionicons name="business-outline" size={13} color={colors.textSecondary} />
-//                   <AppText style={styles.comparisonStatText}>
-//                     {summary.currentRoute?.totalShops || 0} outlets
-//                   </AppText>
-//                 </View>
-//               </View>
-//             </View>
-
-//             {/* Arrow */}
-//             <View style={styles.arrowSection}>
-//               <View style={[styles.arrowIcon, { backgroundColor: colors.primary + '15' }]}>
-//                 <Ionicons name="arrow-down" size={20} color={colors.primary} />
-//               </View>
-//             </View>
-
-//             {/* New Route Card */}
-//             <View style={[styles.comparisonCard, styles.newRouteCard]}>
-//               <View style={[styles.comparisonBadge, styles.newBadge]}>
-//                 <Ionicons name="star-outline" size={14} color="#FFF" />
-//                 <AppText style={[styles.comparisonBadgeText, styles.newBadgeText]}>New</AppText>
-//               </View>
-//               <AppText style={[styles.comparisonRouteName, styles.newRouteName]}>
-//                 {summary.newRoute?.routeName || 'N/A'}
-//               </AppText>
-//               <View style={styles.comparisonStats}>
-//                 <View style={styles.comparisonStat}>
-//                   <Ionicons name="business-outline" size={13} color={colors.primary} />
-//                   <AppText style={[styles.comparisonStatText, { color: colors.primary }]}>
-//                     {summary.newRoute?.totalShops || 0} outlets
-//                   </AppText>
-//                 </View>
-//               </View>
-//             </View>
-//           </View>
-
-//           {/* Statistics Grid */}
-//           <View style={styles.statsGrid}>
-//             <View style={styles.statCardWrapper}>
-//               <LinearGradient
-//                 colors={[colors.primary + '15', colors.primary + '08']}
-//                 style={styles.statCardGradient}
-//               >
-//                 <Ionicons name="business-outline" size={24} color={colors.primary} />
-//                 <AppText style={styles.statCardValue}>{summary.totalOutlets}</AppText>
-//                 <AppText style={styles.statCardLabel}>Outlets</AppText>
-//               </LinearGradient>
-//             </View>
-
-//             <View style={styles.statCardWrapper}>
-//               <LinearGradient
-//                 colors={[colors.warning + '15', colors.warning + '08']}
-//                 style={styles.statCardGradient}
-//               >
-//                 <Ionicons name="time-outline" size={24} color={colors.warning} />
-//                 <AppText style={styles.statCardValue}>{summary.estimatedTime}</AppText>
-//                 <AppText style={styles.statCardLabel}>Est. Time</AppText>
-//               </LinearGradient>
-//             </View>
-
-//             <View style={styles.statCardWrapper}>
-//               <LinearGradient
-//                 colors={[colors.success + '15', colors.success + '08']}
-//                 style={styles.statCardGradient}
-//               >
-//                 <Ionicons name="checkmark-outline" size={24} color={colors.success} />
-//                 <AppText style={styles.statCardValue}>{summary.outletsToVisit.length}</AppText>
-//                 <AppText style={styles.statCardLabel}>Pending</AppText>
-//               </LinearGradient>
-//             </View>
-//           </View>
-
-//           {/* Warning */}
-//           <View style={styles.warningCard}>
-//             <Ionicons name="information-circle-outline" size={18} color={colors.warning} />
-//             <AppText style={styles.warningText}>
-//               Your current progress will be reset. Unvisited outlets will be marked as pending.
-//             </AppText>
-//           </View>
-//         </ScrollView>
-//       </Animated.View>
-//     );
-//   };
-
-//   // ==========================================================================
-//   // Footer Navigation
-//   // ==========================================================================
-
-//   const renderFooter = () => {
-//     // Only show footer on outlets and confirmation pages (not on routes page)
-//     if (currentStep === 'routes' || !hasValidSession || !workSessionId) {
-//       return null;
-//     }
-
-//     const isLastStep = currentStep === 'confirmation';
-
-//     return (
-//       <View style={[styles.footer, { borderTopColor: colors.divider }]}>
-//         {/* Back Button */}
-//         <TouchableOpacity style={styles.backButton} onPress={handleGoBack} activeOpacity={0.7}>
-//           <Ionicons name="arrow-back-outline" size={22} color={colors.textSecondary} />
-//           <AppText style={styles.backButtonText}>Back</AppText>
-//         </TouchableOpacity>
-
-//         {/* Next / Submit Button */}
-//         <TouchableOpacity
-//           style={[styles.nextButton, isLastStep && styles.submitButton]}
-//           onPress={isLastStep ? handleSubmitChange : handleProceedToConfirmation}
-//           disabled={isSubmitting}
-//           activeOpacity={0.8}
-//         >
-//           <AppText style={styles.nextButtonText}>
-//             {isLastStep ? (isSubmitting ? 'Submitting...' : 'Submit') : 'Next'}
-//           </AppText>
-//           <Ionicons
-//             name={isLastStep ? 'checkmark-outline' : 'arrow-forward-outline'}
-//             size={18}
-//             color="#FFF"
-//           />
-//         </TouchableOpacity>
-//       </View>
-//     );
-//   };
-
-//   // Main render with session check
-//   // if (!hasValidSession || !workSessionId) {
-//   //   return (
-//   //     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-//   //       {renderNoSessionView()}
-//   //       <Toast />
-//   //     </SafeAreaView>
-//   //   );
-//   // }
-
-//   return (
-//     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-//       {currentStep === 'routes' && renderRoutesList()}
-//       {currentStep === 'outlets' && renderOutletsList()}
-//       {currentStep === 'confirmation' && renderConfirmation()}
-//       {renderFooter()}
-//       <Toast />
-//     </SafeAreaView>
-//   );
-// }
-
-// // ============================================================================
-// // Styles
-// // ============================================================================
-
-// const getStyles = (colors: any) =>
-//   StyleSheet.create({
-//     safeArea: {
-//       flex: 1,
-//       backgroundColor: colors.background,
-//     },
-//     container: {
-//       flex: 1,
-//       backgroundColor: colors.background,
-//     },
-//     scrollContainer: {
-//       paddingBottom: 100,
-//     },
-//     emptyStateContainer: {
-//       flexGrow: 1,
-//       justifyContent: 'center',
-//       minHeight: Dimensions.get('window').height - 100,
-//     },
-//     searchContainer: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       marginHorizontal: 16,
-//       marginBottom: 20,
-//       marginTop: 16,
-//       paddingHorizontal: 14,
-//       paddingVertical: 12,
-//       backgroundColor: colors.surface,
-//       borderRadius: 14,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//       gap: 10,
-//     },
-//     searchInput: {
-//       flex: 1,
-//       fontSize: 14,
-//       color: colors.textPrimary,
-//     },
-//     centerContainer: {
-//       flex: 1,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//       paddingVertical: 80,
-//       gap: 16,
-//     },
-//     loadingText: {
-//       fontSize: 14,
-//       color: colors.textSecondary,
-//     },
-//     routesGrid: {
-//       gap: 12,
-//       paddingHorizontal: 16,
-//     },
-//     routeCard: {
-//       borderRadius: 16,
-//       overflow: 'hidden',
-//       marginBottom: 4,
-//     },
-//     routeCardInner: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 12,
-//       padding: 14,
-//       backgroundColor: colors.surface,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//       borderRadius: 16,
-//     },
-//     routeIconSection: {
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     routeIcon: {
-//       width: 48,
-//       height: 48,
-//       borderRadius: 12,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     routeContent: {
-//       flex: 1,
-//       gap: 6,
-//     },
-//     routeName: {
-//       fontSize: 15,
-//       fontWeight: '700',
-//       color: colors.textPrimary,
-//       letterSpacing: -0.3,
-//     },
-//     routeMetaRow: {
-//       flexDirection: 'row',
-//       gap: 12,
-//     },
-//     routeMetaItem: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 4,
-//       paddingHorizontal: 8,
-//       paddingVertical: 4,
-//       backgroundColor: colors.background,
-//       borderRadius: 8,
-//     },
-//     routeMetaText: {
-//       fontSize: 11,
-//       color: colors.textSecondary,
-//       fontWeight: '500',
-//     },
-//     routeInfoCard: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 12,
-//       marginHorizontal: 16,
-//       marginTop: 16,
-//       marginBottom: 12,
-//       paddingHorizontal: 14,
-//       paddingVertical: 12,
-//       backgroundColor: colors.primary + '10',
-//       borderRadius: 14,
-//       borderWidth: 1,
-//       borderColor: colors.primary + '25',
-//     },
-//     routeInfoIcon: {
-//       width: 40,
-//       height: 40,
-//       borderRadius: 10,
-//       backgroundColor: colors.primary + '20',
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     routeInfoContent: {
-//       flex: 1,
-//       gap: 2,
-//     },
-//     routeInfoName: {
-//       fontSize: 14,
-//       fontWeight: '700',
-//       color: colors.primary,
-//     },
-//     routeInfoCount: {
-//       fontSize: 12,
-//       color: colors.primary + '80',
-//     },
-//     outletsListContainer: {
-//       paddingHorizontal: 16,
-//       paddingBottom: 100,
-//     },
-//     outletListItem: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'space-between',
-//       paddingVertical: 12,
-//       paddingHorizontal: 4,
-//       borderBottomWidth: 1,
-//       borderBottomColor: colors.divider,
-//     },
-//     outletListLeft: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       flex: 1,
-//       gap: 12,
-//     },
-//     outletListNumber: {
-//       width: 28,
-//       height: 28,
-//       borderRadius: 14,
-//       backgroundColor: colors.primary + '10',
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     outletListNumberText: {
-//       fontSize: 12,
-//       fontWeight: '700',
-//       color: colors.primary,
-//     },
-//     outletListInfo: {
-//       flex: 1,
-//     },
-//     outletListName: {
-//       fontSize: 14,
-//       fontWeight: '600',
-//       color: colors.textPrimary,
-//     },
-//     outletListAddress: {
-//       fontSize: 11,
-//       color: colors.textSecondary,
-//       marginTop: 2,
-//     },
-//     outletListStatus: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 4,
-//       paddingHorizontal: 8,
-//       paddingVertical: 4,
-//       borderRadius: 8,
-//     },
-//     outletListStatusText: {
-//       fontSize: 10,
-//       fontWeight: '600',
-//     },
-//     // Confirmation Page Styles
-//     confirmationHeader: {
-//       alignItems: 'center',
-//       paddingHorizontal: 20,
-//       paddingTop: 20,
-//       paddingBottom: 16,
-//       gap: 12,
-//     },
-//     confirmationIconContainer: {
-//       width: 80,
-//       height: 80,
-//       borderRadius: 40,
-//       backgroundColor: colors.primary + '15',
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//       marginBottom: 8,
-//     },
-//     confirmationTitle: {
-//       fontSize: 24,
-//       fontWeight: '700',
-//       color: colors.textPrimary,
-//       textAlign: 'center',
-//     },
-//     confirmationSubtitle: {
-//       fontSize: 14,
-//       color: colors.textSecondary,
-//       textAlign: 'center',
-//     },
-//     comparisonSection: {
-//       gap: 16,
-//       marginHorizontal: 16,
-//       marginBottom: 20,
-//     },
-//     comparisonCard: {
-//       backgroundColor: colors.surface,
-//       borderRadius: 14,
-//       padding: 14,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//       gap: 10,
-//     },
-//     currentRouteCard: {
-//       opacity: 0.7,
-//     },
-//     newRouteCard: {
-//       borderColor: colors.primary + '30',
-//       backgroundColor: colors.primary + '08',
-//       borderWidth: 2,
-//     },
-//     comparisonBadge: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 4,
-//       paddingHorizontal: 10,
-//       paddingVertical: 4,
-//       backgroundColor: colors.textSecondary + '15',
-//       borderRadius: 8,
-//       alignSelf: 'flex-start',
-//     },
-//     newBadge: {
-//       backgroundColor: colors.primary,
-//     },
-//     comparisonBadgeText: {
-//       fontSize: 10,
-//       fontWeight: '600',
-//       color: colors.textSecondary,
-//     },
-//     newBadgeText: {
-//       color: '#FFF',
-//     },
-//     comparisonRouteName: {
-//       fontSize: 16,
-//       fontWeight: '700',
-//       color: colors.textSecondary,
-//       letterSpacing: -0.3,
-//     },
-//     newRouteName: {
-//       color: colors.primary,
-//     },
-//     comparisonStats: {
-//       flexDirection: 'row',
-//       gap: 12,
-//     },
-//     comparisonStat: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 6,
-//     },
-//     comparisonStatText: {
-//       fontSize: 12,
-//       color: colors.textSecondary,
-//       fontWeight: '600',
-//     },
-//     arrowSection: {
-//       alignItems: 'center',
-//       marginVertical: 8,
-//     },
-//     arrowIcon: {
-//       width: 40,
-//       height: 40,
-//       borderRadius: 20,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     statsGrid: {
-//       flexDirection: 'row',
-//       gap: 10,
-//       paddingHorizontal: 16,
-//       marginBottom: 20,
-//     },
-//     statCardWrapper: {
-//       flex: 1,
-//       borderRadius: 12,
-//       overflow: 'hidden',
-//     },
-//     statCardGradient: {
-//       paddingVertical: 12,
-//       paddingHorizontal: 10,
-//       alignItems: 'center',
-//       gap: 6,
-//     },
-//     statCardValue: {
-//       fontSize: 18,
-//       fontWeight: '800',
-//       color: colors.textPrimary,
-//     },
-//     statCardLabel: {
-//       fontSize: 10,
-//       color: colors.textSecondary,
-//       fontWeight: '600',
-//     },
-//     warningCard: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 12,
-//       marginHorizontal: 16,
-//       marginBottom: 20,
-//       paddingHorizontal: 12,
-//       paddingVertical: 12,
-//       backgroundColor: colors.warning + '10',
-//       borderRadius: 12,
-//     },
-//     warningText: {
-//       flex: 1,
-//       fontSize: 12,
-//       color: colors.warning,
-//       lineHeight: 18,
-//       fontWeight: '500',
-//     },
-//     footer: {
-//       position: 'absolute',
-//       bottom: 0,
-//       left: 0,
-//       right: 0,
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'space-between',
-//       paddingHorizontal: 16,
-//       paddingVertical: 12,
-//       backgroundColor: colors.surface,
-//       borderTopWidth: 1,
-//       gap: 16,
-//     },
-//     backButton: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 6,
-//       paddingVertical: 12,
-//       paddingHorizontal: 16,
-//       borderRadius: 12,
-//       backgroundColor: colors.background,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//     },
-//     backButtonText: {
-//       fontSize: 14,
-//       fontWeight: '600',
-//       color: colors.textSecondary,
-//     },
-//     nextButton: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'center',
-//       gap: 8,
-//       paddingVertical: 12,
-//       paddingHorizontal: 24,
-//       borderRadius: 12,
-//       backgroundColor: colors.primary,
-//       minWidth: 100,
-//     },
-//     submitButton: {
-//       backgroundColor: colors.success,
-//     },
-//     nextButtonText: {
-//       fontSize: 14,
-//       fontWeight: '600',
-//       color: '#FFF',
-//     },
-//   });
-
-// import React, { useState, useEffect, useCallback, useRef } from 'react';
-// import {
-//   View,
-//   ScrollView,
-//   TouchableOpacity,
-//   ActivityIndicator,
-//   TextInput,
-//   RefreshControl,
-//   StyleSheet,
-//   Platform,
-//   Dimensions,
-//   Animated,
-//   Easing,
-//   FlatList,
-// } from 'react-native';
-// import { SafeAreaView } from 'react-native-safe-area-context';
-// import { Ionicons } from '@expo/vector-icons';
-// import { LinearGradient } from 'expo-linear-gradient';
-// import { router, useFocusEffect } from 'expo-router';
-// import * as Haptics from 'expo-haptics';
-// import Toast from 'react-native-toast-message';
-// import { useTheme } from '@/shared/hooks/useTheme';
-// import { AppText } from '@/core/components';
-// import { EmptyState } from '@/core/components/EmptyState';
-// import { useHeader } from '@/shared/contexts/HeaderContext';
-// import { useRouteStore } from '@/core/store/route.store';
-// import { useAuthStore } from '@/core/store/auth.store';
-// import { homeService } from '@/features/home/services/home.service';
-// import { outletService } from '@/features/outlet/services/outlet.service';
-
-// const { width } = Dimensions.get('window');
-// const isWeb = Platform.OS === 'web';
-
-// // Toast helper
-// const toast = {
-//   success: (title: string, message?: string) =>
-//     Toast.show({ type: 'success', text1: title, text2: message }),
-//   error: (title: string, message?: string) =>
-//     Toast.show({ type: 'error', text1: title, text2: message }),
-//   info: (title: string, message?: string) =>
-//     Toast.show({ type: 'info', text1: title, text2: message }),
-// };
-
-// // ============================================================================
-// // Types
-// // ============================================================================
-
-// interface VanRoute {
-//   routeId: string;
-//   routeName: string;
-//   routeCode?: string;
-//   routeSessionId: string;
-//   workSessionId: string;
-//   vanId: string;
-//   name: string;
-//   totalShops: number;
-//   distance: string;
-//   stops: number;
-// }
-
-// interface RouteOutlet {
-//   outletId: string;
-//   outletName: string;
-//   outletCode?: string;
-//   address: string;
-//   phoneNumber: string;
-//   ownerName: string;
-//   customerType?: string;
-//   visitStatus: 'PENDING' | 'VISITED' | 'SKIPPED' | 'NOT_VISITED' | 'ACTIVE';
-//   visitOrder: number;
-//   distance?: number;
-//   sequence: number;
-//   isVisited: boolean;
-//   hasSale: boolean;
-//   geoTag?: {
-//     lat: number;
-//     lng: number;
-//   };
-// }
-
-// interface ChangeRouteSummary {
-//   currentRoute: VanRoute | null;
-//   newRoute: VanRoute | null;
-//   outletsToVisit: RouteOutlet[];
-//   totalOutlets: number;
-//   estimatedTime: string;
-// }
-
-// // ============================================================================
-// // Constants
-// // ============================================================================
-
-// const ROUTE_OUTLETS_LIMIT = 100;
-// const ESTIMATED_TIME_PER_OUTLET = 5;
-
-// // ============================================================================
-// // Main Component
-// // ============================================================================
-
-// export default function ChangeRoute() {
-//   const { colors } = useTheme();
-//   const { setHeader } = useHeader();
-//   const { selectedRoute, setSelectedRoute, van } = useRouteStore();
-//   const workSessionId = useAuthStore((state) => state.workSessionId);
-//   // Animation refs
-//   const fadeInAnim = useRef(new Animated.Value(0)).current;
-
-//   // State
-//   const [routes, setRoutes] = useState<VanRoute[]>([]);
-//   const [selectedVanRoute, setSelectedVanRoute] = useState<VanRoute | null>(null);
-//   const [outlets, setOutlets] = useState<RouteOutlet[]>([]);
-//   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
-//   const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
-//   const [isSubmitting, setIsSubmitting] = useState(false);
-//   const [refreshing, setRefreshing] = useState(false);
-//   const [currentStep, setCurrentStep] = useState<'routes' | 'outlets' | 'confirmation'>('routes');
-//   const [searchQuery, setSearchQuery] = useState('');
-//   const [hasValidSession, setHasValidSession] = useState(true);
-
-//   // Refs
-//   const routeIdRef = useRef<string>('');
-//   const isDataLoadedRef = useRef(false);
-//   const isMountedRef = useRef(true);
-
-//   // ==========================================================================
-//   // Session Validation
-//   // ==========================================================================
-
-//   const validateWorkSession = useCallback((): boolean => {
-//     console.log('Validating work session. Current workSessionId:', workSessionId);
-//     if (!workSessionId) {
-//       setHasValidSession(false);
-//       return false;
-//     }
-//     setHasValidSession(true);
-//     return true;
-//   }, [workSessionId]);
-
-//   // Check session on focus
-//   useFocusEffect(
-//     useCallback(() => {
-//       console.log('Checking work session on focus. Current workSessionId:', workSessionId);
-//       if (!workSessionId) {
-//         setHasValidSession(false);
-//       } else {
-//         setHasValidSession(true);
-//       }
-//     }, [workSessionId]),
-//   );
-
-//   // ==========================================================================
-//   // Lifecycle
-//   // ==========================================================================
-
-//   useFocusEffect(
-//     React.useCallback(() => {
-//       setHeader({
-//         title: 'Change Route',
-//         showBack: true,
-//         showMenu: false,
-//       });
-
-//       startAnimations();
-
-//       return () => {
-//         isMountedRef.current = false;
-//       };
-//     }, []),
-//   );
-
-//   useFocusEffect(
-//     useCallback(() => {
-//       if (validateWorkSession()) {
-//         setCurrentStep('routes');
-//         fetchRoutes();
-//       }
-//     }, []),
-//   );
-
-//   const startAnimations = () => {
-//     Animated.timing(fadeInAnim, {
-//       toValue: 1,
-//       duration: 400,
-//       useNativeDriver: true,
-//     }).start();
-//   };
-
-//   // ==========================================================================
-//   // Data Fetching
-//   // ==========================================================================
-
-//   const fetchRoutes = useCallback(async () => {
-//     if (!validateWorkSession()) {
-//       setIsLoadingRoutes(false);
-//       return;
-//     }
-
-//     setIsLoadingRoutes(true);
-//     try {
-//       const response: any = await homeService.getVanMappedRoutes();
-
-//       if (response.statusCode === 200 && response?.data?.routes?.length) {
-//         const transformedRoutes = response.data.routes.map((item: any) => ({
-//           routeId: item.routeId,
-//           routeName: item.route.name,
-//           routeCode: item.route.code || '',
-//           routeSessionId: item.routeSessionId,
-//           workSessionId: item.workSessionId,
-//           vanId: item.vanId,
-//           name: item.route.name,
-//           totalShops: item.route?.outletCount || 0,
-//           distance: item.route.distance || 'N/A',
-//           stops: item.route?.outletCount || 0,
-//         }));
-
-//         // Filter out the current route from the list
-//         const filteredRoutes = transformedRoutes.filter(
-//           (route: VanRoute) => route.routeId !== selectedRoute?.routeId,
-//         );
-//         setRoutes(filteredRoutes);
-//       } else {
-//         setRoutes([]);
-//       }
-//     } catch (error) {
-//       console.error('Failed to fetch routes:', error);
-//       if (isMountedRef.current) {
-//         toast.error('Error', 'Failed to load routes. Please try again.');
-//       }
-//     } finally {
-//       setIsLoadingRoutes(false);
-//     }
-//   }, [selectedRoute?.routeId, workSessionId, validateWorkSession]);
-
-//   const fetchRouteOutlets = useCallback(
-//     async (route: VanRoute) => {
-//       if (!validateWorkSession()) {
-//         setIsLoadingOutlets(false);
-//         return;
-//       }
-
-//       const currentRouteId = route.routeId;
-//       if (!currentRouteId) return;
-
-//       routeIdRef.current = currentRouteId;
-//       isDataLoadedRef.current = false;
-//       setIsLoadingOutlets(true);
-
-//       const payload = {
-//         routeId: currentRouteId,
-//         page: 1,
-//         limit: ROUTE_OUTLETS_LIMIT,
-//         filters: [],
-//         searchText: '',
-//         routeSessionId: route.routeSessionId,
-//         workSessionId: workSessionId,
-//       };
-
-//       try {
-//         const response = await outletService.getRouteOutlets(payload);
-
-//         if (response.statusCode === 200) {
-//           const outletsData = response.data?.data || [];
-//           const transformedOutlets = transformOutletsData(outletsData);
-//           setOutlets(transformedOutlets);
-//           isDataLoadedRef.current = true;
-//         } else {
-//           setOutlets([]);
-//           toast.error('Error', 'Failed to load outlets for this route');
-//         }
-//       } catch (error) {
-//         console.error('Error fetching route outlets:', error);
-//         if (isMountedRef.current) {
-//           toast.error('Error', 'Failed to load outlets for this route');
-//         }
-//       } finally {
-//         setIsLoadingOutlets(false);
-//       }
-//     },
-//     [workSessionId, validateWorkSession],
-//   );
-
-//   // ==========================================================================
-//   // Data Transformers
-//   // ==========================================================================
-
-//   const transformOutletsData = (outletsData: any[]): RouteOutlet[] => {
-//     return outletsData.map((outlet: any, index: number) => ({
-//       outletId: outlet.customerId || outlet._id,
-//       outletName: outlet.name,
-//       outletCode: outlet.code || '',
-//       address: outlet.address?.line1 || outlet.address || '',
-//       phoneNumber: outlet.phoneNumber,
-//       ownerName: outlet.ownerName,
-//       customerType: outlet.customerType,
-//       visitStatus: getVisitStatus(outlet),
-//       visitOrder: outlet.sequence || index + 1,
-//       distance: outlet.distance || 0,
-//       sequence: outlet.sequence || index + 1,
-//       isVisited: outlet.isVisited || false,
-//       hasSale: outlet.hasSale || false,
-//       geoTag: outlet.geoTag,
-//     }));
-//   };
-
-//   const getVisitStatus = (outlet: any): RouteOutlet['visitStatus'] => {
-//     if (outlet.visitStatus === 'VISITED') return 'VISITED';
-//     if (outlet.visitStatus === 'SKIPPED') return 'SKIPPED';
-//     if (outlet.visitStatus === 'ACTIVE') return 'ACTIVE';
-//     return 'PENDING';
-//   };
-
-//   // ==========================================================================
-//   // Event Handlers
-//   // ==========================================================================
-
-//   const handleRouteSelect = async (route: VanRoute) => {
-//     if (!validateWorkSession()) return;
-
-//     console.log('Selected route:', route);
-//     if (!isWeb) {
-//       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-//     }
-//     setSelectedVanRoute(route);
-//     await fetchRouteOutlets(route);
-//     setCurrentStep('outlets');
-//   };
-
-//   const handleProceedToConfirmation = () => {
-//     if (!validateWorkSession()) return;
-
-//     if (!isWeb) {
-//       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-//     }
-//     setCurrentStep('confirmation');
-//   };
-
-//   const handleSubmitChange = async () => {
-//     if (!validateWorkSession()) return;
-
-//     if (!selectedVanRoute) {
-//       toast.error('Error', 'Please select a route first');
-//       return;
-//     }
-
-//     setIsSubmitting(true);
-//     try {
-//       const payload = {
-//         workSessionId: workSessionId,
-//         routeId: selectedVanRoute.routeId,
-//         routeName: selectedVanRoute.routeName,
-//         totalShops: selectedVanRoute.totalShops,
-//       };
-
-//       const response: any = await outletService.changeRoute(payload);
-
-//       if (response.statusCode === 200 || response.statusCode === 201) {
-//         // Update the selected route in store with the new session
-//         setSelectedRoute({
-//           ...selectedRoute,
-//           routeId: selectedVanRoute.routeId,
-//           routeName: selectedVanRoute.routeName,
-//           routeCode: selectedVanRoute.routeCode,
-//           routeSessionId: response.data?.routeSessionId || selectedVanRoute.routeSessionId,
-//           workSessionId: workSessionId,
-//           totalShops: selectedVanRoute.totalShops,
-//         });
-
-//         if (!isWeb) {
-//           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-//         }
-
-//         toast.success('Success', `Route changed to "${selectedVanRoute.routeName}"`);
-//         setCurrentStep('routes');
-//         // Navigate after a short delay
-//         setTimeout(() => {
-//           router.push('/route');
-//         }, 500);
-//       } else {
-//         if (!isWeb) {
-//           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-//         }
-//         toast.error('Error', response.message || 'Failed to change route');
-//       }
-//     } catch (error) {
-//       console.error('Failed to change route:', error);
-//       if (!isWeb) {
-//         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-//       }
-//       toast.error('Error', 'Failed to change route. Please try again.');
-//     } finally {
-//       setIsSubmitting(false);
-//     }
-//   };
-
-//   const onRefresh = async () => {
-//     if (!validateWorkSession()) {
-//       setRefreshing(false);
-//       return;
-//     }
-
-//     setRefreshing(true);
-//     routeIdRef.current = '';
-//     isDataLoadedRef.current = false;
-//     await fetchRoutes();
-//     if (selectedVanRoute) {
-//       await fetchRouteOutlets(selectedVanRoute);
-//     }
-//     setRefreshing(false);
-//   };
-
-//   const handleGoBack = () => {
-//     if (currentStep === 'confirmation') {
-//       setCurrentStep('outlets');
-//     } else if (currentStep === 'outlets') {
-//       setCurrentStep('routes');
-//       setSearchQuery('');
-//       setSelectedVanRoute(null);
-//       setOutlets([]);
-//     } else {
-//       router.back();
-//     }
-//   };
-
-//   // ==========================================================================
-//   // Helper Functions
-//   // ==========================================================================
-
-//   const getVisitStatusColor = (status: string): string => {
-//     const statusColors: Record<string, string> = {
-//       VISITED: colors.success,
-//       SKIPPED: colors.warning,
-//       PENDING: colors.textTertiary,
-//       NOT_VISITED: colors.textTertiary,
-//       ACTIVE: colors.primary,
-//     };
-//     return statusColors[status] || colors.textTertiary;
-//   };
-
-//   const getVisitStatusIcon = (status: string, isVisited: boolean): string => {
-//     if (isVisited) return 'checkmark-circle';
-//     if (status === 'SKIPPED') return 'close-circle';
-//     return 'time-outline';
-//   };
-
-//   const calculateEstimatedTime = (outletCount: number): string => {
-//     const minutes = Math.ceil(outletCount * ESTIMATED_TIME_PER_OUTLET);
-//     if (minutes < 60) return `${minutes} min`;
-//     const hours = Math.floor(minutes / 60);
-//     const remainingMinutes = minutes % 60;
-//     return `${hours}h ${remainingMinutes}m`;
-//   };
-
-//   // Filter out current route from search results as well
-//   const filteredRoutes = routes.filter((route) =>
-//     route.routeName.toLowerCase().includes(searchQuery.toLowerCase()),
-//   );
-
-//   const styles = getStyles(colors);
-
-//   // ==========================================================================
-//   // No Session View using EmptyState Component
-//   // ==========================================================================
-
-//   const renderNoSessionView = () => (
-//     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-//       <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//         <ScrollView
-//           contentContainerStyle={styles.emptyStateContainer}
-//           showsVerticalScrollIndicator={false}
-//         >
-//           <EmptyState
-//             title="Work Day Not Started"
-//             message="You need to start your work day before you can change routes. This helps us track your activities accurately and maintain proper records."
-//             icon="alert-circle-outline"
-//             actionLabel="Start Work Day"
-//             onAction={() => {
-//               if (!isWeb) {
-//                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-//               }
-//               router.push('/work-session');
-//             }}
-//             secondaryActionLabel="Contact Support"
-//             onSecondaryAction={() => {
-//               toast.info('Contact Support', 'Please contact your supervisor for assistance');
-//             }}
-//           />
-//         </ScrollView>
-//       </Animated.View>
-//     </SafeAreaView>
-//   );
-
-//   // ==========================================================================
-//   // Render Methods
-//   // ==========================================================================
-
-//   const renderRouteCard = (route: VanRoute) => (
-//     <TouchableOpacity
-//       key={route.routeId}
-//       style={styles.routeCard}
-//       onPress={() => handleRouteSelect(route)}
-//       activeOpacity={0.7}
-//     >
-//       <View style={styles.routeCardInner}>
-//         <View style={styles.routeIconSection}>
-//           <LinearGradient
-//             colors={[colors.primary + '20', colors.primary + '10']}
-//             style={styles.routeIcon}
-//           >
-//             <Ionicons name="map-outline" size={24} color={colors.primary} />
-//           </LinearGradient>
-//         </View>
-
-//         <View style={styles.routeContent}>
-//           <AppText style={styles.routeName} numberOfLines={2}>
-//             {route.routeName}
-//           </AppText>
-//           <View style={styles.routeMetaRow}>
-//             <View style={styles.routeMetaItem}>
-//               <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
-//               <AppText style={styles.routeMetaText}>{route.totalShops} outlets</AppText>
-//             </View>
-//             {route.distance !== 'N/A' && (
-//               <View style={styles.routeMetaItem}>
-//                 <Ionicons name="navigate-outline" size={12} color={colors.textSecondary} />
-//                 <AppText style={styles.routeMetaText}>{route.distance}</AppText>
-//               </View>
-//             )}
-//           </View>
-//         </View>
-
-//         <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-//       </View>
-//     </TouchableOpacity>
-//   );
-
-//   // Outlet rendered as a simple list item (not card)
-//   const renderOutletItem = ({ item, index }: { item: RouteOutlet; index: number }) => {
-//     const statusColor = getVisitStatusColor(item.visitStatus);
-//     const statusIcon = getVisitStatusIcon(item.visitStatus, item.isVisited);
-//     const statusText = item.isVisited ? 'VISITED' : item.visitStatus;
-
-//     return (
-//       <View style={styles.outletListItem}>
-//         <View style={styles.outletListLeft}>
-//           <View style={styles.outletListNumber}>
-//             <AppText style={styles.outletListNumberText}>{item.visitOrder || index + 1}</AppText>
-//           </View>
-//           <View style={styles.outletListInfo}>
-//             <AppText style={styles.outletListName} numberOfLines={1}>
-//               {item.outletName}
-//             </AppText>
-//             <AppText style={styles.outletListAddress} numberOfLines={1}>
-//               {item.address}
-//             </AppText>
-//           </View>
-//         </View>
-//         <View style={[styles.outletListStatus, { backgroundColor: statusColor + '15' }]}>
-//           <Ionicons name={statusIcon as any} size={12} color={statusColor} />
-//           <AppText style={[styles.outletListStatusText, { color: statusColor }]}>
-//             {statusText}
-//           </AppText>
-//         </View>
-//       </View>
-//     );
-//   };
-
-//   const renderRoutesList = () => (
-//     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-//       <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//         <ScrollView
-//           showsVerticalScrollIndicator={false}
-//           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-//           contentContainerStyle={styles.scrollContainer}
-//         >
-//           <View style={styles.searchContainer}>
-//             <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
-//             <TextInput
-//               style={styles.searchInput}
-//               placeholder="Search routes..."
-//               placeholderTextColor={colors.textTertiary}
-//               value={searchQuery}
-//               onChangeText={setSearchQuery}
-//             />
-//           </View>
-
-//           {isLoadingRoutes ? (
-//             <View style={styles.centerContainer}>
-//               <ActivityIndicator size="large" color={colors.primary} />
-//               <AppText style={styles.loadingText}>Loading routes...</AppText>
-//             </View>
-//           ) : filteredRoutes.length === 0 ? (
-//             <EmptyState
-//               title={searchQuery ? 'No Routes Found' : 'No Routes Available'}
-//               icon="map-outline"
-//             />
-//           ) : (
-//             <View style={styles.routesGrid}>
-//               {filteredRoutes.map((route) => renderRouteCard(route))}
-//             </View>
-//           )}
-//         </ScrollView>
-//       </Animated.View>
-//     </SafeAreaView>
-//   );
-
-//   const renderOutletsList = () => (
-//     <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-//       <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//         <View style={styles.routeInfoCard}>
-//           <View style={styles.routeInfoIcon}>
-//             <Ionicons name="map-outline" size={20} color={colors.primary} />
-//           </View>
-//           <View style={styles.routeInfoContent}>
-//             <AppText style={styles.routeInfoName}>{selectedVanRoute?.routeName}</AppText>
-//             <AppText style={styles.routeInfoCount}>
-//               {outlets.length} outlets · {calculateEstimatedTime(outlets.length)}
-//             </AppText>
-//           </View>
-//         </View>
-
-//         {isLoadingOutlets ? (
-//           <View style={styles.centerContainer}>
-//             <ActivityIndicator size="large" color={colors.primary} />
-//             <AppText style={styles.loadingText}>Loading outlets...</AppText>
-//           </View>
-//         ) : outlets.length === 0 ? (
-//           <EmptyState
-//             title="No Outlets Found"
-//             message="No outlets are available for this route"
-//             icon="business-outline"
-//           />
-//         ) : (
-//           <FlatList
-//             data={outlets}
-//             keyExtractor={(item) => item.outletId}
-//             renderItem={renderOutletItem}
-//             showsVerticalScrollIndicator={false}
-//             contentContainerStyle={styles.outletsListContainer}
-//             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-//           />
-//         )}
-//       </Animated.View>
-//     </SafeAreaView>
-//   );
-
-//   const renderConfirmation = () => {
-//     const summary: ChangeRouteSummary = {
-//       currentRoute: selectedRoute as any,
-//       newRoute: selectedVanRoute,
-//       outletsToVisit: outlets.filter((o) => o.isVisited === false),
-//       totalOutlets: outlets.length,
-//       estimatedTime: calculateEstimatedTime(outlets.length),
-//     };
-
-//     return (
-//       <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
-//         <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
-//           <ScrollView
-//             showsVerticalScrollIndicator={false}
-//             contentContainerStyle={styles.scrollContainer}
-//           >
-//             {/* Confirmation Header */}
-//             <View style={styles.confirmationHeader}>
-//               <View style={styles.confirmationIconContainer}>
-//                 <Ionicons name="swap-horizontal" size={48} color={colors.primary} />
-//               </View>
-//               <AppText style={styles.confirmationTitle}>Review Route Change</AppText>
-//               <AppText style={styles.confirmationSubtitle}>
-//                 Please review the details before confirming
-//               </AppText>
-//             </View>
-
-//             {/* Current Route Card */}
-//             <View style={styles.comparisonSection}>
-//               <View style={[styles.comparisonCard, styles.currentRouteCard]}>
-//                 <View style={styles.comparisonBadge}>
-//                   <Ionicons
-//                     name="checkmark-circle-outline"
-//                     size={14}
-//                     color={colors.textSecondary}
-//                   />
-//                   <AppText style={styles.comparisonBadgeText}>Current</AppText>
-//                 </View>
-//                 <AppText style={styles.comparisonRouteName}>
-//                   {summary.currentRoute?.routeName || 'No route'}
-//                 </AppText>
-//                 <View style={styles.comparisonStats}>
-//                   <View style={styles.comparisonStat}>
-//                     <Ionicons name="business-outline" size={13} color={colors.textSecondary} />
-//                     <AppText style={styles.comparisonStatText}>
-//                       {summary.currentRoute?.totalShops || 0} outlets
-//                     </AppText>
-//                   </View>
-//                 </View>
-//               </View>
-
-//               {/* Arrow */}
-//               <View style={styles.arrowSection}>
-//                 <View style={[styles.arrowIcon, { backgroundColor: colors.primary + '15' }]}>
-//                   <Ionicons name="arrow-down" size={20} color={colors.primary} />
-//                 </View>
-//               </View>
-
-//               {/* New Route Card */}
-//               <View style={[styles.comparisonCard, styles.newRouteCard]}>
-//                 <View style={[styles.comparisonBadge, styles.newBadge]}>
-//                   <Ionicons name="star-outline" size={14} color="#FFF" />
-//                   <AppText style={[styles.comparisonBadgeText, styles.newBadgeText]}>New</AppText>
-//                 </View>
-//                 <AppText style={[styles.comparisonRouteName, styles.newRouteName]}>
-//                   {summary.newRoute?.routeName || 'N/A'}
-//                 </AppText>
-//                 <View style={styles.comparisonStats}>
-//                   <View style={styles.comparisonStat}>
-//                     <Ionicons name="business-outline" size={13} color={colors.primary} />
-//                     <AppText style={[styles.comparisonStatText, { color: colors.primary }]}>
-//                       {summary.newRoute?.totalShops || 0} outlets
-//                     </AppText>
-//                   </View>
-//                 </View>
-//               </View>
-//             </View>
-
-//             {/* Statistics Grid */}
-//             <View style={styles.statsGrid}>
-//               <View style={styles.statCardWrapper}>
-//                 <LinearGradient
-//                   colors={[colors.primary + '15', colors.primary + '08']}
-//                   style={styles.statCardGradient}
-//                 >
-//                   <Ionicons name="business-outline" size={24} color={colors.primary} />
-//                   <AppText style={styles.statCardValue}>{summary.totalOutlets}</AppText>
-//                   <AppText style={styles.statCardLabel}>Outlets</AppText>
-//                 </LinearGradient>
-//               </View>
-
-//               <View style={styles.statCardWrapper}>
-//                 <LinearGradient
-//                   colors={[colors.warning + '15', colors.warning + '08']}
-//                   style={styles.statCardGradient}
-//                 >
-//                   <Ionicons name="time-outline" size={24} color={colors.warning} />
-//                   <AppText style={styles.statCardValue}>{summary.estimatedTime}</AppText>
-//                   <AppText style={styles.statCardLabel}>Est. Time</AppText>
-//                 </LinearGradient>
-//               </View>
-
-//               <View style={styles.statCardWrapper}>
-//                 <LinearGradient
-//                   colors={[colors.success + '15', colors.success + '08']}
-//                   style={styles.statCardGradient}
-//                 >
-//                   <Ionicons name="checkmark-outline" size={24} color={colors.success} />
-//                   <AppText style={styles.statCardValue}>{summary.outletsToVisit.length}</AppText>
-//                   <AppText style={styles.statCardLabel}>Pending</AppText>
-//                 </LinearGradient>
-//               </View>
-//             </View>
-
-//             {/* Warning */}
-//             <View style={styles.warningCard}>
-//               <Ionicons name="information-circle-outline" size={18} color={colors.warning} />
-//               <AppText style={styles.warningText}>
-//                 Your current progress will be reset. Unvisited outlets will be marked as pending.
-//               </AppText>
-//             </View>
-//           </ScrollView>
-//         </Animated.View>
-//       </SafeAreaView>
-//     );
-//   };
-
-//   // ==========================================================================
-//   // Footer Navigation
-//   // ==========================================================================
-
-//   const renderFooter = () => {
-//     // Only show footer on outlets and confirmation pages (not on routes page)
-//     if (currentStep === 'routes' || !hasValidSession || !workSessionId) {
-//       return null;
-//     }
-
-//     const isLastStep = currentStep === 'confirmation';
-
-//     return (
-//       <View style={[styles.footer, { borderTopColor: colors.divider }]}>
-//         {/* Back Button */}
-//         <TouchableOpacity style={styles.backButton} onPress={handleGoBack} activeOpacity={0.7}>
-//           <Ionicons name="arrow-back-outline" size={22} color={colors.textSecondary} />
-//           <AppText style={styles.backButtonText}>Back</AppText>
-//         </TouchableOpacity>
-
-//         {/* Next / Submit Button */}
-//         <TouchableOpacity
-//           style={[styles.nextButton, isLastStep && styles.submitButton]}
-//           onPress={isLastStep ? handleSubmitChange : handleProceedToConfirmation}
-//           disabled={isSubmitting}
-//           activeOpacity={0.8}
-//         >
-//           <AppText style={styles.nextButtonText}>
-//             {isLastStep ? (isSubmitting ? 'Submitting...' : 'Submit') : 'Next'}
-//           </AppText>
-//           <Ionicons
-//             name={isLastStep ? 'checkmark-outline' : 'arrow-forward-outline'}
-//             size={18}
-//             color="#FFF"
-//           />
-//         </TouchableOpacity>
-//       </View>
-//     );
-//   };
-
-//   // Main render with session check
-//   if (!hasValidSession || !workSessionId) {
-//     return renderNoSessionView();
-//   }
-
-//   return (
-//     <View style={{ flex: 1 }}>
-//       {currentStep === 'routes' && renderRoutesList()}
-//       {currentStep === 'outlets' && renderOutletsList()}
-//       {currentStep === 'confirmation' && renderConfirmation()}
-//       {renderFooter()}
-//       <Toast />
-//     </View>
-//   );
-// }
-
-// // ============================================================================
-// // Styles
-// // ============================================================================
-
-// const getStyles = (colors: any) =>
-//   StyleSheet.create({
-//     safeArea: {
-//       flex: 1,
-//       backgroundColor: colors.background,
-//     },
-//     container: {
-//       flex: 1,
-//       backgroundColor: colors.background,
-//     },
-//     scrollContainer: {
-//       paddingBottom: 100,
-//     },
-//     emptyStateContainer: {
-//       flexGrow: 1,
-//       justifyContent: 'center',
-//       minHeight: Dimensions.get('window').height - 100,
-//     },
-//     searchContainer: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       marginHorizontal: 16,
-//       marginBottom: 20,
-//       marginTop: 16,
-//       paddingHorizontal: 14,
-//       paddingVertical: 12,
-//       backgroundColor: colors.surface,
-//       borderRadius: 14,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//       gap: 10,
-//     },
-//     searchInput: {
-//       flex: 1,
-//       fontSize: 14,
-//       color: colors.textPrimary,
-//     },
-//     centerContainer: {
-//       flex: 1,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//       paddingVertical: 80,
-//       gap: 16,
-//     },
-//     loadingText: {
-//       fontSize: 14,
-//       color: colors.textSecondary,
-//     },
-//     routesGrid: {
-//       gap: 12,
-//       paddingHorizontal: 16,
-//     },
-//     routeCard: {
-//       borderRadius: 16,
-//       overflow: 'hidden',
-//       marginBottom: 4,
-//     },
-//     routeCardInner: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 12,
-//       padding: 14,
-//       backgroundColor: colors.surface,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//       borderRadius: 16,
-//     },
-//     routeIconSection: {
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     routeIcon: {
-//       width: 48,
-//       height: 48,
-//       borderRadius: 12,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     routeContent: {
-//       flex: 1,
-//       gap: 6,
-//     },
-//     routeName: {
-//       fontSize: 15,
-//       fontWeight: '700',
-//       color: colors.textPrimary,
-//       letterSpacing: -0.3,
-//     },
-//     routeMetaRow: {
-//       flexDirection: 'row',
-//       gap: 12,
-//     },
-//     routeMetaItem: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 4,
-//       paddingHorizontal: 8,
-//       paddingVertical: 4,
-//       backgroundColor: colors.background,
-//       borderRadius: 8,
-//     },
-//     routeMetaText: {
-//       fontSize: 11,
-//       color: colors.textSecondary,
-//       fontWeight: '500',
-//     },
-//     routeInfoCard: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 12,
-//       marginHorizontal: 16,
-//       marginTop: 16,
-//       marginBottom: 12,
-//       paddingHorizontal: 14,
-//       paddingVertical: 12,
-//       backgroundColor: colors.primary + '10',
-//       borderRadius: 14,
-//       borderWidth: 1,
-//       borderColor: colors.primary + '25',
-//     },
-//     routeInfoIcon: {
-//       width: 40,
-//       height: 40,
-//       borderRadius: 10,
-//       backgroundColor: colors.primary + '20',
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     routeInfoContent: {
-//       flex: 1,
-//       gap: 2,
-//     },
-//     routeInfoName: {
-//       fontSize: 14,
-//       fontWeight: '700',
-//       color: colors.primary,
-//     },
-//     routeInfoCount: {
-//       fontSize: 12,
-//       color: colors.primary + '80',
-//     },
-//     outletsListContainer: {
-//       paddingHorizontal: 16,
-//       paddingBottom: 100,
-//     },
-//     outletListItem: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'space-between',
-//       paddingVertical: 12,
-//       paddingHorizontal: 4,
-//       borderBottomWidth: 1,
-//       borderBottomColor: colors.divider,
-//     },
-//     outletListLeft: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       flex: 1,
-//       gap: 12,
-//     },
-//     outletListNumber: {
-//       width: 28,
-//       height: 28,
-//       borderRadius: 14,
-//       backgroundColor: colors.primary + '10',
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     outletListNumberText: {
-//       fontSize: 12,
-//       fontWeight: '700',
-//       color: colors.primary,
-//     },
-//     outletListInfo: {
-//       flex: 1,
-//     },
-//     outletListName: {
-//       fontSize: 14,
-//       fontWeight: '600',
-//       color: colors.textPrimary,
-//     },
-//     outletListAddress: {
-//       fontSize: 11,
-//       color: colors.textSecondary,
-//       marginTop: 2,
-//     },
-//     outletListStatus: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 4,
-//       paddingHorizontal: 8,
-//       paddingVertical: 4,
-//       borderRadius: 8,
-//     },
-//     outletListStatusText: {
-//       fontSize: 10,
-//       fontWeight: '600',
-//     },
-//     // Confirmation Page Styles
-//     confirmationHeader: {
-//       alignItems: 'center',
-//       paddingHorizontal: 20,
-//       paddingTop: 20,
-//       paddingBottom: 16,
-//       gap: 12,
-//     },
-//     confirmationIconContainer: {
-//       width: 80,
-//       height: 80,
-//       borderRadius: 40,
-//       backgroundColor: colors.primary + '15',
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//       marginBottom: 8,
-//     },
-//     confirmationTitle: {
-//       fontSize: 24,
-//       fontWeight: '700',
-//       color: colors.textPrimary,
-//       textAlign: 'center',
-//     },
-//     confirmationSubtitle: {
-//       fontSize: 14,
-//       color: colors.textSecondary,
-//       textAlign: 'center',
-//     },
-//     comparisonSection: {
-//       gap: 16,
-//       marginHorizontal: 16,
-//       marginBottom: 20,
-//     },
-//     comparisonCard: {
-//       backgroundColor: colors.surface,
-//       borderRadius: 14,
-//       padding: 14,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//       gap: 10,
-//     },
-//     currentRouteCard: {
-//       opacity: 0.7,
-//     },
-//     newRouteCard: {
-//       borderColor: colors.primary + '30',
-//       backgroundColor: colors.primary + '08',
-//       borderWidth: 2,
-//     },
-//     comparisonBadge: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 4,
-//       paddingHorizontal: 10,
-//       paddingVertical: 4,
-//       backgroundColor: colors.textSecondary + '15',
-//       borderRadius: 8,
-//       alignSelf: 'flex-start',
-//     },
-//     newBadge: {
-//       backgroundColor: colors.primary,
-//     },
-//     comparisonBadgeText: {
-//       fontSize: 10,
-//       fontWeight: '600',
-//       color: colors.textSecondary,
-//     },
-//     newBadgeText: {
-//       color: '#FFF',
-//     },
-//     comparisonRouteName: {
-//       fontSize: 16,
-//       fontWeight: '700',
-//       color: colors.textSecondary,
-//       letterSpacing: -0.3,
-//     },
-//     newRouteName: {
-//       color: colors.primary,
-//     },
-//     comparisonStats: {
-//       flexDirection: 'row',
-//       gap: 12,
-//     },
-//     comparisonStat: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 6,
-//     },
-//     comparisonStatText: {
-//       fontSize: 12,
-//       color: colors.textSecondary,
-//       fontWeight: '600',
-//     },
-//     arrowSection: {
-//       alignItems: 'center',
-//       marginVertical: 8,
-//     },
-//     arrowIcon: {
-//       width: 40,
-//       height: 40,
-//       borderRadius: 20,
-//       justifyContent: 'center',
-//       alignItems: 'center',
-//     },
-//     statsGrid: {
-//       flexDirection: 'row',
-//       gap: 10,
-//       paddingHorizontal: 16,
-//       marginBottom: 20,
-//     },
-//     statCardWrapper: {
-//       flex: 1,
-//       borderRadius: 12,
-//       overflow: 'hidden',
-//     },
-//     statCardGradient: {
-//       paddingVertical: 12,
-//       paddingHorizontal: 10,
-//       alignItems: 'center',
-//       gap: 6,
-//     },
-//     statCardValue: {
-//       fontSize: 18,
-//       fontWeight: '800',
-//       color: colors.textPrimary,
-//     },
-//     statCardLabel: {
-//       fontSize: 10,
-//       color: colors.textSecondary,
-//       fontWeight: '600',
-//     },
-//     warningCard: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 12,
-//       marginHorizontal: 16,
-//       marginBottom: 20,
-//       paddingHorizontal: 12,
-//       paddingVertical: 12,
-//       backgroundColor: colors.warning + '10',
-//       borderRadius: 12,
-//     },
-//     warningText: {
-//       flex: 1,
-//       fontSize: 12,
-//       color: colors.warning,
-//       lineHeight: 18,
-//       fontWeight: '500',
-//     },
-//     footer: {
-//       position: 'absolute',
-//       bottom: 0,
-//       left: 0,
-//       right: 0,
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'space-between',
-//       paddingHorizontal: 16,
-//       paddingVertical: 12,
-//       backgroundColor: colors.surface,
-//       borderTopWidth: 1,
-//       gap: 16,
-//     },
-//     backButton: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       gap: 6,
-//       paddingVertical: 12,
-//       paddingHorizontal: 16,
-//       borderRadius: 12,
-//       backgroundColor: colors.background,
-//       borderWidth: 1,
-//       borderColor: colors.divider,
-//     },
-//     backButtonText: {
-//       fontSize: 14,
-//       fontWeight: '600',
-//       color: colors.textSecondary,
-//     },
-//     nextButton: {
-//       flexDirection: 'row',
-//       alignItems: 'center',
-//       justifyContent: 'center',
-//       gap: 8,
-//       paddingVertical: 12,
-//       paddingHorizontal: 24,
-//       borderRadius: 12,
-//       backgroundColor: colors.primary,
-//       minWidth: 100,
-//     },
-//     submitButton: {
-//       backgroundColor: colors.success,
-//     },
-//     nextButtonText: {
-//       fontSize: 14,
-//       fontWeight: '600',
-//       color: '#FFF',
-//     },
-//   });
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
-  TextInput,
   RefreshControl,
   StyleSheet,
   Platform,
   Dimensions,
   Animated,
   FlatList,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams, usePathname } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppText } from '@/core/components';
+import { AppText, SearchBar, Skeleton } from '@/core/components';
 import { EmptyState } from '@/core/components/EmptyState';
 import { useHeader } from '@/shared/contexts/HeaderContext';
-import { useRouteStore } from '@/core/store/route.store';
+import {
+  getRouteCustomerCategoryId,
+  getRouteLocationIds,
+  useRouteStore,
+} from '@/core/store/route.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { homeService } from '@/features/home/services/home.service';
 import { outletService } from '@/features/outlet/services/outlet.service';
@@ -2492,7 +33,6 @@ import { outletService } from '@/features/outlet/services/outlet.service';
 const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 
-// Toast helper
 const toast = {
   success: (title: string, message?: string) =>
     Toast.show({ type: 'success', text1: title, text2: message }),
@@ -2501,10 +41,6 @@ const toast = {
   info: (title: string, message?: string) =>
     Toast.show({ type: 'info', text1: title, text2: message }),
 };
-
-// ============================================================================
-// Types
-// ============================================================================
 
 interface VanRoute {
   routeId: string;
@@ -2517,6 +53,10 @@ interface VanRoute {
   totalShops: number;
   distance: string;
   stops: number;
+  customerCategoryId?: string;
+  marketId?: string;
+  provinceId?: string;
+  countryId?: string;
 }
 
 interface RouteOutlet {
@@ -2547,50 +87,68 @@ interface ChangeRouteSummary {
   estimatedTime: string;
 }
 
-// ============================================================================
-// Constants
-// ============================================================================
-
 const ROUTE_OUTLETS_LIMIT = 100;
 const ESTIMATED_TIME_PER_OUTLET = 5;
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
-export default function ChangeRoute() {
+export default function Routes() {
   const { colors } = useTheme();
   const { setHeader } = useHeader();
-  const { selectedRoute, setSelectedRoute, van } = useRouteStore();
+  const { selectedRoute, van } = useRouteStore();
   const workSessionId = useAuthStore((state) => state.workSessionId);
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
+  const params = useLocalSearchParams<{ route?: string }>();
 
-  // Animation refs
+  const routeStep: 'routes' | 'outlets' | 'confirmation' = pathname.endsWith('/confirmation')
+    ? 'confirmation'
+    : pathname.endsWith('/outlets')
+      ? 'outlets'
+      : 'routes';
+
+  const handleGoBack = useCallback(() => {
+    if (routeStep === 'confirmation') {
+      router.navigate({
+        pathname: '/switch-route/outlets' as any,
+        params: params.route ? { route: params.route } : undefined,
+      });
+      return;
+    }
+
+    if (routeStep === 'outlets') {
+      router.navigate('/switch-route');
+      return;
+    }
+
+    router.back();
+  }, [params.route, routeStep]);
+
+  const routeFromParams = React.useMemo<VanRoute | null>(() => {
+    if (!params.route) return null;
+    try {
+      return JSON.parse(params.route) as VanRoute;
+    } catch {
+      return null;
+    }
+  }, [params.route]);
+
   const fadeInAnim = useRef(new Animated.Value(0)).current;
 
-  // State
   const [routes, setRoutes] = useState<VanRoute[]>([]);
-  const [selectedVanRoute, setSelectedVanRoute] = useState<VanRoute | null>(null);
+  const [selectedVanRoute, setSelectedVanRoute] = useState<VanRoute | null>(routeFromParams);
   const [outlets, setOutlets] = useState<RouteOutlet[]>([]);
   const [isLoadingRoutes, setIsLoadingRoutes] = useState(false);
   const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentStep, setCurrentStep] = useState<'routes' | 'outlets' | 'confirmation'>('routes');
+  const currentStep = routeStep;
   const [searchQuery, setSearchQuery] = useState('');
   const [hasValidSession, setHasValidSession] = useState(true);
 
-  // Refs
   const routeIdRef = useRef<string>('');
   const isDataLoadedRef = useRef(false);
   const isMountedRef = useRef(true);
 
-  // ==========================================================================
-  // Session Validation
-  // ==========================================================================
-
   const validateWorkSession = useCallback((): boolean => {
-    console.log('Validating work session. Current workSessionId:', workSessionId);
     if (!workSessionId) {
       setHasValidSession(false);
       return false;
@@ -2599,10 +157,8 @@ export default function ChangeRoute() {
     return true;
   }, [workSessionId]);
 
-  // Check session on focus
   useFocusEffect(
     useCallback(() => {
-      console.log('Checking work session on focus. Current workSessionId:', workSessionId);
       if (!workSessionId) {
         setHasValidSession(false);
       } else {
@@ -2611,16 +167,20 @@ export default function ChangeRoute() {
     }, [workSessionId]),
   );
 
-  // ==========================================================================
-  // Lifecycle
-  // ==========================================================================
-
   useFocusEffect(
     React.useCallback(() => {
+      isMountedRef.current = true;
       setHeader({
-        title: 'Change Route',
+        title:
+          routeStep === 'confirmation'
+            ? 'Review Route'
+            : routeStep === 'outlets'
+              ? 'Route Outlets'
+              : 'Routes',
         showBack: true,
         showMenu: false,
+        size: 'small',
+        onBackPress: handleGoBack,
       });
 
       startAnimations();
@@ -2628,16 +188,20 @@ export default function ChangeRoute() {
       return () => {
         isMountedRef.current = false;
       };
-    }, []),
+    }, [handleGoBack, routeStep, setHeader]),
   );
 
   useFocusEffect(
     useCallback(() => {
-      if (validateWorkSession()) {
-        setCurrentStep('routes');
-        fetchRoutes();
-      }
-    }, []),
+      if (Platform.OS === 'web' || routeStep === 'routes') return;
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+        handleGoBack();
+        return true;
+      });
+
+      return () => subscription.remove();
+    }, [handleGoBack, routeStep]),
   );
 
   const startAnimations = () => {
@@ -2648,10 +212,6 @@ export default function ChangeRoute() {
     }).start();
   };
 
-  // ==========================================================================
-  // Data Fetching
-  // ==========================================================================
-
   const fetchRoutes = useCallback(async () => {
     if (!validateWorkSession()) {
       setIsLoadingRoutes(false);
@@ -2659,6 +219,25 @@ export default function ChangeRoute() {
     }
 
     setIsLoadingRoutes(true);
+    const currentRouteFromStore: VanRoute | null = selectedRoute?.routeId
+      ? {
+          routeId: selectedRoute.routeId,
+          routeName: selectedRoute.routeName || selectedRoute.name || 'Current route',
+          routeCode: selectedRoute.routeCode,
+          routeSessionId: selectedRoute.routeSessionId || '',
+          workSessionId: selectedRoute.workSessionId || workSessionId || '',
+          vanId: selectedRoute.vanId || van?.vanId || '',
+          name: selectedRoute.routeName || selectedRoute.name || 'Current route',
+          totalShops: selectedRoute.totalShops || 0,
+          distance: selectedRoute.distance || 'N/A',
+          stops: selectedRoute.totalShops || 0,
+          customerCategoryId: selectedRoute.customerCategoryId,
+          marketId: selectedRoute.marketId ? String(selectedRoute.marketId) : undefined,
+          provinceId: selectedRoute.provinceId ? String(selectedRoute.provinceId) : undefined,
+          countryId: selectedRoute.countryId ? String(selectedRoute.countryId) : undefined,
+        }
+      : null;
+
     try {
       const response: any = await homeService.getVanMappedRoutes();
 
@@ -2674,15 +253,31 @@ export default function ChangeRoute() {
           totalShops: item.route?.outletCount || 0,
           distance: item.route.distance || 'N/A',
           stops: item.route?.outletCount || 0,
+          ...getRouteLocationIds({ ...item, route: item.route }),
+          customerCategoryId: getRouteCustomerCategoryId({
+            customerCategoryId: item.customerCategoryId,
+            customerCategory: item.customerCategory,
+            route: item.route,
+          }),
         }));
 
-        // Filter out the current route from the list
-        const filteredRoutes = transformedRoutes.filter(
-          (route: VanRoute) => route.routeId !== selectedRoute?.routeId,
+        const hasCurrentRoute = transformedRoutes.some(
+          (route: VanRoute) => route.routeId === selectedRoute?.routeId,
         );
-        setRoutes(filteredRoutes);
+        const availableRoutes =
+          currentRouteFromStore && !hasCurrentRoute
+            ? [currentRouteFromStore, ...transformedRoutes]
+            : transformedRoutes;
+
+        setRoutes(
+          availableRoutes.sort((left: VanRoute, right: VanRoute) => {
+            if (left.routeId === selectedRoute?.routeId) return -1;
+            if (right.routeId === selectedRoute?.routeId) return 1;
+            return left.routeName.localeCompare(right.routeName);
+          }),
+        );
       } else {
-        setRoutes([]);
+        setRoutes(currentRouteFromStore ? [currentRouteFromStore] : []);
       }
     } catch (error) {
       console.error('Failed to fetch routes:', error);
@@ -2692,7 +287,18 @@ export default function ChangeRoute() {
     } finally {
       setIsLoadingRoutes(false);
     }
-  }, [selectedRoute?.routeId, workSessionId, validateWorkSession]);
+  }, [selectedRoute, van?.vanId, workSessionId, validateWorkSession]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (routeStep === 'routes' && validateWorkSession()) {
+        setSelectedVanRoute(null);
+        setOutlets([]);
+        setSearchQuery('');
+        void fetchRoutes();
+      }
+    }, [fetchRoutes, routeStep, validateWorkSession]),
+  );
 
   const fetchRouteOutlets = useCallback(
     async (route: VanRoute) => {
@@ -2712,10 +318,10 @@ export default function ChangeRoute() {
         routeId: currentRouteId,
         page: 1,
         limit: ROUTE_OUTLETS_LIMIT,
-        filters: [],
+        filters: {},
         searchText: '',
         routeSessionId: route.routeSessionId,
-        workSessionId: workSessionId,
+        workSessionId: workSessionId || '',
       };
 
       try {
@@ -2742,9 +348,14 @@ export default function ChangeRoute() {
     [workSessionId, validateWorkSession],
   );
 
-  // ==========================================================================
-  // Data Transformers
-  // ==========================================================================
+  useFocusEffect(
+    useCallback(() => {
+      if (routeStep === 'routes' || !routeFromParams || !validateWorkSession()) return;
+
+      setSelectedVanRoute(routeFromParams);
+      void fetchRouteOutlets(routeFromParams);
+    }, [fetchRouteOutlets, routeFromParams, routeStep, validateWorkSession]),
+  );
 
   const transformOutletsData = (outletsData: any[]): RouteOutlet[] => {
     return outletsData.map((outlet: any, index: number) => ({
@@ -2772,20 +383,22 @@ export default function ChangeRoute() {
     return 'PENDING';
   };
 
-  // ==========================================================================
-  // Event Handlers
-  // ==========================================================================
-
-  const handleRouteSelect = async (route: VanRoute) => {
+  const handleRouteSelect = (route: VanRoute) => {
     if (!validateWorkSession()) return;
 
-    console.log('Selected route:', route);
+    if (route.routeId === selectedRoute?.routeId) {
+      router.push('/route');
+      return;
+    }
+
     if (!isWeb) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     setSelectedVanRoute(route);
-    await fetchRouteOutlets(route);
-    setCurrentStep('outlets');
+    router.push({
+      pathname: '/switch-route/outlets' as any,
+      params: { route: JSON.stringify(route) },
+    });
   };
 
   const handleProceedToConfirmation = () => {
@@ -2794,7 +407,12 @@ export default function ChangeRoute() {
     if (!isWeb) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
-    setCurrentStep('confirmation');
+    if (!selectedVanRoute) return;
+
+    router.push({
+      pathname: '/switch-route/confirmation' as any,
+      params: { route: JSON.stringify(selectedVanRoute) },
+    });
   };
 
   const handleSubmitChange = async () => {
@@ -2808,48 +426,42 @@ export default function ChangeRoute() {
     setIsSubmitting(true);
     try {
       const payload = {
-        workSessionId: workSessionId,
+        workSessionId: workSessionId || '',
         routeId: selectedVanRoute.routeId,
         routeName: selectedVanRoute.routeName,
         totalShops: selectedVanRoute.totalShops,
+        customerCategoryId: selectedVanRoute.customerCategoryId,
       };
 
-      const response: any = await outletService.changeRoute(payload);
+      const response: any = await outletService.requestRouteChange(payload);
 
-      if (response.statusCode === 200 || response.statusCode === 201) {
-        // Update the selected route in store with the new session
-        setSelectedRoute({
-          ...selectedRoute,
-          routeId: selectedVanRoute.routeId,
-          routeName: selectedVanRoute.routeName,
-          routeCode: selectedVanRoute.routeCode,
-          routeSessionId: response.data?.routeSessionId || selectedVanRoute.routeSessionId,
-          workSessionId: workSessionId,
-          totalShops: selectedVanRoute.totalShops,
-        });
-
+      if (response?.success !== false && [200, 201, 202].includes(Number(response.statusCode))) {
         if (!isWeb) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
 
-        toast.success('Success', `Route changed to "${selectedVanRoute.routeName}"`);
-        setCurrentStep('routes');
-        // Navigate after a short delay
+        toast.success(
+          'Request sent',
+          `Your manager will review the change to "${selectedVanRoute.routeName}"`,
+        );
         setTimeout(() => {
-          router.push('/route');
-        }, 500);
+          router.replace('/(drawer)/(tabs)/home');
+        }, 800);
       } else {
         if (!isWeb) {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
-        toast.error('Error', response.message || 'Failed to change route');
+        toast.error('Error', response.message || 'Failed to request route change');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to change route:', error);
       if (!isWeb) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      toast.error('Error', 'Failed to change route. Please try again.');
+      toast.error(
+        'Error',
+        error?.response?.data?.message || 'Failed to request route change. Please try again.',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -2870,23 +482,6 @@ export default function ChangeRoute() {
     }
     setRefreshing(false);
   };
-
-  const handleGoBack = () => {
-    if (currentStep === 'confirmation') {
-      setCurrentStep('outlets');
-    } else if (currentStep === 'outlets') {
-      setCurrentStep('routes');
-      setSearchQuery('');
-      setSelectedVanRoute(null);
-      setOutlets([]);
-    } else {
-      router.back();
-    }
-  };
-
-  // ==========================================================================
-  // Helper Functions
-  // ==========================================================================
 
   const getVisitStatusColor = (status: string): string => {
     const statusColors: Record<string, string> = {
@@ -2913,16 +508,57 @@ export default function ChangeRoute() {
     return `${hours}h ${remainingMinutes}m`;
   };
 
-  // Filter out current route from search results as well
-  const filteredRoutes = routes.filter((route) =>
-    route.routeName.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const currentRoute = routes.find((route) => route.routeId === selectedRoute?.routeId) || null;
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const filteredRoutes = routes.filter((route) => {
+    if (route.routeId === selectedRoute?.routeId) return false;
+    if (!normalizedSearchQuery) return true;
+
+    return [route.routeName, route.routeCode].some((value) =>
+      value?.toLowerCase().includes(normalizedSearchQuery),
+    );
+  });
 
   const styles = getStyles(colors, insets);
 
-  // ==========================================================================
-  // No Session View using EmptyState Component
-  // ==========================================================================
+  const renderRouteListSkeleton = () => (
+    <View style={styles.routesGrid}>
+      {[1, 2, 3, 4, 5].map((item) => (
+        <View key={item} style={styles.routeCard}>
+          <View style={styles.routeCardInner}>
+            <View style={styles.routeIconSection}>
+              <Skeleton height={48} width={48} borderRadius={12} />
+            </View>
+            <View style={styles.routeContent}>
+              <Skeleton height={16} width="72%" borderRadius={8} />
+              <View style={styles.routeMetaRow}>
+                <Skeleton height={24} width={86} borderRadius={8} />
+                <Skeleton height={24} width={62} borderRadius={8} />
+              </View>
+            </View>
+            <Skeleton height={20} width={20} variant="circle" />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderOutletListSkeleton = () => (
+    <View style={styles.outletsListContainer}>
+      {[1, 2, 3, 4, 5, 6].map((item) => (
+        <View key={item} style={styles.outletListItem}>
+          <View style={styles.outletListLeft}>
+            <Skeleton height={28} width={28} variant="circle" />
+            <View style={styles.outletListInfo}>
+              <Skeleton height={14} width="68%" borderRadius={7} />
+              <Skeleton height={11} width="48%" borderRadius={6} style={{ marginTop: 6 }} />
+            </View>
+          </View>
+          <Skeleton height={24} width={76} borderRadius={8} />
+        </View>
+      ))}
+    </View>
+  );
 
   const renderNoSessionView = () => (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -2933,70 +569,56 @@ export default function ChangeRoute() {
         >
           <EmptyState
             title="Work Day Not Started"
-            message="You need to start your work day before you can change routes. This helps us track your activities accurately and maintain proper records."
+            description="You need to start your work day before you can change routes. This helps us track your activities accurately and maintain proper records."
             icon="alert-circle-outline"
-            actionLabel="Start Work Day"
-            onAction={() => {
-              if (!isWeb) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              }
-              router.push('/work-session');
-            }}
-            secondaryActionLabel="Contact Support"
-            onSecondaryAction={() => {
-              toast.info('Contact Support', 'Please contact your supervisor for assistance');
-            }}
           />
         </ScrollView>
       </Animated.View>
     </SafeAreaView>
   );
 
-  // ==========================================================================
-  // Render Methods
-  // ==========================================================================
-
-  const renderRouteCard = (route: VanRoute) => (
-    <TouchableOpacity
-      key={route.routeId}
-      style={styles.routeCard}
-      onPress={() => handleRouteSelect(route)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.routeCardInner}>
-        <View style={styles.routeIconSection}>
-          <LinearGradient
-            colors={[colors.primary + '20', colors.primary + '10']}
-            style={styles.routeIcon}
-          >
-            <Ionicons name="map-outline" size={24} color={colors.primary} />
-          </LinearGradient>
-        </View>
-
-        <View style={styles.routeContent}>
-          <AppText style={styles.routeName} numberOfLines={2}>
-            {route.routeName}
-          </AppText>
-          <View style={styles.routeMetaRow}>
-            <View style={styles.routeMetaItem}>
-              <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
-              <AppText style={styles.routeMetaText}>{route.totalShops} outlets</AppText>
-            </View>
-            {route.distance !== 'N/A' && (
-              <View style={styles.routeMetaItem}>
-                <Ionicons name="navigate-outline" size={12} color={colors.textSecondary} />
-                <AppText style={styles.routeMetaText}>{route.distance}</AppText>
-              </View>
-            )}
+  const renderRouteCard = (route: VanRoute) => {
+    return (
+      <TouchableOpacity
+        key={route.routeId}
+        style={styles.routeCard}
+        onPress={() => handleRouteSelect(route)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.routeCardInner}>
+          <View style={styles.routeIconSection}>
+            <LinearGradient
+              colors={[colors.primary + '20', colors.primary + '10']}
+              style={styles.routeIcon}
+            >
+              <Ionicons name="map-outline" size={24} color={colors.primary} />
+            </LinearGradient>
           </View>
+
+          <View style={styles.routeContent}>
+            <AppText style={styles.routeName} numberOfLines={2}>
+              {route.routeName}
+            </AppText>
+            <View style={styles.routeMetaRow}>
+              <View style={styles.routeMetaItem}>
+                <Ionicons name="business-outline" size={12} color={colors.textSecondary} />
+                <AppText style={styles.routeMetaText}>{route.totalShops} outlets</AppText>
+              </View>
+              {route.distance !== 'N/A' && (
+                <View style={styles.routeMetaItem}>
+                  <Ionicons name="navigate-outline" size={12} color={colors.textSecondary} />
+                  <AppText style={styles.routeMetaText}>{route.distance}</AppText>
+                </View>
+              )}
+            </View>
+          </View>
+
+          <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
         </View>
+      </TouchableOpacity>
+    );
+  };
 
-        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-      </View>
-    </TouchableOpacity>
-  );
-
-  // Outlet rendered as a simple list item (not card)
   const renderOutletItem = ({ item, index }: { item: RouteOutlet; index: number }) => {
     const statusColor = getVisitStatusColor(item.visitStatus);
     const statusIcon = getVisitStatusIcon(item.visitStatus, item.isVisited);
@@ -3030,35 +652,59 @@ export default function ChangeRoute() {
   const renderRoutesList = () => (
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
+        <View style={styles.fixedSearchContainer}>
+          <SearchBar
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search routes..."
+            clearable
+            debounceDelay={0}
+          />
+        </View>
         <ScrollView
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          contentContainerStyle={styles.scrollContainer}
+          contentContainerStyle={[styles.scrollContainer, styles.routesScrollContainer]}
         >
-          <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search routes..."
-              placeholderTextColor={colors.textTertiary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
+          {!isLoadingRoutes && currentRoute && (
+            <View style={styles.routeSection}>
+              <View style={styles.sectionHeadingRow}>
+                <AppText style={styles.sectionHeading}>Selected route</AppText>
+                <View style={styles.liveBadge}>
+                  <View style={styles.liveDot} />
+                  <AppText style={styles.liveBadgeText}>ACTIVE</AppText>
+                </View>
+              </View>
+              <View style={styles.routesGrid}>{renderRouteCard(currentRoute)}</View>
+            </View>
+          )}
 
           {isLoadingRoutes ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <AppText style={styles.loadingText}>Loading routes...</AppText>
-            </View>
-          ) : filteredRoutes.length === 0 ? (
-            <EmptyState
-              title={searchQuery ? 'No Routes Found' : 'No Routes Available'}
-              icon="map-outline"
-            />
+            renderRouteListSkeleton()
           ) : (
-            <View style={styles.routesGrid}>
-              {filteredRoutes.map((route) => renderRouteCard(route))}
+            <View style={styles.routeSection}>
+              <View style={styles.sectionHeadingRow}>
+                <AppText style={styles.sectionHeading}>Available routes</AppText>
+                <AppText style={styles.sectionCount}>{filteredRoutes.length}</AppText>
+              </View>
+              {filteredRoutes.length === 0 ? (
+                <EmptyState
+                  title={searchQuery ? 'No routes found' : 'No routes available'}
+                  description={
+                    searchQuery
+                      ? 'Try a different route name or code'
+                      : 'No other routes are assigned'
+                  }
+                  icon={searchQuery ? 'search-outline' : 'map-outline'}
+                  actionLabel={searchQuery ? 'Clear search' : undefined}
+                  onAction={searchQuery ? () => setSearchQuery('') : undefined}
+                  size="small"
+                />
+              ) : (
+                <View style={styles.routesGrid}>
+                  {filteredRoutes.map((route) => renderRouteCard(route))}
+                </View>
+              )}
             </View>
           )}
         </ScrollView>
@@ -3082,14 +728,11 @@ export default function ChangeRoute() {
         </View>
 
         {isLoadingOutlets ? (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <AppText style={styles.loadingText}>Loading outlets...</AppText>
-          </View>
+          renderOutletListSkeleton()
         ) : outlets.length === 0 ? (
           <EmptyState
             title="No Outlets Found"
-            message="No outlets are available for this route"
+            description="No outlets are available for this route"
             icon="business-outline"
           />
         ) : (
@@ -3120,112 +763,94 @@ export default function ChangeRoute() {
         <Animated.View style={[styles.container, { opacity: fadeInAnim }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContainer}
+            contentContainerStyle={[styles.scrollContainer, styles.reviewScrollContainer]}
           >
-            {/* Confirmation Header */}
-            <View style={styles.confirmationHeader}>
-              <View style={styles.confirmationIconContainer}>
-                <Ionicons name="swap-horizontal" size={48} color={colors.primary} />
-              </View>
-              <AppText style={styles.confirmationTitle}>Review Route Change</AppText>
-              <AppText style={styles.confirmationSubtitle}>
-                Please review the details before confirming
-              </AppText>
-            </View>
-
-            {/* Current Route Card */}
-            <View style={styles.comparisonSection}>
-              <View style={[styles.comparisonCard, styles.currentRouteCard]}>
-                <View style={styles.comparisonBadge}>
-                  <Ionicons
-                    name="checkmark-circle-outline"
-                    size={14}
-                    color={colors.textSecondary}
-                  />
-                  <AppText style={styles.comparisonBadgeText}>Current</AppText>
-                </View>
-                <AppText style={styles.comparisonRouteName}>
-                  {summary.currentRoute?.routeName || 'No route'}
+            <View style={styles.reviewSection}>
+              <View style={styles.approvalNotice}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={colors.warning} />
+                <AppText style={styles.approvalNoticeText}>
+                  Your current route remains active until your manager approves this request.
                 </AppText>
-                <View style={styles.comparisonStats}>
-                  <View style={styles.comparisonStat}>
-                    <Ionicons name="business-outline" size={13} color={colors.textSecondary} />
-                    <AppText style={styles.comparisonStatText}>
+              </View>
+              <View style={styles.routeChangeCard}>
+                <View style={styles.routeChangeRow}>
+                  <View style={[styles.routeMarker, styles.currentRouteMarker]}>
+                    <Ionicons name="location-outline" size={19} color={colors.textSecondary} />
+                  </View>
+                  <View style={styles.routeChangeContent}>
+                    <AppText style={styles.routeChangeLabel}>CURRENT ROUTE</AppText>
+                    <AppText style={styles.routeChangeName} numberOfLines={2}>
+                      {summary.currentRoute?.routeName || 'No active route'}
+                    </AppText>
+                    <AppText style={styles.routeChangeMeta}>
                       {summary.currentRoute?.totalShops || 0} outlets
                     </AppText>
                   </View>
                 </View>
-              </View>
 
-              {/* Arrow */}
-              <View style={styles.arrowSection}>
-                <View style={[styles.arrowIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Ionicons name="arrow-down" size={20} color={colors.primary} />
+                <View style={styles.routeChangeDivider}>
+                  <View style={styles.dividerLine} />
+                  <View style={styles.swapIndicator}>
+                    <Ionicons name="arrow-down" size={16} color={colors.primary} />
+                  </View>
+                  <View style={styles.dividerLine} />
                 </View>
-              </View>
 
-              {/* New Route Card */}
-              <View style={[styles.comparisonCard, styles.newRouteCard]}>
-                <View style={[styles.comparisonBadge, styles.newBadge]}>
-                  <Ionicons name="star-outline" size={14} color="#FFF" />
-                  <AppText style={[styles.comparisonBadgeText, styles.newBadgeText]}>New</AppText>
-                </View>
-                <AppText style={[styles.comparisonRouteName, styles.newRouteName]}>
-                  {summary.newRoute?.routeName || 'N/A'}
-                </AppText>
-                <View style={styles.comparisonStats}>
-                  <View style={styles.comparisonStat}>
-                    <Ionicons name="business-outline" size={13} color={colors.primary} />
-                    <AppText style={[styles.comparisonStatText, { color: colors.primary }]}>
-                      {summary.newRoute?.totalShops || 0} outlets
+                <View style={styles.routeChangeRow}>
+                  <View style={[styles.routeMarker, styles.newRouteMarker]}>
+                    <Ionicons name="navigate" size={19} color={colors.primary} />
+                  </View>
+                  <View style={styles.routeChangeContent}>
+                    <View style={styles.newRouteLabelRow}>
+                      <AppText style={[styles.routeChangeLabel, { color: colors.primary }]}>
+                        NEW ROUTE
+                      </AppText>
+                      <View style={styles.selectedBadge}>
+                        <Ionicons name="checkmark" size={11} color={colors.primary} />
+                        <AppText style={styles.selectedBadgeText}>SELECTED</AppText>
+                      </View>
+                    </View>
+                    <AppText
+                      style={[styles.routeChangeName, { color: colors.primary }]}
+                      numberOfLines={2}
+                    >
+                      {summary.newRoute?.routeName || 'Not selected'}
+                    </AppText>
+                    <AppText style={styles.routeChangeMeta}>
+                      {summary.totalOutlets} outlets assigned
                     </AppText>
                   </View>
                 </View>
               </View>
             </View>
 
-            {/* Statistics Grid */}
-            <View style={styles.statsGrid}>
-              <View style={styles.statCardWrapper}>
-                <LinearGradient
-                  colors={[colors.primary + '15', colors.primary + '08']}
-                  style={styles.statCardGradient}
-                >
-                  <Ionicons name="business-outline" size={24} color={colors.primary} />
+            <View style={styles.reviewSection}>
+              <AppText style={styles.reviewSectionTitle}>New route summary</AppText>
+              <View style={styles.statsGrid}>
+                <View style={styles.statCardWrapper}>
+                  <View style={[styles.statIcon, { backgroundColor: colors.primary + '12' }]}>
+                    <Ionicons name="storefront-outline" size={19} color={colors.primary} />
+                  </View>
                   <AppText style={styles.statCardValue}>{summary.totalOutlets}</AppText>
-                  <AppText style={styles.statCardLabel}>Outlets</AppText>
-                </LinearGradient>
-              </View>
+                  <AppText style={styles.statCardLabel}>Total outlets</AppText>
+                </View>
 
-              <View style={styles.statCardWrapper}>
-                <LinearGradient
-                  colors={[colors.warning + '15', colors.warning + '08']}
-                  style={styles.statCardGradient}
-                >
-                  <Ionicons name="time-outline" size={24} color={colors.warning} />
+                <View style={styles.statCardWrapper}>
+                  <View style={[styles.statIcon, { backgroundColor: colors.warning + '12' }]}>
+                    <Ionicons name="time-outline" size={19} color={colors.warning} />
+                  </View>
                   <AppText style={styles.statCardValue}>{summary.estimatedTime}</AppText>
                   <AppText style={styles.statCardLabel}>Est. Time</AppText>
-                </LinearGradient>
-              </View>
+                </View>
 
-              <View style={styles.statCardWrapper}>
-                <LinearGradient
-                  colors={[colors.success + '15', colors.success + '08']}
-                  style={styles.statCardGradient}
-                >
-                  <Ionicons name="checkmark-outline" size={24} color={colors.success} />
+                <View style={styles.statCardWrapper}>
+                  <View style={[styles.statIcon, { backgroundColor: colors.success + '12' }]}>
+                    <Ionicons name="hourglass-outline" size={19} color={colors.success} />
+                  </View>
                   <AppText style={styles.statCardValue}>{summary.outletsToVisit.length}</AppText>
-                  <AppText style={styles.statCardLabel}>Pending</AppText>
-                </LinearGradient>
+                  <AppText style={styles.statCardLabel}>To visit</AppText>
+                </View>
               </View>
-            </View>
-
-            {/* Warning */}
-            <View style={styles.warningCard}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.warning} />
-              <AppText style={styles.warningText}>
-                Your current progress will be reset. Unvisited outlets will be marked as pending.
-              </AppText>
             </View>
           </ScrollView>
         </Animated.View>
@@ -3233,12 +858,7 @@ export default function ChangeRoute() {
     );
   };
 
-  // ==========================================================================
-  // Footer Navigation
-  // ==========================================================================
-
   const renderFooter = () => {
-    // Only show footer on outlets and confirmation pages (not on routes page)
     if (currentStep === 'routes' || !hasValidSession || !workSessionId) {
       return null;
     }
@@ -3269,7 +889,7 @@ export default function ChangeRoute() {
           activeOpacity={0.8}
         >
           <AppText style={styles.nextButtonText}>
-            {isLastStep ? (isSubmitting ? 'Submitting...' : 'Submit') : 'Next'}
+            {isLastStep ? (isSubmitting ? 'Sending...' : 'Request Change') : 'Next'}
           </AppText>
           <Ionicons
             name={isLastStep ? 'checkmark-outline' : 'arrow-forward-outline'}
@@ -3281,7 +901,6 @@ export default function ChangeRoute() {
     );
   };
 
-  // Main render with session check
   if (!hasValidSession || !workSessionId) {
     return renderNoSessionView();
   }
@@ -3297,10 +916,6 @@ export default function ChangeRoute() {
   );
 }
 
-// ============================================================================
-// Styles
-// ============================================================================
-
 const getStyles = (colors: any, insets: any) =>
   StyleSheet.create({
     safeArea: {
@@ -3314,29 +929,73 @@ const getStyles = (colors: any, insets: any) =>
     scrollContainer: {
       paddingBottom: 100,
     },
+    routesScrollContainer: {
+      paddingTop: 16,
+    },
     emptyStateContainer: {
       flexGrow: 1,
       justifyContent: 'center',
       minHeight: Dimensions.get('window').height - 100,
     },
-    searchContainer: {
+    routeSection: {
+      marginBottom: 18,
+    },
+    sectionHeadingRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
+      minHeight: 24,
       marginHorizontal: 16,
-      marginBottom: 20,
-      marginTop: 16,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: colors.divider,
-      gap: 10,
+      marginBottom: 10,
     },
-    searchInput: {
-      flex: 1,
-      fontSize: 14,
+    sectionHeading: {
       color: colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '800',
+      lineHeight: 18,
+      letterSpacing: 0.2,
+      textTransform: 'uppercase',
+    },
+    sectionCount: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      fontWeight: '700',
+      backgroundColor: colors.surface,
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    liveBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      minHeight: 24,
+      paddingHorizontal: 9,
+      borderRadius: 12,
+      backgroundColor: colors.success + '15',
+    },
+    liveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.success,
+    },
+    liveBadgeText: {
+      color: colors.success,
+      fontSize: 9,
+      fontWeight: '800',
+      lineHeight: 12,
+      letterSpacing: 0.5,
+    },
+    fixedSearchContainer: {
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 8,
+      backgroundColor: colors.background,
+      borderBottomWidth: 0.5,
+      borderBottomColor: colors.divider,
     },
     centerContainer: {
       flex: 1,
@@ -3381,6 +1040,7 @@ const getStyles = (colors: any, insets: any) =>
     },
     routeContent: {
       flex: 1,
+      minWidth: 0,
       gap: 6,
     },
     routeName: {
@@ -3391,6 +1051,7 @@ const getStyles = (colors: any, insets: any) =>
     },
     routeMetaRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 12,
     },
     routeMetaItem: {
@@ -3499,33 +1160,125 @@ const getStyles = (colors: any, insets: any) =>
       fontSize: 10,
       fontWeight: '600',
     },
-    // Confirmation Page Styles
-    confirmationHeader: {
+    reviewSection: {
+      paddingHorizontal: 16,
+      marginBottom: 20,
+      gap: 10,
+    },
+    reviewScrollContainer: {
+      paddingTop: 16,
+    },
+    approvalNotice: {
+      flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingTop: 20,
-      paddingBottom: 16,
-      gap: 12,
+      gap: 10,
+      padding: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.warning + '35',
+      backgroundColor: colors.warning + '0D',
     },
-    confirmationIconContainer: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: colors.primary + '15',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 8,
-    },
-    confirmationTitle: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.textPrimary,
-      textAlign: 'center',
-    },
-    confirmationSubtitle: {
-      fontSize: 14,
+    approvalNoticeText: {
+      flex: 1,
       color: colors.textSecondary,
-      textAlign: 'center',
+      fontSize: 12,
+      lineHeight: 17,
+      fontWeight: '600',
+    },
+    reviewSectionTitle: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 0.7,
+      textTransform: 'uppercase',
+    },
+    routeChangeCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      padding: 14,
+    },
+    routeChangeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 2,
+    },
+    routeMarker: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    currentRouteMarker: {
+      backgroundColor: colors.background,
+    },
+    newRouteMarker: {
+      backgroundColor: colors.primary + '12',
+    },
+    routeChangeContent: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
+    },
+    routeChangeLabel: {
+      color: colors.textTertiary,
+      fontSize: 9,
+      fontWeight: '800',
+      letterSpacing: 0.7,
+    },
+    routeChangeName: {
+      color: colors.textPrimary,
+      fontSize: 15,
+      lineHeight: 20,
+      fontWeight: '700',
+    },
+    routeChangeMeta: {
+      color: colors.textSecondary,
+      fontSize: 11,
+      lineHeight: 16,
+    },
+    routeChangeDivider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginVertical: 10,
+      marginLeft: 52,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.divider,
+    },
+    swapIndicator: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary + '12',
+    },
+    newRouteLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    selectedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 7,
+      backgroundColor: colors.primary + '12',
+    },
+    selectedBadgeText: {
+      color: colors.primary,
+      fontSize: 8,
+      fontWeight: '800',
+      letterSpacing: 0.4,
     },
     comparisonSection: {
       gap: 16,
@@ -3605,20 +1358,27 @@ const getStyles = (colors: any, insets: any) =>
     },
     statsGrid: {
       flexDirection: 'row',
-      gap: 10,
-      paddingHorizontal: 16,
-      marginBottom: 20,
+      gap: 8,
     },
     statCardWrapper: {
       flex: 1,
-      borderRadius: 12,
-      overflow: 'hidden',
-    },
-    statCardGradient: {
-      paddingVertical: 12,
-      paddingHorizontal: 10,
+      minHeight: 116,
+      padding: 10,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
       alignItems: 'center',
-      gap: 6,
+      gap: 5,
+    },
+    statIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
     },
     statCardValue: {
       fontSize: 18,
@@ -3629,24 +1389,6 @@ const getStyles = (colors: any, insets: any) =>
       fontSize: 10,
       color: colors.textSecondary,
       fontWeight: '600',
-    },
-    warningCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      marginHorizontal: 16,
-      marginBottom: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 12,
-      backgroundColor: colors.warning + '10',
-      borderRadius: 12,
-    },
-    warningText: {
-      flex: 1,
-      fontSize: 12,
-      color: colors.warning,
-      lineHeight: 18,
-      fontWeight: '500',
     },
     footer: {
       position: 'absolute',

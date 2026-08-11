@@ -21,6 +21,7 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
   data,
   onClose,
   onProceed,
+  proceedLabel = 'Proceed',
 }) => {
   const { colors } = useTheme();
   const styles = createLoadSummaryModalStyles(colors);
@@ -49,10 +50,7 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
   }, []);
 
   const formatWeight = useCallback((weight: number) => {
-    if (weight >= 1000) {
-      return `${(weight / 1000).toFixed(2)} tonnes`;
-    }
-    return `${weight.toFixed(1)} kg`;
+    return `${weight.toFixed(2)} KG`;
   }, []);
 
   const isOutOfStock = useCallback((item: any) => {
@@ -120,7 +118,12 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
     >
       <View style={styles.statsContainer}>
         {/* Cases Card */}
-        <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        <View
+          style={[
+            styles.statCard,
+            { backgroundColor: colors.surface, borderColor: colors.divider },
+          ]}
+        >
           <View style={[styles.statIconWrapper, { backgroundColor: '#3B82F610' }]}>
             <MaterialCommunityIcons name="cube-outline" size={24} color="#3B82F6" />
           </View>
@@ -131,7 +134,12 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
         </View>
 
         {/* Pieces Card */}
-        <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}>
+        <View
+          style={[
+            styles.statCard,
+            { backgroundColor: colors.surface, borderColor: colors.divider },
+          ]}
+        >
           <View style={[styles.statIconWrapper, { backgroundColor: '#10B98110' }]}>
             <MaterialCommunityIcons name="layers-outline" size={24} color="#10B981" />
           </View>
@@ -316,7 +324,7 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
           style={[styles.proceedButton, { backgroundColor: colors.primary }]}
           activeOpacity={0.85}
         >
-          <AppText style={styles.proceedButtonText}>Proceed</AppText>
+          <AppText style={styles.proceedButtonText}>{proceedLabel}</AppText>
         </TouchableOpacity>
       </View>
     </Animated.View>

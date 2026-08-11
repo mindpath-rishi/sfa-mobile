@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { View, Text, Platform, TouchableOpacity } from 'react-native';
+import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import { router, useSegments } from 'expo-router';
@@ -16,6 +16,10 @@ import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSumm
 import { toast } from '@/core/utils';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getRoleId } from '@/core/navigation/role.utils';
+import { useLoaderStore } from '@/core/loader/loader.store';
+import { useOfflineStore } from '@/core/offline/offline.store';
+import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
 /* ============================
  * HELPERS
@@ -32,7 +36,6 @@ const getRouteName = (segments: string[]) => {
 
   return clean[0] || 'home';
 };
-
 const isProfileScreen = (segments: string[]) => {
   const clean = getCleanSegments(segments);
   return clean[0] === 'home';
@@ -42,6 +45,32 @@ const isDetailScreen = (segments: string[]) => {
   const clean = getCleanSegments(segments);
   return clean.length > 1;
 };
+
+const SALESMAN_DRAWER_ROUTES = new Set([
+  '(tabs)',
+  'change-password',
+  'my-pocket',
+  'stock',
+  'route',
+  'my-target',
+  'switch-route',
+  'topup',
+  'checkin',
+  // 'stock-count',
+]);
+
+const MANAGER_DRAWER_ROUTES = new Set([
+  '(tabs)',
+  'change-password',
+  'manager-targets',
+  'team-coverage',
+  'beat-o-meter',
+  'survey-analytics',
+  'breakdown-update',
+]);
+
+const SHARED_TAB_ROUTES = new Set(['home', 'profile']);
+const MANAGER_TAB_ROUTES = new Set(['daily-summary', 'quick-viz']);
 
 /* ============================
  * MODERN DRAWER HEADER
@@ -97,286 +126,19 @@ const ModernDrawerHeader = ({
   );
 };
 
-/* ============================
- * CUSTOM DRAWER CONTENT
- * ============================ */
-
-// const CustomDrawerContent = (props: any) => {
-//   const { colors } = useTheme();
-//   const logout = useAuthStore((s) => s.logout);
-//   const user = useAuthStore((s) => s.user);
-//   const { workSessionId, setWorkSessionId } = useAuthStore();
-
-//   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
-//   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
-//   const [showDayEndSummary, setShowDayEndSummary] = useState(false);
-//   const [showSettlementOptions, setShowSettlementOptions] = useState(false);
-//   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
-//   const [carryForwardStock, setCarryForwardStock] = useState(true);
-//   const settleInFlightRef = useRef(false);
-//   const bumpDashboardRefresh = useAppEventsStore((s) => s.bumpDashboardRefresh);
-
-//   const fetchDayEndSummary = useCallback(async () => {
-//     try {
-//       const vanIdToUse =
-//         useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
-
-//       if (!vanIdToUse) {
-//         toast.error('Van not found. Please start your day first.');
-//         return;
-//       }
-
-//       const res: any = await vanService.fetchTodayStockSummary({
-//         vanId: vanIdToUse,
-//         workSessionId,
-//       });
-//       setDayEndSummary(res?.data);
-//       setShowDayEndSummary(true);
-//     } catch (error) {
-//       console.error('Error fetching day end summary:', error);
-//       toast.error('Failed to load day end summary. Please try again.');
-//     }
-//   }, [user]);
-
-//   const submitSettlement = useCallback(async () => {
-//     if (settleInFlightRef.current) return;
-//     settleInFlightRef.current = true;
-//     try {
-//       const response: any = await homeService.dayComplete(carryForwardStock as any);
-//       if (response?.success || response?.statusCode === 200) {
-//         toast.success('Your day successfully completed');
-//         setShowFinalConfirm(false);
-//         setShowSettlementOptions(false);
-//         setShowDayEndSummary(false);
-//         bumpDashboardRefresh();
-//         setWorkSessionId(null);
-//         router.replace('/(drawer)/(tabs)/home');
-//         return;
-//       }
-//       toast.error(response?.message || 'Failed to complete day');
-//     } catch (error) {
-//       console.error('Error completing day:', error);
-//       toast.error('Failed to complete day. Please try again.');
-//     } finally {
-//       settleInFlightRef.current = false;
-//     }
-//   }, [carryForwardStock]);
-
-//   const handleVanSettlementPress = useCallback(async () => {
-//     try {
-//       const statusRes: any = await homeService.getDayStatus('');
-//       const status = statusRes?.data?.status;
-//       if (status !== 'ACTIVE') {
-//         toast.error('Day not started. Please start day before Van Settlement.');
-//         return;
-//       }
-
-//       setCarryForwardStock(true);
-//       setShowSettlementConfirm(true);
-//     } catch (error) {
-//       console.error('Error checking day status:', error);
-//       toast.error('Unable to check day status. Please try again.');
-//     }
-//   }, []);
-
-//   // Filter out hidden screens from the drawer list (collection hidden)
-//   const filteredProps = {
-//     ...props,
-//     state: {
-//       ...props.state,
-//       routes: props.state.routes.filter((route: any) => {
-//         // Hide 'collection' from drawer
-//         return route.name !== 'collection';
-//       }),
-//     },
-//   };
-
-//   return (
-//     <View style={{ flex: 1, backgroundColor: colors.background }}>
-//       <ModernDrawerHeader colors={colors} />
-
-//       <DrawerContentScrollView
-//         {...filteredProps}
-//         contentContainerStyle={{ paddingTop: 8, paddingHorizontal: 8 }}
-//       >
-//         <DrawerItemList {...filteredProps} />
-//       </DrawerContentScrollView>
-
-//       {/* Logout Section with Divider */}
-//       <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
-//         <DrawerItem
-//           label="Van Settlement"
-//           labelStyle={{ fontWeight: '500', color: 'red' }}
-//           icon={({ size }) => <MaterialCommunityIcons name="power" size={size} color="red" />}
-//           onPress={() => {
-//             props.navigation?.closeDrawer?.();
-//             void handleVanSettlementPress();
-//           }}
-//           style={{
-//             borderRadius: 12,
-//             marginHorizontal: 8,
-//             marginTop: 8,
-//           }}
-//         />
-//       </View>
-
-//       <ConfirmationModal
-//         visible={showSettlementConfirm}
-//         title="Van Settlement"
-//         message="Do you want to settlement of van?"
-//         confirmText="Yes, Continue"
-//         cancelText="Cancel"
-//         type="info"
-//         onCancel={() => setShowSettlementConfirm(false)}
-//         onConfirm={() => {
-//           setShowSettlementConfirm(false);
-//           void fetchDayEndSummary();
-//         }}
-//       />
-
-//       <DayEndSummaryModal
-//         visible={showDayEndSummary}
-//         data={dayEndSummary}
-//         onClose={() => setShowDayEndSummary(false)}
-//         onProceed={() => {
-//           setShowDayEndSummary(false);
-//           setShowSettlementOptions(true);
-//         }}
-//       />
-
-//       <AppModal
-//         visible={showSettlementOptions}
-//         onClose={() => setShowSettlementOptions(false)}
-//         position="center"
-//         animation="fade"
-//         showBackdrop={true}
-//         closeOnBackdropPress={true}
-//         showHeader={false}
-//       >
-//         <View style={{ padding: 16 }}>
-//           <AppText style={{ fontSize: 16, fontWeight: '800', marginBottom: 8 }}>
-//             Settlement Options
-//           </AppText>
-//           <AppText style={{ fontSize: 12, opacity: 0.8, marginBottom: 14 }}>
-//             Choose how you want to handle remaining stock.
-//           </AppText>
-
-//           <TouchableOpacity
-//             onPress={() => setCarryForwardStock(true)}
-//             activeOpacity={0.8}
-//             style={{
-//               flexDirection: 'row',
-//               alignItems: 'center',
-//               padding: 12,
-//               borderRadius: 12,
-//               borderWidth: 1,
-//               borderColor: carryForwardStock ? colors.primary : colors.border,
-//               backgroundColor: carryForwardStock ? colors.primary + '10' : colors.surface,
-//               marginBottom: 10,
-//             }}
-//           >
-//             <Ionicons
-//               name={carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
-//               size={18}
-//               color={carryForwardStock ? colors.primary : colors.textSecondary}
-//             />
-//             <View style={{ marginLeft: 10, flex: 1 }}>
-//               <AppText style={{ fontSize: 14, fontWeight: '700' }}>Carry Forward Stock</AppText>
-//               <AppText style={{ fontSize: 12, opacity: 0.75 }}>
-//                 Keep remaining stock in van for next day.
-//               </AppText>
-//             </View>
-//           </TouchableOpacity>
-
-//           <TouchableOpacity
-//             onPress={() => setCarryForwardStock(false)}
-//             activeOpacity={0.8}
-//             style={{
-//               flexDirection: 'row',
-//               alignItems: 'center',
-//               padding: 12,
-//               borderRadius: 12,
-//               borderWidth: 1,
-//               borderColor: !carryForwardStock ? colors.primary : colors.border,
-//               backgroundColor: !carryForwardStock ? colors.primary + '10' : colors.surface,
-//             }}
-//           >
-//             <Ionicons
-//               name={!carryForwardStock ? 'radio-button-on' : 'radio-button-off'}
-//               size={18}
-//               color={!carryForwardStock ? colors.primary : colors.textSecondary}
-//             />
-//             <View style={{ marginLeft: 10, flex: 1 }}>
-//               <AppText style={{ fontSize: 14, fontWeight: '700' }}>Unload Stock</AppText>
-//               <AppText style={{ fontSize: 12, opacity: 0.75 }}>
-//                 Return all remaining stock to warehouse.
-//               </AppText>
-//             </View>
-//           </TouchableOpacity>
-
-//           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-//             <TouchableOpacity
-//               onPress={() => {
-//                 setShowSettlementOptions(false);
-//                 setShowDayEndSummary(true);
-//               }}
-//               style={{
-//                 flex: 1,
-//                 paddingVertical: 12,
-//                 borderRadius: 12,
-//                 borderWidth: 1,
-//                 borderColor: colors.border,
-//                 alignItems: 'center',
-//               }}
-//             >
-//               <AppText style={{ fontWeight: '700', color: colors.textSecondary }}>Back</AppText>
-//             </TouchableOpacity>
-
-//             <TouchableOpacity
-//               onPress={() => {
-//                 setShowSettlementOptions(false);
-//                 setShowFinalConfirm(true);
-//               }}
-//               style={{
-//                 flex: 1,
-//                 paddingVertical: 12,
-//                 borderRadius: 12,
-//                 backgroundColor: colors.primary,
-//                 alignItems: 'center',
-//               }}
-//             >
-//               <AppText style={{ fontWeight: '800', color: '#fff' }}>Continue</AppText>
-//             </TouchableOpacity>
-//           </View>
-//         </View>
-//       </AppModal>
-
-//       <ConfirmationModal
-//         visible={showFinalConfirm}
-//         title="Final Confirmation"
-//         message={
-//           carryForwardStock
-//             ? 'Confirm van settlement with Carry Forward Stock?'
-//             : 'Confirm van settlement with Unload Stock?'
-//         }
-//         confirmText="Submit"
-//         cancelText="Cancel"
-//         type="warning"
-//         onCancel={() => setShowFinalConfirm(false)}
-//         onConfirm={() => void submitSettlement()}
-//       />
-//     </View>
-//   );
-// };
-
 const CustomDrawerContent = (props: any) => {
   const { colors } = useTheme();
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
   const { workSessionId, setWorkSessionId } = useAuthStore();
+  const roleId = getRoleId(user);
+  const allowedRoutes = roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
+  const loader = useLoaderStore();
+  const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
+  const [settlementTopupAlerts, setSettlementTopupAlerts] = useState<any[]>([]);
   const [showDayEndSummary, setShowDayEndSummary] = useState(false);
   const [showSettlementOptions, setShowSettlementOptions] = useState(false);
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
@@ -384,35 +146,106 @@ const CustomDrawerContent = (props: any) => {
   const settleInFlightRef = useRef(false);
   const bumpDashboardRefresh = useAppEventsStore((s) => s.bumpDashboardRefresh);
 
+  const fetchSettlementTopupAlerts = useCallback(async () => {
+    setSettlementTopupAlerts([]);
+
+    const vanIdToUse =
+      useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
+
+    if (!vanIdToUse) return false;
+
+    try {
+      const response = await vanService.fetchInventoryTopupRequests({
+        page: 1,
+        limit: 20,
+        vanId: vanIdToUse,
+      });
+
+      const topupData = response?.data?.data || response?.data || [];
+      const topups = Array.isArray(topupData) ? topupData : [];
+      const activeTopupStatuses = [TOPUP_STATUS.SUBMITTED, TOPUP_STATUS.APPROVED];
+      const alerts = topups
+        .filter((item: any) => activeTopupStatuses.includes(item?.status))
+        .map((item: any) => ({
+          id: item.vanInventoryTopupId || item._id,
+          reference: `#${item.reference || item.vanInventoryTopupId?.slice(-8) || item._id}`,
+          status: item.status,
+          requestedCases: Number(item.totalRequestedCases || 0),
+          requestedPieces: Number(item.totalRequestedPieces || 0),
+          approvedCases: Number(item.totalApprovedCases || 0),
+          approvedPieces: Number(item.totalApprovedPieces || 0),
+        }));
+
+      setSettlementTopupAlerts(alerts);
+      return true;
+    } catch (error) {
+      console.warn('Failed to fetch top-up requests before settlement:', error);
+      setSettlementTopupAlerts([]);
+      return false;
+    }
+  }, [user]);
+
   const fetchDayEndSummary = useCallback(async () => {
     try {
+      loader.show({ message: 'Loading van settlement summary...' });
+
       const vanIdToUse =
         useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
 
-      if (!vanIdToUse) {
+      if (vanIdToUse) {
+        // toast.error('Van not found. Please start your day first.');
+
+        // return;
+        const res: any = await vanService.fetchTodayStockSummary(
+          {
+            vanId: vanIdToUse,
+            workSessionId,
+          },
+          { showLoader: false },
+        );
+        if (!res?.data?.summary) {
+          toast.error('Failed to load day end summary. Please try again.');
+          return;
+        }
+        setDayEndSummary(res?.data);
+      } else {
         toast.error('Van not found. Please start your day first.');
         return;
       }
 
-      const res: any = await vanService.fetchTodayStockSummary({
-        vanId: vanIdToUse,
-        workSessionId,
-      });
-      setDayEndSummary(res?.data);
+      loader.show({ message: 'Loading top-up details...' });
+      const topupLoaded = await fetchSettlementTopupAlerts();
+      if (!topupLoaded) {
+        toast.error('Failed to load top-up details. Please try again.');
+        return;
+      }
       setShowDayEndSummary(true);
     } catch (error) {
       console.error('Error fetching day end summary:', error);
       toast.error('Failed to load day end summary. Please try again.');
+    } finally {
+      loader.hide();
     }
-  }, [user]);
+  }, [fetchSettlementTopupAlerts, loader, user, workSessionId]);
 
   const submitSettlement = useCallback(async () => {
     if (settleInFlightRef.current) return;
     settleInFlightRef.current = true;
     try {
-      const response: any = await homeService.dayComplete(carryForwardStock as any);
+      setShowFinalConfirm(false);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      loader.show({ message: 'Completing van settlement...' });
+
+      const response: any = await homeService.dayComplete(carryForwardStock as any, {
+        showLoader: false,
+      });
       if (response?.success || response?.statusCode === 200) {
-        toast.success('Your day successfully completed');
+        loader.show({ message: 'Finalizing settlement...' });
+        toast.success(
+          carryForwardStock
+            ? 'Your day successfully completed'
+            : 'Day completed. Stock unload request submitted for approval.',
+        );
         setShowFinalConfirm(false);
         setShowSettlementOptions(false);
         setShowDayEndSummary(false);
@@ -424,45 +257,80 @@ const CustomDrawerContent = (props: any) => {
       toast.error(response?.message || 'Failed to complete day');
     } catch (error) {
       console.error('Error completing day:', error);
-      toast.error('Failed to complete day. Please try again.');
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error instanceof Error ? error.message : null) ||
+        'Failed to complete day. Please try again.';
+      toast.error(message);
     } finally {
       settleInFlightRef.current = false;
+      loader.hide();
     }
-  }, [carryForwardStock]);
+  }, [bumpDashboardRefresh, carryForwardStock, loader, setWorkSessionId]);
 
   const handleVanSettlementPress = useCallback(async () => {
+    if (offline) {
+      toast.error('Van Settlement is unavailable offline. Please reconnect and try again.');
+      return;
+    }
     try {
-      const statusRes: any = await homeService.getDayStatus('');
+      loader.show({ message: 'Checking today activity...' });
+
+      const statusRes: any = await homeService.getDayStatus('', {
+        showLoader: false,
+        cache: false,
+        timeoutMs: 20_000,
+      });
       const status = statusRes?.data?.status;
       if (status !== 'ACTIVE') {
         toast.error('Day not started. Please start day before Van Settlement.');
         return;
       }
 
+      await fetchSettlementTopupAlerts();
       setCarryForwardStock(true);
       setShowSettlementConfirm(true);
     } catch (error) {
       console.error('Error checking day status:', error);
       toast.error('Unable to check day status. Please try again.');
+    } finally {
+      loader.hide();
     }
-  }, []);
+  }, [fetchSettlementTopupAlerts, loader, offline]);
 
-  // Filter out hidden screens from the drawer list (collection hidden)
+  const filteredRoutes = props.state.routes.filter((route: any) => allowedRoutes.has(route.name));
+  const filteredRouteKeys = new Set(filteredRoutes.map((route: any) => route.key));
+  const currentRouteKey = props.state.routes[props.state.index]?.key;
+  const filteredIndex = Math.max(
+    0,
+    filteredRoutes.findIndex((route: any) => route.key === currentRouteKey),
+  );
+
   const filteredProps = {
     ...props,
     state: {
       ...props.state,
-      routes: props.state.routes.filter((route: any) => {
-        // Hide 'collection' from drawer
-        return route.name !== 'collection';
+      index: filteredIndex,
+      routeNames: props.state.routeNames?.filter((routeName: string) =>
+        allowedRoutes.has(routeName),
+      ),
+      routes: filteredRoutes,
+      history: props.state.history?.filter((item: any) => {
+        if (item.type !== 'route') return true;
+        return filteredRouteKeys.has(item.key);
       }),
     },
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
-      <View style={{ flex: 1 }}>
-        <ModernDrawerHeader colors={colors} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }} edges={['top', 'bottom']}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <ModernDrawerHeader
+          colors={colors}
+          userName={user?.name || 'Field User'}
+          userRole={roleId === 'SALESMAN' ? 'Salesman' : 'Manager'}
+        />
 
         <DrawerContentScrollView
           {...filteredProps}
@@ -471,29 +339,37 @@ const CustomDrawerContent = (props: any) => {
           <DrawerItemList {...filteredProps} />
         </DrawerContentScrollView>
 
-        {/* Logout Section with Divider */}
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
-          <DrawerItem
-            label="Van Settlement"
-            labelStyle={{ fontWeight: '500', color: 'red' }}
-            icon={({ size }) => <MaterialCommunityIcons name="power" size={size} color="red" />}
-            onPress={() => {
-              props.navigation?.closeDrawer?.();
-              void handleVanSettlementPress();
-            }}
-            style={{
-              borderRadius: 12,
-              marginHorizontal: 8,
-              marginTop: 8,
-            }}
-          />
-        </View>
+        {roleId == 'SALESMAN' && (
+          <View style={{ borderTopWidth: 1, borderTopColor: colors.border, marginBottom: 20 }}>
+            <DrawerItem
+              label="Van Settlement"
+              labelStyle={{ fontWeight: '500', color: offline ? colors.textSecondary : 'red' }}
+              icon={({ size }) => (
+                <MaterialCommunityIcons
+                  name="power"
+                  size={size}
+                  color={offline ? colors.textSecondary : 'red'}
+                />
+              )}
+              onPress={() => {
+                props.navigation?.closeDrawer?.();
+                void handleVanSettlementPress();
+              }}
+              style={{
+                borderRadius: 12,
+                marginHorizontal: 8,
+                marginTop: 8,
+                opacity: offline ? 0.5 : 1,
+              }}
+            />
+          </View>
+        )}
 
         <ConfirmationModal
           visible={showSettlementConfirm}
           title="Van Settlement"
-          message="Do you want to settlement of van?"
-          confirmText="Yes, Continue"
+          message="Do you want to view the van settlement?"
+          confirmText="View"
           cancelText="Cancel"
           type="info"
           onCancel={() => setShowSettlementConfirm(false)}
@@ -506,6 +382,7 @@ const CustomDrawerContent = (props: any) => {
         <DayEndSummaryModal
           visible={showDayEndSummary}
           data={dayEndSummary}
+          topupSettlementAlerts={settlementTopupAlerts}
           onClose={() => setShowDayEndSummary(false)}
           onProceed={() => {
             setShowDayEndSummary(false);
@@ -649,6 +526,10 @@ export default function DrawerLayout() {
 
   const isDetail = isDetailScreen(segments);
   const isProfile = isProfileScreen(segments);
+  const user = useAuthStore((state) => state.user);
+  const roleId = getRoleId(user);
+  const drawerAllowedRoutes =
+    roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
 
   const HEADER_MAP: Record<string, any> = {
     home: {
@@ -675,6 +556,47 @@ export default function DrawerLayout() {
       backgroundColor: colors.primary,
     },
 
+    'manager-targets': {
+      title: 'Primary Targets',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'team-coverage': {
+      title: 'Team Coverage',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'beat-o-meter': {
+      title: 'Beat-O-Meter',
+      showMenu: false,
+      showSearch: true,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'survey-analytics': {
+      title: 'Survey Analytics',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'breakdown-update': {
+      title: 'Breakdown Update',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
     'switch-route': {
       title: 'Change Route',
       showMenu: false,
@@ -683,7 +605,7 @@ export default function DrawerLayout() {
       backgroundColor: colors.primary,
     },
     'my-pocket': {
-      title: 'My Pocket',
+      title: 'My Pocket MIS',
       showMenu: false,
       showFilter: false,
       showBack: true,
@@ -707,7 +629,7 @@ export default function DrawerLayout() {
     },
 
     route: {
-      title: 'My Route',
+      title: 'Route',
       showMenu: false,
       showFilter: true,
       showBack: true,
@@ -717,6 +639,22 @@ export default function DrawerLayout() {
       showLeftIcon: true,
       backgroundColor: colors.primary,
     },
+
+    checkin: {
+      title: 'Check In',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
+
+    'change-password': {
+      title: 'Change Password',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
   };
 
   /* ============================
@@ -724,7 +662,7 @@ export default function DrawerLayout() {
    * ============================ */
 
   useEffect(() => {
-    if (isProfile) {
+    if (isProfile && !segments.includes('(tabs)')) {
       const routeName = getRouteName(segments);
       const config = HEADER_MAP[routeName];
 
@@ -732,7 +670,26 @@ export default function DrawerLayout() {
         setHeader(config);
       }
     }
-  }, [segments]);
+  }, [segments, isProfile, setHeader]);
+
+  useEffect(() => {
+    const routeName = getRouteName(segments);
+    const isTabRoute = segments.includes('(tabs)');
+    const canViewTabRoute =
+      SHARED_TAB_ROUTES.has(routeName) ||
+      (roleId === 'MANAGER' && MANAGER_TAB_ROUTES.has(routeName));
+
+    if (isTabRoute) {
+      if (!canViewTabRoute) {
+        router.replace('/(drawer)/(tabs)/home');
+      }
+      return;
+    }
+
+    if (!drawerAllowedRoutes.has(routeName)) {
+      router.replace('/(drawer)/(tabs)/home');
+    }
+  }, [drawerAllowedRoutes, roleId, segments]);
 
   /* ============================
    * MODERN ICON MAP
@@ -788,8 +745,8 @@ export default function DrawerLayout() {
         },
         'switch-route': {
           component: MaterialCommunityIcons,
-          focusedIcon: 'swap-horizontal-circle',
-          unfocusedIcon: 'swap-horizontal-circle-outline',
+          focusedIcon: 'map-marker-path',
+          unfocusedIcon: 'map-outline',
         },
         'my-pocket': {
           component: MaterialCommunityIcons,
@@ -800,6 +757,36 @@ export default function DrawerLayout() {
           component: MaterialCommunityIcons,
           focusedIcon: 'package-variant',
           unfocusedIcon: 'package-variant',
+        },
+        'manager-targets': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'target',
+          unfocusedIcon: 'target',
+        },
+        'team-coverage': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'account-group',
+          unfocusedIcon: 'account-group-outline',
+        },
+        'beat-o-meter': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'speedometer',
+          unfocusedIcon: 'speedometer',
+        },
+        'survey-analytics': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'clipboard-text-search',
+          unfocusedIcon: 'clipboard-text-search-outline',
+        },
+        'breakdown-update': {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'car-wrench',
+          unfocusedIcon: 'car-wrench',
+        },
+        checkin: {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'clipboard-check',
+          unfocusedIcon: 'clipboard-check-outline',
         },
       };
 
@@ -816,6 +803,7 @@ export default function DrawerLayout() {
 
   return (
     <Drawer
+      initialRouteName="(tabs)"
       drawerContent={(props) => <CustomDrawerContent {...props} />}
       screenOptions={({ route }) => ({
         header: () => {
@@ -859,10 +847,18 @@ export default function DrawerLayout() {
       />
 
       <Drawer.Screen
+        name="switch-route"
+        options={{
+          title: 'Change Route',
+          drawerLabel: 'Change Route',
+        }}
+      />
+
+      <Drawer.Screen
         name="my-pocket"
         options={{
-          title: 'My Pcoket',
-          drawerLabel: 'My Pocket',
+          title: 'My Pocket MIS',
+          drawerLabel: 'My Pocket MIS',
         }}
       />
 
@@ -877,8 +873,9 @@ export default function DrawerLayout() {
       <Drawer.Screen
         name="route"
         options={{
-          title: 'Route Management',
-          drawerLabel: 'My Route',
+          title: 'Route',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
         }}
       />
 
@@ -891,19 +888,38 @@ export default function DrawerLayout() {
         }}
       />
 
-      <Drawer.Screen
-        name="switch-route"
-        options={{
-          title: 'Change Route',
-          drawerLabel: 'Change Route',
-        }}
-      />
-
       {/* Collection Screen - Hidden from drawer */}
       <Drawer.Screen
         name="collection"
         options={{
           title: 'Cash Collection',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+
+      <Drawer.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+
+      <Drawer.Screen
+        name="stock-unload-detail"
+        options={{
+          title: 'Stock Unload Details',
+          drawerLabel: () => null,
+          drawerItemStyle: { display: 'none' },
+        }}
+      />
+
+      <Drawer.Screen
+        name="change-password"
+        options={{
+          title: 'Change Password',
           drawerLabel: () => null,
           drawerItemStyle: { display: 'none' },
         }}
@@ -921,8 +937,55 @@ export default function DrawerLayout() {
         name="stock-count"
         options={{
           title: 'Van Settlement',
-          drawerLabel: () => null,
-          drawerItemStyle: { display: 'none' },
+          drawerLabel: 'Van Settlement',
+        }}
+      />
+
+      <Drawer.Screen
+        name="manager-targets"
+        options={{
+          title: 'Primary Targets',
+          drawerLabel: 'Primary Targets',
+        }}
+      />
+
+      <Drawer.Screen
+        name="team-coverage"
+        options={{
+          title: 'Team Coverage',
+          drawerLabel: 'Team Coverage',
+        }}
+      />
+
+      <Drawer.Screen
+        name="beat-o-meter"
+        options={{
+          title: 'Beat-O-Meter',
+          drawerLabel: 'Beat-O-Meter',
+        }}
+      />
+
+      <Drawer.Screen
+        name="survey-analytics"
+        options={{
+          title: 'Survey Analytics',
+          drawerLabel: 'Survey Analytics',
+        }}
+      />
+
+      <Drawer.Screen
+        name="breakdown-update"
+        options={{
+          title: 'Breakdown Update',
+          drawerLabel: 'Breakdown Update',
+        }}
+      />
+
+      <Drawer.Screen
+        name="checkin"
+        options={{
+          title: 'Check In',
+          drawerLabel: 'Check In',
         }}
       />
     </Drawer>

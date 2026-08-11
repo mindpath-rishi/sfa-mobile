@@ -10,14 +10,14 @@ export const useDayEndSummaryModalStyles = () => {
 
     // Product Stats - Increased font sizes
     productStatLabel: {
-      fontSize: 12, // Increased from 10
-      marginBottom: 6, // Increased from 4
+      fontSize: 10,
+      marginBottom: 3,
       color: colors.textSecondary,
       fontWeight: '500',
     } as TextStyle,
 
     productStatValue: {
-      fontSize: 16, // Increased from 13
+      fontSize: 13,
       fontWeight: '700',
     } as TextStyle,
 
@@ -29,22 +29,24 @@ export const useDayEndSummaryModalStyles = () => {
 
     // Product Name - Increased size
     productName: {
-      fontSize: 15, // Increased from 14
-      fontWeight: '600',
-      marginBottom: 3, // Increased from 2
+      fontSize: 13,
+      fontWeight: '700',
+      marginBottom: 2,
       color: colors.textPrimary,
+      lineHeight: 17,
     } as TextStyle,
 
     // Product Code
     productCode: {
-      fontSize: 12, // Increased from 11
+      fontSize: 10,
       color: colors.textSecondary,
     } as TextStyle,
 
     // Product Index
     productIndexText: {
-      fontSize: 15, // Increased from 14
-      fontWeight: '700',
+      width: 22,
+      fontSize: 11,
+      fontWeight: '800',
       color: colors.primary,
     } as TextStyle,
 
@@ -80,9 +82,16 @@ export const useDayEndSummaryModalStyles = () => {
     } as TextStyle,
 
     financialStockText: {
-      width: 85,
-      fontSize: 15, // Increased from 14
+      width: 70,
+      fontSize: 14,
       fontWeight: '600',
+      textAlign: 'center',
+    } as TextStyle,
+
+    financialWeightText: {
+      width: 72,
+      fontSize: 13,
+      fontWeight: '700',
       textAlign: 'center',
     } as TextStyle,
 
@@ -94,8 +103,8 @@ export const useDayEndSummaryModalStyles = () => {
     } as TextStyle,
 
     financialValueText: {
-      width: 75,
-      fontSize: 15, // Increased from 14
+      width: 70,
+      fontSize: 14,
       fontWeight: '700',
       textAlign: 'right',
     } as TextStyle,
@@ -137,6 +146,294 @@ export const useDayEndSummaryModalStyles = () => {
       paddingBottom: 24,
     } as ViewStyle,
 
+    summaryHero: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      backgroundColor: colors.surface,
+      padding: 14,
+      marginBottom: 16,
+      gap: 14,
+    } as ViewStyle,
+
+    summaryHeroHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    } as ViewStyle,
+
+    summaryHeroIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    summaryHeroTitleBlock: {
+      flex: 1,
+    } as ViewStyle,
+
+    summaryHeroTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      marginBottom: 2,
+    } as TextStyle,
+
+    summaryHeroSubtitle: {
+      fontSize: 12,
+      lineHeight: 17,
+    } as TextStyle,
+
+    summaryTileGrid: {
+      gap: 10,
+    } as ViewStyle,
+
+    summaryTile: {
+      minHeight: 74,
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    } as ViewStyle,
+
+    summaryTileIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as ViewStyle,
+
+    summaryTileContent: {
+      flex: 1,
+    } as ViewStyle,
+
+    summaryTileLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      marginBottom: 3,
+    } as TextStyle,
+
+    summaryTileValue: {
+      fontSize: 17,
+      fontWeight: '800',
+      marginBottom: 2,
+    } as TextStyle,
+
+    summaryTileHelper: {
+      fontSize: 12,
+      fontWeight: '700',
+    } as TextStyle,
+
+    topupAlertCard: {
+      borderWidth: 1,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 16,
+      gap: 12,
+    } as ViewStyle,
+
+    topupAlertHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    } as ViewStyle,
+
+    topupAlertTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+    } as TextStyle,
+
+    topupAlertSection: {
+      gap: 6,
+    } as ViewStyle,
+
+    topupAlertMessage: {
+      fontSize: 13,
+      fontWeight: '700',
+    } as TextStyle,
+
+    topupAlertItem: {
+      borderRadius: 12,
+      padding: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    } as ViewStyle,
+
+    topupAlertItemMain: {
+      flex: 1,
+    } as ViewStyle,
+
+    topupAlertReference: {
+      fontSize: 13,
+      fontWeight: '800',
+      marginBottom: 2,
+    } as TextStyle,
+
+    topupAlertQty: {
+      fontSize: 12,
+      lineHeight: 17,
+    } as TextStyle,
+
+    topupStatusBadge: {
+      borderRadius: 999,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    } as ViewStyle,
+
+    topupStatusText: {
+      fontSize: 11,
+      fontWeight: '800',
+    } as TextStyle,
+
+    unacceptedStockBackdrop: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      zIndex: 100,
+      elevation: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+      backgroundColor: 'rgba(15, 23, 42, 0.72)',
+    } as ViewStyle,
+
+    unacceptedStockCard: {
+      width: '100%',
+      maxWidth: 420,
+      padding: 20,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.warning + '45',
+      backgroundColor: colors.surface,
+    } as ViewStyle,
+
+    unacceptedStockEyebrow: {
+      alignSelf: 'center',
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      marginBottom: 12,
+      backgroundColor: colors.warning + '18',
+      color: colors.warning,
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1,
+    } as TextStyle,
+
+    unacceptedStockIcon: {
+      alignSelf: 'center',
+      width: 64,
+      height: 64,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+      backgroundColor: colors.warning + '16',
+    } as ViewStyle,
+
+    unacceptedStockTitle: {
+      color: colors.textPrimary,
+      fontSize: 20,
+      lineHeight: 25,
+      fontWeight: '900',
+      textAlign: 'center',
+      marginBottom: 8,
+    } as TextStyle,
+
+    unacceptedStockDescription: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      lineHeight: 19,
+      textAlign: 'center',
+      marginBottom: 16,
+    } as TextStyle,
+
+    unacceptedStockMetrics: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 14,
+    } as ViewStyle,
+
+    unacceptedStockMetric: {
+      flex: 1,
+      alignItems: 'center',
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 4,
+      backgroundColor: colors.background,
+    } as ViewStyle,
+
+    unacceptedStockMetricValue: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: '900',
+      marginBottom: 2,
+    } as TextStyle,
+
+    unacceptedStockMetricLabel: {
+      color: colors.textSecondary,
+      fontSize: 10,
+      fontWeight: '700',
+    } as TextStyle,
+
+    unacceptedStockNote: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      borderRadius: 12,
+      padding: 11,
+      marginBottom: 18,
+      backgroundColor: colors.warning + '10',
+    } as ViewStyle,
+
+    unacceptedStockNoteText: {
+      flex: 1,
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+    } as TextStyle,
+
+    unacceptedStockActions: {
+      gap: 9,
+    } as ViewStyle,
+
+    unacceptedStockReviewButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 46,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+    } as ViewStyle,
+
+    unacceptedStockReviewText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '800',
+    } as TextStyle,
+
+    unacceptedStockEndButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.error + '70',
+      backgroundColor: colors.error + '08',
+    } as ViewStyle,
+
+    unacceptedStockEndText: {
+      color: colors.error,
+      fontSize: 13,
+      fontWeight: '800',
+    } as TextStyle,
+
     // ============================
     // Tab Bar
     // ============================
@@ -145,6 +442,7 @@ export const useDayEndSummaryModalStyles = () => {
       paddingHorizontal: 16,
       borderBottomWidth: 1,
       borderBottomColor: colors.divider,
+      backgroundColor: colors.surface,
     } as ViewStyle,
 
     tab: {
@@ -165,7 +463,7 @@ export const useDayEndSummaryModalStyles = () => {
     // Cards
     // ============================
     card: {
-      borderRadius: 16,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: colors.divider,
       padding: 16,
@@ -184,7 +482,7 @@ export const useDayEndSummaryModalStyles = () => {
     // Stats Card (Reusable component)
     // ============================
     statsCard: {
-      borderRadius: 16,
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: colors.divider,
       marginBottom: 16,
@@ -213,17 +511,18 @@ export const useDayEndSummaryModalStyles = () => {
       flexDirection: 'row',
       flexWrap: 'wrap',
       padding: 12,
-      gap: 12,
+      gap: 10,
     } as ViewStyle,
 
     statsCardItem: {
       flex: 1,
-      minWidth: '30%',
+      minWidth: '45%',
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
       padding: 10,
       borderRadius: 10,
+      backgroundColor: colors.background,
     } as ViewStyle,
 
     statsCardItemIcon: {
@@ -253,7 +552,15 @@ export const useDayEndSummaryModalStyles = () => {
     } as TextStyle,
 
     financialHeaderStock: {
-      width: 85,
+      width: 70,
+      fontSize: 12,
+      fontWeight: '600',
+      textAlign: 'center',
+      color: colors.textSecondary,
+    } as TextStyle,
+
+    financialHeaderWeight: {
+      width: 72,
       fontSize: 12,
       fontWeight: '600',
       textAlign: 'center',
@@ -269,7 +576,7 @@ export const useDayEndSummaryModalStyles = () => {
     } as TextStyle,
 
     financialHeaderValue: {
-      width: 75,
+      width: 70,
       fontSize: 12,
       fontWeight: '600',
       textAlign: 'right',
@@ -304,13 +611,108 @@ export const useDayEndSummaryModalStyles = () => {
     // Products List
     // ============================
     productsList: {
-      padding: 16,
+      padding: 10,
       paddingBottom: 24,
-      gap: 10,
+      gap: 6,
     } as ViewStyle,
 
+    productListHeaderBlock: {
+      gap: 8,
+    } as ViewStyle,
+
+    productSearchBar: {
+      minHeight: 42,
+      borderRadius: 10,
+    } as ViewStyle,
+
+    productSearchInput: {
+      fontSize: 13,
+    } as TextStyle,
+
+    productListHeader: {
+      minHeight: 34,
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    } as ViewStyle,
+
+    productListHeaderName: {
+      flex: 1.35,
+      fontSize: 10,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    } as TextStyle,
+
+    productListHeaderQty: {
+      width: 44,
+      fontSize: 10,
+      fontWeight: '800',
+      textAlign: 'center',
+      textTransform: 'uppercase',
+    } as TextStyle,
+
+    productCompactRow: {
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.divider,
+      backgroundColor: colors.surface,
+      paddingHorizontal: 10,
+      paddingVertical: 7,
+      gap: 5,
+    } as ViewStyle,
+
+    productCompactTop: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+    } as ViewStyle,
+
+    productCompactDetails: {
+      flex: 1,
+      minWidth: 0,
+    } as ViewStyle,
+
+    productCompactInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      paddingLeft: 28,
+    } as ViewStyle,
+
+    productCompactQtys: {
+      flexDirection: 'row',
+      gap: 6,
+      flexShrink: 0,
+    } as ViewStyle,
+
+    productCompactQty: {
+      width: 44,
+      fontSize: 11,
+      fontWeight: '800',
+      textAlign: 'center',
+    } as TextStyle,
+
+    productCompactValues: {
+      flexDirection: 'row',
+      gap: 8,
+      flex: 1,
+      minWidth: 0,
+      justifyContent: 'flex-end',
+    } as ViewStyle,
+
+    productCompactValue: {
+      flexShrink: 1,
+      textAlign: 'right',
+      fontSize: 10,
+      fontWeight: '800',
+    } as TextStyle,
+
     productCard: {
-      padding: 14,
+      padding: 12,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: colors.divider,
@@ -339,13 +741,19 @@ export const useDayEndSummaryModalStyles = () => {
 
     productStats: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
+      flexWrap: 'wrap',
       marginBottom: 12,
+      gap: 8,
     } as ViewStyle,
 
     productStat: {
-      flex: 1,
-      alignItems: 'center',
+      width: '48%',
+      minHeight: 66,
+      alignItems: 'flex-start',
+      justifyContent: 'center',
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
     } as ViewStyle,
 
     productValueRow: {
@@ -361,6 +769,7 @@ export const useDayEndSummaryModalStyles = () => {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      minWidth: 0,
     } as ViewStyle,
 
     // ============================

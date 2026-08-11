@@ -6,13 +6,15 @@ interface HeaderStylesProps {
   elevated: boolean;
   centeredTitle: boolean;
   transparent: boolean;
-  size: 'sm' | 'md' | 'lg';
+  size: 'small' | 'medium' | 'large' | 'sm' | 'md' | 'lg';
   showBorder: boolean;
   showSearchBar?: boolean;
 }
 
 export const useHeaderStyles = (props: HeaderStylesProps) => {
   const { colors } = useTheme();
+  const isSmall = props.size === 'small' || props.size === 'sm';
+  const isLarge = props.size === 'large' || props.size === 'lg';
 
   const styleGenerator = createStyles((utils) => ({
     filterBadge: {
@@ -58,8 +60,8 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
       alignItems: 'center',
       justifyContent: 'space-between',
       // minHeight: props.size === 'sm' ? 56 : props.size === 'lg' ? 80 : 50,
-      minHeight: 48,
-      paddingVertical: 8,
+      minHeight: isSmall ? 48 : isLarge ? 64 : 56,
+      paddingVertical: isSmall ? 4 : 8,
       paddingHorizontal: 8,
       borderBottomWidth: props.showBorder ? 1 : 0,
       borderBottomColor: colors.divider + '40',
@@ -111,9 +113,9 @@ export const useHeaderStyles = (props: HeaderStylesProps) => {
     } as ViewStyle,
 
     title: {
-      fontSize: props.size === 'sm' ? 18 : props.size === 'lg' ? 28 : 22,
-      fontWeight: props.size === 'lg' ? '700' : '600',
-      letterSpacing: props.size === 'lg' ? 0.5 : -0.3,
+      fontSize: isSmall ? 16 : isLarge ? 28 : 22,
+      fontWeight: isLarge ? '700' : '600',
+      letterSpacing: isLarge ? 0.5 : -0.3,
       color: colors.backgroundSecondary,
     } as TextStyle,
 

@@ -11,11 +11,10 @@ import {
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { vanService } from '@/shared/services/van.service';
 import { useRouteStore } from '@/core/store/route.store';
-import { AppText, Skeleton } from '@/core/components';
+import { AppText, SearchBar, Skeleton } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { createStockStyles } from '../styles/stock.styles';
 import { StockProductItem } from '../components/StockProductItem';
@@ -26,13 +25,13 @@ import { PAGINATION, ANIMATION } from '../constants/stock.constants';
 import { EmptyState } from '@/core/components/EmptyState';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { InventoryHistorySheet } from '../components/InventoryHistorySheet';
 
 export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber }) => {
   const styles = createStockStyles(useTheme().colors);
   const { colors } = useTheme();
   const route = useRoute();
-  const van = useRouteStore.getState().van;
-  const insets = useSafeAreaInsets();
+  const van = useRouteStore((state) => state.van);
 
   const loadNumber = propLoadNumber || (route.params as any)?.loadNumber;
 
@@ -45,6 +44,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
+  const [historyItem, setHistoryItem] = useState<StockItem | null>(null);
   const [summary, setSummary] = useState<StockSummary>({
     totalCases: 0,
     totalPiece: 0,
@@ -56,36 +56,28 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   // Animations
   const opacityAnim = useState(new Animated.Value(0))[0];
   const flatListRef = useRef<FlatList>(null);
+  const loadingMoreRef = useRef(false);
   const { setHeader } = useHeader();
+  const vanName = van?.vanName || van?.name || van?.vanNumber || 'Van';
 
-  // Update header with search bar
+  // Update header title. Search stays fixed in the page content.
   useFocusEffect(
     useCallback(() => {
       setHeader({
-        title: 'Available Stock',
+        title: `${vanName} Stock`,
         showBack: true,
-        showSearchBar: true,
-        searchPlaceholder: 'Search products...',
-        searchValue: searchQuery,
-        onSearchChange: handleSearch,
-        onSearchClear: clearSearch,
-        onSearchPress: () => {
-          if (searchQuery.trim()) {
-            fetchStock(false, 1, searchQuery, true);
-          }
-        },
-        autoFocusSearch: false,
+        showSearchBar: false,
+        showSearch: false,
         showFilter: false,
         elevated: true,
-        centeredTitle: false,
-        size: 'sm',
         showBorder: false,
+        backgroundColor: colors.primary,
       });
-    }, [searchQuery]),
+    }, [colors.primary, setHeader, vanName]),
   );
 
   const fetchStock = useCallback(
-    async (isRefresh = false, page = 1, search = searchQuery, isSearchAction = false) => {
+    async (isRefresh = false, page = 1, search = '', isSearchAction = false) => {
       if (!van?.vanId) {
         setStock([]);
         setTotalItems(0);
@@ -99,6 +91,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
           setIsLoading(true);
           setStock([]);
         } else {
+          loadingMoreRef.current = true;
           setIsLoadingMore(true);
         }
 
@@ -109,11 +102,14 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         });
 
         const data = response?.data;
+        const meta = response?.meta;
         const products = data?.products || [];
+        const total = Number(meta?.total ?? data?.total ?? 0);
+        const totalPages = Math.ceil(total / PAGINATION.LIMIT);
 
         if (page === 1 || isSearchAction) {
           setStock(products);
-          setTotalItems(data?.total || 0);
+          setTotalItems(total);
           setSummary({
             totalCases: data?.totalCases || 0,
             totalPiece: data?.totalPieces || 0,
@@ -125,9 +121,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
           setStock((prev) => [...prev, ...products]);
         }
 
-        setHasMore(
-          products.length === PAGINATION.LIMIT && page * PAGINATION.LIMIT < (data?.total || 0),
-        );
+        setHasMore(page < totalPages);
         setCurrentPage(page);
 
         Animated.timing(opacityAnim, {
@@ -147,6 +141,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         } else if (isSearchAction || page === 1) {
           setIsLoading(false);
         } else {
+          loadingMoreRef.current = false;
           setIsLoadingMore(false);
         }
       }
@@ -181,23 +176,27 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
   }, [fetchStock]);
 
   const onRefresh = useCallback(() => {
-    fetchStock(true, 1);
-  }, [fetchStock]);
+    if (refreshing || isLoadingMore) return;
+    fetchStock(true, 1, searchQuery);
+  }, [fetchStock, isLoadingMore, refreshing, searchQuery]);
 
   const handleLoadMore = useCallback(() => {
-    if (!isLoadingMore && hasMore && !isLoading) {
-      fetchStock(false, currentPage + 1);
+    if (!loadingMoreRef.current && !isLoadingMore && hasMore && !isLoading) {
+      fetchStock(false, currentPage + 1, searchQuery);
     }
-  }, [isLoadingMore, hasMore, isLoading, fetchStock, currentPage]);
+  }, [isLoadingMore, hasMore, isLoading, fetchStock, currentPage, searchQuery]);
 
   useFocusEffect(
     useCallback(() => {
-      fetchStock(false, 1);
+      fetchStock(false, 1, searchQuery);
     }, [van]),
   );
 
   const renderSkeleton = () => (
     <View style={styles.skeletonContainer}>
+      <View style={styles.fixedSearchContainer}>
+        <Skeleton height={48} width="100%" borderRadius={12} />
+      </View>
       <View style={styles.skeletonMetrics}>
         <View style={styles.skeletonMetricsRow}>
           <Skeleton height={48} width="23%" borderRadius={10} />
@@ -260,6 +259,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
       opacityAnim={opacityAnim}
       colors={colors}
       styles={styles}
+      onPress={setHistoryItem}
     />
   );
 
@@ -269,6 +269,16 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      <View style={styles.fixedSearchContainer}>
+        <SearchBar
+          value={searchQuery}
+          onChangeText={handleSearch}
+          placeholder="Search products..."
+          clearable
+          debounceDelay={0}
+          loading={isLoading && stock.length > 0}
+        />
+      </View>
       <FlatList
         ref={flatListRef}
         data={stock}
@@ -279,12 +289,15 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
           { paddingBottom: Platform.OS === 'ios' ? 20 : 16 },
         ]}
         showsVerticalScrollIndicator={false}
+        alwaysBounceVertical
+        bounces
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             colors={[colors.primary]}
             tintColor={colors.primary}
+            progressBackgroundColor={colors.background}
             progressViewOffset={Platform.OS === 'ios' ? 0 : 8}
           />
         }
@@ -313,6 +326,12 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         maxToRenderPerBatch={PAGINATION.LIMIT}
         windowSize={10}
         removeClippedSubviews={Platform.OS === 'android'}
+      />
+      <InventoryHistorySheet
+        visible={Boolean(historyItem)}
+        item={historyItem}
+        vanId={van?.vanId}
+        onClose={() => setHistoryItem(null)}
       />
     </SafeAreaView>
   );

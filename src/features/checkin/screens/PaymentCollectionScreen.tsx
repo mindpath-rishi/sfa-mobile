@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppCard } from '@/core/components/Card';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,13 +20,16 @@ import { usePaymentCollectionStyles } from '../styles/PaymentCollection.styles';
 import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { useCartStore } from '@/core/store/cart.store';
-import { useRouteStore } from '@/core/store/route.store';
+import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
 import { saleService } from '@/shared/services/sale.service';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { AppModal, ConfirmationModal } from '@/core/components';
 import { FlatList } from 'react-native-gesture-handler';
+import { useInvoiceStore } from '@/core/store/invoice.store';
+import { useLoaderStore } from '@/core/loader/loader.store';
+import { toBusinessId } from '@/shared/utils/business-id.utils';
 
 type PaymentMode = 'cash' | 'wallet' | 'card' | 'cheque' | 'credit' | 'split';
 
@@ -824,17 +827,36 @@ export default function PaymentCollectionScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = usePaymentCollectionStyles();
-
+  const loader = useLoaderStore();
   const outlet = useOutletStore((s) => s.selectedOutlet);
-  const { items, getCartSummary, clearCart } = useCartStore();
+  const { items, getCartSummary, clearCart, refreshSchemeDiscounts, schemeDiscounts } =
+    useCartStore();
   const van = useRouteStore.getState().van;
+  const selectedRoute = useRouteStore((s) => s.selectedRoute);
   const user = useAuthStore((s) => s.user);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSplitPaymentModal, setShowSplitPaymentModal] = useState(false);
   const activeVisit = useOutletStore.getState().activeVisit;
 
-  const { total: orderTotal, totalNetWeight, caseDetails, pieceDetails } = getCartSummary();
+  // Re-resolve category/sub-category/product/province/route/van wise schemes in case
+  // cart contents changed since the sales summary screen last refreshed them.
+  useEffect(() => {
+    refreshSchemeDiscounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items]);
+
+  const {
+    subtotal: orderSubtotal,
+    total: orderTotal,
+    discount: orderDiscount,
+    totalNetWeight,
+    caseDetails,
+    pieceDetails,
+  } = getCartSummary();
+  const appliedSchemeNames = Array.from(
+    new Set(Object.values(schemeDiscounts).map((benefit) => benefit.schemeName)),
+  );
 
   // const params = useLocalSearchParams<{
   //   customerName?: string;
@@ -855,6 +877,10 @@ export default function PaymentCollectionScreen() {
 
   const [selectedMode, setSelectedMode] = useState<PaymentMode>('cash');
   const [amount, setAmount] = useState(orderTotal.toString());
+
+  useEffect(() => {
+    setAmount(orderTotal.toString());
+  }, [orderTotal]);
   const [paymentDetails, setPaymentDetails] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCreditInfo, setShowCreditInfo] = useState(true);
@@ -974,211 +1000,343 @@ export default function PaymentCollectionScreen() {
   };
 
   const confirmPayment = async () => {
-    setIsSubmitting(true);
-
-    const toFixed4 = (val: number) => Number((val || 0).toFixed(4));
-    const totalValue = toFixed4(orderTotal);
-
-    let paidAmount = 0;
-    let pendingAmount = totalValue;
-    let saleType = 'CASH';
-    let paymentMode = selectedMode.toUpperCase();
-    let creditAmountUsed = 0;
-    let otherPaymentsList: SplitPaymentItem[] = [];
-
-    // Handle split payment with multiple modes
-    if (isSplitPayment) {
-      creditAmountUsed = toFixed4(splitPayment.creditAmount);
-      otherPaymentsList = splitPayment.otherPayments.map((p) => ({
-        ...p,
-        amount: toFixed4(p.amount),
-      }));
-      paidAmount = otherPaymentsList.reduce((sum, p) => sum + p.amount, 0);
-
-      pendingAmount = creditAmountUsed > 0 ? toFixed4(creditAmountUsed) : 0;
-      saleType = creditAmountUsed > 0 ? 'CREDIT' : 'CASH';
-      paymentMode = 'SPLIT_MULTIPLE';
-    }
-    // Handle full credit sale
-    else if (isCreditSelected) {
-      paidAmount = 0;
-      pendingAmount = totalValue;
-      saleType = 'CREDIT';
-      paymentMode = 'CREDIT';
-    }
-    // Handle regular payment
-    else {
-      paidAmount = toFixed4(parsedAmount);
-      pendingAmount = toFixed4(totalValue - paidAmount);
-      saleType = pendingAmount > 0 ? 'CREDIT' : 'CASH';
-      paymentMode = selectedMode.toUpperCase();
-    }
-
-    const saleItems = items.map((item) => {
-      const caseQty = item.caseQty || 0;
-      const pieceQty = item.pieceQty || 0;
-      const unitQtyInCase = item.unitQtyInCase || 1;
-
-      return {
-        productId: item.productId,
-        productName: item.productName,
-        caseQty,
-        pieceQty,
-        quantity: caseQty * unitQtyInCase + pieceQty,
-        unitQtyInCase,
-        casePrice: item.casePrice,
-        caseNetWeight: item.caseNetWeight,
-        pieceNetWeight: item.pieceNetWeight,
-        piecePrice: item.piecePrice,
-      };
-    });
-
-    const totalQty = items.reduce((sum, item) => {
-      const caseQty = item.caseQty || 0;
-      const pieceQty = item.pieceQty || 0;
-      const unitQtyInCase = item.unitQtyInCase || 1;
-      return sum + caseQty * unitQtyInCase + pieceQty;
-    }, 0);
-
-    // Build remark with all payment details
-    let remarkText = paymentDetails;
-    if (isSplitPayment) {
-      const paymentDetailsStr = otherPaymentsList
-        .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
-        .join(', ');
-      if (creditAmountUsed > 0) {
-        remarkText = `${paymentDetails}\nSplit payment: ${creditAmountUsed} credit + ${paymentDetailsStr}`;
-      } else {
-        remarkText = `${paymentDetails}\nSplit payment: ${paymentDetailsStr}`;
-      }
-    }
-
-    const payload: any = {
-      vanId: van?.vanId,
-      vanName: van?.vanNumber || 'Van',
-      customerId: outlet?.customerId,
-      customerName: outlet?.name || 'test',
-      employeeId: user?.userId,
-      employeeName: user?.name,
-      date: new Date().toISOString(),
-      totalCases: caseDetails.totalCases,
-      totalPieces: pieceDetails.totalPieces,
-      totalQty,
-      totalNetWeight: toFixed4(totalNetWeight),
-      totalValue,
-      type: saleType,
-      paymentMode,
-      paidAmount,
-      pendingAmount,
-      remark: remarkText,
-      items: saleItems,
-      visitId: activeVisit?.visitId,
-    };
-
-    // Add split payment details if applicable
-    if (isSplitPayment && creditAmountUsed > 0) {
-      payload.splitPayment = {
-        creditAmount: creditAmountUsed,
-        otherPayments: otherPaymentsList,
-      };
-    }
-
-    const response = await saleService.createSale(payload);
-
-    setIsSubmitting(false);
+    if (isSubmitting) return;
     setShowConfirm(false);
 
-    if (!response?.success) return;
+    setIsSubmitting(true);
 
-    let successMessage = 'Sale created successfully';
-    if (isSplitPayment) {
-      const paymentsStr = otherPaymentsList
-        .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
-        .join(', ');
-      if (creditAmountUsed > 0) {
-        successMessage = `Split payment completed!\nCredit: ${currency}${creditAmountUsed.toFixed(2)}\n${paymentsStr}`;
+    try {
+      loader.show({ message: 'Preparing sale...' });
+
+      const toFixed4 = (val: number) => Number((val || 0).toFixed(4));
+      const totalValue = toFixed4(orderTotal);
+
+      let paidAmount = 0;
+      let pendingAmount = totalValue;
+      let saleType = 'CASH';
+      let paymentMode = selectedMode.toUpperCase();
+      let creditAmountUsed = 0;
+      let otherPaymentsList: SplitPaymentItem[] = [];
+
+      if (isSplitPayment) {
+        creditAmountUsed = toFixed4(splitPayment.creditAmount);
+        otherPaymentsList = splitPayment.otherPayments.map((p) => ({
+          ...p,
+          amount: toFixed4(p.amount),
+        }));
+        paidAmount = otherPaymentsList.reduce((sum, p) => sum + p.amount, 0);
+
+        pendingAmount = creditAmountUsed > 0 ? toFixed4(creditAmountUsed) : 0;
+        saleType = creditAmountUsed > 0 ? 'CREDIT' : 'CASH';
+        paymentMode = 'SPLIT_MULTIPLE';
+      } else if (isCreditSelected) {
+        paidAmount = 0;
+        pendingAmount = totalValue;
+        saleType = 'CREDIT';
+        paymentMode = 'CREDIT';
       } else {
-        successMessage = `Split payment completed!\n${paymentsStr}`;
+        paidAmount = toFixed4(parsedAmount);
+        pendingAmount = toFixed4(totalValue - paidAmount);
+        saleType = pendingAmount > 0 ? 'CREDIT' : 'CASH';
+        paymentMode = selectedMode.toUpperCase();
       }
-    } else if (isCreditSelected) {
-      successMessage = 'Credit sale created successfully';
-    }
 
-    toast.success('Success', successMessage);
+      loader.show({ message: 'Preparing sale items...' });
 
-    const saleId = response?.data?.saleId;
+      const saleItems = items.map((item) => {
+        const caseQty = item.caseQty || 0;
+        const pieceQty = item.pieceQty || 0;
+        const unitQtyInCase = item.unitQtyInCase || 1;
+        const customerCategoryId = getRouteCustomerCategoryId(selectedRoute);
+        const categoryId = toBusinessId(item.categoryId, ['categoryId', 'productCategoryId']);
+        const parentCategoryId = toBusinessId(item.parentCategoryId, [
+          'parentCategoryId',
+          'categoryId',
+          'productCategoryId',
+        ]);
+        const quantity = caseQty * unitQtyInCase + pieceQty;
+        const grossValue = caseQty * (item.casePrice || 0) + pieceQty * (item.piecePrice || 0);
+        const benefit = schemeDiscounts[item.productId];
+        const discountAmount = toFixed4(Math.min(benefit?.discountAmount ?? 0, grossValue));
 
-    // Prepare invoice data
-    const invoiceData = {
-      id: saleId,
-      invoiceNumber: saleId,
-      customer: outlet?.name,
-      customerId: outlet?.customerId,
-      date: new Date().toLocaleDateString(),
-      dateTime: new Date().toISOString(),
-      amount: totalValue,
-      currency: currency,
-      paymentMode,
-      paidAmount,
-      pendingAmount,
-      saleType,
-      ...(isSplitPayment && {
-        splitDetails: {
+        return {
+          productId: item.productId,
+          productName: item.productName,
+          compCode: item.compCode,
+          categoryId,
+          parentCategoryId,
+          customerCategoryId,
+          isFocusedPack: item.isFocusedPack === 'Y' ? 'Y' : 'N',
+          caseQty,
+          pieceQty,
+          quantity,
+          netCases: toFixed4(quantity / unitQtyInCase),
+          unitQtyInCase,
+          casePrice: item.casePrice,
+          caseNetWeight: item.caseNetWeight,
+          pieceNetWeight: item.pieceNetWeight,
+          piecePrice: item.piecePrice,
+          totalNetWeight:
+            caseQty * (item.caseNetWeight || 0) + pieceQty * (item.pieceNetWeight || 0),
+          grossValue: toFixed4(grossValue),
+          totalValue: toFixed4(grossValue - discountAmount),
+          schemeId: benefit?.schemeId,
+          schemeName: benefit?.schemeName,
+          schemeType: benefit?.schemeType,
+          schemeMinimumQuantity: benefit?.minimumQuantity,
+          schemeDiscountPercent: benefit?.discountPercent,
+          schemeDiscountValue: benefit?.discountValue,
+          schemeBuyQty: benefit?.buyQty,
+          schemeDiscountAmount: discountAmount || undefined,
+          schemeFreeQty: benefit?.freeQty,
+          schemeFreeProductId: benefit?.freeProductId,
+          schemeFreeProductName: benefit?.freeProductName,
+        };
+      });
+
+      const firstSaleItem = saleItems[0];
+
+      const netCases = toFixed4(saleItems.reduce((sum, item) => sum + item.netCases, 0));
+
+      const totalQty = items.reduce((sum, item) => {
+        const caseQty = item.caseQty || 0;
+        const pieceQty = item.pieceQty || 0;
+        const unitQtyInCase = item.unitQtyInCase || 1;
+        return sum + caseQty * unitQtyInCase + pieceQty;
+      }, 0);
+
+      let remarkText = paymentDetails;
+
+      if (isSplitPayment) {
+        const paymentDetailsStr = otherPaymentsList
+          .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
+          .join(', ');
+
+        if (creditAmountUsed > 0) {
+          remarkText = `${paymentDetails}\nSplit payment: ${creditAmountUsed} credit + ${paymentDetailsStr}`;
+        } else {
+          remarkText = `${paymentDetails}\nSplit payment: ${paymentDetailsStr}`;
+        }
+      }
+
+      let saleVisit = useOutletStore.getState().activeVisit;
+
+      if (!saleVisit) {
+        loader.show({ message: 'Starting outlet visit...' });
+
+        const interaction = useOutletStore.getState().activeInteraction;
+
+        if (
+          !interaction ||
+          !outlet?.customerId ||
+          interaction.customerId !== outlet?.customerId ||
+          !selectedRoute?.routeSessionId ||
+          !selectedRoute?.workSessionId ||
+          !van?.vanId
+        ) {
+          toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
+          return;
+        }
+
+        const visitResponse = await outletService.startVisit(
+          {
+            routeSessionId: selectedRoute.routeSessionId,
+            workSessionId: selectedRoute.workSessionId,
+            vanId: van.vanId,
+            outletId: outlet.customerId,
+            visitType: interaction.visitType,
+            interactionId: interaction.interactionId,
+          },
+          { showLoader: true },
+        );
+
+        if (!visitResponse.success || !visitResponse.data?.visitId) {
+          toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
+          return;
+        }
+
+        const visit = visitResponse.data;
+
+        saleVisit = {
+          visitId: visit.visitId,
+          outlet,
+          checkInTime: new Date(visit.checkInTime || interaction.arrivalTime),
+          status: 'ACTIVE',
+          routeSessionId: selectedRoute.routeSessionId,
+          customerId: outlet.customerId,
+          visitType: interaction.visitType,
+        };
+
+        useOutletStore.getState().setActiveVisit(saleVisit);
+        useOutletStore.getState().setActiveInteraction({
+          ...interaction,
+          status: 'CONVERTED',
+        });
+      }
+
+      const payload: any = {
+        vanId: van?.vanId,
+        vanName: van?.vanNumber || 'Van',
+        compCode: firstSaleItem?.compCode,
+        categoryId: firstSaleItem?.categoryId,
+        parentCategoryId: firstSaleItem?.parentCategoryId,
+        customerId: outlet?.customerId,
+        customerName: outlet?.name || 'test',
+        date: new Date().toISOString(),
+        totalCases: caseDetails.totalCases,
+        netCases,
+        totalPieces: pieceDetails.totalPieces,
+        totalQty,
+        totalWeight: toFixed4(totalNetWeight),
+        subtotal: toFixed4(orderSubtotal),
+        schemeIds: Array.from(
+          new Set(
+            Object.values(schemeDiscounts)
+              .map((benefit) => benefit.schemeId)
+              .filter(Boolean),
+          ),
+        ),
+        schemeNames: appliedSchemeNames,
+        schemeDiscountAmount: toFixed4(orderDiscount),
+        totalValue,
+        type: saleType,
+        paymentMode,
+        paidAmount,
+        pendingAmount,
+        remark: remarkText,
+        items: saleItems,
+        visitId: saleVisit.visitId,
+      };
+
+      if (isSplitPayment && creditAmountUsed > 0) {
+        payload.splitPayment = {
           creditAmount: creditAmountUsed,
           otherPayments: otherPaymentsList,
-        },
-      }),
-      items: saleItems.map((item) => ({
-        name: item.productName,
-        quantity: item.quantity,
-        price: item.casePrice,
-        total: item.casePrice * (item.caseQty + item.pieceQty / item.unitQtyInCase),
-        caseQty: item.caseQty,
-        pieceQty: item.pieceQty,
-        unitQtyInCase: item.unitQtyInCase,
-      })),
-      summary: {
-        totalCases: caseDetails.totalCases,
-        totalPieces: pieceDetails.totalPieces,
-        totalQty: totalQty,
-        totalNetWeight: toFixed4(totalNetWeight),
-        subtotal: toFixed4(orderTotal),
-        tax: toFixed4(0),
-        total: totalValue,
-      },
-      van: {
-        id: van?.vanId,
-        name: van?.vanNumber || 'Van',
-        number: van?.vanNumber,
-      },
-      employee: {
-        id: user?.userId,
-        name: user?.name,
-      },
-      paymentDetails: paymentDetails,
-      reference: `ORD-${Date.now()}`,
-      status: pendingAmount > 0 ? (paidAmount > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
-    };
-
-    clearCart();
-
-    // Auto-close the visit after successful sale
-    if (activeVisit?.visitId) {
-      try {
-        await outletService.completeVisit(activeVisit.visitId);
-        const setActiveVisit = useOutletStore.getState().setActiveVisit;
-        setActiveVisit(null);
-      } catch (error) {
-        console.error('Error completing visit:', error);
+        };
       }
-    }
 
-    router.push({
-      pathname: '/checkin/shareinvoice',
-      params: {
-        invoice: JSON.stringify(invoiceData),
-      },
-    });
+      loader.show({ message: 'Creating sale...' });
+
+      const response: any = await saleService.createSale(payload, {
+        showLoader: false,
+      });
+
+      if (!response?.success) {
+        toast.error('Error', response?.message || 'Failed to create sale');
+        setShowConfirm(false);
+        return;
+      }
+
+      let successMessage = 'Sale created successfully';
+
+      if (isSplitPayment) {
+        const paymentsStr = otherPaymentsList
+          .map((p) => `${p.mode.toUpperCase()}: ${currency}${p.amount.toFixed(2)}`)
+          .join(', ');
+
+        if (creditAmountUsed > 0) {
+          successMessage = `Split payment completed!\nCredit: ${currency}${creditAmountUsed.toFixed(2)}\n${paymentsStr}`;
+        } else {
+          successMessage = `Split payment completed!\n${paymentsStr}`;
+        }
+      } else if (isCreditSelected) {
+        successMessage = 'Credit sale created successfully';
+      }
+
+      toast.success('Success', successMessage);
+
+      const saleId = response?.data?.saleId;
+
+      loader.show({ message: 'Preparing invoice...' });
+
+      const invoiceData = {
+        id: saleId,
+        invoiceNumber: saleId,
+        customer: outlet?.name,
+        customerId: outlet?.customerId,
+        date: new Date().toLocaleDateString(),
+        dateTime: new Date().toISOString(),
+        amount: totalValue,
+        currency,
+        paymentMode,
+        paidAmount,
+        pendingAmount,
+        saleType,
+        ...(isSplitPayment && {
+          splitDetails: {
+            creditAmount: creditAmountUsed,
+            otherPayments: otherPaymentsList,
+          },
+        }),
+        items: saleItems.map((item) => ({
+          name: item.productName,
+          quantity: item.quantity,
+          price: item.casePrice,
+          total: item.casePrice * (item.caseQty + item.pieceQty / item.unitQtyInCase),
+          caseQty: item.caseQty,
+          pieceQty: item.pieceQty,
+          unitQtyInCase: item.unitQtyInCase,
+        })),
+        summary: {
+          totalCases: caseDetails.totalCases,
+          totalPieces: pieceDetails.totalPieces,
+          totalQty,
+          totalNetWeight: toFixed4(totalNetWeight),
+          subtotal: toFixed4(orderSubtotal),
+          discount: toFixed4(orderDiscount),
+          tax: toFixed4(0),
+          total: totalValue,
+        },
+        van: {
+          id: van?.vanId,
+          name: van?.vanNumber || 'Van',
+          number: van?.vanNumber,
+        },
+        employee: {
+          id: user?.userId,
+          name: user?.name,
+        },
+        paymentDetails,
+        reference: `ORD-${Date.now()}`,
+        status: pendingAmount > 0 ? (paidAmount > 0 ? 'PARTIAL' : 'CREDIT') : 'PAID',
+      };
+
+      useInvoiceStore.getState().setLatestInvoice(invoiceData);
+      setShowConfirm(false);
+
+      loader.show({ message: 'Completing visit...' });
+
+      clearCart();
+
+      const completedVisit = useOutletStore.getState().activeVisit;
+
+      if (completedVisit?.visitId) {
+        try {
+          await outletService.completeVisit(completedVisit.visitId);
+          useOutletStore.getState().setActiveVisit(null);
+        } catch (error) {
+          console.error('Error completing visit:', error);
+        }
+      }
+
+      router.replace({
+        pathname: '/checkin/shareinvoice',
+        params: {
+          invoiceId: saleId,
+          customerId: outlet?.customerId,
+        },
+      });
+    } catch (error: any) {
+      console.error('Sale creation failed:', error);
+
+      toast.error(
+        'Error',
+        error?.response?.data?.message || error?.message || 'Failed to create sale',
+      );
+    } finally {
+      setIsSubmitting(false);
+      loader.hide();
+    }
   };
 
   const handleSetFullAmount = () => {
@@ -1350,6 +1508,46 @@ export default function PaymentCollectionScreen() {
                     {totalNetWeight.toFixed(3)} kg
                   </Text>
                 </View>
+                <View style={styles.summaryDivider} />
+              </>
+            )}
+
+            {orderDiscount > 0 && (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Subtotal</Text>
+                  <Text style={styles.summaryValue}>
+                    {currency} {orderSubtotal.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Ionicons name="pricetag" size={14} color={colors.success} />
+                    <Text style={[styles.summaryLabel, { color: colors.success }]}>
+                      Scheme savings
+                    </Text>
+                  </View>
+                  <Text style={[styles.summaryValue, { color: colors.success, fontWeight: '700' }]}>
+                    − {currency} {orderDiscount.toFixed(2)}
+                  </Text>
+                </View>
+                {appliedSchemeNames.map((schemeName) => (
+                  <View
+                    key={schemeName}
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: 3,
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: colors.success + '12',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.success }}>
+                      Applied: {schemeName}
+                    </Text>
+                  </View>
+                ))}
                 <View style={styles.summaryDivider} />
               </>
             )}

@@ -54,7 +54,6 @@ export const SelectedCategoryBadge: React.FC<SelectedCategoryBadgeProps> = ({
         </View>
 
         <View style={{ flex: 1, flexShrink: 1 }}>
-          {' '}
           {/* Allow text container to shrink */}
           <Text style={{ fontSize: 12, color: colors.textTertiary }}>Selected Category</Text>
           <Text

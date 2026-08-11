@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, TouchableOpacity, FlatList } from 'react-native';
 import { router } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { AppText, Skeleton } from '@/core/components';
 import { formatCurrency, formatDateSafe } from '@/shared/utils/currenty.utils';
@@ -76,21 +77,32 @@ export const TopupList: React.FC<TopupListProps> = ({
 
   const renderItem = ({ item }: { item: Topup }) => {
     const statusConfig = getStatusConfig(item.status);
-    const isApproved = item.status === 'APPROVED';
+    const isAwaitingAcceptance = item.status === 'APPROVED';
+    const isAccepted = item.status === 'ACCEPTED';
     const isRejected = item.status === 'REJECTED';
-    const isPending = item.status === 'PENDING';
+    const isDeclined = item.status === 'DECLINED';
 
     const requestedValue = item.totalRequestedValue || 0;
     const approvedValue = item.totalApprovedValue || 0;
 
     return (
       <TouchableOpacity style={styles.itemContainer} onPress={() => handleItemPress(item)}>
+        <View style={[styles.cardAccent, { backgroundColor: statusConfig.color }]} />
         <View style={styles.itemHeader}>
-          <View>
-            <AppText style={styles.title}>{item.vanName || item.vanId}</AppText>
-            <AppText style={styles.reference}>
-              {item.reference || item.vanInventoryTopupId?.slice(-8)}
-            </AppText>
+          <View style={styles.titleGroup}>
+            <View style={styles.vanIcon}>
+              <MaterialCommunityIcons
+                name="truck-delivery-outline"
+                size={20}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.titleCopy}>
+              <AppText style={styles.title}>{item.vanName || item.vanId}</AppText>
+              <AppText style={styles.reference}>
+                #{item.reference || item.vanInventoryTopupId?.slice(-8)}
+              </AppText>
+            </View>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: statusConfig.bg }]}>
             <View style={[styles.statusDot, { backgroundColor: statusConfig.color }]} />
@@ -101,50 +113,62 @@ export const TopupList: React.FC<TopupListProps> = ({
         </View>
 
         <View style={styles.metaRow}>
-          <AppText style={styles.metaText}>{formatDateSafe(item.date)}</AppText>
-          <AppText style={styles.metaText}>•</AppText>
-          <AppText style={styles.metaText}>{item.employeeName || item.employeeId}</AppText>
+          <View style={styles.metaItem}>
+            <Ionicons name="calendar-clear-outline" size={13} color={colors.textTertiary} />
+            <AppText style={styles.metaText}>{formatDateSafe(item.date)}</AppText>
+          </View>
+          <View style={styles.metaItem}>
+            <Ionicons name="person-outline" size={13} color={colors.textTertiary} />
+            <AppText style={styles.metaText} numberOfLines={1}>
+              {item.employeeName || item.employeeId}
+            </AppText>
+          </View>
         </View>
 
         <View style={styles.amountSection}>
-          <View style={styles.amountBlock}>
+          <View style={[styles.amountBlock, styles.requestedBlock]}>
             <AppText style={styles.amountLabel}>Requested</AppText>
-            <AppText style={[styles.amountValue, { color: colors.warning }]}>
-              {formatCurrency(requestedValue)}
-            </AppText>
-            <AppText style={styles.quantityText}>
-              {item.totalRequestedCases || 0} cases / {item.totalRequestedPieces || 0} pieces
-            </AppText>
+            <AppText style={styles.amountValue}>{formatCurrency(requestedValue)}</AppText>
+            <View style={styles.quantityRow}>
+              <AppText style={styles.quantityText}>{item.totalRequestedCases || 0} cases</AppText>
+              <View style={styles.quantityDot} />
+              <AppText style={styles.quantityText}>{item.totalRequestedPieces || 0} pieces</AppText>
+            </View>
           </View>
 
-          {(isApproved || isRejected) && approvedValue > 0 && (
-            <View style={styles.amountBlock}>
-              <AppText style={styles.amountLabel}>Approved</AppText>
-              <AppText style={[styles.amountValue, { color: colors.success }]}>
-                {formatCurrency(approvedValue)}
-              </AppText>
-              <AppText style={[styles.quantityText, { color: colors.success }]}>
-                {item.totalApprovedCases || 0} cases / {item.totalApprovedPieces || 0} pieces
-              </AppText>
-            </View>
-          )}
+          {(isAwaitingAcceptance || isAccepted || isRejected || isDeclined) &&
+            approvedValue > 0 && (
+              <View style={[styles.amountBlock, styles.approvedBlock]}>
+                <AppText style={styles.amountLabel}>Approved</AppText>
+                <AppText style={[styles.amountValue, { color: colors.success }]}>
+                  {formatCurrency(approvedValue)}
+                </AppText>
+                <AppText style={[styles.quantityText, { color: colors.success }]}>
+                  {item.totalApprovedCases || 0} cases / {item.totalApprovedPieces || 0} pieces
+                </AppText>
+              </View>
+            )}
         </View>
 
-        {isApproved && item.approvedByName && (
-          <View style={styles.infoRow}>
-            <AppText style={styles.infoText}>✓ Approved by {item.approvedByName}</AppText>
-          </View>
-        )}
-
-        {isRejected && item.rejectedReason && (
-          <View style={[styles.infoRow, styles.errorRow]}>
-            <AppText style={styles.errorText}>⚠ {item.rejectedReason}</AppText>
-          </View>
-        )}
-
-        {isPending && (
+        {isAwaitingAcceptance && (
           <View style={[styles.infoRow, styles.pendingRow]}>
-            <AppText style={styles.pendingInfoText}>⏳ Waiting for approval</AppText>
+            <Ionicons name="time-outline" size={16} color={colors.warning} />
+            <AppText style={styles.pendingInfoText}>Ready for your acceptance</AppText>
+          </View>
+        )}
+
+        {isAccepted && (
+          <View style={styles.infoRow}>
+            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+            <AppText style={styles.infoText}>Accepted and added to stock</AppText>
+          </View>
+        )}
+
+        {(isRejected || isDeclined) && (item.rejectedReason || item.declinedReason) && (
+          <View style={[styles.infoRow, styles.errorRow]}>
+            <AppText style={styles.errorText}>
+              ⚠ {item.rejectedReason || item.declinedReason}
+            </AppText>
           </View>
         )}
       </TouchableOpacity>

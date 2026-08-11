@@ -305,12 +305,21 @@ import { CartItemWithDetails } from '@/features/product';
 import { create } from 'zustand';
 import { storage } from '../storage';
 import { registerStoreReset } from './reset.store';
+import {
+  getApplicableSchemeBenefitFromRecords,
+  type SchemeBenefit,
+} from '@/shared/services/scheme.service';
 
 /* ================= TYPES ================= */
 
 export interface CartSummary {
   totalSkus: number;
+  /** Discounted (net) total charged to the customer. */
   totalValue: number;
+  /** Gross total before any scheme discount. */
+  grossValue: number;
+  /** Total scheme discount applied across all items. */
+  discountValue: number;
   totalItems: number;
   totalCases: number;
   totalPieces: number;
@@ -320,6 +329,8 @@ export interface CartSummary {
 interface CartStore {
   items: CartItemWithDetails[];
   summary: CartSummary;
+  /** productId -> best applicable scheme benefit, populated by refreshSchemeDiscounts(). */
+  schemeDiscounts: Record<string, SchemeBenefit>;
 
   addItems: (items: CartItemWithDetails[]) => void;
   removeItem: (productId: string) => void;
@@ -329,10 +340,18 @@ interface CartStore {
 
   hydrate: () => Promise<void>;
 
+  /**
+   * Resolves the best scheme discount for every cart line (category, sub-category,
+   * product, province, route, and van wise) and folds it into summary.totalValue.
+   * Call before displaying/charging the final sale amount (e.g. entering payment collection).
+   */
+  refreshSchemeDiscounts: () => Promise<void>;
+
   getCartSummary: () => {
     subtotal: number;
     tax: number;
     total: number;
+    discount: number;
     totalQty: number;
     totalNetWeight: number;
     caseDetails: {
@@ -353,11 +372,14 @@ const initialState = {
   summary: {
     totalSkus: 0,
     totalValue: 0,
+    grossValue: 0,
+    discountValue: 0,
     totalItems: 0,
     totalCases: 0,
     totalPieces: 0,
     totalNetWeight: 0,
   },
+  schemeDiscounts: {},
 };
 
 /* ================= STORAGE ================= */
@@ -439,7 +461,10 @@ const getItemNetWeight = (item: CartItemWithDetails) => {
 //   };
 // };
 
-const calculateSummary = (items: CartItemWithDetails[]): CartSummary => {
+const calculateSummary = (
+  items: CartItemWithDetails[],
+  schemeDiscounts: Record<string, SchemeBenefit> = {},
+): CartSummary => {
   const summary = items.reduce(
     (acc, item) => {
       const caseQty = item.caseQty ?? 0;
@@ -449,6 +474,11 @@ const calculateSummary = (items: CartItemWithDetails[]): CartSummary => {
       const piecePrice = item.piecePrice ?? 0;
 
       const { total } = getItemNetWeight(item);
+      const lineGrossValue = caseQty * casePrice + pieceQty * piecePrice;
+      const discountAmount = Math.min(
+        schemeDiscounts[item.productId]?.discountAmount ?? 0,
+        lineGrossValue,
+      );
 
       // ✅ Cases & Pieces
       acc.totalCases += caseQty;
@@ -462,8 +492,10 @@ const calculateSummary = (items: CartItemWithDetails[]): CartSummary => {
         acc.totalSkus += 1;
       }
 
-      // ✅ Value
-      acc.totalValue += caseQty * casePrice + pieceQty * piecePrice;
+      // ✅ Value (gross vs scheme-discounted net)
+      acc.grossValue += lineGrossValue;
+      acc.discountValue += discountAmount;
+      acc.totalValue += lineGrossValue - discountAmount;
 
       // ✅ Weight
       acc.totalNetWeight += total;
@@ -473,6 +505,8 @@ const calculateSummary = (items: CartItemWithDetails[]): CartSummary => {
     {
       totalSkus: 0,
       totalValue: 0,
+      grossValue: 0,
+      discountValue: 0,
       totalItems: 0,
       totalCases: 0,
       totalPieces: 0,
@@ -483,6 +517,8 @@ const calculateSummary = (items: CartItemWithDetails[]): CartSummary => {
   return {
     ...summary,
     totalValue: toFixed4(summary.totalValue),
+    grossValue: toFixed4(summary.grossValue),
+    discountValue: toFixed4(summary.discountValue),
     totalNetWeight: toFixed4(summary.totalNetWeight),
   };
 };
@@ -504,15 +540,20 @@ export const useCartStore = create<CartStore>((set, get) => {
 
     hydrate: async () => {
       const currentItems = get().items;
-      if (currentItems.length > 0) return;
+      if (currentItems.length > 0) {
+        await get().refreshSchemeDiscounts();
+        return;
+      }
 
       const data = await loadFromStorage();
       if (!data) return;
 
       set({
         items: data.items || [],
-        summary: data.summary || calculateSummary(data.items || []),
+        summary: calculateSummary(data.items || [], {}),
       });
+
+      await get().refreshSchemeDiscounts();
     },
 
     addItems: (newItems) => {
@@ -540,6 +581,11 @@ export const useCartStore = create<CartStore>((set, get) => {
               pieceNetWeight: newItem.pieceNetWeight ?? updated[index].pieceNetWeight,
               casePrice: newItem.casePrice ?? updated[index].casePrice ?? 0,
               piecePrice: newItem.piecePrice ?? updated[index].piecePrice ?? 0,
+              compCode: newItem.compCode ?? updated[index].compCode,
+              categoryId: newItem.categoryId ?? updated[index].categoryId,
+              parentCategoryId: newItem.parentCategoryId ?? updated[index].parentCategoryId,
+              applicableSchemes:
+                newItem.applicableSchemes ?? updated[index].applicableSchemes ?? [],
             };
           } else {
             updated.push({
@@ -555,7 +601,7 @@ export const useCartStore = create<CartStore>((set, get) => {
 
         const newState = {
           items: updated,
-          summary: calculateSummary(updated),
+          summary: calculateSummary(updated, state.schemeDiscounts),
         };
 
         saveToStorage(newState);
@@ -569,7 +615,7 @@ export const useCartStore = create<CartStore>((set, get) => {
 
         const newState = {
           items: updated,
-          summary: calculateSummary(updated),
+          summary: calculateSummary(updated, state.schemeDiscounts),
         };
 
         saveToStorage(newState);
@@ -591,7 +637,7 @@ export const useCartStore = create<CartStore>((set, get) => {
 
         const newState = {
           items: updated,
-          summary: calculateSummary(updated),
+          summary: calculateSummary(updated, state.schemeDiscounts),
         };
 
         saveToStorage(newState);
@@ -605,8 +651,51 @@ export const useCartStore = create<CartStore>((set, get) => {
       set(newState);
     },
 
-    getCartSummary: () => {
+    refreshSchemeDiscounts: async () => {
       const { items } = get();
+
+      if (!items.length) {
+        set((state) => ({
+          schemeDiscounts: {},
+          summary: calculateSummary(state.items, {}),
+        }));
+        return;
+      }
+
+      const entries = items.map((item) => {
+        const caseQty = item.caseQty ?? 0;
+        const pieceQty = item.pieceQty ?? 0;
+        const unitQtyInCase = item.unitQtyInCase ?? 1;
+        const quantity = caseQty * unitQtyInCase + pieceQty;
+        const grossValue = caseQty * (item.casePrice ?? 0) + pieceQty * (item.piecePrice ?? 0);
+
+        const benefit = getApplicableSchemeBenefitFromRecords(
+          {
+            productId: item.productId,
+            categoryId: item.categoryId,
+            parentCategoryId: item.parentCategoryId,
+            quantity,
+          },
+          grossValue,
+          item.casePrice ?? 0,
+          item.applicableSchemes ?? [],
+        );
+
+        return benefit ? ([item.productId, benefit] as const) : null;
+      });
+
+      const schemeDiscounts = Object.fromEntries(
+        entries.filter((entry): entry is readonly [string, SchemeBenefit] => entry !== null),
+      );
+
+      set((state) => ({
+        schemeDiscounts,
+        summary: calculateSummary(state.items, schemeDiscounts),
+      }));
+    },
+
+    getCartSummary: () => {
+      const { items, schemeDiscounts } = get();
 
       const subtotalRaw = items.reduce((sum, item) => {
         return (
@@ -614,6 +703,14 @@ export const useCartStore = create<CartStore>((set, get) => {
           (item.caseQty ?? 0) * Number(item.casePrice ?? 0) +
           (item.pieceQty ?? 0) * Number(item.piecePrice ?? 0)
         );
+      }, 0);
+
+      const discountRaw = items.reduce((sum, item) => {
+        const caseQty = item.caseQty ?? 0;
+        const pieceQty = item.pieceQty ?? 0;
+        const lineGrossValue =
+          caseQty * Number(item.casePrice ?? 0) + pieceQty * Number(item.piecePrice ?? 0);
+        return sum + Math.min(schemeDiscounts[item.productId]?.discountAmount ?? 0, lineGrossValue);
       }, 0);
 
       let totalCaseWeight = 0;
@@ -642,7 +739,8 @@ export const useCartStore = create<CartStore>((set, get) => {
       return {
         subtotal: toFixed4(subtotalRaw),
         tax: toFixed4(0),
-        total: toFixed4(subtotalRaw),
+        total: toFixed4(subtotalRaw - discountRaw),
+        discount: toFixed4(discountRaw),
         totalQty,
         totalNetWeight: toFixed4(totalCaseWeight + totalPieceWeight),
 

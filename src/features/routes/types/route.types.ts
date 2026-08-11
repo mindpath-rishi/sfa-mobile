@@ -19,8 +19,9 @@ export interface Outlet {
   address: Address;
   geoTag: GeoTag;
   segmentation: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'PENDING';
+  status: 'ACTIVE' | 'INACTIVE' | 'VERIFICATION_PENDING' | 'REJECTED';
   lastVisitedAt: string;
+  lastOrderDate?: string | null;
   sequence: number;
   visitStatus?: 'ACTIVE' | 'COMPLETED' | 'NOT_VISITED';
   orderValue?: number;

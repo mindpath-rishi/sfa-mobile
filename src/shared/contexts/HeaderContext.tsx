@@ -10,6 +10,7 @@ export type HeaderConfig = {
 
   showBack?: boolean;
   showMenu?: boolean;
+  onBackPress?: () => void;
 
   showSearch?: boolean;
   showFilter?: boolean;
@@ -27,6 +28,7 @@ export type HeaderConfig = {
 
   rightIcon?: string;
   rightIcon2?: string;
+  badgeCount?: number;
 
   onRightPress?: () => void;
   onRightPress2?: () => void;
@@ -35,7 +37,7 @@ export type HeaderConfig = {
 
   backgroundColor?: string;
 
-  size?: 'small' | 'medium' | 'large';
+  size?: 'small' | 'medium' | 'large' | 'sm' | 'md' | 'lg';
 };
 
 type HeaderContextType = {
@@ -85,10 +87,11 @@ export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
 
       backgroundColor: colors.primary,
 
-      size: 'medium',
+      size: 'small',
 
       rightIcon: undefined,
       rightIcon2: undefined,
+      badgeCount: 0,
 
       onRightPress: undefined,
       onRightPress2: undefined,

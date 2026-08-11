@@ -38,9 +38,9 @@ export const useFormFieldStyles = (props: FormFieldStyleProps = {}) => {
     // Get background color based on state and variant
     const getBackgroundColor = (): string => {
       if (disabled) return colors.divider;
-      if (variant === 'filled') return colors.surface + '20';
+      if (variant === 'filled') return colors.surfaceElevated;
       if (variant === 'ghost') return 'transparent';
-      return colors.background;
+      return colors.surface;
     };
 
     // Get min height based on size

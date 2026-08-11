@@ -1,9 +1,16 @@
 // DayEndSummaryModal.tsx
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, TouchableOpacity, FlatList, Animated, SafeAreaView, ScrollView } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import {
+  View,
+  TouchableOpacity,
+  FlatList,
+  Animated,
+  SafeAreaView,
+  ScrollView,
+} from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { AppModal, AppText } from '@/core/components';
+import { AppModal, AppText, SearchBar } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useDayEndSummaryModalStyles } from '../../styles/DayEndSummaryModal.styles';
 
@@ -74,6 +81,15 @@ interface DayEndSummaryModalProps {
       closingItems: number;
     }>;
   };
+  topupSettlementAlerts?: Array<{
+    id: string;
+    reference: string;
+    status: 'SUBMITTED' | 'APPROVED';
+    requestedCases?: number;
+    requestedPieces?: number;
+    approvedCases?: number;
+    approvedPieces?: number;
+  }>;
   onClose: () => void;
   onProceed?: () => void;
 }
@@ -81,6 +97,7 @@ interface DayEndSummaryModalProps {
 export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
   visible,
   data,
+  topupSettlementAlerts = [],
   onClose,
   onProceed,
 }) => {
@@ -88,6 +105,8 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
   const { colors } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'products'>('overview');
+  const [productSearch, setProductSearch] = useState('');
+  const [showUnacceptedStockConfirm, setShowUnacceptedStockConfirm] = useState(false);
   const fadeAnim = useState(new Animated.Value(0))[0];
 
   const formatCurrency = useCallback((value: number) => {
@@ -99,11 +118,49 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
     return `${cases}C ${pieces}P`;
   }, []);
 
+  const formatWeightKg = useCallback((weightInKg: number) => {
+    if (!weightInKg) return '-';
+    return `${weightInKg.toFixed(2)} KG`;
+  }, []);
+
+  const submittedTopups = topupSettlementAlerts.filter((item) => item.status === 'SUBMITTED');
+  const approvedTopups = topupSettlementAlerts.filter((item) => item.status === 'APPROVED');
+  const approvedTopupCases = approvedTopups.reduce(
+    (total, item) => total + Number(item.approvedCases || 0),
+    0,
+  );
+  const approvedTopupPieces = approvedTopups.reduce(
+    (total, item) => total + Number(item.approvedPieces || 0),
+    0,
+  );
+  const totalAttentionTopups = submittedTopups.length + approvedTopups.length;
+  const handleProceed = () => {
+    if (!onProceed) return;
+
+    if (!approvedTopups.length) {
+      onProceed();
+      return;
+    }
+
+    setShowUnacceptedStockConfirm(true);
+  };
+  const filteredProducts = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+    if (!query) return data?.products || [];
+
+    return (data?.products || []).filter((item) => {
+      const name = String(item.productName || '').toLowerCase();
+      const code = String(item.productId || '').toLowerCase();
+      return name.includes(query) || code.includes(query);
+    });
+  }, [data?.products, productSearch]);
+
   useEffect(() => {
     if (visible) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start();
     } else {
       fadeAnim.setValue(0);
+      setShowUnacceptedStockConfirm(false);
     }
   }, [visible, fadeAnim]);
 
@@ -117,6 +174,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       cases: opening.cases,
       pieces: opening.pieces,
       value: opening.value,
+      weight: opening.weight,
       color: '#6B7280',
     },
     {
@@ -124,6 +182,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       cases: received.cases,
       pieces: received.pieces,
       value: received.value,
+      weight: received.weight,
       color: '#3B82F6',
     },
     {
@@ -131,6 +190,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       cases: sold.cases,
       pieces: sold.pieces,
       value: sold.value,
+      weight: sold.weight,
       color: '#F59E0B',
     },
     {
@@ -138,51 +198,27 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
       cases: closing.cases,
       pieces: closing.pieces,
       value: closing.value,
+      weight: closing.weight,
       color: '#10B981',
     },
   ];
 
-  const StatsCard = ({ title, icon, data: statsData, color }: any) => (
+  const SummaryTile = ({ label, value, helper, icon, color }: any) => (
     <View
-      style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.divider }]}
+      style={[styles.summaryTile, { backgroundColor: colors.surface, borderColor: color + '30' }]}
     >
-      <View style={styles.statsCardHeader}>
-        <View style={[styles.statsCardIcon, { backgroundColor: color + '15' }]}>
-          <MaterialCommunityIcons name={icon} size={22} color={color} />
-        </View>
-        <AppText style={[styles.statsCardTitle, { color: colors.textPrimary }]}>{title}</AppText>
+      <View style={[styles.summaryTileIcon, { backgroundColor: color + '12' }]}>
+        <MaterialCommunityIcons name={icon} size={18} color={color} />
       </View>
-      <View style={styles.statsCardGrid}>
-        {statsData.map((item: any, index: number) => (
-          <View key={index} style={styles.statsCardItem}>
-            <View style={[styles.statsCardItemIcon, { backgroundColor: color + '10' }]}>
-              <MaterialCommunityIcons name={item.icon} size={18} color={color} />
-            </View>
-            <View>
-              <AppText style={[styles.statsCardItemLabel, { color: colors.textSecondary }]}>
-                {item.label}
-              </AppText>
-              <AppText style={[styles.statsCardItemValue, { color: color }]}>{item.value}</AppText>
-            </View>
-          </View>
-        ))}
+      <View style={styles.summaryTileContent}>
+        <AppText style={[styles.summaryTileLabel, { color: colors.textSecondary }]}>
+          {label}
+        </AppText>
+        <AppText style={[styles.summaryTileValue, { color: colors.textPrimary }]}>{value}</AppText>
+        <AppText style={[styles.summaryTileHelper, { color }]}>{helper}</AppText>
       </View>
     </View>
   );
-
-  const soldData = [
-    { label: 'Sold Cases', value: sold.cases, icon: 'cube-outline' },
-    { label: 'Sold Pieces', value: sold.pieces, icon: 'layers-outline' },
-    { label: 'Sale Value', value: formatCurrency(sold.value), icon: 'cash' },
-    { label: 'Sold Weight', value: `${sold.weight.toFixed(2)} kg`, icon: 'weight-kilogram' },
-  ];
-
-  const closingData = [
-    { label: 'Closing Cases', value: closing.cases, icon: 'cube-outline' },
-    { label: 'Closing Pieces', value: closing.pieces, icon: 'layers-outline' },
-    { label: 'Stock Value', value: formatCurrency(closing.value), icon: 'currency-usd' },
-    { label: 'Total Weight', value: `${closing.weight.toFixed(2)} kg`, icon: 'weight-kilogram' },
-  ];
 
   return (
     <AppModal
@@ -246,6 +282,155 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
             contentContainerStyle={styles.scrollContent}
           >
             <Animated.View style={{ opacity: fadeAnim }}>
+              <View style={styles.summaryHero}>
+                <View style={styles.summaryHeroHeader}>
+                  <View
+                    style={[styles.summaryHeroIcon, { backgroundColor: colors.primary + '12' }]}
+                  >
+                    <MaterialCommunityIcons
+                      name="clipboard-check-outline"
+                      size={22}
+                      color={colors.primary}
+                    />
+                  </View>
+                  <View style={styles.summaryHeroTitleBlock}>
+                    <AppText style={[styles.summaryHeroTitle, { color: colors.textPrimary }]}>
+                      Settlement snapshot
+                    </AppText>
+                    <AppText style={[styles.summaryHeroSubtitle, { color: colors.textSecondary }]}>
+                      Review stock movement before confirming day end
+                    </AppText>
+                  </View>
+                </View>
+
+                <View style={styles.summaryTileGrid}>
+                  <SummaryTile
+                    label="Closing stock"
+                    value={formatStock(closing.cases, closing.pieces)}
+                    helper={formatCurrency(closing.value)}
+                    icon="package-variant-closed"
+                    color="#10B981"
+                  />
+                  <SummaryTile
+                    label="Sold today"
+                    value={formatStock(sold.cases, sold.pieces)}
+                    helper={formatCurrency(sold.value)}
+                    icon="trending-up"
+                    color="#F59E0B"
+                  />
+                  <SummaryTile
+                    label="Closing KG"
+                    value={formatWeightKg(closing.weight)}
+                    helper="Final van load"
+                    icon="weight-kilogram"
+                    color="#6366F1"
+                  />
+                  <SummaryTile
+                    label="Top-up checks"
+                    value={totalAttentionTopups || '-'}
+                    helper={totalAttentionTopups ? 'Needs review' : 'No pending items'}
+                    icon="alert-circle-outline"
+                    color={totalAttentionTopups ? colors.warning : colors.success}
+                  />
+                </View>
+              </View>
+
+              {topupSettlementAlerts.length > 0 && (
+                <View
+                  style={[
+                    styles.topupAlertCard,
+                    { backgroundColor: colors.warning + '10', borderColor: colors.warning + '35' },
+                  ]}
+                >
+                  <View style={styles.topupAlertHeader}>
+                    <MaterialCommunityIcons
+                      name="alert-circle-outline"
+                      size={20}
+                      color={colors.warning}
+                    />
+                    <AppText style={[styles.topupAlertTitle, { color: colors.textPrimary }]}>
+                      Top-up request attention
+                    </AppText>
+                  </View>
+
+                  {submittedTopups.length > 0 && (
+                    <View style={styles.topupAlertSection}>
+                      <AppText style={[styles.topupAlertMessage, { color: colors.textPrimary }]}>
+                        Pending top-up requests
+                      </AppText>
+                      {submittedTopups.map((item) => (
+                        <View
+                          key={item.id}
+                          style={[styles.topupAlertItem, { backgroundColor: colors.background }]}
+                        >
+                          <View style={styles.topupAlertItemMain}>
+                            <AppText
+                              style={[styles.topupAlertReference, { color: colors.textPrimary }]}
+                            >
+                              {item.reference}
+                            </AppText>
+                            <AppText
+                              style={[styles.topupAlertQty, { color: colors.textSecondary }]}
+                            >
+                              Requested{' '}
+                              {formatStock(item.requestedCases || 0, item.requestedPieces || 0)}
+                            </AppText>
+                          </View>
+                          <View
+                            style={[
+                              styles.topupStatusBadge,
+                              { backgroundColor: colors.warning + '15' },
+                            ]}
+                          >
+                            <AppText style={[styles.topupStatusText, { color: colors.warning }]}>
+                              Pending
+                            </AppText>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+
+                  {approvedTopups.length > 0 && (
+                    <View style={styles.topupAlertSection}>
+                      <AppText style={[styles.topupAlertMessage, { color: colors.textPrimary }]}>
+                        Approved top-up requests
+                      </AppText>
+                      {approvedTopups.map((item) => (
+                        <View
+                          key={item.id}
+                          style={[styles.topupAlertItem, { backgroundColor: colors.background }]}
+                        >
+                          <View style={styles.topupAlertItemMain}>
+                            <AppText
+                              style={[styles.topupAlertReference, { color: colors.textPrimary }]}
+                            >
+                              {item.reference}
+                            </AppText>
+                            <AppText
+                              style={[styles.topupAlertQty, { color: colors.textSecondary }]}
+                            >
+                              Approved{' '}
+                              {formatStock(item.approvedCases || 0, item.approvedPieces || 0)}
+                            </AppText>
+                          </View>
+                          <View
+                            style={[
+                              styles.topupStatusBadge,
+                              { backgroundColor: colors.success + '15' },
+                            ]}
+                          >
+                            <AppText style={[styles.topupStatusText, { color: colors.success }]}>
+                              Approved
+                            </AppText>
+                          </View>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
+
               <View
                 style={[
                   styles.card,
@@ -265,6 +450,9 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                   </AppText>
                   <AppText style={[styles.financialHeaderStock, { color: colors.textSecondary }]}>
                     Stock
+                  </AppText>
+                  <AppText style={[styles.financialHeaderWeight, { color: colors.textSecondary }]}>
+                    KG
                   </AppText>
                   <AppText style={[styles.financialHeaderValue, { color: colors.textSecondary }]}>
                     Value
@@ -288,32 +476,62 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                     <AppText style={[styles.financialStockText, { color: stat.color }]}>
                       {formatStock(stat.cases, stat.pieces)}
                     </AppText>
+                    <AppText style={[styles.financialWeightText, { color: stat.color }]}>
+                      {formatWeightKg(stat.weight)}
+                    </AppText>
                     <AppText style={[styles.financialValueText, { color: stat.color }]}>
                       {stat.value > 0 ? formatCurrency(stat.value) : '-'}
                     </AppText>
                   </View>
                 ))}
               </View>
-
-              <StatsCard title="Sold Details" icon="trending-up" data={soldData} color="#F59E0B" />
-              <StatsCard
-                title="Closing Stock"
-                icon="package-variant"
-                data={closingData}
-                color="#10B981"
-              />
             </Animated.View>
           </ScrollView>
         ) : (
           <FlatList
-            data={data.products}
+            data={filteredProducts}
             keyExtractor={(item) => item.productId}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.productsList}
+            ListHeaderComponent={
+              <View style={styles.productListHeaderBlock}>
+                <SearchBar
+                  value={productSearch}
+                  onChangeText={setProductSearch}
+                  placeholder="Search products"
+                  debounceDelay={0}
+                  clearable={true}
+                  style={styles.productSearchBar}
+                  inputStyle={styles.productSearchInput}
+                />
+                <View
+                  style={[
+                    styles.productListHeader,
+                    { backgroundColor: colors.surface, borderColor: colors.divider },
+                  ]}
+                >
+                  <AppText style={[styles.productListHeaderName, { color: colors.textSecondary }]}>
+                    Product
+                  </AppText>
+                  <AppText style={[styles.productListHeaderQty, { color: colors.textSecondary }]}>
+                    Open
+                  </AppText>
+                  <AppText style={[styles.productListHeaderQty, { color: colors.textSecondary }]}>
+                    In
+                  </AppText>
+                  <AppText style={[styles.productListHeaderQty, { color: colors.textSecondary }]}>
+                    Sold
+                  </AppText>
+                  <AppText style={[styles.productListHeaderQty, { color: colors.textSecondary }]}>
+                    Close
+                  </AppText>
+                </View>
+              </View>
+            }
             renderItem={({ item, index }) => (
               <Animated.View
                 style={[
-                  styles.productCard,
+                  styles.productCompactRow,
                   {
                     backgroundColor: colors.surface,
                     borderColor: colors.divider,
@@ -321,86 +539,51 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                   },
                 ]}
               >
-                <View style={styles.productRow}>
-                  <View style={styles.productIndex}>
-                    <AppText style={[styles.productIndexText, { color: colors.primary }]}>
-                      {index + 1}
-                    </AppText>
-                  </View>
-                  <View style={styles.productDetails}>
-                    <AppText
-                      style={[styles.productName, { color: colors.textPrimary }]}
-                      numberOfLines={2}
-                    >
+                <View style={styles.productCompactTop}>
+                  <AppText style={[styles.productIndexText, { color: colors.primary }]}>
+                    {index + 1}
+                  </AppText>
+                  <View style={styles.productCompactDetails}>
+                    <AppText style={[styles.productName, { color: colors.textPrimary }]}>
                       {item.productName}
                     </AppText>
-                    <AppText style={[styles.productCode, { color: colors.textSecondary }]}>
+                    <AppText
+                      style={[styles.productCode, { color: colors.textSecondary }]}
+                      numberOfLines={1}
+                    >
                       {item.productId}
                     </AppText>
                   </View>
                 </View>
 
-                <View style={styles.productStats}>
-                  <View style={styles.productStat}>
-                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
-                      Opening
-                    </AppText>
-                    <AppText style={[styles.productStatValue, { color: '#6B7280' }]}>
+                <View style={styles.productCompactInfoRow}>
+                  <View style={styles.productCompactQtys}>
+                    <AppText style={[styles.productCompactQty, { color: '#6B7280' }]}>
                       {formatStock(item.openingCases, item.openingPieces)}
                     </AppText>
-                    {/* <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
-                      {item.openingItems} items
-                    </AppText> */}
-                  </View>
-                  <View style={styles.productStat}>
-                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
-                      Received
-                    </AppText>
-                    <AppText style={[styles.productStatValue, { color: '#3B82F6' }]}>
+                    <AppText style={[styles.productCompactQty, { color: '#3B82F6' }]}>
                       {formatStock(item.inCases, item.inPieces)}
                     </AppText>
-                    {/* <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
-                      {item.receivedItems} items
-                    </AppText> */}
-                  </View>
-                  <View style={styles.productStat}>
-                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
-                      Sold
-                    </AppText>
-                    <AppText style={[styles.productStatValue, { color: '#F59E0B' }]}>
+                    <AppText style={[styles.productCompactQty, { color: '#F59E0B' }]}>
                       {formatStock(item.outCases, item.outPieces)}
                     </AppText>
-                  </View>
-                  <View style={styles.productStat}>
-                    <AppText style={[styles.productStatLabel, { color: colors.textSecondary }]}>
-                      Closing
-                    </AppText>
-                    <AppText style={[styles.productStatValue, { color: '#10B981' }]}>
+                    <AppText style={[styles.productCompactQty, { color: '#10B981' }]}>
                       {formatStock(item.closingCases, item.closingPieces)}
                     </AppText>
-                    {/* <AppText style={[styles.productStatSub, { color: colors.textTertiary }]}>
-                      {item.closingItems} items
-                    </AppText> */}
                   </View>
-                </View>
 
-                <View style={styles.productValueRow}>
-                  <View style={styles.productValueItem}>
-                    <MaterialCommunityIcons name="cash" size={14} color="#F59E0B" />
-                    <AppText style={[styles.productValueLabel, { color: colors.textSecondary }]}>
-                      Sale Value
+                  <View style={styles.productCompactValues}>
+                    <AppText
+                      style={[styles.productCompactValue, { color: '#F59E0B' }]}
+                      numberOfLines={1}
+                    >
+                      Sale {formatCurrency(item.soldValue)}
                     </AppText>
-                    <AppText style={[styles.productValueAmount, { color: '#F59E0B' }]}>
-                      {formatCurrency(item.soldValue)}
-                    </AppText>
-                  </View>
-                  <View style={styles.productValueItem}>
-                    <MaterialCommunityIcons name="currency-usd" size={14} color="#10B981" />
-                    <AppText style={[styles.productValueLabel, { color: colors.textSecondary }]}>
-                      Stock Value
-                    </AppText>
-                    <AppText style={[styles.productValueAmount, { color: '#10B981' }]}>
-                      {formatCurrency(item.closingValue)}
+                    <AppText
+                      style={[styles.productCompactValue, { color: '#10B981' }]}
+                      numberOfLines={1}
+                    >
+                      Stock {formatCurrency(item.closingValue)}
                     </AppText>
                   </View>
                 </View>
@@ -414,7 +597,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
                   color={colors.textTertiary}
                 />
                 <AppText style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  No products found
+                  {productSearch.trim() ? 'No matching products found' : 'No products found'}
                 </AppText>
               </View>
             }
@@ -432,7 +615,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
           </TouchableOpacity>
           {onProceed && (
             <TouchableOpacity
-              onPress={onProceed}
+              onPress={handleProceed}
               style={[styles.proceedButton, { backgroundColor: colors.primary }]}
             >
               <AppText style={styles.proceedButtonText}>Confirm Day End</AppText>
@@ -440,6 +623,72 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
           )}
         </View>
       </SafeAreaView>
+
+      {showUnacceptedStockConfirm && (
+        <View style={styles.unacceptedStockBackdrop}>
+          <View style={styles.unacceptedStockCard}>
+            <AppText style={styles.unacceptedStockEyebrow}>ACTION REQUIRED</AppText>
+            <View style={styles.unacceptedStockIcon}>
+              <MaterialCommunityIcons name="package-variant" size={34} color={colors.warning} />
+            </View>
+            <AppText style={styles.unacceptedStockTitle}>
+              Approved stock awaits acceptance
+            </AppText>
+            <AppText style={styles.unacceptedStockDescription}>
+              This approved quantity has not yet been accepted into your van inventory.
+            </AppText>
+
+            <View style={styles.unacceptedStockMetrics}>
+              <View style={styles.unacceptedStockMetric}>
+                <AppText style={styles.unacceptedStockMetricValue}>
+                  {approvedTopups.length}
+                </AppText>
+                <AppText style={styles.unacceptedStockMetricLabel}>
+                  {approvedTopups.length === 1 ? 'Request' : 'Requests'}
+                </AppText>
+              </View>
+              <View style={styles.unacceptedStockMetric}>
+                <AppText style={styles.unacceptedStockMetricValue}>{approvedTopupCases}</AppText>
+                <AppText style={styles.unacceptedStockMetricLabel}>Cases</AppText>
+              </View>
+              <View style={styles.unacceptedStockMetric}>
+                <AppText style={styles.unacceptedStockMetricValue}>{approvedTopupPieces}</AppText>
+                <AppText style={styles.unacceptedStockMetricLabel}>Pieces</AppText>
+              </View>
+            </View>
+
+            <View style={styles.unacceptedStockNote}>
+              <MaterialCommunityIcons
+                name="information-outline"
+                size={18}
+                color={colors.warning}
+              />
+              <AppText style={styles.unacceptedStockNoteText}>
+                If you end the day now, this approved quantity will not be included in today&apos;s
+                van stock.
+              </AppText>
+            </View>
+
+            <View style={styles.unacceptedStockActions}>
+              <TouchableOpacity
+                onPress={() => setShowUnacceptedStockConfirm(false)}
+                style={styles.unacceptedStockReviewButton}
+              >
+                <AppText style={styles.unacceptedStockReviewText}>Review Approved Stock</AppText>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowUnacceptedStockConfirm(false);
+                  onProceed?.();
+                }}
+                style={styles.unacceptedStockEndButton}
+              >
+                <AppText style={styles.unacceptedStockEndText}>End Day Anyway</AppText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </AppModal>
   );
 };

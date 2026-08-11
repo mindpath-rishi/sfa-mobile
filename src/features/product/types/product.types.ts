@@ -40,6 +40,11 @@ export interface CartItemWithDetails {
   caseNetWeight?: number; // Weight per case (calculated as unitQtyInCase * netWeightPerUnit)
   pieceNetWeight?: number; // Weight per piece (same as netWeightPerUnit)
   stock: number;
+  categoryId?: string;
+  parentCategoryId?: string;
+  compCode?: string;
+  isFocusedPack?: string;
+  applicableSchemes?: import('@/shared/services/scheme.service').SchemeRecord[];
 }
 
 /* ======================================================
@@ -53,6 +58,9 @@ export interface Product {
 
   category: string;
   subCategory: string;
+  parentCategory?: string;
+  parentCategoryName?: string;
+  categoryName?: string;
   brand: string;
 
   description: string;
@@ -95,6 +103,10 @@ export interface Product {
   reorderPoint?: number;
   caseNetWeight?: number;
   pieceNetWeight?: number;
+  categoryId?: string;
+  parentCategoryId?: string;
+  compCode?: string;
+  isFocusedPack?: string;
 }
 
 /* ======================================================
@@ -140,7 +152,7 @@ export interface UnitOption {
 }
 
 export interface ProductsScreenProps {
-  mode: 'sales' | 'topup'
+  mode: 'sales' | 'topup';
   onProductsCountChange?: (count: number) => void;
   onCartUpdate?: (
     items: any[],
