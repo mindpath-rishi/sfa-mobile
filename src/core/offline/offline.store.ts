@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { storage } from '@/core/storage';
+import { useAuthStore } from '@/core/store/auth.store';
+import { isSalesman } from '@/core/navigation/role.utils';
 
 const offlineEnabledKey = (ownerId: string) => `offline_enabled:${ownerId}`;
 
@@ -134,6 +136,14 @@ export const saveOfflinePreference = async (ownerId: string, enabled: boolean) =
 };
 
 export const isOfflineMode = () => {
+  const user = useAuthStore.getState().user;
+
+  // Offline queuing/local-completion is only ever valid for a salesman who has
+  // been granted offline access. Without that permission, a connectivity blip
+  // must surface as "you're offline" rather than silently routing the action
+  // through the offline queue and later showing an offline-only error.
+  if (!isSalesman(user) || user?.offlineAccessAllowed !== true) return false;
+
   const { isConnected, isInternetReachable, offlineEnabled } = useOfflineStore.getState();
 
   return offlineEnabled || !isConnected || !isInternetReachable;

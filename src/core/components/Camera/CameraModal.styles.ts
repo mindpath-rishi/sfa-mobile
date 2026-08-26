@@ -1,12 +1,14 @@
 // src/components/camera/CameraModal/styles/CameraModel.style.ts
 import { createStyles, StyleUtils } from '@/shared/theme/styles';
-import { ViewStyle, TextStyle, Dimensions, Platform } from 'react-native';
+import { ViewStyle, TextStyle, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 const { width, height } = Dimensions.get('window');
 
 export const useCameraModalStyles = () => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const styleGenerator = createStyles((utils: StyleUtils) => ({
     fullScreenContainer: {
@@ -97,7 +99,7 @@ export const useCameraModalStyles = () => {
       right: 0,
       bottom: 0,
       justifyContent: 'space-between',
-      paddingTop: Platform.OS === 'ios' ? utils.spacing[12] : utils.spacing[8],
+      paddingTop: insets.top + utils.spacing[4],
       paddingBottom: utils.spacing[8],
       paddingHorizontal: utils.spacing[4],
     } as ViewStyle,
@@ -338,7 +340,7 @@ export const useCameraModalStyles = () => {
     // Status badge
     statusBadge: {
       position: 'absolute',
-      top: Platform.OS === 'ios' ? utils.spacing[12] : utils.spacing[8],
+      top: insets.top + utils.spacing[4],
       alignSelf: 'center',
       backgroundColor: 'rgba(0,0,0,0.6)',
       paddingHorizontal: utils.spacing[3],
@@ -389,7 +391,7 @@ export const useCameraModalStyles = () => {
 
     previewHeader: {
       position: 'absolute',
-      top: Platform.OS === 'ios' ? utils.spacing[12] : utils.spacing[8],
+      top: insets.top + utils.spacing[4],
       left: 0,
       right: 0,
       alignItems: 'center',

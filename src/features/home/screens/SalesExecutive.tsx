@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { useCameraPermissions } from 'expo-camera';
+import { useCameraPermissionCompat as useCameraPermission } from '@/shared/hooks/useCameraPermissionCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -36,7 +36,8 @@ import {
 import { OtherWorkOption } from '../types/salesExecutive.types';
 import { Van } from '../types/van.types';
 import { ActivityType, TodayActivity } from '../types/activity.types';
-import { CameraModal } from '@/core/components/Camera/CameraModal';
+import { SelfieFaceCamera } from '@/core/components/Camera/SelfieFaceCamera';
+import { StockUnloadDetailModal } from '@/features/notification/components/StockUnloadDetailModal';
 import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
 import { homeService } from '../services/home.service';
 import { AppText, ConfirmationModal, Skeleton } from '@/core/components';
@@ -66,7 +67,6 @@ import {
   startSalesmanBackgroundLocation,
   stopSalesmanBackgroundLocation,
 } from '@/shared/services/location.service';
-import { validateSelfieFace } from '@/shared/services/face-detection.service';
 import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
 type SettlementTopupAlert = {
@@ -97,6 +97,7 @@ export default function SalesExecutiveScreen() {
   >('van-change');
   const [cameraVisible, setCameraVisible] = useState(false);
   const [loadSummaryVisible, setLoadSummaryVisible] = useState(false);
+  const [stockUnloadDetailVisible, setStockUnloadDetailVisible] = useState(false);
 
   const [selectedActivity, setSelectedActivity] = useState('');
   const [selectedActivityColor, setSelectedActivityColor] = useState('');
@@ -129,11 +130,10 @@ export default function SalesExecutiveScreen() {
   const [selectedLeaveType, setSelectedLeaveType] = useState<string | null>(null);
   const [isTodayLeave, setIsTodayLeave] = useState<boolean>(false);
 
-  const cameraRef = useRef<any>(null);
   const dayStartWithVanChangeRef = useRef(false);
   const handledApprovedVanChangeRequestRef = useRef<string | null>(null);
   const completedApprovedVanChangeRequestRef = useRef<string | null>(null);
-  const [permission, requestPermission] = useCameraPermissions();
+  const { hasPermission, requestPermission } = useCameraPermission();
   const [filteredOtherWorkOptions, setFilteredOtherWorkOptions] =
     useState<OtherWorkOption[]>(OTHER_WORK_OPTIONS);
   const [routes, setRoutes] = useState<any>();
@@ -251,6 +251,14 @@ export default function SalesExecutiveScreen() {
   };
 
   const handleStartDayPress = () => {
+    if (pendingStockUnloadRequest) {
+      toast.error(
+        'Your previous day stock unload request is still pending manager approval. You cannot start a new day until it is resolved.',
+      );
+      setStockUnloadDetailVisible(true);
+      return;
+    }
+
     setUnifiedModalType('activity-change');
     setUnifiedModalVisible(true);
     setIsChangingActivity(false);
@@ -532,9 +540,9 @@ export default function SalesExecutiveScreen() {
   };
 
   const openCamera = async () => {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
+    if (!hasPermission) {
+      const granted = await requestPermission();
+      if (!granted) {
         toast.error('Camera permission is needed to take your photo');
         return;
       }
@@ -542,51 +550,33 @@ export default function SalesExecutiveScreen() {
     setCameraVisible(true);
   };
 
-  const handleCaptureImage = async (photo: any): Promise<boolean | string> => {
-    if (photo && photo.uri) {
-      const faceValidation = await validateSelfieFace(photo.uri);
-
-      if (!faceValidation.valid) {
-        let message: string;
-        if (faceValidation.reason === 'no-face') {
-          message = 'No face detected. Please keep your face clearly visible and retake.';
-        } else if (faceValidation.reason === 'multiple-faces') {
-          message = 'Multiple faces detected. Only one person should be visible.';
-        } else if (faceValidation.reason === 'module-missing') {
-          message =
-            'Face verification isn’t available in this app build. Please use the installed app build, not Expo Go.';
-        } else {
-          message = 'Unable to verify your face. Please retake the selfie.';
-        }
-        toast.error(message);
-        return message;
-      }
-
-      setUserPhoto(photo.uri);
-      setCameraVisible(false);
-      if (isChangingActivity) return true;
-
-      if (dayStartWithVanChangeRef.current) {
-        dayStartWithVanChangeRef.current = false;
-        void handleStartDay({
-          skipRouteValidation: true,
-          forceVanChangePending: true,
-          photoUri: photo.uri,
-        });
-        return true;
-      }
-
-      if (selectedRoute) {
-        setLoadSummaryVisible(true);
-      } else {
-        handleStartDay({ photoUri: photo.uri });
-      }
-      return true;
-    } else {
+  const handleCaptureImage = async (photoUri: string): Promise<boolean | string> => {
+    if (!photoUri) {
       console.error('No photo captured');
       toast.error('Failed to capture photo');
       return 'Failed to capture photo. Please try again.';
     }
+
+    setUserPhoto(photoUri);
+    setCameraVisible(false);
+    if (isChangingActivity) return true;
+
+    if (dayStartWithVanChangeRef.current) {
+      dayStartWithVanChangeRef.current = false;
+      void handleStartDay({
+        skipRouteValidation: true,
+        forceVanChangePending: true,
+        photoUri,
+      });
+      return true;
+    }
+
+    if (selectedRoute) {
+      setLoadSummaryVisible(true);
+    } else {
+      handleStartDay({ photoUri });
+    }
+    return true;
   };
 
   const handleLoadSummaryProceed = () => {
@@ -607,6 +597,15 @@ export default function SalesExecutiveScreen() {
     forceVanChangePending?: boolean;
     photoUri?: string;
   }) => {
+    if (pendingStockUnloadRequest) {
+      setCameraVisible(false);
+      toast.error(
+        'Your previous day stock unload request is still pending manager approval. You cannot start a new day until it is resolved.',
+      );
+      setStockUnloadDetailVisible(true);
+      return;
+    }
+
     console.log('Selected Activity:', selectedActivity);
     console.log('Selected Route:', selectedRoute);
     console.log('Van:', van);
@@ -741,8 +740,10 @@ export default function SalesExecutiveScreen() {
         loader.show({ message: 'Preparing today activity...' });
         await getDayStatus({ showLoader: false });
 
-        loader.show({ message: 'Starting location tracking...' });
-        await startSalesmanBackgroundLocation(user);
+        if (selectedActivity === 'Retailing' || selectedActivity === 'Other Work') {
+          loader.show({ message: 'Starting location tracking...' });
+          await startSalesmanBackgroundLocation(user);
+        }
 
         if (!isVanChangePending) {
           toast.success('Your day successfully started.');
@@ -1028,7 +1029,12 @@ export default function SalesExecutiveScreen() {
 
       if (response.statusCode === 200 && data?.status === 'ACTIVE') {
         setWorkSessionId(data?.workSessionId || '');
-        void startSalesmanBackgroundLocation(user);
+
+        const activeActivityName = data?.activeActivity?.name;
+        if (activeActivityName === 'Retailing' || activeActivityName === 'Other Work') {
+          void startSalesmanBackgroundLocation(user);
+        }
+
         setCurrentActivity(data?.activeActivity?.name || null);
         setStartTime(data?.activeActivity?.startTime || null);
         setSelectedActivityColor('#4158D0');
@@ -1565,13 +1571,7 @@ export default function SalesExecutiveScreen() {
               {!!pendingStockUnloadRequest && (
                 <TouchableOpacity
                   activeOpacity={0.85}
-                  onPress={() =>
-                    router.push(
-                      `/stock-unload-detail?unloadRequestId=${encodeURIComponent(
-                        String(pendingStockUnloadRequest.unloadRequestId),
-                      )}` as never,
-                    )
-                  }
+                  onPress={() => setStockUnloadDetailVisible(true)}
                   style={[
                     styles.stockUnloadPendingBanner,
                     {
@@ -1716,22 +1716,17 @@ export default function SalesExecutiveScreen() {
         proceedLabel={isChangingActivity ? 'Submit' : 'Proceed'}
       />
 
-      <CameraModal
+      <SelfieFaceCamera
         visible={cameraVisible}
-        cameraRef={cameraRef}
         onClose={handleCancelCamera}
         onCapture={handleCaptureImage}
-        closeOnCapture={false}
-        onError={(error) => console.error('Camera error:', error)}
         title="Center your face and take a selfie"
-        allowCameraSwitch={false}
-        showFaceGuide={true}
-        showPreview={true}
-        cameraProps={{
-          facing: 'front',
-          quality: 0.8,
-          autofocus: true,
-        }}
+      />
+
+      <StockUnloadDetailModal
+        visible={stockUnloadDetailVisible}
+        unloadRequestId={pendingStockUnloadRequest?.unloadRequestId ?? null}
+        onClose={() => setStockUnloadDetailVisible(false)}
       />
 
       <DayEndConfirmationModal

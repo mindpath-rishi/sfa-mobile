@@ -780,7 +780,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
         statusBarColor={colors.primary}
         statusBarStyle="light-content"
         statusBarTranslucent={false}
-        keyboardAvoiding={Platform.OS === 'ios'}
+        keyboardAvoiding
         contentStyle={{ padding: 0, flex: 1 }}
         headerStyle={{
           backgroundColor: colors.primary,

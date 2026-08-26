@@ -585,13 +585,6 @@ export default function ProfileScreen() {
   const handleGalleryPress = async () => {
     if (profileImageUploading) return;
 
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      toast.error('Permission required', 'Photo library permission is required.');
-      return;
-    }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,

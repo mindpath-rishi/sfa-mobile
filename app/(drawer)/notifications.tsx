@@ -20,6 +20,7 @@ import {
 } from '@/features/notification/services/notification.service';
 import { toast } from '@/core/utils';
 import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
+import { StockUnloadDetailModal } from '@/features/notification/components/StockUnloadDetailModal';
 import { outletService } from '@/features/outlet/services/outlet.service';
 
 type NotificationItem = {
@@ -210,6 +211,7 @@ export default function NotificationsScreen() {
     item: NotificationItem;
     action: 'accept' | 'reject';
   } | null>(null);
+  const [stockUnloadDetailId, setStockUnloadDetailId] = useState<string | null>(null);
 
   const loadNotifications = useCallback(async (showRefresh = false) => {
     if (showRefresh) {
@@ -261,12 +263,14 @@ export default function NotificationsScreen() {
 
   const handleNotificationPress = async (item: NotificationItem) => {
     const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
-    const target =
-      item.type === 'stock_unload' && unloadRequestId
-        ? `/stock-unload-detail?unloadRequestId=${encodeURIComponent(String(unloadRequestId))}`
-        : item.data?.route || item.data?.url;
-    if (typeof target === 'string' && target.startsWith('/')) {
-      router.push(target as never);
+
+    if (item.type === 'stock_unload' && unloadRequestId) {
+      setStockUnloadDetailId(String(unloadRequestId));
+    } else {
+      const target = item.data?.route || item.data?.url;
+      if (typeof target === 'string' && target.startsWith('/')) {
+        router.push(target as never);
+      }
     }
 
     if (!item.unread) return;
@@ -841,6 +845,16 @@ export default function NotificationsScreen() {
         onConfirm={() => {
           if (!confirmTopupAction) return;
           void performTopupAction(confirmTopupAction.item, confirmTopupAction.action);
+        }}
+      />
+
+      <StockUnloadDetailModal
+        visible={!!stockUnloadDetailId}
+        unloadRequestId={stockUnloadDetailId}
+        onClose={() => setStockUnloadDetailId(null)}
+        canResolve
+        onResolved={() => {
+          void loadNotifications(true);
         }}
       />
     </>

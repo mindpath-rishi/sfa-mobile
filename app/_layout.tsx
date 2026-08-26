@@ -20,6 +20,7 @@ import { useGlobalErrorStore } from '@/core/store/error.store';
 import AppErrorScreen from '@/core/screens/error/Error';
 import LoaderOverlay from '@/core/screens/LoaderOverlay';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { BackgroundLocationDisclosureModal } from '@/shared/components/models/BackgroundLocationDisclosureModal';
 
 import {
   addFirebaseNotificationListeners,
@@ -356,6 +357,7 @@ export default function RootLayout() {
 
             <OfflineSyncGate />
             <LoaderOverlay />
+            <BackgroundLocationDisclosureModal />
             <Toast position="top" />
           </FilterProvider>
         </AppProviders>

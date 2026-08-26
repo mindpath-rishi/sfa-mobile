@@ -13,7 +13,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/core/components';
 import { notificationService } from '@/features/notification/services/notification.service';
-import { useHeader } from '@/shared/contexts/HeaderContext';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { toast } from '@/core/utils';
 
@@ -42,7 +41,6 @@ type UnloadRequest = {
 
 export default function StockUnloadDetailScreen() {
   const { colors } = useTheme();
-  const { setHeader } = useHeader();
   const { unloadRequestId } = useLocalSearchParams<{ unloadRequestId: string }>();
   const [request, setRequest] = useState<UnloadRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,9 +65,8 @@ export default function StockUnloadDetailScreen() {
   );
 
   useEffect(() => {
-    setHeader({ hidden: true });
     void loadDetail();
-  }, [loadDetail, setHeader]);
+  }, [loadDetail]);
 
   if (loading) {
     return (

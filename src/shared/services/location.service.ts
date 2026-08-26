@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as Network from 'expo-network';
 import * as TaskManager from 'expo-task-manager';
 import { jwtDecode } from 'jwt-decode';
-import { Alert, AppState, Linking, Platform } from 'react-native';
+import { AppState, Linking, Platform } from 'react-native';
 import * as Application from 'expo-application';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { io } from 'socket.io-client';
@@ -21,6 +21,7 @@ import {
   stopNativeBackgroundLocation,
   syncNativePendingLocationUploads,
 } from './native-location.service';
+import { requestBackgroundLocationDisclosure } from './backgroundLocationDisclosure.bridge';
 
 export const SALESMAN_BACKGROUND_LOCATION_TASK = 'salesman-background-location';
 
@@ -29,6 +30,7 @@ const ACTIVE_LOCATION_SESSION_KEY = 'active_location_work_session_id';
 const LAST_BACKGROUND_LOCATION_KEY = 'last_background_location';
 const LAST_BACKGROUND_LOCATION_ERROR_KEY = 'last_background_location_error';
 const BATTERY_OPTIMIZATION_PROMPTED_KEY = 'battery_optimization_prompted';
+const BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY = 'background_location_disclosure_acknowledged';
 
 /**
  * Real-time tracking settings
@@ -90,6 +92,26 @@ const requestBatteryOptimizationPermission = async () => {
 
 export const resetBatteryOptimizationPrompt = async () => {
   await storage.removeItem(BATTERY_OPTIMIZATION_PROMPTED_KEY);
+};
+
+/**
+ * Google Play's Prominent Disclosure & Consent requirement: before the OS
+ * background-location permission prompt can appear, the user must first see
+ * an in-app explanation of what is collected, that it happens in the
+ * background, and why - with an explicit accept/decline choice. This is
+ * rendered as a real in-app screen (BackgroundLocationDisclosureModal,
+ * mounted in app/_layout.tsx) rather than a native Alert, since a native
+ * Alert can be mistaken by reviewers for the OS permission dialog itself.
+ */
+const ensureBackgroundLocationDisclosure = async () => {
+  const acknowledged = await storage.getItem(BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY);
+  if (acknowledged === 'true') return true;
+
+  const accepted = await requestBackgroundLocationDisclosure();
+  if (!accepted) return false;
+
+  await storage.setItem(BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY, 'true');
+  return true;
 };
 
 export const isLocationTrackingEnabled = async (ownerId: string) => {
@@ -1438,7 +1460,11 @@ const performStartSalesmanBackgroundLocation = async (user?: LocationOwner) => {
      *      tries socket when available and then HTTP fallback. Your backend
      *      should emit manager socket updates after HTTP receives a location.
      */
-    if (Platform.OS === 'android') {
+    const disclosureAccepted = await ensureBackgroundLocationDisclosure();
+
+    if (!disclosureAccepted) {
+      logLocation('Background location disclosure declined by user');
+    } else if (Platform.OS === 'android') {
       await startNativeAndroidBackgroundTracking(activeSessionId);
     } else if (Platform.OS === 'ios') {
       await startBackgroundTracking();

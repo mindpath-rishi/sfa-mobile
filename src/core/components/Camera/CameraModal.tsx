@@ -24,6 +24,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   allowCameraSwitch = true,
   showFaceGuide = false,
   showPreview = false,
+  validateBeforePreview,
   cameraProps = {},
   modalProps = {},
 }) => {
@@ -34,6 +35,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
   const cameraRef = externalCameraRef || internalCameraRef;
 
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isValidatingCapture, setIsValidatingCapture] = useState(false);
   const isCapturingRef = useRef(false); // 🔥 important fix
   const [cameraKey, setCameraKey] = useState(0);
   const [previewPhoto, setPreviewPhoto] = useState<CameraCapturedPhoto | null>(null);
@@ -42,6 +44,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
   const pulseAnim = useRef(new Animated.Value(0)).current;
   const previewAnim = useRef(new Animated.Value(0)).current;
+  const errorShakeAnim = useRef(new Animated.Value(0)).current;
 
   // Force remount when modal opens
   React.useEffect(() => {
@@ -77,6 +80,35 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
     return () => loop.stop();
   }, [showFaceGuide, previewPhoto, pulseAnim]);
+
+  // Shake the error pill whenever a new validation error appears
+  useEffect(() => {
+    if (!captureError) return;
+
+    errorShakeAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(errorShakeAnim, {
+        toValue: 1,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(errorShakeAnim, {
+        toValue: -1,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(errorShakeAnim, {
+        toValue: 1,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(errorShakeAnim, {
+        toValue: 0,
+        duration: 60,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [captureError, errorShakeAnim]);
 
   // Fade/scale-in animation when the preview appears
   useEffect(() => {
@@ -136,6 +168,22 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       console.log('Photo captured:', photo);
       setCaptureError(null);
 
+      if (validateBeforePreview) {
+        setIsValidatingCapture(true);
+        let validation: void | boolean | string;
+        try {
+          validation = await validateBeforePreview(photo);
+        } finally {
+          setIsValidatingCapture(false);
+        }
+
+        if (validation === false || typeof validation === 'string') {
+          setCaptureError(typeof validation === 'string' ? validation : 'Please retake the photo.');
+          setCameraKey((prev) => prev + 1);
+          return;
+        }
+      }
+
       if (showPreview) {
         setPreviewPhoto(photo);
       } else {
@@ -148,7 +196,7 @@ export const CameraModal: React.FC<CameraModalProps> = ({
       isCapturingRef.current = false;
       setIsCapturing(false);
     }
-  }, [cameraRef, showPreview, confirmPhoto, onError]);
+  }, [cameraRef, showPreview, validateBeforePreview, confirmPhoto, onError]);
 
   const handleRetake = useCallback(() => {
     setPreviewPhoto(null);
@@ -218,24 +266,44 @@ export const CameraModal: React.FC<CameraModalProps> = ({
           )}
         </View>
 
-        {/* Title */}
-        {showHeader && title && !captureError && (
+        {/* Title / verifying state */}
+        {showHeader && !captureError && (isValidatingCapture || title) && (
           <View style={styles.cameraInstruction}>
             <BlurView intensity={35} tint="dark" style={styles.instructionPill}>
-              <Ionicons name="scan-outline" size={16} color="white" style={styles.instructionIcon} />
-              <AppText style={styles.instructionText}>{title}</AppText>
+              {isValidatingCapture ? (
+                <ActivityIndicator size="small" color="white" style={styles.instructionIcon} />
+              ) : (
+                <Ionicons name="scan-outline" size={16} color="white" style={styles.instructionIcon} />
+              )}
+              <AppText style={styles.instructionText}>
+                {isValidatingCapture ? 'Verifying face…' : title}
+              </AppText>
             </BlurView>
           </View>
         )}
 
         {/* Inline capture/validation error */}
         {captureError && (
-          <View style={styles.cameraInstruction}>
+          <Animated.View
+            style={[
+              styles.cameraInstruction,
+              {
+                transform: [
+                  {
+                    translateX: errorShakeAnim.interpolate({
+                      inputRange: [-1, 1],
+                      outputRange: [-8, 8],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
             <BlurView intensity={35} tint="dark" style={styles.errorPill}>
               <Ionicons name="alert-circle" size={16} color="#FF6B6B" style={styles.instructionIcon} />
               <AppText style={styles.errorPillText}>{captureError}</AppText>
             </BlurView>
-          </View>
+          </Animated.View>
         )}
 
         {/* Bottom scrim + capture button */}
@@ -246,12 +314,15 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         >
           <View style={styles.captureContainer}>
             <TouchableOpacity
-              style={[styles.captureButton, isCapturing && styles.captureButtonDisabled]}
+              style={[
+                styles.captureButton,
+                (isCapturing || isValidatingCapture) && styles.captureButtonDisabled,
+              ]}
               onPress={handleCapture}
-              disabled={isCapturing}
+              disabled={isCapturing || isValidatingCapture}
               activeOpacity={0.8}
             >
-              {isCapturing ? (
+              {isCapturing || isValidatingCapture ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <View style={styles.captureButtonInner} />
@@ -280,8 +351,14 @@ export const CameraModal: React.FC<CameraModalProps> = ({
 
         <View style={styles.previewHeader}>
           <BlurView intensity={35} tint="dark" style={styles.previewHeaderPill}>
-            <Ionicons name="image-outline" size={16} color="white" style={styles.instructionIcon} />
-            <AppText style={styles.instructionText}>Review your photo</AppText>
+            {isConfirming ? (
+              <ActivityIndicator size="small" color="white" style={styles.instructionIcon} />
+            ) : (
+              <Ionicons name="image-outline" size={16} color="white" style={styles.instructionIcon} />
+            )}
+            <AppText style={styles.instructionText}>
+              {isConfirming ? 'Verifying face…' : 'Review your photo'}
+            </AppText>
           </BlurView>
         </View>
 
@@ -292,7 +369,11 @@ export const CameraModal: React.FC<CameraModalProps> = ({
         >
           <View style={styles.previewActions}>
             <TouchableOpacity
-              style={[styles.previewButton, styles.retakeButton]}
+              style={[
+                styles.previewButton,
+                styles.retakeButton,
+                isConfirming && styles.captureButtonDisabled,
+              ]}
               onPress={handleRetake}
               disabled={isConfirming}
               activeOpacity={0.8}

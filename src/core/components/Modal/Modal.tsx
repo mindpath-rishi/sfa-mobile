@@ -283,6 +283,7 @@ export const Modal: React.FC<ModalProps> & {
   const safeInsetStyle = useMemo((): ViewStyle => {
     if (size === 'full') {
       return {
+        paddingTop: insets.top,
         paddingBottom: insets.bottom,
         paddingLeft: insets.left,
         paddingRight: insets.right,
@@ -405,7 +406,7 @@ export const Modal: React.FC<ModalProps> & {
     keyboardAvoiding && Platform.OS === 'ios'
       ? 'padding'
       : keyboardAvoiding && Platform.OS === 'android'
-        ? undefined
+        ? 'height'
         : undefined;
 
   return (

@@ -171,6 +171,14 @@ export interface CameraModalProps {
   showFaceGuide?: boolean;
   /** Show a preview of the captured photo with Retake/Use Photo actions before confirming capture */
   showPreview?: boolean;
+  /**
+   * Optional validation run immediately after capture, before the preview (Retake/Use Photo)
+   * screen is shown. Return `false` or a rejection message to reject the shot and go straight
+   * back to the live camera — the user never sees a Use Photo button for an invalid capture.
+   */
+  validateBeforePreview?: (
+    photo: CameraCapturedPhoto,
+  ) => void | boolean | string | Promise<void | boolean | string>;
   /** Camera component props */
   cameraProps?: Omit<CameraProps, 'onCapture' | 'onError' | 'visible'>;
   /** Modal component props */

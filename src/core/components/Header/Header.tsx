@@ -27,7 +27,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const Header: React.FC = () => {
   const { config } = useHeader();
   const navigation = useNavigation();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
   const user = useAuthStore((state) => state.user);
@@ -193,6 +193,21 @@ const Header: React.FC = () => {
   const bgColor = config.transparent
     ? 'transparent'
     : safeConfig.backgroundColor || colors.background;
+
+  // Keep the status bar visually attached to whatever the header actually paints —
+  // a flat color, a gradient's start color, or the transparent/background fallback —
+  // instead of a hardcoded primary color that only matched some header variants.
+  const statusBarColor = config.transparent
+    ? 'transparent'
+    : useGradient
+      ? gradientColors[0]
+      : bgColor;
+
+  const statusBarStyle = useGradient || safeConfig.backgroundColor
+    ? 'light-content'
+    : isDark
+      ? 'light-content'
+      : 'dark-content';
 
   /* ============================
    * BADGES
@@ -412,7 +427,7 @@ const Header: React.FC = () => {
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor={colors.primary} />
+      <StatusBar barStyle={statusBarStyle} backgroundColor={statusBarColor} />
 
       <View style={{ paddingTop: insets.top, backgroundColor: bgColor }}>
         {useGradient ? (
