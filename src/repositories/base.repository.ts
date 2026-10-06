@@ -159,6 +159,30 @@ export class BaseRepository<T extends Record<string, unknown>> {
     return this.findById(ownerId, current.uuid) as Promise<LocalEntity<T>>;
   }
 
+  /**
+   * Save a record on the device only, without creating a server sync
+   * operation (e.g. buffers that are uploaded through their own API).
+   */
+  async createLocal(ownerId: string, data: T) {
+    if (!ownerId?.trim())
+      throw new Error(`Cannot save local ${this.entity}: ownerId is required`);
+    const uuid = String(data.uuid ?? createUuid());
+    const now = new Date().toISOString();
+    const database = await getDatabase();
+    await database.runAsync(
+      `INSERT INTO ${this.table}
+       (uuid, server_id, owner_id, data, search_text, version, sync_status, created_at, updated_at)
+       VALUES (?, NULL, ?, ?, ?, 1, 'SYNCED', ?, ?)`,
+      uuid,
+      ownerId,
+      JSON.stringify(data),
+      searchText(data),
+      now,
+      now,
+    );
+    return this.findById(ownerId, uuid) as Promise<LocalEntity<T>>;
+  }
+
   /** Update a downloaded snapshot without creating a server sync operation. */
   async updateLocal(ownerId: string, id: string, changes: Partial<T>) {
     const current = await this.findById(ownerId, id);

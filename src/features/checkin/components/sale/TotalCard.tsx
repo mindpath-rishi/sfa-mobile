@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
+import type { GroupSchemeBenefit } from '@/shared/services/group-scheme.engine';
+import { GroupFreeGoods } from './GroupFreeGoods';
 
 interface TotalsCardProps {
   total: number;
@@ -10,6 +12,8 @@ interface TotalsCardProps {
   mode?: 'sales' | 'topup';
   showWeight?: boolean;
   totalWeight?: number;
+  /** Free goods earned from group schemes (sales mode) */
+  freeGoods?: GroupSchemeBenefit[];
 }
 
 export const TotalsCard: React.FC<TotalsCardProps> = ({
@@ -20,6 +24,7 @@ export const TotalsCard: React.FC<TotalsCardProps> = ({
   mode = 'sales',
   showWeight,
   totalWeight = 0,
+  freeGoods = [],
 }) => {
   const { colors } = useTheme();
 
@@ -72,6 +77,12 @@ export const TotalsCard: React.FC<TotalsCardProps> = ({
               − K{discount.toLocaleString()}
             </Text>
           </View>
+        </View>
+      )}
+
+      {mode === 'sales' && freeGoods.length > 0 && (
+        <View style={{ paddingHorizontal: 12, paddingTop: 9 }}>
+          <GroupFreeGoods benefits={freeGoods} />
         </View>
       )}
 

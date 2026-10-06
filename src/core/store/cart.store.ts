@@ -309,6 +309,10 @@ import {
   getApplicableSchemeBenefitFromRecords,
   type SchemeBenefit,
 } from '@/shared/services/scheme.service';
+import {
+  computeGroupSchemeBenefits,
+  type GroupSchemeBenefit,
+} from '@/shared/services/group-scheme.engine';
 
 /* ================= TYPES ================= */
 
@@ -331,6 +335,8 @@ interface CartStore {
   summary: CartSummary;
   /** productId -> best applicable scheme benefit, populated by refreshSchemeDiscounts(). */
   schemeDiscounts: Record<string, SchemeBenefit>;
+  /** Free goods earned on the combined quantity of product groups (group schemes). */
+  groupSchemeBenefits: GroupSchemeBenefit[];
 
   addItems: (items: CartItemWithDetails[]) => void;
   removeItem: (productId: string) => void;
@@ -380,6 +386,7 @@ const initialState = {
     totalNetWeight: 0,
   },
   schemeDiscounts: {},
+  groupSchemeBenefits: [] as GroupSchemeBenefit[],
 };
 
 /* ================= STORAGE ================= */
@@ -657,6 +664,7 @@ export const useCartStore = create<CartStore>((set, get) => {
       if (!items.length) {
         set((state) => ({
           schemeDiscounts: {},
+          groupSchemeBenefits: [],
           summary: calculateSummary(state.items, {}),
         }));
         return;
@@ -688,8 +696,22 @@ export const useCartStore = create<CartStore>((set, get) => {
         entries.filter((entry): entry is readonly [string, SchemeBenefit] => entry !== null),
       );
 
+      const groupSchemeBenefits = computeGroupSchemeBenefits(
+        items.flatMap((item) => item.applicableSchemes ?? []),
+        items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          categoryId: item.categoryId,
+          parentCategoryId: item.parentCategoryId,
+          caseQty: item.caseQty,
+          pieceQty: item.pieceQty,
+          unitQtyInCase: item.unitQtyInCase,
+        })),
+      );
+
       set((state) => ({
         schemeDiscounts,
+        groupSchemeBenefits,
         summary: calculateSummary(state.items, schemeDiscounts),
       }));
     },

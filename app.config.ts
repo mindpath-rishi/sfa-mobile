@@ -55,7 +55,7 @@ export default ({ config }: any) => {
     name: 'Sales Stream',
     slug: 'expo-jwt-tabs-template-ultimate',
     scheme: 'expojwttabsultimate',
-    version: '1.0.1',
+    version: '1.0.2',
     icon: './assets/images/sales-stream-logo.png',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
@@ -124,7 +124,7 @@ export default ({ config }: any) => {
     android: {
       softwareKeyboardLayoutMode: 'resize',
       package: 'com.salesstream.app',
-      versionCode: 6,
+      versionCode: 7,
 
       adaptiveIcon: {
         foregroundImage: './assets/images/sales-stream-logo.png',

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
 import { createSchemaId } from '@/utils/uuid';
 import { toBusinessId } from '@/shared/utils/business-id.utils';
+import type { GroupSchemeBenefit } from './group-scheme.engine';
 
 /* ======================================================
  * TYPES
@@ -45,6 +46,8 @@ export interface CreateSalePayload {
   schemeNames?: string[];
   schemeDiscountAmount?: number;
   schemes?: AppliedSaleScheme[];
+  /** Free goods earned on the combined quantity of product groups */
+  groupSchemes?: GroupSchemeBenefit[];
   type: 'CASH' | 'CREDIT';
   paymentMode: string;
   paidAmount: number;
@@ -189,14 +192,16 @@ const calculateSalePayload = (payload: CreateSalePayload): CreateSalePayload => 
     totalWeight: toFixed4(items.reduce((sum, item) => sum + item.totalNetWeight, 0)),
     subtotal: toFixed4(items.reduce((sum, item) => sum + (item.grossValue ?? 0), 0)),
     schemeIds: Array.from(
-      new Set(
-        items.map((item) => item.schemeId).filter((value): value is string => Boolean(value)),
-      ),
+      new Set([
+        ...items.map((item) => item.schemeId).filter((value): value is string => Boolean(value)),
+        ...(payload.groupSchemes ?? []).map((scheme) => scheme.schemeId),
+      ]),
     ),
     schemeNames: Array.from(
-      new Set(
-        items.map((item) => item.schemeName).filter((value): value is string => Boolean(value)),
-      ),
+      new Set([
+        ...items.map((item) => item.schemeName).filter((value): value is string => Boolean(value)),
+        ...(payload.groupSchemes ?? []).map((scheme) => scheme.schemeName),
+      ]),
     ),
     schemeDiscountAmount: toFixed4(
       items.reduce((sum, item) => sum + (item.schemeDiscountAmount ?? 0), 0),

@@ -157,7 +157,7 @@ export default function RootLayout() {
       lastLocationStartAtRef.current = now;
 
       try {
-        await startSalesmanBackgroundLocation(authUser);
+        await startSalesmanBackgroundLocation(authUser, { canPromptDisclosure: false });
         await syncPendingLocationUploads();
 
         if (__DEV__) {

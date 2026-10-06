@@ -1,7 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Alert, View, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useAuthStore } from '@/core/store/auth.store';
+import { useCartStore } from '@/core/store/cart.store';
+import { useOfflineStore } from '@/core/offline/offline.store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppText } from '@/core/components';
@@ -34,6 +37,8 @@ export const VanInventoryTopupDetail: React.FC = () => {
   const [confirmAction, setConfirmAction] = useState<'accept' | 'reject' | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
   const { setHeader } = useHeader();
+  const user = useAuthStore((state) => state.user);
+  const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);
 
   const isSuccessResponse = (response: any) =>
     response?.success === true || [200, 201].includes(Number(response?.statusCode));
@@ -71,6 +76,16 @@ export const VanInventoryTopupDetail: React.FC = () => {
     }, [setHeader]),
   );
 
+  // Reload when returning to this screen (e.g. after editing the request)
+  const hasFocusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (hasFocusedOnce.current) void fetchDetail(true);
+      hasFocusedOnce.current = true;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]),
+  );
+
   const handleTabChange = useCallback((tab: ActiveTab) => {
     setActiveTab(tab);
   }, []);
@@ -102,6 +117,53 @@ export const VanInventoryTopupDetail: React.FC = () => {
       setActionLoading(null);
     }
   }, [actionLoading, confirmAction, detail?.vanInventoryTopupId]);
+
+  // A requested (not yet approved) top-up can be edited by the salesman who raised it
+  const canEdit = detail?.status === 'SUBMITTED' && detail?.employeeId === user?.userId;
+
+  const startEditing = useCallback(() => {
+    if (!detail) return;
+    if (offline) {
+      toast.error('Top-up requests are unavailable offline. Please reconnect and try again.');
+      return;
+    }
+
+    const open = () => {
+      const { clearCart, addItems } = useCartStore.getState();
+      clearCart();
+      addItems(
+        (detail.items ?? []).map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          casePrice: Number(item.casePrice) || 0,
+          piecePrice: Number(item.piecePrice) || 0,
+          unitQtyInCase: Math.max(Number(item.unitQtyInCase) || 1, 1),
+          caseQty: Number(item.requestedCaseQty) || 0,
+          pieceQty: Number(item.requestedPieceQty) || 0,
+          caseNetWeight: Number(item.caseNetWeight) || 0,
+          pieceNetWeight: Number(item.pieceNetWeight) || 0,
+          stock: 0,
+        })),
+      );
+      router.push({
+        pathname: '/topup/create',
+        params: { editTopupId: detail.vanInventoryTopupId },
+      });
+    };
+
+    if (useCartStore.getState().items.length) {
+      Alert.alert(
+        'Edit top-up request',
+        'Items currently in your cart will be replaced with this request.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue', onPress: open },
+        ],
+      );
+      return;
+    }
+    open();
+  }, [detail, offline]);
 
   const handleAcceptTopup = useCallback(() => {
     if (!detail?.vanInventoryTopupId || actionLoading) return;
@@ -144,6 +206,19 @@ export const VanInventoryTopupDetail: React.FC = () => {
         <TopupDetailOverview detail={detail} colors={colors} />
       ) : (
         <TopupDetailProducts items={detail.items} colors={colors} />
+      )}
+
+      {canEdit && (
+        <View style={styles.actionBar}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={startEditing}
+            style={styles.acceptButton}
+          >
+            <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+            <AppText style={styles.acceptButtonText}>Edit Request</AppText>
+          </TouchableOpacity>
+        </View>
       )}
 
       {detail.status === 'APPROVED' && (

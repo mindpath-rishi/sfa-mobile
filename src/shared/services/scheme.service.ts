@@ -4,12 +4,19 @@ import { repositories } from '@/repositories';
 import { api } from '@/core/network';
 import { isSalesman } from '@/core/navigation/role.utils';
 import { isOfflineMode } from '@/core/offline/offline.store';
+import { isGroupSchemeType } from './group-scheme.engine';
 
 /* ======================================================
  * TYPES
  * ====================================================== */
 
-export type SchemeType = 'DISCOUNT_PERCENT' | 'DISCOUNT_VALUE' | 'BUY_X_GET_Y' | 'FREE_ITEM';
+export type SchemeType =
+  | 'DISCOUNT_PERCENT'
+  | 'DISCOUNT_VALUE'
+  | 'BUY_X_GET_Y'
+  | 'FREE_ITEM'
+  | 'GROUP_FREE_QTY'
+  | 'GROUP_FREE_PERCENT';
 
 export interface SchemeRecord {
   schemeId: string;
@@ -28,6 +35,12 @@ export interface SchemeRecord {
   freeQty?: number;
   freeProductId?: string;
   freeProductName?: string;
+  /** Group schemes: combined cases of the group per benefit multiple */
+  groupMinCases?: number;
+  /** GROUP_FREE_PERCENT: % of each group line's quantity free */
+  freePercent?: number;
+  /** GROUP_FREE_QTY: unit of freeQty */
+  freeUnit?: 'CASE' | 'PIECE';
   startDate: string;
   endDate: string;
   status?: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | string;
@@ -93,15 +106,16 @@ const matchesGeography = (
   routeId?: string,
   provinceId?: string,
 ) => {
-  const hasGeographyScope = Boolean(
-    scheme.vanIds?.length || scheme.routeIds?.length || scheme.provinceIds?.length,
-  );
-  if (!hasGeographyScope) return true;
+  // Every geography dimension the scheme defines must match (province AND
+  // route AND van); within a dimension any listed value matches. An empty
+  // dimension applies everywhere. Same rule as the server.
+  const dimensionMatches = (ids: string[] | undefined, value?: string | null) =>
+    !ids?.length || matchesDimension(ids, value);
 
   return (
-    matchesDimension(scheme.vanIds, vanId) ||
-    matchesDimension(scheme.routeIds, routeId) ||
-    matchesDimension(scheme.provinceIds, provinceId)
+    dimensionMatches(scheme.vanIds, vanId) &&
+    dimensionMatches(scheme.routeIds, routeId) &&
+    dimensionMatches(scheme.provinceIds, provinceId)
   );
 };
 
@@ -251,6 +265,7 @@ export const getApplicableSchemeBenefitFromRecords = (
 
   const eligible = schemes.filter(
     (scheme) =>
+      !isGroupSchemeType(scheme.schemeType) &&
       isWithinValidity(scheme, date) &&
       input.quantity >= (scheme.minQty ?? 0) &&
       matchesProduct(scheme, input),
@@ -267,9 +282,10 @@ export const getSchemePreviewFromRecords = (
   casePrice: number,
   piecePrice: number,
 ): SchemeBenefit | null => {
-  if (!schemes.length) return null;
+  const lineSchemes = schemes.filter((scheme) => !isGroupSchemeType(scheme.schemeType));
+  if (!lineSchemes.length) return null;
 
-  return schemes
+  return lineSchemes
     .map((scheme) => {
       const minimumQuantity = Math.max(scheme.minQty ?? 0, 1);
       return computeDiscount(scheme, minimumQuantity * Math.max(piecePrice, 0), casePrice);

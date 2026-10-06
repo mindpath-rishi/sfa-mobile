@@ -24,14 +24,18 @@ const numberOrZero = (value: unknown) => {
 
 export default function OrderSummary() {
   const { colors } = useTheme();
-  const { mode } = useLocalSearchParams<{ mode: ScreenMode }>();
+  const { mode, editTopupId } = useLocalSearchParams<{
+    mode: ScreenMode;
+    editTopupId?: string;
+  }>();
   const currentMode = mode || 'sales';
   const user = useAuthStore((state) => state.user);
   const activeWorkSessionId = useAuthStore((state) => state.workSessionId);
   const { setHeader } = useHeader();
 
   // Zustand stores
-  const { items, summary, clearCart, refreshSchemeDiscounts } = useCartStore();
+  const { items, summary, clearCart, refreshSchemeDiscounts, groupSchemeBenefits } =
+    useCartStore();
   const outlet = useOutletStore((s) => s.selectedOutlet);
   const van = useRouteStore.getState().van;
   const selectedRoute = useRouteStore.getState().selectedRoute;
@@ -89,9 +93,11 @@ export default function OrderSummary() {
         icon: 'arrow-forward-circle' as const,
       },
       topup: {
-        title: 'Top-up Summary',
-        submitButtonText: 'Submit Top-up Request',
-        successMessage: 'Top-up request submitted successfully!',
+        title: editTopupId ? 'Edit Top-up Request' : 'Top-up Summary',
+        submitButtonText: editTopupId ? 'Update Top-up Request' : 'Submit Top-up Request',
+        successMessage: editTopupId
+          ? 'Top-up request updated successfully!'
+          : 'Top-up request submitted successfully!',
         emptyMessage: 'Please add at least one item to continue.',
         showTax: false,
         showCustomer: false,
@@ -100,7 +106,7 @@ export default function OrderSummary() {
         icon: 'send' as const,
       },
     }),
-    [],
+    [editTopupId],
   );
 
   const currentConfig = config[currentMode];
@@ -209,6 +215,29 @@ export default function OrderSummary() {
     setIsSubmitting(true);
 
     try {
+      if (editTopupId) {
+        const response = await vanService.updateMyInventoryTopupItems(
+          editTopupId,
+          items.map((item) => ({
+            productId: item.productId,
+            requestedCaseQty: numberOrZero(item.caseQty),
+            requestedPieceQty: numberOrZero(item.pieceQty),
+          })),
+        );
+        if (!response?.success) {
+          toast.error(
+            'Top-up update failed',
+            response?.message || 'Please check the request and try again.',
+          );
+          return;
+        }
+        clearCart();
+        toast.success('Your top-up request was updated.');
+        // Back to the request's detail screen (it reloads on focus)
+        router.dismissTo({ pathname: '/topup/detail', params: { id: editTopupId } });
+        return;
+      }
+
       const payload = buildTopupPayload();
       const missingHeader = [
         ['van', payload.vanId],
@@ -237,7 +266,7 @@ export default function OrderSummary() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [buildTopupPayload, clearCart]);
+  }, [buildTopupPayload, clearCart, editTopupId, items]);
 
   /* ================= HANDLE SUBMIT ================= */
   const handleSubmit = useCallback(() => {
@@ -302,6 +331,7 @@ export default function OrderSummary() {
         total: summary.totalValue,
         subtotal: summary.totalValue + summary.discountValue,
         discount: summary.discountValue,
+        freeGoods: groupSchemeBenefits,
         hasItems,
         mode: currentMode,
       };

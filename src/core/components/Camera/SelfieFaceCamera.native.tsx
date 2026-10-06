@@ -75,7 +75,7 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
     loop.start();
 
     return () => loop.stop();
-  }, [visible, pulseAnim]);
+  }, [visible, pulseAnim, previewUri]);
 
   React.useEffect(() => {
     if (!visible) {

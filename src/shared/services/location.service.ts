@@ -103,9 +103,13 @@ export const resetBatteryOptimizationPrompt = async () => {
  * mounted in app/_layout.tsx) rather than a native Alert, since a native
  * Alert can be mistaken by reviewers for the OS permission dialog itself.
  */
-const ensureBackgroundLocationDisclosure = async () => {
+export const ensureBackgroundLocationDisclosure = async (options?: { canPrompt?: boolean }) => {
   const acknowledged = await storage.getItem(BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY);
   if (acknowledged === 'true') return true;
+
+  // App-resume/recovery paths call this after the day is already underway -
+  // only the day-start flow should ever surface the disclosure screen itself.
+  if (options?.canPrompt === false) return false;
 
   const accepted = await requestBackgroundLocationDisclosure();
   if (!accepted) return false;
@@ -698,7 +702,9 @@ const saveBackgroundLocationOffline = async (
   } else {
     const user = useAuthStore.getState().user;
 
-    await repositories.attendance.create(ownerId, {
+    // Device-only container for buffered points: they are uploaded through the
+    // live-location API, never through the offline sync queue.
+    await repositories.attendance.createLocal(ownerId, {
       uuid: sessionId,
       workSessionId: sessionId,
       userId: ownerId,
@@ -1401,7 +1407,10 @@ const startBackgroundTracking = async () => {
   });
 };
 
-const performStartSalesmanBackgroundLocation = async (user?: LocationOwner) => {
+const performStartSalesmanBackgroundLocation = async (
+  user?: LocationOwner,
+  options?: { canPromptDisclosure?: boolean },
+) => {
   if (!isSalesman(user)) {
     console.warn('[Location] Unable to start live location: current user is not a salesman');
     return;
@@ -1460,7 +1469,9 @@ const performStartSalesmanBackgroundLocation = async (user?: LocationOwner) => {
      *      tries socket when available and then HTTP fallback. Your backend
      *      should emit manager socket updates after HTTP receives a location.
      */
-    const disclosureAccepted = await ensureBackgroundLocationDisclosure();
+    const disclosureAccepted = await ensureBackgroundLocationDisclosure({
+      canPrompt: options?.canPromptDisclosure !== false,
+    });
 
     if (!disclosureAccepted) {
       logLocation('Background location disclosure declined by user');
@@ -1496,12 +1507,17 @@ const performStartSalesmanBackgroundLocation = async (user?: LocationOwner) => {
   }
 };
 
-export const startSalesmanBackgroundLocation = async (user?: LocationOwner) => {
+export const startSalesmanBackgroundLocation = async (
+  user?: LocationOwner,
+  options?: { canPromptDisclosure?: boolean },
+) => {
   if (locationTrackingStartPromise) return locationTrackingStartPromise;
 
-  locationTrackingStartPromise = performStartSalesmanBackgroundLocation(user).finally(() => {
-    locationTrackingStartPromise = null;
-  });
+  locationTrackingStartPromise = performStartSalesmanBackgroundLocation(user, options).finally(
+    () => {
+      locationTrackingStartPromise = null;
+    },
+  );
 
   return locationTrackingStartPromise;
 };

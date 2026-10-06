@@ -1,3 +1,4 @@
+import { GroupFreeGoods } from '@/features/checkin/components/sale/GroupFreeGoods';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -829,7 +830,14 @@ export default function PaymentCollectionScreen() {
   const styles = usePaymentCollectionStyles();
   const loader = useLoaderStore();
   const outlet = useOutletStore((s) => s.selectedOutlet);
-  const { items, getCartSummary, clearCart, refreshSchemeDiscounts, schemeDiscounts } =
+  const {
+    items,
+    getCartSummary,
+    clearCart,
+    refreshSchemeDiscounts,
+    schemeDiscounts,
+    groupSchemeBenefits,
+  } =
     useCartStore();
   const van = useRouteStore.getState().van;
   const selectedRoute = useRouteStore((s) => s.selectedRoute);
@@ -855,7 +863,10 @@ export default function PaymentCollectionScreen() {
     pieceDetails,
   } = getCartSummary();
   const appliedSchemeNames = Array.from(
-    new Set(Object.values(schemeDiscounts).map((benefit) => benefit.schemeName)),
+    new Set([
+      ...Object.values(schemeDiscounts).map((benefit) => benefit.schemeName),
+      ...groupSchemeBenefits.map((benefit) => benefit.schemeName),
+    ]),
   );
 
   // const params = useLocalSearchParams<{
@@ -1190,13 +1201,15 @@ export default function PaymentCollectionScreen() {
         totalWeight: toFixed4(totalNetWeight),
         subtotal: toFixed4(orderSubtotal),
         schemeIds: Array.from(
-          new Set(
-            Object.values(schemeDiscounts)
+          new Set([
+            ...Object.values(schemeDiscounts)
               .map((benefit) => benefit.schemeId)
               .filter(Boolean),
-          ),
+            ...groupSchemeBenefits.map((benefit) => benefit.schemeId),
+          ]),
         ),
         schemeNames: appliedSchemeNames,
+        groupSchemes: groupSchemeBenefits,
         schemeDiscountAmount: toFixed4(orderDiscount),
         totalValue,
         type: saleType,
@@ -1548,6 +1561,12 @@ export default function PaymentCollectionScreen() {
                     </Text>
                   </View>
                 ))}
+                <View style={styles.summaryDivider} />
+              </>
+            )}
+            {groupSchemeBenefits.length > 0 && (
+              <>
+                <GroupFreeGoods benefits={groupSchemeBenefits} />
                 <View style={styles.summaryDivider} />
               </>
             )}

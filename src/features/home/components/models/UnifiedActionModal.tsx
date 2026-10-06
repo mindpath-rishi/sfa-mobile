@@ -458,7 +458,8 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
                 No vans available
               </AppText>
               <AppText style={[styles.emptyRoutesSubtext, { color: colors.textTertiary }]}>
-                Please contact your administrator
+                Only vans with a free salesman position in your area can be selected. Please
+                contact your administrator.
               </AppText>
             </View>
           )}

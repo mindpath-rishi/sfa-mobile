@@ -64,6 +64,7 @@ import type { LeaveType } from '@/features/leave/types/leave.types';
 import { useLoaderStore } from '@/core/loader/loader.store';
 import {
   captureCurrentLocation,
+  ensureBackgroundLocationDisclosure,
   startSalesmanBackgroundLocation,
   stopSalesmanBackgroundLocation,
 } from '@/shared/services/location.service';
@@ -623,6 +624,24 @@ export default function SalesExecutiveScreen() {
       return;
     }
 
+    const needsBackgroundLocation =
+      selectedActivity === 'Retailing' || selectedActivity === 'Other Work';
+
+    if (needsBackgroundLocation) {
+      // Show the in-app background-location disclosure before the very first
+      // native location-permission prompt of the day, not just before the
+      // background-tracking request later in this flow — otherwise Android's
+      // foreground-location dialog (triggered by captureCurrentLocation below)
+      // appears first and the disclosure looks like it came too late. If the
+      // user declines here, the native permission popup must never appear and
+      // day-start must not proceed at all.
+      const disclosureAccepted = await ensureBackgroundLocationDisclosure();
+      if (!disclosureAccepted) {
+        toast.error('Background location access is required to start your day.');
+        return;
+      }
+    }
+
     try {
       loader.show({ message: 'Getting your start location...' });
 
@@ -1032,7 +1051,10 @@ export default function SalesExecutiveScreen() {
 
         const activeActivityName = data?.activeActivity?.name;
         if (activeActivityName === 'Retailing' || activeActivityName === 'Other Work') {
-          void startSalesmanBackgroundLocation(user);
+          // getDayStatus reflects a day that is already ACTIVE (e.g. on screen
+          // mount/refresh) - only the fresh day-start flow above should ever
+          // surface the background-location disclosure screen.
+          void startSalesmanBackgroundLocation(user, { canPromptDisclosure: false });
         }
 
         setCurrentActivity(data?.activeActivity?.name || null);

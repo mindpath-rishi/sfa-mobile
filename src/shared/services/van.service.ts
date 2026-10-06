@@ -15,6 +15,10 @@ export interface VanService {
   fetchInventoryTopupRequest: (topupId: string) => Promise<ApiResponse<any>>;
   fetchInventoryTransactions: (params?: Record<string, any>) => Promise<ApiResponse<any>>;
   acceptInventoryTopupRequest: (topupId: string) => Promise<ApiResponse<any>>;
+  updateMyInventoryTopupItems: (
+    topupId: string,
+    items: { productId: string; requestedCaseQty: number; requestedPieceQty: number }[],
+  ) => Promise<ApiResponse<any>>;
   rejectInventoryTopupRequest: (topupId: string, payload?: any) => Promise<ApiResponse<any>>;
 }
 
@@ -875,6 +879,12 @@ export const vanService: VanService = {
 
   acceptInventoryTopupRequest: (topupId: string) =>
     api.patch<any>(`/van-inventory-topup/${topupId}/accept`, {}) as Promise<ApiResponse<any>>,
+
+  /** Edit quantities / add / remove products of my own requested (SUBMITTED) top-up */
+  updateMyInventoryTopupItems: (topupId, items) =>
+    api.patch<any>(`/van-inventory-topup/${topupId}/my-items`, { items }) as Promise<
+      ApiResponse<any>
+    >,
 
   rejectInventoryTopupRequest: (topupId: string, payload: any = {}) =>
     api.patch<any>(`/van-inventory-topup/${topupId}/reject`, payload) as Promise<ApiResponse<any>>,

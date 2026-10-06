@@ -636,6 +636,8 @@ const download = async (downloadOwnerId = ownerId()) => {
 
 export const syncService = {
   async getPendingCount() {
+    // Purely-online users have nothing to upload
+    if (!enabled()) return 0;
     return pendingCount();
   },
 
@@ -726,6 +728,9 @@ export const syncService = {
   },
 
   async uploadPendingBeforeSettlement() {
+    // Purely-online users never upload device data
+    if (!enabled()) return 0;
+
     const uploadOwnerId = ownerId();
     const queuedBeforeUpload = await pendingCount();
 
@@ -793,6 +798,21 @@ export const syncService = {
 
     if (useAuthStore.getState().user?.offlineAccessAllowed !== true) {
       await saveOfflinePreference(ownerId(), false);
+
+      /**
+       * Purely-online user: older app versions queued an attendance record
+       * while buffering background location points. It must never be
+       * uploaded (it would overwrite the server work session), so drop it.
+       */
+      if (ownerId()) {
+        const database = await getDatabase();
+        await database.runAsync(
+          `DELETE FROM sync_queue
+           WHERE owner_id = ? AND entity = 'attendance'
+             AND status IN ('PENDING', 'FAILED', 'SYNCING')`,
+          ownerId(),
+        );
+      }
     }
 
     const database = await getDatabase();
@@ -822,6 +842,7 @@ export const syncService = {
   },
 
   async sync() {
+    // Without offline access the app works purely online: no upload, no download.
     if (!enabled() || !ownerId()) return;
 
     const syncOwnerId = ownerId();
