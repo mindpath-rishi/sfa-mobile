@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, ScrollView, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, Skeleton } from '@/core/components';
 import { PageSkeleton } from '@/shared/components/PageSkeleton';
@@ -172,6 +173,7 @@ function TargetBreakdownModal({
   onClose: () => void;
 }) {
   const styles = createManagerTargetsStyles(colors);
+  const insets = useSafeAreaInsets();
 
   const title =
     view === 'ubo'
@@ -181,11 +183,26 @@ function TargetBreakdownModal({
         : 'Primary Category Targets';
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    // Fade so the backdrop doesn't slide in with the sheet; translucent bars +
+    // bottom inset keep the sheet above the device navigation bar.
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={styles.modalDismissArea} activeOpacity={1} onPress={onClose} />
 
-        <View style={[styles.bottomSheet, isWide && styles.bottomSheetWide]}>
+        <View
+          style={[
+            styles.bottomSheet,
+            isWide && styles.bottomSheetWide,
+            { paddingBottom: 24 + insets.bottom },
+          ]}
+        >
           <View style={styles.sheetHandle} />
 
           <View style={styles.sheetHeader}>
@@ -661,6 +678,35 @@ export default function ManagerTargetsScreen() {
           ))}
         </View>
 
+        {activeView !== 'ubo' && (
+          <View style={styles.metricToolbar}>
+            <AppText style={styles.metricLabel}>Show in</AppText>
+            <View style={styles.metricSegment}>
+              {METRIC_OPTIONS.map((option) => {
+                const selected = selectedMetric === option.value;
+
+                return (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[styles.metricChip, selected && styles.metricChipActive]}
+                    activeOpacity={0.78}
+                    onPress={() => setSelectedMetric(option.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={`Show targets by ${option.label}`}
+                  >
+                    <AppText
+                      style={[styles.metricChipText, selected && styles.metricChipTextActive]}
+                    >
+                      {option.label}
+                    </AppText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {activeView === 'user' && selectedUser && (
           <View style={styles.parentBanner}>
             <Ionicons name="git-branch-outline" size={16} color={colors.primary} />
@@ -670,30 +716,6 @@ export default function ManagerTargetsScreen() {
               </AppText>
               <AppText style={styles.parentSubtitle}>Primary category target drill-down</AppText>
             </View>
-          </View>
-        )}
-
-        {activeView !== 'ubo' && (
-          <View style={styles.metricToolbar}>
-            {METRIC_OPTIONS.map((option) => {
-              const selected = selectedMetric === option.value;
-
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[styles.metricChip, selected && styles.metricChipActive]}
-                  activeOpacity={0.78}
-                  onPress={() => setSelectedMetric(option.value)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  accessibilityLabel={`Show targets by ${option.label}`}
-                >
-                  <AppText style={[styles.metricChipText, selected && styles.metricChipTextActive]}>
-                    {option.label}
-                  </AppText>
-                </TouchableOpacity>
-              );
-            })}
           </View>
         )}
 

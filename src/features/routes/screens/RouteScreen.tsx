@@ -1521,7 +1521,13 @@ export default function RouteScreen() {
       </Animated.ScrollView>
 
       {/* End Route Modal */}
-      <Modal visible={showEndRouteConfirm} transparent animationType="fade">
+      <Modal
+        visible={showEndRouteConfirm}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent
+      >
         <TouchableWithoutFeedback onPress={() => setShowEndRouteConfirm(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.confirmModal}>

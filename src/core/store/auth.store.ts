@@ -162,6 +162,10 @@ import { storage } from '../storage';
 import * as Network from 'expo-network';
 import { isSalesman } from '../navigation/role.utils';
 
+/** Resolves after `ms` at the latest so a hung cleanup can't stall logout */
+const withTimeout = (promise: Promise<unknown>, ms: number) =>
+  Promise.race([promise, new Promise((resolve) => setTimeout(resolve, ms))]);
+
 /* ======================================================
  * TYPES
  * ====================================================== */
@@ -381,20 +385,36 @@ export const useAuthStore = create<AuthStore>((set) => ({
    * Logout
    */
   logout: async () => {
-    try {
-      await clearTokens();
+    // Clear the in-memory session first so a failing cleanup step below can
+    // never leave the user logged in.
+    set({
+      accessToken: null,
+      user: null,
+      workSessionId: null,
+    });
 
-      await storage.removeItem(AUTH_USER_KEY);
-
-      resetAllStores();
-
-      set({
-        accessToken: null,
-        user: null,
-        workSessionId: null,
-      });
-    } catch (error) {
-      console.error('Logout error:', error);
+    const steps: [string, () => unknown][] = [
+      // A salesman's background location tracking (foreground service,
+      // socket, heartbeat) would otherwise keep running after logout.
+      // Imported lazily: location.service imports this store.
+      [
+        'stop location tracking',
+        async () => {
+          const { stopSalesmanBackgroundLocation } =
+            await import('@/shared/services/location.service');
+          await withTimeout(stopSalesmanBackgroundLocation(), 5000);
+        },
+      ],
+      ['clear tokens', () => clearTokens()],
+      ['remove stored user', () => storage.removeItem(AUTH_USER_KEY)],
+      ['reset stores', () => resetAllStores()],
+    ];
+    for (const [label, step] of steps) {
+      try {
+        await step();
+      } catch (error) {
+        console.error(`Logout error (${label}):`, error);
+      }
     }
   },
 }));

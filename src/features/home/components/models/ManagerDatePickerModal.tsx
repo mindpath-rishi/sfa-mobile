@@ -83,8 +83,7 @@ export function ManagerDatePickerModal({
   const currentMonth = useMemo(() => startOfMonth(today), [today]);
   const isRangeMode = mode === 'range';
 
-  const clampFutureDate = (date: Date) =>
-    startOfDay(date) > todayStart ? todayStart : date;
+  const clampFutureDate = (date: Date) => (startOfDay(date) > todayStart ? todayStart : date);
 
   useEffect(() => {
     if (visible) {
@@ -145,7 +144,14 @@ export function ManagerDatePickerModal({
   const canGoNextMonth = addMonths(visibleMonth, 1) <= currentMonth;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
@@ -252,7 +258,11 @@ export function ManagerDatePickerModal({
             <TouchableOpacity style={styles.secondaryButton} activeOpacity={0.78} onPress={onClose}>
               <AppText style={styles.secondaryButtonText}>Cancel</AppText>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryButton} activeOpacity={0.82} onPress={handleApply}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              activeOpacity={0.82}
+              onPress={handleApply}
+            >
               <AppText style={styles.primaryButtonText}>Apply</AppText>
             </TouchableOpacity>
           </View>

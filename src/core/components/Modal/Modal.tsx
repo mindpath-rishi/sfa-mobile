@@ -61,7 +61,9 @@ export const Modal: React.FC<ModalProps> & {
   hideStatusBar = false,
   statusBarStyle,
   statusBarColor,
-  statusBarTranslucent = false,
+  // Edge-to-edge (Expo 54): draw under both system bars and pad with the
+  // safe-area insets below, so content never sits behind the nav bar.
+  statusBarTranslucent = true,
   transparent = true,
   swipeDirection = 'up',
   keyboardAvoiding = true,
@@ -420,6 +422,7 @@ export const Modal: React.FC<ModalProps> & {
       presentationStyle={presentationStyle}
       supportedOrientations={supportedOrientations}
       statusBarTranslucent={statusBarTranslucent}
+      navigationBarTranslucent={statusBarTranslucent}
     >
       <StatusBar
         hidden={hideStatusBar}

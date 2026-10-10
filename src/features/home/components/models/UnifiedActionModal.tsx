@@ -458,8 +458,8 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
                 No vans available
               </AppText>
               <AppText style={[styles.emptyRoutesSubtext, { color: colors.textTertiary }]}>
-                Only vans with a free salesman position in your area can be selected. Please
-                contact your administrator.
+                Only vans with a free salesman position in your area can be selected. Please contact
+                your administrator.
               </AppText>
             </View>
           )}
@@ -870,6 +870,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent={true}
+      navigationBarTranslucent
     >
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} activeOpacity={1} />

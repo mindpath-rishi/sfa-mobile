@@ -20,15 +20,9 @@ import {
 } from '@/features/notification/services/notification.service';
 import { toast } from '@/core/utils';
 import { useAuthStore } from '@/core/store/auth.store';
+import { isManager as isManagerUser } from '@/core/navigation/role.utils';
 import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
 import { outletService } from '@/features/outlet/services/outlet.service';
-
-// ─── Constants ─────────────────────────────────────────────────────────────
-
-/** Role names/IDs that can approve/reject van change requests */
-const MANAGER_ROLES = ['manager', 'admin', 'supervisor'];
-
-const isManagerRole = (role?: string) => !!role && MANAGER_ROLES.includes(role.toLowerCase());
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -293,7 +287,8 @@ function NotificationDetail({
 }) {
   const styles = createDetailStyles(colors, insets);
   const { user } = useAuthStore();
-  const isManager = isManagerRole(user?.role ?? user?.roleId);
+  // Any non-salesman role (team leader, manager, ...) can act on approvals
+  const isManager = isManagerUser(user);
   const isVanChange = isPendingVanChangeApproval(item);
   const isStockUnload = isPendingStockUnloadApproval(item);
   const isTopupAcceptance = isPendingTopupAcceptance(item);
@@ -812,7 +807,8 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const { user } = useAuthStore();
-  const isManager = isManagerRole(user?.role ?? user?.roleId);
+  // Any non-salesman role (team leader, manager, ...) can act on approvals
+  const isManager = isManagerUser(user);
   const [processing, setProcessing] = useState<{ id: string; action: 'approve' | 'reject' } | null>(
     null,
   );

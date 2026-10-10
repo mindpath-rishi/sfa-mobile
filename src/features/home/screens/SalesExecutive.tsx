@@ -80,6 +80,9 @@ type SettlementTopupAlert = {
   approvedPieces?: number;
 };
 
+/** Returning to the dashboard within this window reuses the loaded data */
+const DASHBOARD_STALE_MS = 60_000;
+
 export default function SalesExecutiveScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -204,7 +207,10 @@ export default function SalesExecutiveScreen() {
     };
   }, [van]);
 
+  const lastDashboardLoadAt = useRef(0);
+
   const loadDashboard = useCallback(async (showSkeleton = false) => {
+    lastDashboardLoadAt.current = Date.now();
     if (showSkeleton) setDashboardLoading(true);
 
     try {
@@ -231,9 +237,14 @@ export default function SalesExecutiveScreen() {
     void loadDashboard(true);
   }, [dashboardRefreshTick, loadDashboard]);
 
+  // Skeleton + full load only on first open. On returning to the screen,
+  // refresh silently and only when the data is stale, so plain navigation
+  // doesn't re-hit every API. Pull-to-refresh still always reloads.
   useFocusEffect(
     React.useCallback(() => {
-      void loadDashboard(true);
+      const isFirstLoad = lastDashboardLoadAt.current === 0;
+      if (!isFirstLoad && Date.now() - lastDashboardLoadAt.current < DASHBOARD_STALE_MS) return;
+      void loadDashboard(isFirstLoad);
     }, [loadDashboard]),
   );
 

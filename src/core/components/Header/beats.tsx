@@ -1787,7 +1787,13 @@ const ConfirmationModal = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <TouchableWithoutFeedback onPress={onCancel}>
         <View
           style={{
@@ -2467,7 +2473,13 @@ export default function BeatsScreen() {
   };
 
   const OutletDetailModal = () => (
-    <Modal visible={!!selectedOutlet} transparent animationType="fade">
+    <Modal
+      visible={!!selectedOutlet}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <TouchableWithoutFeedback onPress={() => setSelectedOutlet(null)}>
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback>
@@ -2742,7 +2754,13 @@ export default function BeatsScreen() {
       </Animated.ScrollView>
 
       {/* End Route Confirmation Modal */}
-      <Modal visible={showEndRouteConfirm} transparent animationType="fade">
+      <Modal
+        visible={showEndRouteConfirm}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        navigationBarTranslucent
+      >
         <TouchableWithoutFeedback onPress={() => setShowEndRouteConfirm(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.confirmModal}>

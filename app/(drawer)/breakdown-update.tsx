@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton, AppModal, AppText, SearchBar } from '@/core/components';
 import { useOfflineStore } from '@/core/offline/offline.store';
@@ -196,7 +197,8 @@ export default function BreakdownUpdateScreen() {
     }
   };
 
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
 
   return (
     <View style={styles.screen}>
@@ -402,7 +404,7 @@ export default function BreakdownUpdateScreen() {
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: any, bottomInset: number) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.background },
     fixedSearchContainer: {
@@ -457,7 +459,7 @@ const createStyles = (colors: any) =>
     vehicleCount: { color: colors.textSecondary, fontSize: 12, fontWeight: '600' },
     selectedCount: { color: colors.primary, fontSize: 12, fontWeight: '700' },
     searchInput: { minHeight: 44, fontSize: 13 },
-    listContent: { padding: 14, paddingBottom: 110, gap: 10, flexGrow: 1 },
+    listContent: { padding: 14, paddingBottom: 110 + bottomInset, gap: 10, flexGrow: 1 },
     vanCard: {
       flexDirection: 'row',
       alignItems: 'flex-start',
@@ -547,7 +549,8 @@ const createStyles = (colors: any) =>
       bottom: 0,
       paddingHorizontal: 16,
       paddingTop: 12,
-      paddingBottom: 18,
+      // Keep the button above the device navigation / gesture bar
+      paddingBottom: 18 + bottomInset,
       borderTopWidth: 1,
       borderTopColor: colors.border,
       backgroundColor: colors.surface,

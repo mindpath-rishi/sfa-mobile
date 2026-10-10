@@ -461,8 +461,6 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                           returnKeyType="next"
                           onSubmitEditing={focusPassword}
                           icon="person-outline"
-                          iconColor="#FFFFFF"
-                          placeholderTextColor="#000000"
                           editable={!loading}
                           touched={touchedFields.userId}
                           containerStyle={styles.inputContainer}
@@ -528,8 +526,6 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
                           returnKeyType="done"
                           onSubmitEditing={handleSubmit(onSubmit)}
                           icon="lock-closed-outline"
-                          iconColor="#FFFFFF"
-                          placeholderTextColor="#000000"
                           rightIcon={secureTextEntry ? 'eye-off-outline' : 'eye-outline'}
                           onRightIconPress={toggleSecureEntry}
                           editable={!loading}

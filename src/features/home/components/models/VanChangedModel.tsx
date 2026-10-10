@@ -1,6 +1,7 @@
 // VanChangeModal.tsx
 import React from 'react';
 import { View, TouchableOpacity, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { VanChangeModalProps } from '../../types/van.types';
 import { useVanChangeModalStyles } from '../../styles/VanChangeModel.styles';
@@ -16,6 +17,7 @@ export const VanChangeModal: React.FC<VanChangeModalProps> = ({
 }) => {
   const styles = useVanChangeModalStyles({ vanChangeReason });
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal
@@ -24,9 +26,15 @@ export const VanChangeModal: React.FC<VanChangeModalProps> = ({
       animationType="slide"
       onRequestClose={onClose}
       statusBarTranslucent={true}
+      navigationBarTranslucent
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.bottomModalContent, { backgroundColor: colors.surface }]}>
+        <View
+          style={[
+            styles.bottomModalContent,
+            { backgroundColor: colors.surface, paddingBottom: 24 + insets.bottom },
+          ]}
+        >
           {/* Drag Indicator */}
           <View style={styles.dragIndicator}>
             <View style={[styles.dragIndicatorBar, { backgroundColor: colors.border }]} />
@@ -38,9 +46,7 @@ export const VanChangeModal: React.FC<VanChangeModalProps> = ({
           </View>
 
           {/* Title */}
-          <AppText style={[styles.title, { color: colors.textPrimary }]}>
-            Change Van?
-          </AppText>
+          <AppText style={[styles.title, { color: colors.textPrimary }]}>Change Van?</AppText>
 
           {/* Question */}
           <AppText style={[styles.questionText, { color: colors.textSecondary }]}>
@@ -62,10 +68,12 @@ export const VanChangeModal: React.FC<VanChangeModalProps> = ({
                   <MaterialCommunityIcons name="check-circle" size={20} color={colors.success} />
                 </View>
                 <View style={styles.optionTextContainer}>
-                  <AppText style={[
-                    styles.optionTitle,
-                    vanChangeReason === 'Yes, Same Van' && styles.optionTextSelected
-                  ]}>
+                  <AppText
+                    style={[
+                      styles.optionTitle,
+                      vanChangeReason === 'Yes, Same Van' && styles.optionTextSelected,
+                    ]}
+                  >
                     Yes, Same Van
                   </AppText>
                   <AppText style={[styles.optionDescription, { color: colors.textTertiary }]}>
@@ -91,10 +99,12 @@ export const VanChangeModal: React.FC<VanChangeModalProps> = ({
                   <MaterialCommunityIcons name="truck-fast" size={20} color={colors.warning} />
                 </View>
                 <View style={styles.optionTextContainer}>
-                  <AppText style={[
-                    styles.optionTitle,
-                    vanChangeReason === 'No, Change Van' && styles.optionTextSelected
-                  ]}>
+                  <AppText
+                    style={[
+                      styles.optionTitle,
+                      vanChangeReason === 'No, Change Van' && styles.optionTextSelected,
+                    ]}
+                  >
                     No, Change Van
                   </AppText>
                   <AppText style={[styles.optionDescription, { color: colors.textTertiary }]}>
@@ -135,7 +145,7 @@ export const VanChangeModal: React.FC<VanChangeModalProps> = ({
               style={[
                 styles.submitButton,
                 { backgroundColor: colors.primary },
-                !vanChangeReason && styles.submitButtonDisabled
+                !vanChangeReason && styles.submitButtonDisabled,
               ]}
               activeOpacity={0.85}
               disabled={!vanChangeReason}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouteSelectionModalStyles } from '../../styles/RouteSelectionModel.styles';
@@ -14,12 +15,20 @@ export const RouteSelectionModal: React.FC<RouteSelectionModalProps> = ({
   onSelectRoute,
 }) => {
   const styles = useRouteSelectionModalStyles();
+  const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { paddingBottom: 16 + insets.bottom }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.titleSmall}>SELECT YOUR ROUTE</Text>
             <TouchableOpacity onPress={onClose}>

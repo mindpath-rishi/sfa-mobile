@@ -74,7 +74,10 @@ export interface OutletService {
   startInteraction(payload: StartInteractionPayload): Promise<ApiResponse<any>>;
   abandonInteraction(interactionId: string): Promise<ApiResponse<any>>;
   visitStatus(payload: VisitStatusParams): Promise<ApiResponse<any>>;
-  completeVisit(visitId: string | undefined): Promise<ApiResponse<any>>;
+  completeVisit(
+    visitId: string | undefined,
+    checkOutLocation?: Promise<CapturedLocation | undefined>,
+  ): Promise<ApiResponse<any>>;
   createCustomer(payload: any): Promise<ApiResponse<any>>;
   uploadCustomerImage(
     customerId: string,
@@ -601,8 +604,10 @@ export const outletService: OutletService = {
     return api.get<any>(`shop-visit/status`, { params }) as Promise<ApiResponse<any>>;
   },
 
-  completeVisit: async (visitId?: string) => {
-    const checkOutLocation = await captureCurrentLocation();
+  /** Pass a location capture already in flight to avoid waiting for GPS again */
+  completeVisit: async (visitId, preCapturedLocation) => {
+    const checkOutLocation =
+      (await preCapturedLocation?.catch(() => undefined)) ?? (await captureCurrentLocation());
     if (!checkOutLocation) throw new Error('Current GPS location is required to complete a visit');
     const user = useAuthStore.getState().user;
     if (isSalesman(user) && isOfflineMode() && visitId) {

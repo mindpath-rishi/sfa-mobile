@@ -1,5 +1,12 @@
 import React from 'react';
-import { Dimensions, Modal, Text, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import {
+  Dimensions,
+  Modal,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -45,7 +52,14 @@ export function ConfirmationModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onCancel}
+    >
       <TouchableWithoutFeedback onPress={onCancel}>
         <View
           style={{
@@ -146,4 +160,3 @@ export function ConfirmationModal({
     </Modal>
   );
 }
-

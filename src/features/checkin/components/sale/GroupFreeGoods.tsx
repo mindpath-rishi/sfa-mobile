@@ -10,7 +10,7 @@ interface GroupFreeGoodsProps {
 
 /** Free-goods lines a group scheme gives, e.g. "2 cs Cola 300ml" */
 export const describeGroupFreeGoods = (benefit: GroupSchemeBenefit): string[] => {
-  if (benefit.schemeType === 'GROUP_FREE_QTY') {
+  if (benefit.schemeType === 'GROUP_FREE_QTY' || benefit.schemeType === 'COMBO_FREE_QTY') {
     const unit = benefit.freeUnit === 'PIECE' ? 'pcs' : 'cs';
     return [
       `${benefit.freeQty} ${unit} ${benefit.freeProductName || benefit.freeProductId || 'free item'}`,
@@ -20,6 +20,15 @@ export const describeGroupFreeGoods = (benefit: GroupSchemeBenefit): string[] =>
     .filter((line) => line.freeQty > 0)
     .map((line) => `${line.freeQty} pcs ${line.productName || line.productId}`);
 };
+
+/** One combo set, e.g. "3 cs Cola + 1 pcs Chips" */
+const describeComboSet = (benefit: GroupSchemeBenefit) =>
+  (benefit.comboItems ?? [])
+    .map(
+      (item) =>
+        `${item.qty} ${item.unit === 'PIECE' ? 'pcs' : 'cs'} ${item.productName || item.productId}`,
+    )
+    .join(' + ');
 
 /** Lists free goods earned on the combined quantity of product groups. */
 export const GroupFreeGoods: React.FC<GroupFreeGoodsProps> = ({ benefits }) => {
@@ -46,10 +55,13 @@ export const GroupFreeGoods: React.FC<GroupFreeGoodsProps> = ({ benefits }) => {
             </Text>
           </View>
           <Text style={{ fontSize: 11, color: colors.textSecondary }}>
-            Group {benefit.qualifyingCases} cs
-            {benefit.schemeType === 'GROUP_FREE_QTY'
-              ? ` · ${benefit.multiples} × ${benefit.groupMinCases} cs`
-              : ` · ${benefit.freePercent}% free`}
+            {benefit.schemeType === 'COMBO_FREE_QTY'
+              ? `Combo ${describeComboSet(benefit)} · ${benefit.multiples} set${benefit.multiples === 1 ? '' : 's'}`
+              : `Group ${benefit.qualifyingCases} cs${
+                  benefit.schemeType === 'GROUP_FREE_QTY'
+                    ? ` · ${benefit.multiples} × ${benefit.groupMinCases} cs`
+                    : ` · ${benefit.freePercent}% free`
+                }`}
           </Text>
           {describeGroupFreeGoods(benefit).map((line) => (
             <Text key={line} style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary }}>

@@ -12,7 +12,7 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -96,6 +96,7 @@ interface VisitHistory {
   orderValue?: number;
   orderCases?: number;
   orderWeight?: number;
+  orderPlacedAt?: string;
 }
 
 type TabType = 'summary' | 'sales' | 'invoices' | 'visits';
@@ -181,70 +182,81 @@ const BottomSheet = ({
   subtitle?: string;
   children: React.ReactNode;
   colors: ReturnType<typeof useTheme>['colors'];
-}) => (
-  <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-    <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
-      <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
-      <View
-        style={{
-          backgroundColor: c.surface,
-          borderTopLeftRadius: 20,
-          borderTopRightRadius: 20,
-          maxHeight: '80%',
-          borderTopWidth: 1,
-          borderTopColor: c.border,
-        }}
-      >
-        {/* Drag handle */}
-        <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 6 }}>
-          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
-        </View>
-
-        {/* Header */}
+}) => {
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' }}>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingBottom: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: c.border,
+            backgroundColor: c.surface,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            maxHeight: '80%',
+            borderTopWidth: 1,
+            borderTopColor: c.border,
+            paddingBottom: insets.bottom,
           }}
         >
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <AppText style={{ ...T.title, color: c.textPrimary }}>{title}</AppText>
-            {subtitle ? (
-              <AppText
-                numberOfLines={1}
-                style={{ ...T.label, color: c.textSecondary, marginTop: 2 }}
-              >
-                {subtitle}
-              </AppText>
-            ) : null}
+          {/* Drag handle */}
+          <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 6 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: c.border }} />
           </View>
-          <TouchableOpacity
-            onPress={onClose}
-            activeOpacity={0.7}
+
+          {/* Header */}
+          <View
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 16,
-              backgroundColor: c.background,
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: 12,
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: c.border,
             }}
           >
-            <Ionicons name="close" size={18} color={c.textPrimary} />
-          </TouchableOpacity>
-        </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <AppText style={{ ...T.title, color: c.textPrimary }}>{title}</AppText>
+              {subtitle ? (
+                <AppText
+                  numberOfLines={1}
+                  style={{ ...T.label, color: c.textSecondary, marginTop: 2 }}
+                >
+                  {subtitle}
+                </AppText>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              onPress={onClose}
+              activeOpacity={0.7}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: c.background,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginLeft: 12,
+              }}
+            >
+              <Ionicons name="close" size={18} color={c.textPrimary} />
+            </TouchableOpacity>
+          </View>
 
-        {children}
+          {children}
+        </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+};
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function CustomerDetailScreen() {
@@ -1834,6 +1846,27 @@ const SalesTab = ({ colors: c, customerId, van }: any) => {
 // ── Invoices Tab ───────────────────────────────────────────────────────────────
 const InvoicesTab = ({ invoices, loading, total, colors: c }: any) => {
   const [selectedInvoice, setSelectedInvoice] = useState<SaleItem | null>(null);
+  const [itemsLoading, setItemsLoading] = useState(false);
+
+  // The sales list only carries invoice headers; load line items on open.
+  const openInvoice = async (inv: SaleItem) => {
+    setSelectedInvoice(inv);
+    if (inv.items?.length) return;
+    setItemsLoading(true);
+    try {
+      const res: any = await saleService.fetchSaleById(inv.saleId);
+      const items = res?.data?.items;
+      if (Array.isArray(items)) {
+        setSelectedInvoice((current) =>
+          current?.saleId === inv.saleId ? { ...current, items } : current,
+        );
+      }
+    } catch (e) {
+      console.error('Failed to load invoice items:', e);
+    } finally {
+      setItemsLoading(false);
+    }
+  };
 
   const paymentConfig = (status: string) =>
     ({
@@ -1878,7 +1911,7 @@ const InvoicesTab = ({ invoices, loading, total, colors: c }: any) => {
           <TouchableOpacity
             key={inv.saleId}
             activeOpacity={0.78}
-            onPress={() => setSelectedInvoice(inv)}
+            onPress={() => void openInvoice(inv)}
             style={{
               backgroundColor: c.surface,
               borderRadius: 14,
@@ -2047,7 +2080,11 @@ const InvoicesTab = ({ invoices, loading, total, colors: c }: any) => {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 16 }}
         >
-          {selectedInvoice?.items?.length ? (
+          {itemsLoading && !selectedInvoice?.items?.length ? (
+            <View style={{ alignItems: 'center', paddingVertical: 28 }}>
+              <ActivityIndicator size="small" color={c.primary} />
+            </View>
+          ) : selectedInvoice?.items?.length ? (
             selectedInvoice.items.map((item, i) => (
               <View
                 key={`${item.productId || item.productName}-${i}`}
@@ -2386,7 +2423,7 @@ const VisitsTab = ({ visits, loading, total, colors: c }: any) => {
                   ? {
                       title: 'Order Placed',
                       sub: `${fmt(Number(selectedVisit.orderValue || 0))} value, ${Number(selectedVisit.orderCases || 0).toFixed(1)} cases`,
-                      time: fmtTime(selectedVisit.checkInTime),
+                      time: fmtTime(selectedVisit.orderPlacedAt),
                       icon: 'cart-outline',
                       color: c.success,
                     }

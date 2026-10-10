@@ -246,6 +246,7 @@ export interface SaleService {
     options: { showLoader: boolean },
   ) => Promise<ApiResponse<any>>;
   fetchSales: (params: FetchSaleQuery) => Promise<ApiResponse<any>>;
+  fetchSaleById: (saleId: string) => Promise<ApiResponse<any>>;
   fetchPayments: (params: FetchSaleQuery) => Promise<ApiResponse<any>>;
   createPayment: (payload: any) => Promise<ApiResponse<any>>;
   getCategoryWiseSales: (params: any) => Promise<ApiResponse<any>>;
@@ -927,6 +928,10 @@ export const saleService: SaleService = {
       meta: { total: data.length, page: params.page ?? 1, limit: params.limit ?? 50 },
     } as ApiResponse<any>;
   },
+
+  /** Single sale with its line items */
+  fetchSaleById: (saleId: string) =>
+    api.get<any>(`/sales/${encodeURIComponent(saleId)}`) as Promise<ApiResponse<any>>,
 
   fetchPayments: async (params: FetchSaleQuery) => {
     const user = useAuthStore.getState().user;

@@ -19,6 +19,19 @@ export async function getRefreshToken() {
 }
 
 export async function clearTokens() {
-  await storage.removeItem(ACCESS_TOKEN_KEY);
-  await storage.removeItem(REFRESH_TOKEN_KEY);
+  await Promise.all([forceRemove(ACCESS_TOKEN_KEY), forceRemove(REFRESH_TOKEN_KEY)]);
+}
+
+/**
+ * SecureStore deletes occasionally fail on some Android devices. If the
+ * delete throws, blank the value instead: an empty token reads as logged out,
+ * so the session cannot come back on the next app start.
+ */
+async function forceRemove(key: string) {
+  try {
+    await storage.removeItem(key);
+  } catch (error) {
+    console.warn(`Token delete failed for ${key}, blanking it instead:`, error);
+    await storage.setItem(key, '');
+  }
 }

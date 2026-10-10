@@ -22,7 +22,14 @@ export const ChangeActivityModal: React.FC<ChangeActivityModalProps> = ({
   const bottomInset = Math.max(insets.bottom, 16);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={{ flex: 1 }} onPress={onClose} />
         <View style={[styles.modalContent, { paddingBottom: 16 + bottomInset }]}>

@@ -16,7 +16,8 @@ export type SchemeType =
   | 'BUY_X_GET_Y'
   | 'FREE_ITEM'
   | 'GROUP_FREE_QTY'
-  | 'GROUP_FREE_PERCENT';
+  | 'GROUP_FREE_PERCENT'
+  | 'COMBO_FREE_QTY';
 
 export interface SchemeRecord {
   schemeId: string;
@@ -39,8 +40,10 @@ export interface SchemeRecord {
   groupMinCases?: number;
   /** GROUP_FREE_PERCENT: % of each group line's quantity free */
   freePercent?: number;
-  /** GROUP_FREE_QTY: unit of freeQty */
+  /** GROUP_FREE_QTY / COMBO_FREE_QTY: unit of freeQty */
   freeUnit?: 'CASE' | 'PIECE';
+  /** COMBO_FREE_QTY: products and quantities that must all be bought */
+  comboItems?: import('./group-scheme.engine').ComboItem[];
   startDate: string;
   endDate: string;
   status?: 'ACTIVE' | 'INACTIVE' | 'EXPIRED' | string;

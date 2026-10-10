@@ -24,6 +24,7 @@ import { useCartStore } from '@/core/store/cart.store';
 import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
 import { saleService } from '@/shared/services/sale.service';
 import { outletService } from '@/features/outlet/services/outlet.service';
+import { captureCurrentLocation } from '@/shared/services/location.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { AppModal, ConfirmationModal } from '@/core/components';
@@ -837,8 +838,7 @@ export default function PaymentCollectionScreen() {
     refreshSchemeDiscounts,
     schemeDiscounts,
     groupSchemeBenefits,
-  } =
-    useCartStore();
+  } = useCartStore();
   const van = useRouteStore.getState().van;
   const selectedRoute = useRouteStore((s) => s.selectedRoute);
   const user = useAuthStore((s) => s.user);
@@ -1230,6 +1230,9 @@ export default function PaymentCollectionScreen() {
 
       loader.show({ message: 'Creating sale...' });
 
+      // Start the checkout GPS fix now so it is ready when the visit completes
+      const checkOutLocationPromise = captureCurrentLocation();
+
       const response: any = await saleService.createSale(payload, {
         showLoader: false,
       });
@@ -1325,7 +1328,7 @@ export default function PaymentCollectionScreen() {
 
       if (completedVisit?.visitId) {
         try {
-          await outletService.completeVisit(completedVisit.visitId);
+          await outletService.completeVisit(completedVisit.visitId, checkOutLocationPromise);
           useOutletStore.getState().setActiveVisit(null);
         } catch (error) {
           console.error('Error completing visit:', error);

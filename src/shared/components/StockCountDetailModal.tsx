@@ -1,6 +1,7 @@
 // shared/components/StockCountDetailModal.tsx
 import React from 'react';
 import { View, Modal, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText } from '@/core/components';
@@ -22,6 +23,7 @@ export const StockCountDetailModal: React.FC<StockCountDetailModalProps> = ({
   onClose,
 }) => {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
   if (!stockCount) return null;
 
@@ -55,13 +57,21 @@ export const StockCountDetailModal: React.FC<StockCountDetailModalProps> = ({
   const varianceColor = getVarianceColor(stockCount.varianceQty);
 
   return (
-    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}>
         <View
           style={{
             flex: 1,
             backgroundColor: colors.surface,
-            marginTop: 60,
+            marginTop: 60 + insets.top,
+            paddingBottom: insets.bottom,
             borderTopLeftRadius: 24,
             borderTopRightRadius: 24,
           }}
@@ -137,27 +147,31 @@ export const StockCountDetailModal: React.FC<StockCountDetailModalProps> = ({
                     </AppText>
                   </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}
+                >
                   <Ionicons name="business-outline" size={14} color={colors.textTertiary} />
                   <AppText style={{ fontSize: 13, color: colors.textSecondary }}>
                     {stockCount.vanName || 'N/A'}
                   </AppText>
                 </View>
-                
+
                 {/* Carry Forward Stock - Added Here */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <MaterialCommunityIcons name="archive-arrow-up" size={14} color={colors.textTertiary} />
+                  <MaterialCommunityIcons
+                    name="archive-arrow-up"
+                    size={14}
+                    color={colors.textTertiary}
+                  />
                   <AppText style={{ fontSize: 13, color: colors.textSecondary }}>
-                    Carry Forward Stock: 
+                    Carry Forward Stock:
                   </AppText>
                   <View
                     style={{
                       paddingHorizontal: 8,
                       paddingVertical: 2,
                       borderRadius: 12,
-                      backgroundColor: stockCount.carryForwardStock 
-                        ? '#10B98112' 
-                        : '#EF444412',
+                      backgroundColor: stockCount.carryForwardStock ? '#10B98112' : '#EF444412',
                     }}
                   >
                     <AppText

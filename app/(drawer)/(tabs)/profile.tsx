@@ -667,9 +667,16 @@ export default function ProfileScreen() {
     }
   };
 
+  const [loggingOut, setLoggingOut] = useState(false);
   const handleLogout = async () => {
-    await logout();
-    router.replace('/(auth)');
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logout();
+    } finally {
+      setLoggingOut(false);
+      router.replace('/(auth)');
+    }
   };
 
   const handleComingSoon = (feature: string) => {
@@ -1082,7 +1089,13 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleLogout} style={{ marginTop: 8 }}>
+        <TouchableOpacity
+          onPress={handleLogout}
+          disabled={loggingOut}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ marginTop: 8, paddingVertical: 12, opacity: loggingOut ? 0.6 : 1 }}
+          accessibilityRole="button"
+        >
           <Text
             style={{
               color: colors.error,
@@ -1091,7 +1104,7 @@ export default function ProfileScreen() {
               fontWeight: '600',
             }}
           >
-            Logout
+            {loggingOut ? 'Logging out...' : 'Logout'}
           </Text>
         </TouchableOpacity>
       </AppCard>

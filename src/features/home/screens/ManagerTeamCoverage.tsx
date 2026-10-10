@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { FlatList, Modal, RefreshControl, ScrollView, TouchableOpacity, View } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppText, Skeleton } from '@/core/components';
 import { useHeader } from '@/shared/contexts/HeaderContext';
@@ -65,8 +66,18 @@ function TeamCoverageDetailModal({
   colors: ReturnType<typeof useTheme>['colors'];
   onClose: () => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    // Fade so the dimmed backdrop appears in place instead of sliding up with
+    // the sheet; translucent bars + bottom inset keep it above the nav bar.
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      navigationBarTranslucent
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
         <TouchableOpacity
           style={styles.modalBackdrop}
@@ -75,7 +86,7 @@ function TeamCoverageDetailModal({
           accessibilityRole="button"
           accessibilityLabel={`Close ${title} list`}
         />
-        <View style={styles.detailModal}>
+        <View style={[styles.detailModal, { paddingBottom: insets.bottom }]}>
           <View style={styles.modalHandle} />
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleBlock}>
