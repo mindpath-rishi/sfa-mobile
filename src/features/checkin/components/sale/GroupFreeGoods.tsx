@@ -57,11 +57,7 @@ export const GroupFreeGoods: React.FC<GroupFreeGoodsProps> = ({ benefits }) => {
           <Text style={{ fontSize: 11, color: colors.textSecondary }}>
             {benefit.schemeType === 'COMBO_FREE_QTY'
               ? `Combo ${describeComboSet(benefit)} · ${benefit.multiples} set${benefit.multiples === 1 ? '' : 's'}`
-              : `Group ${benefit.qualifyingCases} cs${
-                  benefit.schemeType === 'GROUP_FREE_QTY'
-                    ? ` · ${benefit.multiples} × ${benefit.groupMinCases} cs`
-                    : ` · ${benefit.freePercent}% free`
-                }`}
+              : `Group ${benefit.qualifyingCases} ${benefit.groupMinUnit === 'PIECE' ? 'pcs' : 'cs'} · ${benefit.multiples} × ${benefit.groupMinCases} ${benefit.groupMinUnit === 'PIECE' ? 'pcs' : 'cs'}`}
           </Text>
           {describeGroupFreeGoods(benefit).map((line) => (
             <Text key={line} style={{ fontSize: 12, fontWeight: '600', color: colors.textPrimary }}>

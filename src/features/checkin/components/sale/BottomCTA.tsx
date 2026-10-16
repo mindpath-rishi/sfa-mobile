@@ -51,21 +51,29 @@ export const BottomCTA: React.FC<BottomCTAProps> = ({
           borderRadius: 10,
           paddingVertical: 12,
           paddingHorizontal: 16,
-          backgroundColor: hasItems && !isProcessing ? colors.primary : colors.surface,
+          backgroundColor: hasItems ? colors.primary : colors.surface,
+          opacity: isProcessing ? 0.85 : 1,
           shadowColor: '#000',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.05,
           shadowRadius: 4,
           elevation: 2,
           borderWidth: 0.5,
-          borderColor: hasItems && !isProcessing ? colors.primary : colors.border + '40',
+          borderColor: hasItems ? colors.primary : colors.border + '40',
         }}
         onPress={onPress}
         disabled={!hasItems || isProcessing}
         activeOpacity={0.8}
       >
         {isProcessing ? (
-          <ActivityIndicator color="white" size="small" />
+          <View
+            style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
+          >
+            <ActivityIndicator color="white" size="small" />
+            <Text style={{ color: 'white', fontSize: 14, fontWeight: '600', marginLeft: 8 }}>
+              {mode === 'sales' ? 'Processing…' : 'Submitting top-up request…'}
+            </Text>
+          </View>
         ) : (
           <View
             style={{

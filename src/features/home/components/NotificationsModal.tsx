@@ -29,6 +29,7 @@ import { outletService } from '@/features/outlet/services/outlet.service';
 type NotificationType =
   | 'order'
   | 'route'
+  | 'route_change'
   | 'target'
   | 'system'
   | 'van_change'
@@ -87,11 +88,27 @@ const formatFullDate = (value?: string) => {
 };
 
 const mapNotification = (item: ApiNotificationItem): NotificationItem => {
-  const rawCategory = String(item.category || item.data?.category || 'system').toLowerCase();
-  const category = rawCategory === 'outlet_approval_result' ? 'outlet_approval' : rawCategory;
+  const rawCategory = String(
+    item.data?.category ||
+      item.data?.notificationType ||
+      item.data?.type ||
+      item.category ||
+      '',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  const category = rawCategory.startsWith('van_change')
+    ? 'van_change'
+    : rawCategory.startsWith('route_change')
+      ? 'route_change'
+      : rawCategory === 'outlet_approval_result'
+      ? 'outlet_approval'
+      : rawCategory || 'system';
   const type: NotificationType = [
     'order',
     'route',
+    'route_change',
     'target',
     'van_change',
     'stock_unload',
@@ -117,6 +134,7 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
 const ICON_MAP: Record<NotificationType, string> = {
   order: 'receipt-outline',
   route: 'map-outline',
+  route_change: 'map-outline',
   target: 'flag-outline',
   van_change: 'car-outline',
   stock_unload: 'archive-outline',
@@ -128,6 +146,7 @@ const ICON_MAP: Record<NotificationType, string> = {
 const TYPE_LABEL: Record<NotificationType, string> = {
   order: 'Order',
   route: 'Route',
+  route_change: 'Route Change',
   target: 'Target',
   van_change: 'Van Change',
   stock_unload: 'Stock Unload',
@@ -137,13 +156,33 @@ const TYPE_LABEL: Record<NotificationType, string> = {
 };
 
 const isPendingVanChangeApproval = (item: NotificationItem) => {
-  const category = String(item.data?.category || item.category || '').toLowerCase();
+  // The API may put the notification category on the record instead of inside data.
+  const category = String(item.data?.category || item.category || item.type || '').toLowerCase();
   const action = String(item.data?.action || '').toUpperCase();
   const status = String(item.data?.vanChangeStatus || item.data?.status || '').toUpperCase();
 
   return (
-    category === 'van_change' && action === 'APPROVAL_REQUIRED' && (!status || status === 'PENDING')
+    category === 'van_change' &&
+    (action === 'APPROVAL_REQUIRED' || (!action && (!status || status === 'PENDING'))) &&
+    (!status || status === 'PENDING')
   );
+};
+
+const isPendingRouteChangeApproval = (item: NotificationItem) => {
+  const category = String(item.data?.category || item.category || item.type || '').toLowerCase();
+  const action = String(item.data?.action || '').toUpperCase();
+  const status = String(item.data?.routeChangeStatus || item.data?.status || '').toUpperCase();
+  return (
+    category.startsWith('route_change') &&
+    (action === 'APPROVAL_REQUIRED' || (!action && (!status || status === 'PENDING'))) &&
+    (!status || status === 'PENDING')
+  );
+};
+
+const getRouteChangeStatus = (item: NotificationItem) => {
+  const status = String(item.data?.routeChangeStatus || item.data?.status || item.data?.action || '')
+    .toUpperCase();
+  return ['APPROVED', 'REJECTED'].includes(status) ? status : '';
 };
 
 const getDataText = (data: Record<string, any> | undefined, keys: string[]) => {
@@ -290,12 +329,14 @@ function NotificationDetail({
   // Any non-salesman role (team leader, manager, ...) can act on approvals
   const isManager = isManagerUser(user);
   const isVanChange = isPendingVanChangeApproval(item);
+  const isRouteChange = isPendingRouteChangeApproval(item);
   const isStockUnload = isPendingStockUnloadApproval(item);
   const isTopupAcceptance = isPendingTopupAcceptance(item);
   const isOutletApproval = isPendingOutletApproval(item);
   const isApprovingThis = processing?.id === item.id && processing?.action === 'approve';
   const isRejectingThis = processing?.id === item.id && processing?.action === 'reject';
   const vanChangeStatus = getVanChangeStatus(item);
+  const routeChangeStatus = getRouteChangeStatus(item);
   const topupStatus = getTopupStatus(item);
   const outletApprovalStatus = getOutletApprovalStatus(item);
   const stockUnloadStatus = getStockUnloadStatus(item);
@@ -348,6 +389,12 @@ function NotificationDetail({
       metaRows.push({
         label: 'Status',
         value: getVanChangeStatusLabel(vanChangeStatus),
+      });
+    }
+    if (routeChangeStatus) {
+      metaRows.push({
+        label: 'Route Change Status',
+        value: routeChangeStatus === 'APPROVED' ? 'Approved' : 'Rejected',
       });
     }
     if (item.data.vanInventoryTopupId)
@@ -550,7 +597,7 @@ function NotificationDetail({
         )}
 
         {/* Approval/acceptance actions */}
-        {((isManager && (isVanChange || isStockUnload)) ||
+        {((isManager && (isVanChange || isRouteChange || isStockUnload)) ||
           isTopupAcceptance ||
           isOutletApproval) && (
           <View style={[styles.section, { backgroundColor: colors.surface }]}>
@@ -562,7 +609,9 @@ function NotificationDetail({
                 ? 'This approved top-up is waiting for your acceptance. Accepting will add the approved quantity to your van stock.'
                 : isOutletApproval
                   ? 'Review the outlet details, images, and registered location before approving or rejecting it.'
-                  : isStockUnload
+                  : isRouteChange
+                    ? 'Review the requested route change, then approve or reject the request.'
+                    : isStockUnload
                     ? 'Approving this request will unload all current van stock. Rejecting it will leave the stock unchanged.'
                     : 'This van change request is pending your approval. Please review the details above before taking action.'}
             </AppText>
@@ -1031,6 +1080,49 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
       return;
     }
 
+    if (isPendingRouteChangeApproval(item)) {
+      const routeChangeRequestId = item.data?.routeChangeRequestId || item.data?.requestId;
+      if (!routeChangeRequestId || processing) {
+        toast.error('Route change request ID not found');
+        return;
+      }
+
+      setProcessing({ id: item.id, action });
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveRouteChange(String(routeChangeRequestId))
+            : await notificationService.rejectRouteChange(String(routeChangeRequestId));
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} route change`);
+          return;
+        }
+
+        const status = action === 'approve' ? 'APPROVED' : 'REJECTED';
+        toast.success(`Route change ${action === 'approve' ? 'approved' : 'rejected'}`);
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === item.id
+              ? {
+                  ...notification,
+                  unread: false,
+                  data: { ...notification.data, action: status, status, routeChangeStatus: status },
+                }
+              : notification,
+          ),
+        );
+        await notificationService.markAsRead(item.id);
+        navigateBack();
+        loadNotifications();
+      } catch (error: any) {
+        console.warn(`Failed to ${action} route change:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action} route change`);
+      } finally {
+        setProcessing(null);
+      }
+      return;
+    }
+
     const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
     if (!vanChangeRequestId || processing) {
       toast.error('Van change request ID not found');
@@ -1155,6 +1247,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                 <View style={styles.list}>
                   {filteredNotifications.map((item) => {
                     const isVanChange = isPendingVanChangeApproval(item);
+                    const isRouteChange = isPendingRouteChangeApproval(item);
                     const isStockUnload = isPendingStockUnloadApproval(item);
                     const isTopupAcceptance = isPendingTopupAcceptance(item);
                     const isOutletApproval = isPendingOutletApproval(item);
@@ -1236,7 +1329,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                             </View>
 
                             {/* Inline approval actions — managers only */}
-                            {isManager && (isVanChange || isStockUnload) && (
+                            {isManager && (isVanChange || isRouteChange || isStockUnload) && (
                               <View style={styles.inlineActions}>
                                 <Pressable
                                   disabled={!!processing}

@@ -745,7 +745,7 @@ export default function RouteScreen() {
           checkAllGeofences(latitude, longitude);
         },
         (error) => console.log('Error getting location:', error),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 },
       );
       return;
     }

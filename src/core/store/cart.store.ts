@@ -680,9 +680,13 @@ export const useCartStore = create<CartStore>((set, get) => {
         const benefit = getApplicableSchemeBenefitFromRecords(
           {
             productId: item.productId,
+            productName: item.productName,
             categoryId: item.categoryId,
             parentCategoryId: item.parentCategoryId,
             quantity,
+            caseQty,
+            pieceQty,
+            unitQtyInCase,
           },
           grossValue,
           item.casePrice ?? 0,

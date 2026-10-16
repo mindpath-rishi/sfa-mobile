@@ -1,24 +1,26 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { CartItemWithDetails } from '@/features/product';
 import { ProductItem } from './ProductItem';
 import { EmptyState } from '@/core/components/EmptyState/EmptyState';
-import { useCartStore } from '@/core/store/cart.store';
 
 interface ProductsSectionProps {
   products: CartItemWithDetails[];
   hasItems: boolean;
   mode?: 'sales' | 'topup';
+  /** Shows a "Clear cart" button that empties every item */
+  onClearCart?: () => void;
 }
 
 export const ProductsSection: React.FC<ProductsSectionProps> = ({
   products,
   hasItems,
   mode = 'sales',
+  onClearCart,
 }) => {
   const { colors } = useTheme();
-  const { items } = useCartStore();
 
   const getModeText = () => {
     if (mode === 'topup') {
@@ -61,9 +63,32 @@ export const ProductsSection: React.FC<ProductsSectionProps> = ({
           {modeText.title} ({products.length})
         </Text>
 
-        <Text style={{ fontSize: 12, color: colors.textTertiary }}>
-          {hasItems ? `${items.length} items selected` : 'select products'}
-        </Text>
+        {hasItems && onClearCart ? (
+          <TouchableOpacity
+            onPress={onClearCart}
+            hitSlop={8}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: colors.error + '55',
+              backgroundColor: colors.error + '0D',
+            }}
+          >
+            <Ionicons name="trash-outline" size={13} color={colors.error} />
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.error }}>
+              {mode === 'topup' ? 'Clear all' : 'Clear cart'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          !hasItems && (
+            <Text style={{ fontSize: 12, color: colors.textTertiary }}>Select products</Text>
+          )
+        )}
       </View>
 
       {products.map((product, idx) => (

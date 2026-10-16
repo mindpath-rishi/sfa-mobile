@@ -1,4 +1,4 @@
-export const ROUTE_OUTLETS_LIMIT = 50;
+export const ROUTE_OUTLETS_LIMIT = 500;
 
 export const DEFAULT_CURRENT_LOCATION = {
   latitude: 22.7443,

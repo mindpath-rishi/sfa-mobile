@@ -6,6 +6,9 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { CartItemWithDetails } from '@/features/product';
 import { ProductUnitSelector } from '@/features/product';
 import { useCartStore } from '@/core/store/cart.store';
+import { appliedSchemesOf } from '@/shared/services/scheme.service';
+import { formatCurrency } from '@/shared/utils/currenty.utils';
+import { unitLabel } from './SchemeBenefitsPanel';
 
 interface ProductItemProps {
   product: CartItemWithDetails;
@@ -82,10 +85,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
     (product.caseQty || 0) * (product.caseNetWeight || 0) +
     (product.pieceQty || 0) * (product.pieceNetWeight || 0);
 
-  const formatCurrency = (amount: number) =>
-    `K${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  const formatUnitCurrency = (amount: number) =>
-    `K${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const appliedSchemes = appliedSchemesOf(schemeBenefit);
 
   return (
     <Animated.View
@@ -147,97 +147,106 @@ export const ProductItem: React.FC<ProductItemProps> = ({
             {product.productName}
           </Text>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 12, color: colors.textTertiary }}>Case:</Text>
-              {schemeDiscount > 0 && (
+          {/* Unit prices: discounted price first, original struck through */}
+          <View style={{ gap: 2 }}>
+            {[
+              { label: 'Case', price: product.casePrice, discounted: discountedCasePrice },
+              { label: 'Piece', price: product.piecePrice, discounted: discountedPiecePrice },
+            ].map((row) => (
+              <View
+                key={row.label}
+                style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}
+              >
+                <Text style={{ width: 38, fontSize: 12, color: colors.textTertiary }}>
+                  {row.label}
+                </Text>
                 <Text
                   style={{
-                    fontSize: 11,
-                    color: colors.textTertiary,
-                    textDecorationLine: 'line-through',
+                    fontSize: 12,
+                    fontWeight: '600',
+                    color: schemeDiscount > 0 ? colors.success : colors.textSecondary,
                   }}
                 >
-                  {formatUnitCurrency(product.casePrice)}
+                  {formatCurrency(schemeDiscount > 0 ? row.discounted : row.price)}
                 </Text>
-              )}
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: schemeDiscount > 0 ? '600' : '400',
-                  color: schemeDiscount > 0 ? colors.success : colors.textTertiary,
-                }}
-              >
-                {formatUnitCurrency(schemeDiscount > 0 ? discountedCasePrice : product.casePrice)}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-              <Text style={{ fontSize: 12, color: colors.textTertiary }}>Piece:</Text>
-              {schemeDiscount > 0 && (
-                <Text
-                  style={{
-                    fontSize: 11,
-                    color: colors.textTertiary,
-                    textDecorationLine: 'line-through',
-                  }}
-                >
-                  {formatUnitCurrency(product.piecePrice)}
-                </Text>
-              )}
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: schemeDiscount > 0 ? '600' : '400',
-                  color: schemeDiscount > 0 ? colors.success : colors.textTertiary,
-                }}
-              >
-                {formatUnitCurrency(schemeDiscount > 0 ? discountedPiecePrice : product.piecePrice)}
-              </Text>
-            </View>
+                {schemeDiscount > 0 && (
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: colors.textTertiary,
+                      textDecorationLine: 'line-through',
+                    }}
+                  >
+                    {formatCurrency(row.price)}
+                  </Text>
+                )}
+              </View>
+            ))}
           </View>
 
-          {/* Show selected quantities */}
-          {(product.caseQty > 0 || product.pieceQty > 0) && (
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
-              {product.caseQty > 0 && (
-                <Text style={{ fontSize: 11, color: colors.success }}>{product.caseQty} cases</Text>
-              )}
-              {product.pieceQty > 0 && (
-                <Text style={{ fontSize: 11, color: colors.success }}>
-                  {product.pieceQty} pieces
-                </Text>
-              )}
-              {mode === 'topup' && totalWeight > 0 && (
-                <Text style={{ fontSize: 11, color: colors.warning }}>
-                  {totalWeight.toFixed(2)} kg
-                </Text>
-              )}
+          {/* Selected quantities */}
+          {(product.caseQty > 0 || product.pieceQty > 0 || (mode === 'topup' && totalWeight > 0)) && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+              {[
+                product.caseQty > 0 && `${product.caseQty} ${unitLabel(product.caseQty, 'CASE')}`,
+                product.pieceQty > 0 &&
+                  `${product.pieceQty} ${product.pieceQty === 1 ? 'piece' : 'pieces'}`,
+                mode === 'topup' && totalWeight > 0 && `${totalWeight.toFixed(2)} kg`,
+              ]
+                .filter((text): text is string => Boolean(text))
+                .map((text) => (
+                  <View
+                    key={text}
+                    style={{
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      backgroundColor: colors.primary + '10',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>
+                      {text}
+                    </Text>
+                  </View>
+                ))}
             </View>
           )}
 
-          {mode === 'sales' && schemeBenefit && schemeDiscount > 0 && (
-            <View
-              style={{
-                alignSelf: 'flex-start',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-                marginTop: 7,
-                paddingHorizontal: 7,
-                paddingVertical: 4,
-                borderRadius: 6,
-                backgroundColor: colors.success + '12',
-                borderWidth: 0.5,
-                borderColor: colors.success + '35',
-              }}
-            >
-              <Ionicons name="pricetag" size={12} color={colors.success} />
-              <Text
-                numberOfLines={1}
-                style={{ maxWidth: 190, fontSize: 11, fontWeight: '600', color: colors.success }}
-              >
-                {schemeBenefit.schemeName}
-              </Text>
+          {/* Schemes on this line, and the free goods they give */}
+          {mode === 'sales' && appliedSchemes.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 7 }}>
+              {appliedSchemes.map((applied) => (
+                <View
+                  key={applied.schemeId}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    maxWidth: '100%',
+                    paddingHorizontal: 7,
+                    paddingVertical: 3,
+                    borderRadius: 10,
+                    backgroundColor: colors.success + '12',
+                    borderWidth: 0.5,
+                    borderColor: colors.success + '35',
+                  }}
+                >
+                  <Ionicons
+                    name={(applied.freeQty ?? 0) > 0 ? 'gift' : 'pricetag'}
+                    size={11}
+                    color={colors.success}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={{ flexShrink: 1, fontSize: 11, fontWeight: '600', color: colors.success }}
+                  >
+                    {applied.schemeName}
+                    {(applied.freeQty ?? 0) > 0
+                      ? ` · ${applied.freeQty} ${unitLabel(applied.freeQty ?? 0, applied.freeUnit)} free`
+                      : ''}
+                  </Text>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -257,7 +266,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
                   {formatCurrency(totalValue)}
                 </Text>
               )}
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: colors.primary }}>
                 {formatCurrency(netValue)}
               </Text>
               {schemeDiscount > 0 && (

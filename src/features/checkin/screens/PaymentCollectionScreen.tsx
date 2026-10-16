@@ -1,4 +1,3 @@
-import { GroupFreeGoods } from '@/features/checkin/components/sale/GroupFreeGoods';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -32,6 +31,9 @@ import { FlatList } from 'react-native-gesture-handler';
 import { useInvoiceStore } from '@/core/store/invoice.store';
 import { useLoaderStore } from '@/core/loader/loader.store';
 import { toBusinessId } from '@/shared/utils/business-id.utils';
+import { allAppliedSchemes, appliedSchemesOf } from '@/shared/services/scheme.service';
+import { formatCurrency } from '@/shared/utils/currenty.utils';
+import { SchemeBenefitsPanel } from '../components/sale/SchemeBenefitsPanel';
 
 type PaymentMode = 'cash' | 'wallet' | 'card' | 'cheque' | 'credit' | 'split';
 
@@ -864,7 +866,7 @@ export default function PaymentCollectionScreen() {
   } = getCartSummary();
   const appliedSchemeNames = Array.from(
     new Set([
-      ...Object.values(schemeDiscounts).map((benefit) => benefit.schemeName),
+      ...allAppliedSchemes(schemeDiscounts).map((benefit) => benefit.schemeName),
       ...groupSchemeBenefits.map((benefit) => benefit.schemeName),
     ]),
   );
@@ -1095,13 +1097,33 @@ export default function PaymentCollectionScreen() {
           schemeName: benefit?.schemeName,
           schemeType: benefit?.schemeType,
           schemeMinimumQuantity: benefit?.minimumQuantity,
+          schemeMinimumQuantityUnit: benefit?.minimumQuantityUnit,
           schemeDiscountPercent: benefit?.discountPercent,
           schemeDiscountValue: benefit?.discountValue,
           schemeBuyQty: benefit?.buyQty,
+          schemeBuyUnit: benefit?.buyUnit,
           schemeDiscountAmount: discountAmount || undefined,
           schemeFreeQty: benefit?.freeQty,
+          schemeFreeUnit: benefit?.freeUnit,
           schemeFreeProductId: benefit?.freeProductId,
           schemeFreeProductName: benefit?.freeProductName,
+          // Every scheme applied to the line; the fields above describe the main one
+          appliedSchemes: appliedSchemesOf(benefit).map((applied) => ({
+            schemeId: applied.schemeId,
+            schemeName: applied.schemeName,
+            schemeType: applied.schemeType,
+            minimumQuantity: applied.minimumQuantity,
+            minimumQuantityUnit: applied.minimumQuantityUnit,
+            discountPercent: applied.discountPercent,
+            discountValue: applied.discountValue,
+            buyQty: applied.buyQty,
+            buyUnit: applied.buyUnit,
+            discountAmount: toFixed4(applied.discountAmount),
+            freeQty: applied.freeQty,
+            freeUnit: applied.freeUnit,
+            freeProductId: applied.freeProductId,
+            freeProductName: applied.freeProductName,
+          })),
         };
       });
 
@@ -1202,7 +1224,7 @@ export default function PaymentCollectionScreen() {
         subtotal: toFixed4(orderSubtotal),
         schemeIds: Array.from(
           new Set([
-            ...Object.values(schemeDiscounts)
+            ...allAppliedSchemes(schemeDiscounts)
               .map((benefit) => benefit.schemeId)
               .filter(Boolean),
             ...groupSchemeBenefits.map((benefit) => benefit.schemeId),
@@ -1532,9 +1554,7 @@ export default function PaymentCollectionScreen() {
               <>
                 <View style={styles.summaryRow}>
                   <Text style={styles.summaryLabel}>Subtotal</Text>
-                  <Text style={styles.summaryValue}>
-                    {currency} {orderSubtotal.toFixed(2)}
-                  </Text>
+                  <Text style={styles.summaryValue}>{formatCurrency(orderSubtotal)}</Text>
                 </View>
                 <View style={styles.summaryRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
@@ -1544,40 +1564,27 @@ export default function PaymentCollectionScreen() {
                     </Text>
                   </View>
                   <Text style={[styles.summaryValue, { color: colors.success, fontWeight: '700' }]}>
-                    − {currency} {orderDiscount.toFixed(2)}
+                    − {formatCurrency(orderDiscount)}
                   </Text>
                 </View>
-                {appliedSchemeNames.map((schemeName) => (
-                  <View
-                    key={schemeName}
-                    style={{
-                      alignSelf: 'flex-start',
-                      marginTop: 3,
-                      paddingHorizontal: 8,
-                      paddingVertical: 4,
-                      borderRadius: 6,
-                      backgroundColor: colors.success + '12',
-                    }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.success }}>
-                      Applied: {schemeName}
-                    </Text>
-                  </View>
-                ))}
-                <View style={styles.summaryDivider} />
               </>
             )}
-            {groupSchemeBenefits.length > 0 && (
-              <>
-                <GroupFreeGoods benefits={groupSchemeBenefits} />
-                <View style={styles.summaryDivider} />
-              </>
+            {(Object.keys(schemeDiscounts).length > 0 || groupSchemeBenefits.length > 0) && (
+              <View style={{ marginTop: 8 }}>
+                <SchemeBenefitsPanel
+                  lineBenefits={allAppliedSchemes(schemeDiscounts)}
+                  groupBenefits={groupSchemeBenefits}
+                />
+              </View>
             )}
+            {(orderDiscount > 0 ||
+              Object.keys(schemeDiscounts).length > 0 ||
+              groupSchemeBenefits.length > 0) && <View style={styles.summaryDivider} />}
 
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total Amount Due</Text>
               <Text style={[styles.totalValue, { color: colors.primary }]}>
-                {currency} {orderTotal.toFixed(2)}
+                {formatCurrency(orderTotal)}
               </Text>
             </View>
           </AppCard>
@@ -1882,8 +1889,8 @@ export default function PaymentCollectionScreen() {
                   : !isValidAmount
                     ? 'Enter amount'
                     : parsedAmount === amountDue
-                      ? `Pay Full Amount ${currency} ${amountDue.toFixed(2)}`
-                      : `Pay ${currency} ${parsedAmount.toFixed(2)}`}
+                      ? `Pay Full Amount ${formatCurrency(amountDue)}`
+                      : `Pay ${formatCurrency(parsedAmount)}`}
             </Text>
           )}
         </TouchableOpacity>

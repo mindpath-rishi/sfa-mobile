@@ -14,9 +14,9 @@ export type SchemeType =
   | 'DISCOUNT_PERCENT'
   | 'DISCOUNT_VALUE'
   | 'BUY_X_GET_Y'
+  | 'BUY_ONE_GET_ONE'
   | 'FREE_ITEM'
   | 'GROUP_FREE_QTY'
-  | 'GROUP_FREE_PERCENT'
   | 'COMBO_FREE_QTY';
 
 export interface SchemeRecord {
@@ -30,16 +30,18 @@ export interface SchemeRecord {
   vanIds?: string[];
   schemeType: SchemeType;
   minQty?: number;
+  minQtyUnit?: 'CASE' | 'PIECE';
   discountPercent?: number;
   discountValue?: number;
   buyQty?: number;
+  buyUnit?: 'CASE' | 'PIECE';
   freeQty?: number;
   freeProductId?: string;
   freeProductName?: string;
   /** Group schemes: combined cases of the group per benefit multiple */
   groupMinCases?: number;
-  /** GROUP_FREE_PERCENT: % of each group line's quantity free */
-  freePercent?: number;
+  /** Group schemes: unit of groupMinCases; cases when not set */
+  groupMinUnit?: 'CASE' | 'PIECE';
   /** GROUP_FREE_QTY / COMBO_FREE_QTY: unit of freeQty */
   freeUnit?: 'CASE' | 'PIECE';
   /** COMBO_FREE_QTY: products and quantities that must all be bought */
@@ -51,9 +53,13 @@ export interface SchemeRecord {
 
 export interface SchemeMatchInput {
   productId: string;
+  productName?: string;
   categoryId?: string;
   parentCategoryId?: string;
   quantity: number;
+  caseQty?: number;
+  pieceQty?: number;
+  unitQtyInCase?: number;
 }
 
 export interface SchemeBenefit {
@@ -61,15 +67,31 @@ export interface SchemeBenefit {
   schemeName: string;
   schemeType: SchemeType;
   minimumQuantity: number;
+  minimumQuantityUnit?: 'CASE' | 'PIECE';
   discountPercent?: number;
   discountValue?: number;
   buyQty?: number;
+  buyUnit?: 'CASE' | 'PIECE';
+  freeUnit?: 'CASE' | 'PIECE';
   /** Total monetary discount to subtract from the line's gross value. */
   discountAmount: number;
   freeQty?: number;
   freeProductId?: string;
   freeProductName?: string;
+  /**
+   * Cart lines: every scheme applied to the line. The line benefit itself is
+   * the combined result (discounts added up, capped at the line value).
+   */
+  appliedSchemes?: SchemeBenefit[];
 }
+
+/** Each applied scheme of a line benefit (a single benefit is its own list). */
+export const appliedSchemesOf = (benefit?: SchemeBenefit | null): SchemeBenefit[] =>
+  benefit ? benefit.appliedSchemes ?? [benefit] : [];
+
+/** Every scheme applied across cart lines. */
+export const allAppliedSchemes = (benefits: Record<string, SchemeBenefit>) =>
+  Object.values(benefits).flatMap(appliedSchemesOf);
 
 /* ======================================================
  * HELPERS
@@ -88,20 +110,9 @@ const isWithinValidity = (scheme: SchemeRecord, date: Date) => {
 const matchesDimension = (ids: string[] | undefined, value?: string | null) =>
   Boolean(ids?.length && value && ids.includes(value));
 
-const matchesProduct = (scheme: SchemeRecord, input: SchemeMatchInput) => {
-  const hasProductScope = Boolean(
-    scheme.productIds?.length || scheme.categoryIds?.length || scheme.subCategoryIds?.length,
-  );
-  if (!hasProductScope) return true;
-
-  return (
-    matchesDimension(scheme.productIds, input.productId) ||
-    matchesDimension(scheme.categoryIds, input.categoryId) ||
-    matchesDimension(scheme.subCategoryIds, input.categoryId) ||
-    matchesDimension(scheme.categoryIds, input.parentCategoryId) ||
-    matchesDimension(scheme.subCategoryIds, input.parentCategoryId)
-  );
-};
+// A scheme applies only to its selected products
+const matchesProduct = (scheme: SchemeRecord, input: SchemeMatchInput) =>
+  matchesDimension(scheme.productIds, input.productId);
 
 const matchesGeography = (
   scheme: SchemeRecord,
@@ -109,9 +120,12 @@ const matchesGeography = (
   routeId?: string,
   provinceId?: string,
 ) => {
-  // Every geography dimension the scheme defines must match (province AND
-  // route AND van); within a dimension any listed value matches. An empty
-  // dimension applies everywhere. Same rule as the server.
+  // At least one location dimension must be selected. Selected dimensions
+  // all have to match; empty dimensions add no filter.
+  const hasGeographyScope = Boolean(
+    scheme.provinceIds?.length || scheme.routeIds?.length || scheme.vanIds?.length,
+  );
+  if (!hasGeographyScope) return false;
   const dimensionMatches = (ids: string[] | undefined, value?: string | null) =>
     !ids?.length || matchesDimension(ids, value);
 
@@ -126,15 +140,20 @@ const computeDiscount = (
   scheme: SchemeRecord,
   grossValue: number,
   casePrice: number,
+  piecePrice: number,
+  earnedFreeQty = scheme.freeQty ?? 0,
 ): SchemeBenefit => {
   const details = {
     schemeId: scheme.schemeId,
     schemeName: scheme.name,
     schemeType: scheme.schemeType,
     minimumQuantity: scheme.minQty ?? 0,
+    minimumQuantityUnit: scheme.minQtyUnit,
     discountPercent: scheme.discountPercent,
     discountValue: scheme.discountValue,
     buyQty: scheme.buyQty,
+    buyUnit: scheme.buyUnit,
+    freeUnit: scheme.freeUnit,
   };
 
   switch (scheme.schemeType) {
@@ -151,8 +170,17 @@ const computeDiscount = (
     case 'BUY_X_GET_Y':
       return {
         ...details,
-        discountAmount: Math.min((scheme.freeQty ?? 0) * casePrice, grossValue),
-        freeQty: scheme.freeQty,
+        discountAmount: 0,
+        freeQty: earnedFreeQty,
+        freeProductId: scheme.freeProductId,
+        freeProductName: scheme.freeProductName,
+      };
+    case 'BUY_ONE_GET_ONE':
+      return {
+        ...details,
+        discountAmount: 0,
+        freeQty: earnedFreeQty,
+        freeUnit: scheme.buyUnit,
       };
     case 'FREE_ITEM':
       return {
@@ -257,6 +285,73 @@ export const getApplicableSchemeRecords = async (
   );
 };
 
+/** Buy X Get Y and Buy One Get One qualify on the bought quantity in buyUnit. */
+const isBuyGetScheme = (scheme: SchemeRecord) =>
+  scheme.schemeType === 'BUY_X_GET_Y' || scheme.schemeType === 'BUY_ONE_GET_ONE';
+
+/** Buy One Get One is always buy 1, get 1 of the same product. */
+const buyThreshold = (scheme: SchemeRecord) =>
+  scheme.schemeType === 'BUY_ONE_GET_ONE' ? 1 : scheme.buyQty ?? 0;
+
+/**
+ * Every line scheme the cart line qualifies for. All of them apply together:
+ * each discount is worked out on the line's gross value.
+ */
+export const getApplicableSchemeBenefitsFromRecords = (
+  input: SchemeMatchInput,
+  grossValue: number,
+  casePrice: number,
+  schemes: SchemeRecord[],
+  date: Date = new Date(),
+): SchemeBenefit[] => {
+  if (input.quantity <= 0 || grossValue <= 0) return [];
+
+  const quantityIn = (unit?: string) =>
+    unit === 'CASE'
+      ? (input.caseQty ?? 0) + (input.pieceQty ?? 0) / Math.max(input.unitQtyInCase ?? 1, 1)
+      : input.quantity;
+
+  const eligible = schemes.filter(
+    (scheme) =>
+      !isGroupSchemeType(scheme.schemeType) &&
+      isWithinValidity(scheme, date) &&
+      (isBuyGetScheme(scheme)
+        ? buyThreshold(scheme) > 0 &&
+          Math.floor(quantityIn(scheme.buyUnit) / buyThreshold(scheme)) > 0
+        : quantityIn(scheme.minQtyUnit) >= (scheme.minQty ?? 0)) &&
+      matchesProduct(scheme, input),
+  );
+
+  return eligible
+    .map((scheme) => {
+      const multiples = isBuyGetScheme(scheme)
+        ? Math.floor(quantityIn(scheme.buyUnit) / Math.max(buyThreshold(scheme), 1))
+        : 1;
+      const freeQtyPerMultiple = scheme.schemeType === 'BUY_ONE_GET_ONE' ? 1 : scheme.freeQty ?? 0;
+      const benefit = computeDiscount(
+        scheme,
+        grossValue,
+        casePrice,
+        casePrice / Math.max(input.unitQtyInCase ?? 1, 1),
+        freeQtyPerMultiple * multiples,
+      );
+      // The free item of Buy One Get One is the product being bought
+      return scheme.schemeType === 'BUY_ONE_GET_ONE'
+        ? {
+            ...benefit,
+            freeProductId: input.productId,
+            freeProductName: input.productName || input.productId,
+          }
+        : benefit;
+    })
+    .sort((first, second) => second.discountAmount - first.discountAmount);
+};
+
+/**
+ * Combined line benefit of all applicable schemes: the largest discount
+ * scheme describes the line, discountAmount is the sum (capped at the line
+ * value) and appliedSchemes lists every scheme.
+ */
 export const getApplicableSchemeBenefitFromRecords = (
   input: SchemeMatchInput,
   grossValue: number,
@@ -264,20 +359,20 @@ export const getApplicableSchemeBenefitFromRecords = (
   schemes: SchemeRecord[],
   date: Date = new Date(),
 ): SchemeBenefit | null => {
-  if (input.quantity <= 0 || grossValue <= 0) return null;
-
-  const eligible = schemes.filter(
-    (scheme) =>
-      !isGroupSchemeType(scheme.schemeType) &&
-      isWithinValidity(scheme, date) &&
-      input.quantity >= (scheme.minQty ?? 0) &&
-      matchesProduct(scheme, input),
+  const benefits = getApplicableSchemeBenefitsFromRecords(
+    input,
+    grossValue,
+    casePrice,
+    schemes,
+    date,
   );
-  if (!eligible.length) return null;
+  if (!benefits.length) return null;
 
-  return eligible
-    .map((scheme) => computeDiscount(scheme, grossValue, casePrice))
-    .reduce((best, current) => (current.discountAmount > best.discountAmount ? current : best));
+  const discountAmount = Math.min(
+    benefits.reduce((sum, benefit) => sum + benefit.discountAmount, 0),
+    grossValue,
+  );
+  return { ...benefits[0], discountAmount, appliedSchemes: benefits };
 };
 
 export const getSchemePreviewFromRecords = (
@@ -291,7 +386,14 @@ export const getSchemePreviewFromRecords = (
   return lineSchemes
     .map((scheme) => {
       const minimumQuantity = Math.max(scheme.minQty ?? 0, 1);
-      return computeDiscount(scheme, minimumQuantity * Math.max(piecePrice, 0), casePrice);
+      const threshold = isBuyGetScheme(scheme)
+        ? Math.max(buyThreshold(scheme), 1)
+        : minimumQuantity;
+      const thresholdUnit = isBuyGetScheme(scheme) ? scheme.buyUnit : scheme.minQtyUnit;
+      const previewGrossValue =
+        threshold *
+        Math.max(thresholdUnit === 'CASE' ? casePrice : piecePrice, 0);
+      return computeDiscount(scheme, previewGrossValue, casePrice, piecePrice);
     })
     .reduce((best, current) => (current.discountAmount > best.discountAmount ? current : best));
 };

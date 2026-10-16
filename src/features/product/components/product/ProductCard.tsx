@@ -9,7 +9,8 @@ import { ProductUnitSelector } from './ProductUnitSelector';
 import { CartItemWithDetails } from '../../types/product.types';
 import { useProductCardStyles } from '../../styles/ProductCard.styles';
 import { useCartStore } from '@/core/store/cart.store';
-import { getSchemePreviewFromRecords, type SchemeRecord } from '@/shared/services/scheme.service';
+import { appliedSchemesOf, type SchemeRecord } from '@/shared/services/scheme.service';
+import { SchemeChips } from './SchemeChips';
 
 interface Props {
   product: any;
@@ -21,16 +22,21 @@ interface Props {
 const ProductCardComponent: React.FC<Props> = ({ product, onAddToCart, mode }) => {
   const styles = useProductCardStyles();
   const schemeBenefit = useCartStore((state) => state.schemeDiscounts[product?.productId]);
-  const schemePreview = useMemo(
+  const groupSchemeBenefits = useCartStore((state) => state.groupSchemeBenefits);
+  const productSchemes = useMemo(
+    () => (mode === 'sales' ? ((product?.applicableSchemes ?? []) as SchemeRecord[]) : []),
+    [mode, product?.applicableSchemes],
+  );
+  // Line schemes applied by the cart, plus group/combo schemes this product counts towards
+  const appliedSchemeIds = useMemo(
     () =>
-      mode === 'sales'
-        ? getSchemePreviewFromRecords(
-            (product?.applicableSchemes ?? []) as SchemeRecord[],
-            Number(product?.casePrice ?? 0),
-            Number(product?.piecePrice ?? 0),
-          )
-        : null,
-    [mode, product?.applicableSchemes, product?.casePrice, product?.piecePrice],
+      new Set([
+        ...appliedSchemesOf(schemeBenefit).map((applied) => applied.schemeId),
+        ...groupSchemeBenefits
+          .filter((benefit) => benefit.lines.some((line) => line.productId === product?.productId))
+          .map((benefit) => benefit.schemeId),
+      ]),
+    [schemeBenefit, groupSchemeBenefits, product?.productId],
   );
 
   const handlePress = useCallback(() => {
@@ -47,12 +53,6 @@ const ProductCardComponent: React.FC<Props> = ({ product, onAddToCart, mode }) =
 
   const isInStock = Number(product?.stock ?? 0) > 0;
   const discount = Number(product?.discount ?? 0);
-  const grossValue =
-    Number(product?.caseQty ?? 0) * Number(product?.casePrice ?? 0) +
-    Number(product?.pieceQty ?? 0) * Number(product?.piecePrice ?? 0);
-  const schemeDiscount = Math.min(schemeBenefit?.discountAmount ?? 0, grossValue);
-  const displayedScheme = schemeBenefit ?? schemePreview;
-
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
@@ -86,19 +86,9 @@ const ProductCardComponent: React.FC<Props> = ({ product, onAddToCart, mode }) =
                 <ProductStatusBadge status={isInStock ? 'in_stock' : 'out_of_stock'} />
               </View>
 
-              {mode === 'sales' && displayedScheme && (
-                <View style={styles.schemeContainer}>
-                  <AppText style={styles.schemeText} numberOfLines={2}>
-                    🏷️ {displayedScheme.schemeName}
-                    {!schemeBenefit && displayedScheme.minimumQuantity > 0
-                      ? ` • Min ${displayedScheme.minimumQuantity}`
-                      : ''}
-                    {schemeDiscount > 0 ? ` • Save K${schemeDiscount.toFixed(2)}` : ''}
-                  </AppText>
-                </View>
-              )}
+              <SchemeChips schemes={productSchemes} appliedSchemeIds={appliedSchemeIds} />
 
-              {!displayedScheme && discount > 0 && (
+              {!productSchemes.length && discount > 0 && (
                 <View style={styles.schemeContainer}>
                   <AppText style={styles.schemeText}>🏷️ {discount}% OFF</AppText>
                 </View>

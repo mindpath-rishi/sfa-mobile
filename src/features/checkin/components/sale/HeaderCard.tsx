@@ -1,6 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 interface HeaderCardProps {
@@ -24,11 +23,7 @@ interface HeaderCardProps {
 
 export const HeaderCard: React.FC<HeaderCardProps> = ({
   outletName,
-  customerId,
-  reference,
   totals,
-  onReset,
-  isProcessing = false,
   mode = 'sales',
   title,
   warehouseId,
@@ -38,62 +33,34 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
   const { colors } = useTheme();
 
   const displayTitle = title || (mode === 'sales' ? 'Sales Summary' : 'Top-up Summary');
+  // Sales show only the outlet; top-ups show where the stock comes from
   const displaySubtitle =
-    mode === 'sales'
-      ? `${reference} · #${customerId}`
-      : `${reference} · ${warehouseName || warehouseId || 'Warehouse'}`;
+    mode === 'topup'
+      ? [warehouseName || warehouseId, date].filter(Boolean).join(' · ')
+      : undefined;
 
   return (
     <View
       style={{
         backgroundColor: colors.surface,
         borderRadius: 10,
-        padding: 10,
+        padding: 12,
         borderWidth: 0.5,
         borderColor: colors.border + '30',
       }}
     >
-      {/* Header Row */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 8,
-        }}
-      >
-        <View>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>
-            {outletName || displayTitle}
-          </Text>
+      <View style={{ marginBottom: 10 }}>
+        <Text
+          numberOfLines={2}
+          style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}
+        >
+          {outletName || displayTitle}
+        </Text>
+        {displaySubtitle ? (
           <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
             {displaySubtitle}
           </Text>
-          {mode === 'topup' && date && (
-            <Text style={{ fontSize: 10, color: colors.textTertiary, marginTop: 1 }}>{date}</Text>
-          )}
-        </View>
-
-        {onReset && (
-          <TouchableOpacity
-            onPress={onReset}
-            disabled={isProcessing}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 6,
-              borderWidth: 0.5,
-              borderColor: colors.border + '50',
-              backgroundColor: colors.background,
-            }}
-          >
-            <Ionicons name="refresh-outline" size={12} color={colors.textSecondary} />
-            <Text style={{ fontSize: 11, color: colors.textSecondary }}>Reset</Text>
-          </TouchableOpacity>
-        )}
+        ) : null}
       </View>
 
       {/* Stats Row - Compact grid */}
@@ -122,21 +89,21 @@ const StatItem = ({
       style={{
         flex: 1,
         alignItems: 'center',
-        paddingVertical: 4,
-        borderRadius: 6,
+        paddingVertical: 6,
+        borderRadius: 8,
         backgroundColor: highlight ? colors.primary + '10' : colors.background,
       }}
     >
       <Text
         style={{
-          fontSize: 13,
+          fontSize: 15,
           fontWeight: '600',
           color: highlight ? colors.primary : colors.textPrimary,
         }}
       >
         {value}
       </Text>
-      <Text style={{ fontSize: 9, color: colors.textTertiary }}>{label}</Text>
+      <Text style={{ fontSize: 10, letterSpacing: 0.3, color: colors.textTertiary }}>{label}</Text>
     </View>
   );
 };

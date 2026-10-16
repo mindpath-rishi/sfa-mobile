@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -14,6 +14,7 @@ import { vanService } from '@/shared/services/van.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { useHeader } from '@/shared/contexts/HeaderContext';
+import { allAppliedSchemes } from '@/shared/services/scheme.service';
 
 type ScreenMode = 'sales' | 'topup';
 
@@ -33,7 +34,7 @@ export default function OrderSummary() {
   const { setHeader } = useHeader();
 
   // Zustand stores
-  const { items, summary, clearCart, refreshSchemeDiscounts, groupSchemeBenefits } =
+  const { items, summary, clearCart, refreshSchemeDiscounts, groupSchemeBenefits, schemeDiscounts } =
     useCartStore();
   const outlet = useOutletStore((s) => s.selectedOutlet);
   const van = useRouteStore.getState().van;
@@ -42,6 +43,8 @@ export default function OrderSummary() {
   // Local state
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Blocks a second tap before the isSubmitting re-render lands
+  const submittingRef = useRef(false);
 
   const hasItems = summary.totalSkus > 0;
 
@@ -109,18 +112,12 @@ export default function OrderSummary() {
   const currentConfig = config[currentMode];
 
   /* ================= RESET ================= */
-  const handleReset = useCallback(() => {
-    const alertTitle = currentMode === 'sales' ? 'Reset Order' : 'Reset Top-up';
-    const alertMessage =
-      currentMode === 'sales'
-        ? 'Clear all items from cart?'
-        : 'Clear all items from top-up request?';
-
-    Alert.alert(alertTitle, alertMessage, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: clearCart },
-    ]);
-  }, [clearCart, currentMode]);
+  // Confirmed in-app (Alert.alert is a no-op on web)
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const handleClearCart = useCallback(() => {
+    clearCart();
+    setShowClearConfirm(false);
+  }, [clearCart]);
 
   /* ================= BUILD TOP-UP PAYLOAD ================= */
   const buildTopupPayload = useCallback(() => {
@@ -208,7 +205,9 @@ export default function OrderSummary() {
 
   /* ================= HANDLE TOP-UP SUBMIT ================= */
   const handleTopupSubmit = useCallback(async () => {
-    setShowConfirmation(false);
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    // The confirmation stays open with its loader until the request finishes
     setIsSubmitting(true);
 
     try {
@@ -232,18 +231,21 @@ export default function OrderSummary() {
         return;
       }
       clearCart();
+      setShowConfirmation(false);
       toast.success('Your top-up request was submitted successfully.');
       router.replace('topup');
     } catch (error) {
       console.error('Error submitting top-up:', error);
       Alert.alert('Error', 'Failed to submit top-up request. Please try again.');
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   }, [buildTopupPayload, clearCart]);
 
   /* ================= HANDLE SUBMIT ================= */
   const handleSubmit = useCallback(() => {
+    if (submittingRef.current) return;
     if (!hasItems) {
       Alert.alert('No items', currentConfig.emptyMessage);
       return;
@@ -306,6 +308,7 @@ export default function OrderSummary() {
         subtotal: summary.totalValue + summary.discountValue,
         discount: summary.discountValue,
         freeGoods: groupSchemeBenefits,
+        lineRewards: allAppliedSchemes(schemeDiscounts),
         hasItems,
         mode: currentMode,
       };
@@ -340,13 +343,17 @@ export default function OrderSummary() {
             totalSkus: summary.totalSkus,
             totalItems: summary.totalItems,
           }}
-          onReset={currentConfig.showReset ? handleReset : undefined}
           mode={currentMode}
         />
 
         <TotalsCard {...getTotalsProps()} />
 
-        <ProductsSection products={items} hasItems={hasItems} mode={currentMode} />
+        <ProductsSection
+          products={items}
+          hasItems={hasItems}
+          mode={currentMode}
+          onClearCart={isSubmitting ? undefined : () => setShowClearConfirm(true)}
+        />
       </ScrollView>
 
       <BottomCTA
@@ -357,6 +364,16 @@ export default function OrderSummary() {
         onPress={handleSubmit}
         buttonText={currentConfig.submitButtonText}
         mode={currentMode}
+      />
+
+      <ConfirmationModal
+        visible={showClearConfirm}
+        title={currentMode === 'sales' ? 'Clear cart?' : 'Clear top-up items?'}
+        message={`Remove all ${summary.totalSkus} item${summary.totalSkus === 1 ? '' : 's'}? This cannot be undone.`}
+        confirmText="Clear"
+        cancelText="Cancel"
+        onConfirm={handleClearCart}
+        onCancel={() => setShowClearConfirm(false)}
       />
 
       {/* Confirmation Modal for Top-up */}
@@ -372,7 +389,9 @@ export default function OrderSummary() {
         confirmText="Submit Request"
         cancelText="Cancel"
         onConfirm={handleTopupSubmit}
-        onCancel={() => setShowConfirmation(false)}
+        onCancel={() => {
+          if (!submittingRef.current) setShowConfirmation(false);
+        }}
         loading={isSubmitting}
       />
     </KeyboardAvoidingView>

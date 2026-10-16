@@ -433,7 +433,7 @@ export default function CustomerDetailScreen() {
           checkGeofenceStatus(latitude, longitude);
         },
         (e) => console.warn('Location error:', e),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 },
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 },
       );
       return;
     }

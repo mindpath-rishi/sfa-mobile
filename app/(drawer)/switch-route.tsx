@@ -87,7 +87,7 @@ interface ChangeRouteSummary {
   estimatedTime: string;
 }
 
-const ROUTE_OUTLETS_LIMIT = 100;
+const ROUTE_OUTLETS_LIMIT = 500;
 const ESTIMATED_TIME_PER_OUTLET = 5;
 
 export default function Routes() {

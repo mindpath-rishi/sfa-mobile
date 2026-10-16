@@ -17,9 +17,12 @@ export interface AppliedSaleScheme {
   schemeName: string;
   schemeType: string;
   minimumQuantity: number;
+  minimumQuantityUnit?: 'CASE' | 'PIECE';
   discountPercent?: number;
   discountValue?: number;
   buyQty?: number;
+  buyUnit?: 'CASE' | 'PIECE';
+  freeUnit?: 'CASE' | 'PIECE';
   discountAmount: number;
   freeQty: number;
   freeProductId?: string;
@@ -76,11 +79,14 @@ export interface CreateSalePayload {
     schemeName?: string;
     schemeType?: string;
     schemeMinimumQuantity?: number;
+    schemeMinimumQuantityUnit?: 'CASE' | 'PIECE';
     schemeDiscountPercent?: number;
     schemeDiscountValue?: number;
     schemeBuyQty?: number;
+    schemeBuyUnit?: 'CASE' | 'PIECE';
     schemeDiscountAmount?: number;
     schemeFreeQty?: number;
+    schemeFreeUnit?: 'CASE' | 'PIECE';
     schemeFreeProductId?: string;
     schemeFreeProductName?: string;
     unitQtyInCase: number;
@@ -173,9 +179,12 @@ const calculateSalePayload = (payload: CreateSalePayload): CreateSalePayload => 
       schemeName: item.schemeName,
       schemeType: item.schemeType,
       minimumQuantity: Math.max(Number(item.schemeMinimumQuantity) || 0, 0),
+      minimumQuantityUnit: item.schemeMinimumQuantityUnit,
       discountPercent: item.schemeDiscountPercent,
       discountValue: item.schemeDiscountValue,
       buyQty: item.schemeBuyQty,
+      buyUnit: item.schemeBuyUnit,
+      freeUnit: item.schemeFreeUnit,
       discountAmount: toFixed4((existing?.discountAmount ?? 0) + (item.schemeDiscountAmount ?? 0)),
       freeQty: (existing?.freeQty ?? 0) + Math.max(Number(item.schemeFreeQty) || 0, 0),
       freeProductId: item.schemeFreeProductId || existing?.freeProductId,

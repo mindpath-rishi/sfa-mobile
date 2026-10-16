@@ -64,8 +64,23 @@ const formatRelativeTime = (value?: string) => {
 };
 
 const mapNotification = (item: ApiNotificationItem): NotificationItem => {
-  const rawCategory = String(item.category || item.data?.category || 'system').toLowerCase();
-  const category = rawCategory === 'outlet_approval_result' ? 'outlet_approval' : rawCategory;
+  const rawCategory = String(
+    item.data?.category ||
+      item.data?.notificationType ||
+      item.data?.type ||
+      item.category ||
+      '',
+  )
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  const category = rawCategory.startsWith('van_change')
+    ? 'van_change'
+    : rawCategory.startsWith('route_change')
+      ? 'route_change'
+      : rawCategory === 'outlet_approval_result'
+      ? 'outlet_approval'
+      : rawCategory || 'system';
 
   return {
     id: item._id || item.id || `${item.title}-${item.createdAt || item.sentAt || Date.now()}`,
@@ -126,12 +141,15 @@ const getTopupStatus = (item: NotificationItem) => {
 };
 
 const isPendingVanChangeApproval = (item: NotificationItem) => {
-  const category = String(item.data?.category || '').toLowerCase();
+  // The API may put the notification category on the record instead of inside data.
+  const category = String(item.data?.category || item.type || '').toLowerCase();
   const action = String(item.data?.action || '').toUpperCase();
   const status = String(item.data?.vanChangeStatus || item.data?.status || '').toUpperCase();
 
   return (
-    category === 'van_change' && action === 'APPROVAL_REQUIRED' && (!status || status === 'PENDING')
+    category === 'van_change' &&
+    (action === 'APPROVAL_REQUIRED' || (!action && (!status || status === 'PENDING'))) &&
+    (!status || status === 'PENDING')
   );
 };
 
@@ -150,22 +168,23 @@ const getVanChangeStatus = (item: NotificationItem) => {
 };
 
 const isPendingRouteChangeApproval = (item: NotificationItem) => {
-  const category = String(item.data?.category || '').toLowerCase();
+  const category = String(item.data?.category || item.type || '').toLowerCase();
   const action = String(item.data?.action || '').toUpperCase();
-  const status = String(item.data?.status || '').toUpperCase();
+  const status = String(item.data?.routeChangeStatus || item.data?.status || '').toUpperCase();
 
   return (
-    category === 'route_change' &&
-    action === 'APPROVAL_REQUIRED' &&
+    category.startsWith('route_change') &&
+    (action === 'APPROVAL_REQUIRED' || (!action && (!status || status === 'PENDING'))) &&
     (!status || status === 'PENDING')
   );
 };
 
 const getRouteChangeStatus = (item: NotificationItem) => {
-  if (String(item.data?.category || '').toLowerCase() !== 'route_change') return '';
+  if (!String(item.data?.category || item.type || '').toLowerCase().startsWith('route_change'))
+    return '';
 
   const action = String(item.data?.action || '').toUpperCase();
-  const status = String(item.data?.status || '').toUpperCase();
+  const status = String(item.data?.routeChangeStatus || item.data?.status || '').toUpperCase();
 
   if (['APPROVED', 'REJECTED'].includes(status)) return status;
   if (['APPROVED', 'REJECTED'].includes(action)) return action;

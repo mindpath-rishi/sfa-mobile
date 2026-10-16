@@ -2,7 +2,9 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 import type { GroupSchemeBenefit } from '@/shared/services/group-scheme.engine';
-import { GroupFreeGoods } from './GroupFreeGoods';
+import type { SchemeBenefit } from '@/shared/services/scheme.service';
+import { formatCurrency } from '@/shared/utils/currenty.utils';
+import { SchemeBenefitsPanel } from './SchemeBenefitsPanel';
 
 interface TotalsCardProps {
   total: number;
@@ -14,6 +16,8 @@ interface TotalsCardProps {
   totalWeight?: number;
   /** Free goods earned from group schemes (sales mode) */
   freeGoods?: GroupSchemeBenefit[];
+  /** Every scheme applied to cart lines (sales mode) */
+  lineRewards?: SchemeBenefit[];
 }
 
 export const TotalsCard: React.FC<TotalsCardProps> = ({
@@ -25,6 +29,7 @@ export const TotalsCard: React.FC<TotalsCardProps> = ({
   showWeight,
   totalWeight = 0,
   freeGoods = [],
+  lineRewards = [],
 }) => {
   const { colors } = useTheme();
 
@@ -58,31 +63,31 @@ export const TotalsCard: React.FC<TotalsCardProps> = ({
       )}
 
       {mode === 'sales' && discount > 0 && (
-        <View style={{ paddingHorizontal: 12, paddingTop: 9, gap: 7 }}>
+        <View style={{ paddingHorizontal: 14, paddingTop: 12, gap: 8 }}>
           <View
             style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
           >
-            <Text style={{ fontSize: 12, color: colors.textSecondary }}>Subtotal</Text>
-            <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-              K{subtotal.toLocaleString()}
+            <Text style={{ fontSize: 13, color: colors.textSecondary }}>Subtotal</Text>
+            <Text style={{ fontSize: 13, color: colors.textPrimary }}>
+              {formatCurrency(subtotal)}
             </Text>
           </View>
           <View
             style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
           >
-            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.success }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: colors.success }}>
               Scheme savings
             </Text>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.success }}>
-              − K{discount.toLocaleString()}
+            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.success }}>
+              − {formatCurrency(discount)}
             </Text>
           </View>
         </View>
       )}
 
-      {mode === 'sales' && freeGoods.length > 0 && (
-        <View style={{ paddingHorizontal: 12, paddingTop: 9 }}>
-          <GroupFreeGoods benefits={freeGoods} />
+      {mode === 'sales' && (lineRewards.length > 0 || freeGoods.length > 0) && (
+        <View style={{ paddingHorizontal: 14, paddingTop: 12 }}>
+          <SchemeBenefitsPanel lineBenefits={lineRewards} groupBenefits={freeGoods} />
         </View>
       )}
 
@@ -92,20 +97,21 @@ export const TotalsCard: React.FC<TotalsCardProps> = ({
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          paddingHorizontal: 12,
-          paddingVertical: 10,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          marginTop: mode === 'sales' && (discount > 0 || lineRewards.length > 0 || freeGoods.length > 0) ? 12 : 0,
           backgroundColor: hasItems ? colors.primary + '0C' : 'transparent',
         }}
       >
-        <Text style={{ fontSize: 13, fontWeight: '500', color: colors.textPrimary }}>Total</Text>
+        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textPrimary }}>Total</Text>
         <Text
           style={{
-            fontSize: 16,
+            fontSize: 17,
             fontWeight: '700',
             color: hasItems ? colors.primary : colors.textSecondary,
           }}
         >
-          K{total.toLocaleString()}
+          {formatCurrency(total)}
         </Text>
       </View>
     </View>

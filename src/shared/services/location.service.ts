@@ -66,6 +66,11 @@ const BACKGROUND_HEARTBEAT_INTERVAL_MS = 10_000;
  */
 const LOCATION_MAX_AGE_MS = 120_000;
 const LOCATION_MAX_ACCURACY_METERS = 100;
+// Browser geolocation often falls back to Wi-Fi/IP positioning, which can be
+// less precise than a native GPS fix. Accept those fixes for web workflows.
+const WEB_LOCATION_MAX_ACCURACY_METERS = 1_000;
+const getMaxLocationAccuracy = () =>
+  Platform.OS === 'web' ? WEB_LOCATION_MAX_ACCURACY_METERS : LOCATION_MAX_ACCURACY_METERS;
 
 const MAX_SPEED_METERS_PER_SECOND = 200 / 3.6;
 const UPLOAD_TIMEOUT_MS = 15_000;
@@ -283,7 +288,7 @@ const validateLocation = (
     return rejectLocation(`stale location (${age}ms old)`, location);
   }
 
-  if (accuracy != null && (!Number.isFinite(accuracy) || accuracy > LOCATION_MAX_ACCURACY_METERS)) {
+  if (accuracy != null && (!Number.isFinite(accuracy) || accuracy > getMaxLocationAccuracy())) {
     return rejectLocation(`accuracy ${accuracy}m exceeds limit`, location);
   }
 
@@ -965,7 +970,7 @@ const startWebLocationTracking = () => {
     },
     (error) => console.warn('[Location] Browser location tracking error:', error.message),
     {
-      enableHighAccuracy: true,
+      enableHighAccuracy: false,
       maximumAge: LOCATION_MAX_AGE_MS,
       timeout: 10_000,
     },
@@ -1048,7 +1053,7 @@ const performLocationCapture = async (
       if (
         age >= 0 &&
         age <= LOCATION_MAX_AGE_MS &&
-        (accuracy == null || accuracy <= LOCATION_MAX_ACCURACY_METERS)
+        (accuracy == null || accuracy <= getMaxLocationAccuracy())
       ) {
         logLocation('Using recent tracked GPS fix', {
           ageMs: age,
@@ -1106,7 +1111,7 @@ const performLocationCapture = async (
         if (
           age <= LOCATION_MAX_AGE_MS &&
           accuracy != null &&
-          accuracy <= LOCATION_MAX_ACCURACY_METERS
+          accuracy <= getMaxLocationAccuracy()
         ) {
           return latestCapturedLocation;
         }

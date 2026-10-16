@@ -6,7 +6,7 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { CartItemWithDetails } from '../../types/product.types';
 import { AppText } from '@/core/components';
 import { useCartStore } from '@/core/store/cart.store';
-import { getSchemePreviewFromRecords, type SchemeRecord } from '@/shared/services/scheme.service';
+import { formatCurrency } from '@/shared/utils/currenty.utils';
 import { useProductUnitSelectorStyles } from '../../styles/ProductUnitSelector.styles';
 
 interface Props {
@@ -42,23 +42,10 @@ export const ProductUnitSelector: React.FC<Props> = ({
   const schemeDiscount =
     mode === 'sales' ? Math.min(schemeBenefit?.discountAmount ?? 0, totalValue) : 0;
   const discountedTotal = Math.max(0, totalValue - schemeDiscount);
-  const schemePreview =
-    mode === 'sales'
-      ? getSchemePreviewFromRecords(
-          (product.applicableSchemes ?? []) as SchemeRecord[],
-          casePrice,
-          piecePrice,
-        )
-      : null;
-  const previewGrossValue =
-    Math.max(schemePreview?.minimumQuantity ?? 0, 1) * Math.max(piecePrice, 0);
-  const previewDiscountRatio =
-    previewGrossValue > 0
-      ? Math.min(Math.max((schemePreview?.discountAmount ?? 0) / previewGrossValue, 0), 1)
-      : 0;
-  const appliedDiscountRatio =
+  // Discounted unit price shows only once the cart line meets the scheme's
+  // minimum quantity (the cart sets a discount only after that).
+  const unitPriceDiscountRatio =
     totalValue > 0 ? Math.min(Math.max(schemeDiscount / totalValue, 0), 1) : 0;
-  const unitPriceDiscountRatio = appliedDiscountRatio || previewDiscountRatio;
   const hasDiscountedUnitPrice = mode === 'sales' && unitPriceDiscountRatio > 0;
   const discountedCasePrice = Math.max(0, casePrice * (1 - unitPriceDiscountRatio));
   const discountedPiecePrice = Math.max(0, piecePrice * (1 - unitPriceDiscountRatio));
@@ -120,46 +107,44 @@ export const ProductUnitSelector: React.FC<Props> = ({
     setUnitQuantity(0);
   }, []);
 
-  const formatCurrency = (amount: number) =>
-    `K${amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  const formatUnitCurrency = (amount: number) =>
-    `K${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatUnitCurrency = formatCurrency;
 
   const availableCases = Math.floor(availableStock / UNITS_PER_CASE);
   const remainingPieces = availableStock % UNITS_PER_CASE;
 
   return (
     <View style={styles.container}>
-      {/* Header with Actions */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          {showName && (
-            <AppText style={[styles.productName, { color: colors.textPrimary }]} numberOfLines={1}>
-              {product.productName}
-            </AppText>
-          )}
-          {!isUnlimitedMode && availableStock < 10 && availableStock > 0 && (
-            <View style={[styles.lowStockBadge, { backgroundColor: colors.warning + '20' }]}>
-              <AppText style={[styles.lowStockText, { color: colors.warning }]}>Low Stock</AppText>
-            </View>
-          )}
-        </View>
+      {/* Header: name, low-stock badge and Max (top-up) */}
+      {(showName || isUnlimitedMode || (availableStock < 10 && availableStock > 0)) && (
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            {showName && (
+              <AppText
+                style={[styles.productName, { color: colors.textPrimary }]}
+                numberOfLines={1}
+              >
+                {product.productName}
+              </AppText>
+            )}
+            {!isUnlimitedMode && availableStock < 10 && availableStock > 0 && (
+              <View style={[styles.lowStockBadge, { backgroundColor: colors.warning + '20' }]}>
+                <AppText style={[styles.lowStockText, { color: colors.warning }]}>
+                  Low Stock
+                </AppText>
+              </View>
+            )}
+          </View>
 
-        <View style={styles.actionIcons}>
-          {isUnlimitedMode && (
-            <TouchableOpacity onPress={setMaxQuantity} style={styles.actionButton}>
-              <Ionicons name="flash-outline" size={16} color={colors.primary} />
-              <AppText style={[styles.actionText, { color: colors.primary }]}>Max</AppText>
-            </TouchableOpacity>
-          )}
-          {(caseQuantity > 0 || unitQuantity > 0) && (
-            <TouchableOpacity onPress={clearQuantities} style={styles.actionButton}>
-              <Ionicons name="trash-outline" size={14} color={colors.error} />
-              <AppText style={[styles.actionText, { color: colors.error }]}>Clear</AppText>
-            </TouchableOpacity>
-          )}
+          <View style={styles.actionIcons}>
+            {isUnlimitedMode && (
+              <TouchableOpacity onPress={setMaxQuantity} style={styles.actionButton}>
+                <Ionicons name="flash-outline" size={16} color={colors.primary} />
+                <AppText style={[styles.actionText, { color: colors.primary }]}>Max</AppText>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Cases and Pieces Row */}
       <View style={styles.quantityRow}>
@@ -294,54 +279,60 @@ export const ProductUnitSelector: React.FC<Props> = ({
         </View>
       </View>
 
-      {/* Compact Stock Info */}
+      {/* Stock, clear and line total */}
       <View style={[styles.stockInfoRow, { borderTopColor: colors.divider }]}>
-        <View style={styles.stockInfoLeft}>
-          <View style={styles.stockInfoItem}>
-            <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
-            <AppText style={[styles.stockInfoText, { color: colors.textSecondary }]}>
-              {availableStock} pcs
-            </AppText>
-          </View>
-          {availableCases > 0 && (
+        <View style={{ flex: 1, gap: 4 }}>
+          {!isUnlimitedMode && (
             <View style={styles.stockInfoItem}>
-              <Ionicons name="options-outline" size={10} color={colors.textSecondary} />
-              <AppText style={[styles.stockInfoDetail, { color: colors.textSecondary }]}>
-                {availableCases}c {remainingPieces > 0 && `+${remainingPieces}p`}
+              <Ionicons name="cube-outline" size={12} color={colors.textSecondary} />
+              <AppText style={[styles.stockInfoText, { color: colors.textSecondary }]}>
+                Stock {availableStock} pcs
+                {availableCases > 0
+                  ? ` (${availableCases} cs${remainingPieces > 0 ? ` + ${remainingPieces} pcs` : ''})`
+                  : ''}
               </AppText>
+              {totalUnits === availableStock && totalUnits > 0 && (
+                <AppText style={[styles.allStockText, { color: colors.success }]}> · all</AppText>
+              )}
             </View>
           )}
-          {!isUnlimitedMode && totalUnits === availableStock && totalUnits > 0 && (
-            <View style={styles.stockInfoItem}>
-              <Ionicons name="checkmark-circle" size={10} color={colors.success} />
-              <AppText style={[styles.allStockText, { color: colors.success }]}>Max</AppText>
-            </View>
+          {(caseQuantity > 0 || unitQuantity > 0) && (
+            <TouchableOpacity
+              onPress={clearQuantities}
+              hitSlop={8}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                alignSelf: 'flex-start',
+              }}
+            >
+              <Ionicons name="close-circle-outline" size={13} color={colors.error} />
+              <AppText style={{ fontSize: 11, fontWeight: '600', color: colors.error }}>
+                Clear
+              </AppText>
+            </TouchableOpacity>
           )}
         </View>
-        <View style={styles.totalValueContainer}>
-          <AppText style={[styles.totalLabel, { color: colors.textSecondary }]}>
-            {schemeDiscount > 0 ? 'Discounted:' : 'Total:'}
-          </AppText>
-          <View style={styles.totalPriceStack}>
-            {schemeDiscount > 0 && (
-              <AppText style={[styles.originalTotalValue, { color: colors.textTertiary }]}>
-                {formatCurrency(totalValue)}
-              </AppText>
-            )}
-            <AppText
-              style={[
-                styles.totalValue,
-                { color: schemeDiscount > 0 ? colors.success : colors.primary },
-              ]}
-            >
-              {formatCurrency(discountedTotal)}
+        <View style={{ alignItems: 'flex-end' }}>
+          {schemeDiscount > 0 && (
+            <AppText style={[styles.originalTotalValue, { color: colors.textTertiary }]}>
+              {formatCurrency(totalValue)}
             </AppText>
-            {schemeDiscount > 0 && (
-              <AppText style={[styles.discountSavings, { color: colors.success }]}>
-                Save {formatCurrency(schemeDiscount)}
-              </AppText>
-            )}
-          </View>
+          )}
+          <AppText
+            style={[
+              styles.totalValue,
+              { color: schemeDiscount > 0 ? colors.success : colors.primary },
+            ]}
+          >
+            {formatCurrency(discountedTotal)}
+          </AppText>
+          {schemeDiscount > 0 && (
+            <AppText style={[styles.discountSavings, { color: colors.success }]}>
+              You save {formatCurrency(schemeDiscount)}
+            </AppText>
+          )}
         </View>
       </View>
     </View>

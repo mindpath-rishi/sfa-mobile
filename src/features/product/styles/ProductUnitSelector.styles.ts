@@ -178,6 +178,19 @@ export const useProductUnitSelectorStyles = () => {
       fontSize: utils.fontSize.sm,
     } as TextStyle,
 
+    schemeHintRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 6,
+    } as ViewStyle,
+
+    schemeHintText: {
+      fontSize: utils.fontSize.xs,
+      fontWeight: utils.getFontWeight('semibold'),
+      flexShrink: 1,
+    } as TextStyle,
+
     discountSavings: {
       fontSize: utils.fontSize.xs,
       fontWeight: utils.getFontWeight('semibold'),

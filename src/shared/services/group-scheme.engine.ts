@@ -1,19 +1,17 @@
 /**
  * Group scheme engine
  * -------------------
- * Pure functions (no app imports) that evaluate GROUP_FREE_QTY and
- * GROUP_FREE_PERCENT schemes across ALL cart lines in a scheme's product group.
+ * Pure functions (no app imports) that evaluate GROUP_FREE_QTY schemes
+ * across ALL cart lines in a scheme's product group.
  *
  * Rules:
  * - Group  : cart lines whose product / category / sub-category is in the
  *            scheme scope (same matching as line schemes).
  * - Measure: combined cases = caseQty + pieceQty / unitQtyInCase per line.
- * - Qualify: every full `groupMinCases` is one multiple.
+ * - Qualify: some of every product in the group is bought, and every full
+ *   `groupMinCases` (in `groupMinUnit`) of the combined quantity is one multiple.
  * - GROUP_FREE_QTY     : freeQty x multiples of the fixed free product
  *                        (unit CASE or PIECE).
- * - GROUP_FREE_PERCENT : once qualified, freePercent % of each group line's
- *                        quantity is given free as the same product
- *                        (whole pieces, rounded down per line).
  * - COMBO_FREE_QTY     : every product in `comboItems` must be bought in its
  *                        required quantity (e.g. A x3 + B x1). Multiples =
  *                        the fewest full sets across the combo products;
@@ -21,7 +19,7 @@
  * Group schemes give free goods and stack with per-line discount schemes.
  */
 
-export type GroupSchemeType = 'GROUP_FREE_QTY' | 'GROUP_FREE_PERCENT' | 'COMBO_FREE_QTY';
+export type GroupSchemeType = 'GROUP_FREE_QTY' | 'COMBO_FREE_QTY';
 
 export interface ComboItem {
   productId: string;
@@ -39,7 +37,8 @@ export interface GroupSchemeDefinition {
   subCategoryIds?: string[];
   productIds?: string[];
   groupMinCases?: number;
-  freePercent?: number;
+  /** Unit of groupMinCases; cases when not set */
+  groupMinUnit?: 'CASE' | 'PIECE' | string;
   freeQty?: number;
   freeUnit?: 'CASE' | 'PIECE' | string;
   freeProductId?: string;
@@ -64,7 +63,6 @@ export interface GroupCartLine {
 export interface GroupSchemeBenefitLine {
   productId: string;
   productName?: string;
-  /** Free quantity in pieces (GROUP_FREE_PERCENT) */
   freeQty: number;
 }
 
@@ -73,10 +71,11 @@ export interface GroupSchemeBenefit {
   schemeName: string;
   schemeType: GroupSchemeType;
   groupMinCases: number;
-  /** Combined cases of the group lines in the cart */
+  /** Unit of groupMinCases and qualifyingCases */
+  groupMinUnit: 'CASE' | 'PIECE';
+  /** Combined quantity of the group lines in the cart, in groupMinUnit */
   qualifyingCases: number;
   multiples: number;
-  freePercent?: number;
   freeUnit: 'CASE' | 'PIECE';
   /** Total free quantity in `freeUnit` */
   freeQty: number;
@@ -84,7 +83,7 @@ export interface GroupSchemeBenefit {
   freeProductName?: string;
   /** COMBO_FREE_QTY: the required products and quantities per set */
   comboItems?: ComboItem[];
-  /** Group lines that counted towards the scheme (with free pieces for %) */
+  /** Product lines whose quantities counted toward the group threshold */
   lines: GroupSchemeBenefitLine[];
 }
 
@@ -92,18 +91,14 @@ const EPSILON = 1e-9;
 
 export const isGroupSchemeType = (schemeType?: string): schemeType is GroupSchemeType =>
   schemeType === 'GROUP_FREE_QTY' ||
-  schemeType === 'GROUP_FREE_PERCENT' ||
   schemeType === 'COMBO_FREE_QTY';
 
 const includes = (ids: string[] | undefined, value?: string) =>
   Boolean(ids?.length && value && ids.includes(value));
 
+// Only the selected products form the group
 export const isLineInGroup = (scheme: GroupSchemeDefinition, line: GroupCartLine) =>
-  includes(scheme.productIds, line.productId) ||
-  includes(scheme.categoryIds, line.categoryId) ||
-  includes(scheme.subCategoryIds, line.categoryId) ||
-  includes(scheme.categoryIds, line.parentCategoryId) ||
-  includes(scheme.subCategoryIds, line.parentCategoryId);
+  includes(scheme.productIds, line.productId);
 
 const isActiveOn = (scheme: GroupSchemeDefinition, date: Date) => {
   if ((scheme.status ?? 'ACTIVE') !== 'ACTIVE') return false;
@@ -157,6 +152,7 @@ const computeComboBenefit = (
     schemeName: scheme.name,
     schemeType: 'COMBO_FREE_QTY',
     groupMinCases: 0,
+    groupMinUnit: 'CASE',
     qualifyingCases: Number(comboLines.reduce((sum, line) => sum + lineCases(line), 0).toFixed(4)),
     multiples,
     freeUnit: scheme.freeUnit === 'PIECE' ? 'PIECE' : 'CASE',
@@ -186,16 +182,24 @@ export const computeGroupSchemeBenefit = (
     );
   }
 
-  const hasScope = Boolean(
-    scheme.productIds?.length || scheme.categoryIds?.length || scheme.subCategoryIds?.length,
-  );
+  const hasScope = Boolean(scheme.productIds?.length);
   const groupMinCases = Number(scheme.groupMinCases) || 0;
   if (!hasScope || groupMinCases <= 0) return null;
 
   const groupLines = lines.filter((line) => linePieces(line) > 0 && isLineInGroup(scheme, line));
   if (!groupLines.length) return null;
 
-  const qualifyingCases = groupLines.reduce((sum, line) => sum + lineCases(line), 0);
+  // Every product of the group must be bought; one product alone never qualifies
+  const boughtProductIds = new Set(groupLines.map((line) => line.productId));
+  if (!(scheme.productIds ?? []).every((productId) => boughtProductIds.has(productId))) {
+    return null;
+  }
+
+  const groupMinUnit: 'CASE' | 'PIECE' = scheme.groupMinUnit === 'PIECE' ? 'PIECE' : 'CASE';
+  const qualifyingCases = groupLines.reduce(
+    (sum, line) => sum + (groupMinUnit === 'PIECE' ? linePieces(line) : lineCases(line)),
+    0,
+  );
   const multiples = Math.floor(qualifyingCases / groupMinCases + EPSILON);
   if (multiples < 1) return null;
 
@@ -204,6 +208,7 @@ export const computeGroupSchemeBenefit = (
     schemeName: scheme.name,
     schemeType: scheme.schemeType,
     groupMinCases,
+    groupMinUnit,
     qualifyingCases: Number(qualifyingCases.toFixed(4)),
     multiples,
   };
@@ -225,22 +230,7 @@ export const computeGroupSchemeBenefit = (
     };
   }
 
-  const freePercent = Math.min(Math.max(Number(scheme.freePercent) || 0, 0), 100);
-  const benefitLines = groupLines.map((line) => ({
-    productId: line.productId,
-    productName: line.productName,
-    freeQty: Math.floor((linePieces(line) * freePercent) / 100 + EPSILON),
-  }));
-  const freeQty = benefitLines.reduce((sum, line) => sum + line.freeQty, 0);
-  if (freeQty <= 0) return null;
-
-  return {
-    ...base,
-    freePercent,
-    freeUnit: 'PIECE',
-    freeQty,
-    lines: benefitLines,
-  };
+  return null;
 };
 
 /**
