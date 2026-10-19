@@ -19,6 +19,7 @@ interface HeaderCardProps {
   warehouseId?: string;
   warehouseName?: string;
   date?: string;
+  address?: string;
 }
 
 export const HeaderCard: React.FC<HeaderCardProps> = ({
@@ -29,6 +30,7 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
   warehouseId,
   warehouseName,
   date,
+  address,
 }) => {
   const { colors } = useTheme();
 
@@ -37,7 +39,7 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
   const displaySubtitle =
     mode === 'topup'
       ? [warehouseName || warehouseId, date].filter(Boolean).join(' · ')
-      : undefined;
+      : address;
 
   return (
     <View
@@ -57,7 +59,11 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
           {outletName || displayTitle}
         </Text>
         {displaySubtitle ? (
-          <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}>
+          <Text
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            style={{ fontSize: 11, color: colors.textTertiary, marginTop: 2 }}
+          >
             {displaySubtitle}
           </Text>
         ) : null}

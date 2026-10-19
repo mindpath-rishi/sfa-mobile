@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { ActivityIndicator, Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -104,7 +105,20 @@ export function OfflineSyncGate() {
     pendingCount,
     deviceServerUploadVisible,
     deviceServerUploadMessage,
-  } = useOfflineStore();
+  } = useOfflineStore(
+    useShallow((state) => ({
+      isConnected: state.isConnected,
+      isInternetReachable: state.isInternetReachable,
+      isSyncing: state.isSyncing,
+      lastSyncTime: state.lastSyncTime,
+      lastError: state.lastError,
+      offlineEnabled: state.offlineEnabled,
+      offlineSetupInProgress: state.offlineSetupInProgress,
+      pendingCount: state.pendingCount,
+      deviceServerUploadVisible: state.deviceServerUploadVisible,
+      deviceServerUploadMessage: state.deviceServerUploadMessage,
+    })),
+  );
 
   const isOfflineUser = isSalesman(user) && user?.offlineAccessAllowed === true;
   const offline = !isConnected || !isInternetReachable;

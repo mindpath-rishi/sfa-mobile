@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, Text, StyleSheet } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -7,11 +8,34 @@ import { useLoaderStore } from '../loader/loader.store';
 import { useTheme } from '@/shared/hooks/useTheme';
 import HolographicLoader from './HolographicLoader';
 
+/** Fast requests finish before this, so the blur/spinner never flashes. */
+const SPINNER_DELAY_MS = 300;
+
 const LoaderOverlay = () => {
-  const { visible, message } = useLoaderStore();
+  const { visible, message, type } = useLoaderStore(
+    useShallow((state) => ({ visible: state.visible, message: state.message, type: state.type })),
+  );
   const { colors, isDark } = useTheme();
+  const [showSpinner, setShowSpinner] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      setShowSpinner(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowSpinner(true), SPINNER_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [visible]);
 
   if (!visible) return null;
+
+  // Touches are blocked from the first moment, exactly as before; only the
+  // visible blur and spinner wait for the request to take noticeable time.
+  // Success/error messages are meant to be read, so they show immediately.
+  // collapsable={false} keeps Android from flattening away the blocking view.
+  if (!showSpinner && type === 'spinner') {
+    return <View collapsable={false} style={styles.container} />;
+  }
 
   return (
     <Animated.View

@@ -49,15 +49,16 @@ export default function OrderSummary() {
   const hasItems = summary.totalSkus > 0;
 
   const selectedOutlet = useOutletStore((s) => s.selectedOutlet);
+  const displayVanName = van?.vanName || van?.name || van?.vanNumber || 'Van';
 
   useFocusEffect(
     React.useCallback(() => {
       setHeader({
-        title: selectedOutlet?.name,
+        title: currentMode === 'topup' ? displayVanName : selectedOutlet?.name,
         showBack: true,
         showMenu: false,
       });
-    }, []),
+    }, [currentMode, displayVanName, selectedOutlet?.name, setHeader]),
   );
 
   // Resolve category/sub-category/product/province/route/van wise schemes for sale mode
@@ -184,7 +185,7 @@ export default function OrderSummary() {
 
     return {
       vanId: van?.vanId,
-      vanName: van?.name,
+      vanName: displayVanName,
       employeeId: user?.userId,
       warehouseId: 'WH-001',
       date: new Date().toISOString(),
@@ -195,13 +196,13 @@ export default function OrderSummary() {
       totalRequestedWeight,
       totalRequestedValue,
 
-      remark: `Top-up request for ${van?.name || 'van'} - ${new Date().toLocaleDateString()}`,
+      remark: `Top-up request for ${displayVanName} - ${new Date().toLocaleDateString()}`,
       status: 'DRAFT',
 
       items: topupItems,
       workSessionId: activeWorkSessionId || selectedRoute?.workSessionId,
     };
-  }, [items, van, user, activeWorkSessionId, selectedRoute]);
+  }, [items, van, displayVanName, user, activeWorkSessionId, selectedRoute]);
 
   /* ================= HANDLE TOP-UP SUBMIT ================= */
   const handleTopupSubmit = useCallback(async () => {
@@ -286,11 +287,15 @@ export default function OrderSummary() {
       return {
         outletName: outlet?.name,
         customerId: outlet?.customerId,
+        address: [outlet?.address?.line1, outlet?.address?.line2]
+          .map((part) => part?.trim())
+          .filter(Boolean)
+          .join(', '),
         reference: `SALE-${Date.now()}`,
       };
     } else {
       return {
-        outletName: van?.vanName || 'Van',
+        outletName: displayVanName,
         customerId: van?.vanId || 'N/A',
         reference: `TOP-${Date.now()}`,
         warehouseId: 'WH-001',

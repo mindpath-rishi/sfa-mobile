@@ -67,3 +67,18 @@ export const useLoaderStore = create<LoaderState>((set) => ({
     }, 1500);
   },
 }));
+
+/**
+ * Stable loader actions for components that only show/hide the loader.
+ * Unlike `useLoaderStore()`, it does not re-render the caller whenever the
+ * loader opens or closes.
+ */
+const loaderActions = {
+  show: (...args: Parameters<LoaderState['show']>) => useLoaderStore.getState().show(...args),
+  hide: () => useLoaderStore.getState().hide(),
+  setProgress: (progress: number) => useLoaderStore.getState().setProgress(progress),
+  showSuccess: (message?: string) => useLoaderStore.getState().showSuccess(message),
+  showError: (message?: string) => useLoaderStore.getState().showError(message),
+};
+
+export const useLoaderActions = () => loaderActions;

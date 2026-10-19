@@ -196,9 +196,6 @@ const Button: React.FC<ButtonProps> = ({
   const handlePress = useCallback(() => {
     if (!isDisabled && onPress) {
       if (hapticFeedback && Platform.OS !== 'web') {
-        // You can implement haptic feedback here
-        // import { Haptics } from 'expo-haptics';
-        // Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       onPress();
     }

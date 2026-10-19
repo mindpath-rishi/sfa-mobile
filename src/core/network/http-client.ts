@@ -19,6 +19,8 @@ import { isTokenExpired } from '@/shared/utils/auth-token.utils';
 
 import type { ApiRequestConfig, ApiResponse, HttpMethod } from './api.types';
 import { toast } from '../utils';
+import { APP_BUILD, APP_VERSION } from '@/core/diagnostics/app-info';
+import { useAppUpdateStore } from '@/core/diagnostics/app-update.store';
 
 /* ======================================================
  * CUSTOM AXIOS CONFIG
@@ -44,7 +46,7 @@ type AppExtraConfig = {
 
 const extra = Constants.expoConfig?.extra as AppExtraConfig | undefined;
 
-const BASE_URL = extra?.api?.baseURL ?? 'https://order.tradekings.app:4001/api/v1';
+export const BASE_URL = extra?.api?.baseURL ?? 'https://order.tradekings.app:4001/api/v1';
 const TIMEOUT_MS = extra?.api?.timeoutMs ?? 15000;
 const AUTH_HEADER_KEY = extra?.api?.authHeaderKey ?? 'Authorization';
 const TOKEN_PREFIX = extra?.api?.tokenPrefix ?? 'Bearer';
@@ -97,6 +99,13 @@ httpClient.interceptors.request.use(
 
       const token = await getToken();
 
+      // Lets the server enforce the minimum app version set in MIS.
+      const versionHeaders = AxiosHeaders.from(config.headers ?? {});
+      versionHeaders.set('x-app-version', APP_VERSION);
+      versionHeaders.set('x-app-build', APP_BUILD);
+      versionHeaders.set('x-client-platform', 'mobile');
+      config.headers = versionHeaders;
+
       if (config.expectedUserId && useAuthStore.getState().user?.userId !== config.expectedUserId) {
         throw new axios.CanceledError('Request cancelled because the authenticated user changed');
       }
@@ -146,6 +155,21 @@ httpClient.interceptors.response.use(
 
     const appError = errorHandler(error);
 
+    // 426: this app version is below the minimum set in MIS. Show the update
+    // screen instead of an error toast on every request.
+    if (error.response?.status === 426) {
+      const body = (error.response.data ?? {}) as Record<string, any>;
+      useAppUpdateStore.getState().setFromServer({
+        updateRequired: true,
+        minAppVersion: body.minAppVersion,
+        message: body.message,
+        storeUrl: body.storeUrl,
+      });
+      return Promise.resolve({
+        data: { success: false, statusCode: 426, message: body.message ?? 'Please update the app', data: null },
+      } as AxiosResponse<ApiResponse<unknown>>);
+    }
+
     if (error.response?.status === 401) {
       useAuthStore.getState().logout();
     }
@@ -179,6 +203,24 @@ httpClient.interceptors.response.use(
 /* ======================================================
  * GENERIC REQUEST
  * ====================================================== */
+
+/**
+ * A sale makes several writes in a row (visit, sale, payment...). Run one
+ * offline sync shortly after the last of them instead of one per write.
+ */
+const POST_MUTATION_SYNC_DELAY_MS = 2_000;
+let postMutationSyncTimer: ReturnType<typeof setTimeout> | null = null;
+
+const schedulePostMutationSync = (url: string) => {
+  if (postMutationSyncTimer) clearTimeout(postMutationSyncTimer);
+  postMutationSyncTimer = setTimeout(() => {
+    postMutationSyncTimer = null;
+    // Dynamic import avoids a static cycle: syncApi uses this HTTP client.
+    void import('@/sync/sync.service')
+      .then(({ syncService }) => syncService.sync())
+      .catch((error) => logger.warn('Post-mutation offline sync failed', { url, error }));
+  }, POST_MUTATION_SYNC_DELAY_MS);
+};
 
 export const apiRequest = async <TResponse, TBody = unknown>(
   method: HttpMethod,
@@ -236,10 +278,13 @@ export const apiRequest = async <TResponse, TBody = unknown>(
   } as CustomAxiosRequestConfig);
 
   const response = res.data;
+  // The cache is only read in offline mode, which requires offline access;
+  // writing it for anyone else just costs JSON + disk work on every request.
   if (
     method === 'GET' &&
     config?.cache !== false &&
     isSalesman(user) &&
+    user?.offlineAccessAllowed === true &&
     response?.success &&
     !url.startsWith('/sync/')
   ) {
@@ -252,10 +297,7 @@ export const apiRequest = async <TResponse, TBody = unknown>(
 
   if (method !== 'GET' && isSalesman(user) && response?.success && !url.startsWith('/sync/')) {
     // Keep the offline database current after successful online mutations.
-    // Dynamic import avoids a static cycle: syncApi uses this HTTP client.
-    void import('@/sync/sync.service')
-      .then(({ syncService }) => syncService.sync())
-      .catch((error) => logger.warn('Post-mutation offline sync failed', { url, error }));
+    schedulePostMutationSync(url);
   }
 
   return response;

@@ -16,15 +16,6 @@ export const useCurrentActivityCardStyles = ({
       backgroundColor: 'transparent',
       borderRadius: 0,
       padding: 0,
-      // marginHorizontal: 16,
-      // marginVertical: 8,
-      // shadowColor: '#000',
-      // shadowOffset: { width: 0, height: 2 },
-      // shadowOpacity: 0.05,
-      // shadowRadius: 8,
-      // elevation: 2,
-      // borderWidth: 1,
-      // borderColor: colors.divider,
     } as ViewStyle,
 
     // Activity Header

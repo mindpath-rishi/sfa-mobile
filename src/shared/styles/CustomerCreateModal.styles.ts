@@ -12,12 +12,6 @@ export const useCustomerCreateStyles = () => {
       flex: 1,
     } as ViewStyle,
 
-    // container: {
-    //   flex: 1,
-    //   display: 'flex',
-    //   flexDirection: 'column',
-    // } as ViewStyle,
-
     // Progress Bar
     progressContainer: {
       paddingHorizontal: utils.spacing[4],

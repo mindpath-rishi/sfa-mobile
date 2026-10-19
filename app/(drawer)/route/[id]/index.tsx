@@ -9,14 +9,5 @@ export default function CustomerDetailRoute() {
   const activeOutlet = useOutletStore.getState().selectedOutlet;
   const { colors } = useTheme();
 
-  // useEffect(() => {
-  //   setHeader({
-  //     title: activeOutlet?.name,
-  //     showBack: true,
-  //     showMenu: false,
-  //     backgroundColor: colors.primary
-  //   });
-  // }, [setHeader]);
-
   return <CustomerDetailScreen />;
 }

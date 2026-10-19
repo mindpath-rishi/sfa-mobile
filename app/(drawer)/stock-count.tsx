@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, TouchableOpacity, ActivityIndicator, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -23,7 +24,7 @@ import { homeService } from '@/features/home/services/home.service';
 import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSummaryModal';
 import { ConfirmationModal } from '@/core/components';
-import { useLoaderStore } from '@/core/loader/loader.store';
+import { useLoaderActions } from '@/core/loader/loader.store';
 import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
 const LIMIT = 15;
@@ -95,10 +96,14 @@ export default function StockCountScreen({
   const [showFinalConfirm, setShowFinalConfirm] = useState(false);
   const [carryForwardStock, setCarryForwardStock] = useState(true);
   const hasPromptedSettlementRef = useRef(false);
-  const loader = useLoaderStore();
+  const loader = useLoaderActions();
 
-  const { user, workSessionId } = useAuthStore();
-  const { selectedRoute: route } = useRouteStore();
+  const { user, workSessionId } = useAuthStore(
+    useShallow((state) => ({ user: state.user, workSessionId: state.workSessionId })),
+  );
+  const { selectedRoute: route } = useRouteStore(
+    useShallow((state) => ({ selectedRoute: state.selectedRoute })),
+  );
   const { setHeader } = useHeader();
   const {
     stockCountFilterCount,

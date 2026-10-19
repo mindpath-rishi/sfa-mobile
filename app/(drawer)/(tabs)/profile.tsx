@@ -30,6 +30,7 @@ import {
 } from '@/shared/services/location.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { toast } from '@/core/utils';
+import { ConfirmationModal } from '@/core/components';
 
 const DEFAULT_PROFILE_DATA = {
   id: 'EMP001',
@@ -668,8 +669,11 @@ export default function ProfileScreen() {
   };
 
   const [loggingOut, setLoggingOut] = useState(false);
-  const handleLogout = async () => {
-    if (loggingOut) return;
+  // Unsent offline records when the salesman asked to log out (0 = none)
+  const [unsentOnLogout, setUnsentOnLogout] = useState(0);
+
+  const performLogout = async () => {
+    setUnsentOnLogout(0);
     setLoggingOut(true);
     try {
       await logout();
@@ -677,6 +681,35 @@ export default function ProfileScreen() {
       setLoggingOut(false);
       router.replace('/(auth)');
     }
+  };
+
+  /**
+   * Offline records stay on the device after logout and upload when the same
+   * salesman logs in again here, but they are lost if the app is reinstalled
+   * or its data cleared. Try to upload first; warn if anything is left.
+   */
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    let pending = 0;
+    try {
+      pending = await syncService.getPendingCount();
+      const online = useOfflineStore.getState();
+      if (pending > 0 && online.isConnected && online.isInternetReachable) {
+        await syncService.sync().catch(() => undefined);
+        pending = await syncService.getPendingCount();
+      }
+    } catch {
+      pending = 0;
+    } finally {
+      setLoggingOut(false);
+    }
+
+    if (pending > 0) {
+      setUnsentOnLogout(pending);
+      return;
+    }
+    await performLogout();
   };
 
   const handleComingSoon = (feature: string) => {
@@ -1088,6 +1121,17 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </TouchableOpacity>
+
+        <ConfirmationModal
+          visible={unsentOnLogout > 0}
+          title="Unsent data on this device"
+          message={`${unsentOnLogout} record${unsentOnLogout === 1 ? '' : 's'} could not be uploaded yet. They stay on this device and upload when you log in again here, but are lost if the app is reinstalled or its data is cleared. Log out anyway?`}
+          confirmText="Log out"
+          cancelText="Stay logged in"
+          variant="destructive"
+          onConfirm={() => void performLogout()}
+          onCancel={() => setUnsentOnLogout(0)}
+        />
 
         <TouchableOpacity
           onPress={handleLogout}

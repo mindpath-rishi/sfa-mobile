@@ -135,7 +135,7 @@ const computeComboBenefit = (
     (item) => item.productId && Number(item.qty) > 0,
   );
   const freeQtyPerSet = Math.floor(Number(scheme.freeQty) || 0);
-  if (!comboItems.length || freeQtyPerSet <= 0 || !scheme.freeProductId) return null;
+  if (!comboItems.length || freeQtyPerSet <= 0) return null;
 
   // Full sets bought = the scarcest combo product
   const multiples = Math.min(
@@ -215,7 +215,7 @@ export const computeGroupSchemeBenefit = (
 
   if (scheme.schemeType === 'GROUP_FREE_QTY') {
     const freeQty = Math.floor(Number(scheme.freeQty) || 0) * multiples;
-    if (freeQty <= 0 || !scheme.freeProductId) return null;
+    if (freeQty <= 0) return null;
     return {
       ...base,
       freeUnit: scheme.freeUnit === 'PIECE' ? 'PIECE' : 'CASE',

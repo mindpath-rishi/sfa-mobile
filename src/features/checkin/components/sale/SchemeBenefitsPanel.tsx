@@ -51,8 +51,7 @@ const toFreeGoodsRows = (
     .filter(
       (benefit) =>
         LINE_FREE_GOODS_TYPES.includes(benefit.schemeType) &&
-        (benefit.freeQty ?? 0) > 0 &&
-        benefit.freeProductId,
+        (benefit.freeQty ?? 0) > 0,
     )
     .map((benefit) => ({
       key: `line-${benefit.schemeId}-${benefit.freeProductId}`,
@@ -126,6 +125,8 @@ export const SchemeBenefitsPanel: React.FC<SchemeBenefitsPanelProps> = ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 4,
+                  alignSelf: 'flex-start',
+                  maxWidth: '100%',
                   paddingHorizontal: 8,
                   paddingVertical: 4,
                   borderRadius: 12,
@@ -135,7 +136,17 @@ export const SchemeBenefitsPanel: React.FC<SchemeBenefitsPanelProps> = ({
                 }}
               >
                 <Ionicons name="pricetag" size={11} color={colors.success} />
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.success }}>
+                <Text
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: colors.success,
+                  }}
+                >
                   {name}
                 </Text>
               </View>
@@ -171,7 +182,8 @@ export const SchemeBenefitsPanel: React.FC<SchemeBenefitsPanelProps> = ({
                 <Ionicons name="gift" size={16} color={colors.success} style={{ marginTop: 1 }} />
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text
-                    numberOfLines={2}
+                    numberOfLines={3}
+                    ellipsizeMode="tail"
                     style={{ fontSize: 13, fontWeight: '600', color: colors.textPrimary }}
                   >
                     {row.productName}

@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
@@ -30,7 +31,9 @@ export default function PaymentsScreen({
   const { colors } = useTheme();
 
   const { setHeader } = useHeader();
-  const { selectedOutlet } = useOutletStore();
+  const { selectedOutlet } = useOutletStore(
+    useShallow((state) => ({ selectedOutlet: state.selectedOutlet })),
+  );
 
   const { updatePaymentsFilterCount, resetPaymentsFilterCount, setOpenPaymentFilterHandler } =
     useFilterContext();

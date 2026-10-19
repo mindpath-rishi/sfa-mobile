@@ -83,11 +83,6 @@ export const NonSaleCategoryScreen: React.FC<NonSaleCategoryScreenProps> = ({
         router.push({
           pathname: '/checkin/nonsale/second-step',
           params: {
-            // customerId: customer.id,
-            // customerName: customer.name,
-            // customerAddress: customer.address,
-            // customerPhone: customer.phone,
-            // customerRoute: customer.route,
             categoryId: category.id,
             categoryTitle: category.title.replace('\n', ' '),
             categoryColor: category.color,

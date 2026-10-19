@@ -157,8 +157,6 @@ const AppCardComponent = memo<CardProps>(
         setPressed(true);
 
         if (hapticFeedback && Platform.OS !== 'web') {
-          // You can implement haptic feedback here
-          // Example: Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
 
         onPressIn?.();

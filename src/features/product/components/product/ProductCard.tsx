@@ -40,8 +40,6 @@ const ProductCardComponent: React.FC<Props> = ({ product, onAddToCart, mode }) =
   );
 
   const handlePress = useCallback(() => {
-    // Product detail navigation disabled for now.
-    // router.push(`/products/${product?.productId}`);
   }, []);
 
   const handleAddToCart = useCallback(

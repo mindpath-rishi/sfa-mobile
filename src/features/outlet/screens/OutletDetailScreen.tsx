@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   View,
   ScrollView,
@@ -299,7 +300,9 @@ export default function CustomerDetailScreen() {
   const selectedOutlet = useOutletStore((s) => s.selectedOutlet);
   const setActiveInteraction = useOutletStore((s) => s.setActiveInteraction);
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
-  const { setSelectedOutlet } = useOutletStore();
+  const { setSelectedOutlet } = useOutletStore(
+    useShallow((state) => ({ setSelectedOutlet: state.setSelectedOutlet })),
+  );
   const { setHeader } = useHeader();
   const selectedRoute = useRouteStore((s) => s.selectedRoute);
   const interactionStartedRef = useRef<string | null>(null);

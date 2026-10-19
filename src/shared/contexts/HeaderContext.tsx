@@ -40,13 +40,18 @@ export type HeaderConfig = {
   size?: 'small' | 'medium' | 'large' | 'sm' | 'md' | 'lg';
 };
 
-type HeaderContextType = {
-  config: HeaderConfig;
+type HeaderActions = {
   setHeader: (config: Partial<HeaderConfig>) => void;
   resetHeader: () => void;
 };
 
-const HeaderContext = createContext<HeaderContextType | undefined>(undefined);
+/*
+ * Config and actions live in separate contexts: screens only set the header,
+ * so they must not re-render every time any screen changes it. Only the
+ * header bar subscribes to the config.
+ */
+const HeaderConfigContext = createContext<HeaderConfig | undefined>(undefined);
+const HeaderActionsContext = createContext<HeaderActions | undefined>(undefined);
 
 export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
   const segments = useSegments();
@@ -121,24 +126,33 @@ export const HeaderProvider = ({ children }: { children: React.ReactNode }) => {
     setConfig(baseConfig);
   }, [baseConfig]);
 
-  const value = useMemo(
-    () => ({
-      config,
-      setHeader,
-      resetHeader,
-    }),
-    [config, setHeader, resetHeader],
-  );
+  const actions = useMemo(() => ({ setHeader, resetHeader }), [setHeader, resetHeader]);
 
-  return <HeaderContext.Provider value={value}>{children}</HeaderContext.Provider>;
+  return (
+    <HeaderActionsContext.Provider value={actions}>
+      <HeaderConfigContext.Provider value={config}>{children}</HeaderConfigContext.Provider>
+    </HeaderActionsContext.Provider>
+  );
 };
 
+/** Set or reset the header from a screen; does not re-render on header changes. */
 export const useHeader = () => {
-  const context = useContext(HeaderContext);
+  const context = useContext(HeaderActionsContext);
 
   if (!context) {
     throw new Error('useHeader must be used within HeaderProvider');
   }
 
   return context;
+};
+
+/** Current header config, for the header bar itself. */
+export const useHeaderConfig = () => {
+  const config = useContext(HeaderConfigContext);
+
+  if (!config) {
+    throw new Error('useHeaderConfig must be used within HeaderProvider');
+  }
+
+  return config;
 };

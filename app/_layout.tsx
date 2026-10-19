@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-router';
 import { ActivityIndicator, AppState, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -34,6 +35,9 @@ import {
 
 import { authService } from '@/features/auth/services/auth.service';
 import { getClientDeviceIdAsync } from '@/shared/services/device.service';
+import { installErrorReporter } from '@/core/diagnostics/error-reporter';
+import { sendHeartbeat } from '@/core/diagnostics/diagnostics.service';
+import { UpdateGate } from '@/core/diagnostics/UpdateGate';
 
 import {
   debugLocationTrackingStatus,
@@ -50,6 +54,15 @@ import {
 
 setupBackgroundMessageHandler();
 
+// Logging serialises its arguments on the JS thread; keep it out of release
+// builds. Warnings and errors stay visible.
+if (!__DEV__) {
+  const noop = () => {};
+  console.log = noop;
+  console.info = noop;
+  console.debug = noop;
+}
+
 export default function RootLayout() {
   const router = useRouter();
   const navigationState = useRootNavigationState();
@@ -62,10 +75,24 @@ export default function RootLayout() {
    * STORES
    * ====================================================== */
 
-  const { hydrate: hydrateTheme, hydrated: themeHydrated } = useThemeStore();
-  const { hydrate: hydrateLanguage, hydrated: languageHydrated } = useLanguageStore();
+  const { hydrate: hydrateTheme, hydrated: themeHydrated } = useThemeStore(
+    useShallow((state) => ({ hydrate: state.hydrate, hydrated: state.hydrated })),
+  );
+  const { hydrate: hydrateLanguage, hydrated: languageHydrated } = useLanguageStore(
+    useShallow((state) => ({ hydrate: state.hydrate, hydrated: state.hydrated })),
+  );
 
-  const { hydrate: hydrateAuth, isHydrated: authHydrated, accessToken: token } = useAuthStore();
+  const {
+    hydrate: hydrateAuth,
+    isHydrated: authHydrated,
+    accessToken: token,
+  } = useAuthStore(
+    useShallow((state) => ({
+      hydrate: state.hydrate,
+      isHydrated: state.isHydrated,
+      accessToken: state.accessToken,
+    })),
+  );
   const hydrateCart = useCartStore((state) => state.hydrate);
   const hydrateRoute = useRouteStore((state) => state.hydrate);
 
@@ -111,18 +138,26 @@ export default function RootLayout() {
     void initialiseOffline();
   }, [authHydrated, authUser?.userId, hydrateCart, hydrateRoute]);
 
+  /* App errors → MIS System Logs (warnings/errors, and crashes). */
+  useEffect(() => installErrorReporter(), []);
+
   useEffect(() => {
     if (!token) return;
 
     void syncOfflineQueue();
+    // Phone health check-in for MIS → Devices & App; also returns update
+    // status and any command MIS queued for this phone.
+    void sendHeartbeat();
 
     const timer = setInterval(() => {
       void syncOfflineQueue();
+      void sendHeartbeat();
     }, 5 * 60_000);
 
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         void syncOfflineQueue();
+        void sendHeartbeat();
       }
     });
 
@@ -358,6 +393,7 @@ export default function RootLayout() {
             <OfflineSyncGate />
             <LoaderOverlay />
             <BackgroundLocationDisclosureModal />
+            <UpdateGate />
             <Toast position="top" />
           </FilterProvider>
         </AppProviders>

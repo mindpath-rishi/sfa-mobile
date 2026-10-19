@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
@@ -17,7 +18,7 @@ import { toast } from '@/core/utils';
 import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getRoleId } from '@/core/navigation/role.utils';
-import { useLoaderStore } from '@/core/loader/loader.store';
+import { useLoaderActions } from '@/core/loader/loader.store';
 import { useOfflineStore } from '@/core/offline/offline.store';
 import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
 
@@ -130,10 +131,15 @@ const CustomDrawerContent = (props: any) => {
   const { colors } = useTheme();
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
-  const { workSessionId, setWorkSessionId } = useAuthStore();
+  const { workSessionId, setWorkSessionId } = useAuthStore(
+    useShallow((state) => ({
+      workSessionId: state.workSessionId,
+      setWorkSessionId: state.setWorkSessionId,
+    })),
+  );
   const roleId = getRoleId(user);
   const allowedRoutes = roleId === 'SALESMAN' ? SALESMAN_DRAWER_ROUTES : MANAGER_DRAWER_ROUTES;
-  const loader = useLoaderStore();
+  const loader = useLoaderActions();
   const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);
 
   const [showSettlementConfirm, setShowSettlementConfirm] = useState(false);
@@ -193,9 +199,6 @@ const CustomDrawerContent = (props: any) => {
         useRouteStore.getState().van?.vanId || (user as any)?.vanId || (user as any)?.defaultVanId;
 
       if (vanIdToUse) {
-        // toast.error('Van not found. Please start your day first.');
-
-        // return;
         const res: any = await vanService.fetchTodayStockSummary(
           {
             vanId: vanIdToUse,

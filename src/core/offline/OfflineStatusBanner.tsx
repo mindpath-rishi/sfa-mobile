@@ -1,4 +1,5 @@
 import React from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { AppText } from '@/core/components';
@@ -18,7 +19,17 @@ export function OfflineStatusBanner() {
     lastSyncTime,
     lastError,
     offlineEnabled,
-  } = useOfflineStore();
+  } = useOfflineStore(
+    useShallow((state) => ({
+      isConnected: state.isConnected,
+      isInternetReachable: state.isInternetReachable,
+      pendingCount: state.pendingCount,
+      isSyncing: state.isSyncing,
+      lastSyncTime: state.lastSyncTime,
+      lastError: state.lastError,
+      offlineEnabled: state.offlineEnabled,
+    })),
+  );
 
   const offline = !isConnected || !isInternetReachable;
   if (!isSalesman(user) || user?.offlineAccessAllowed !== true || (!offlineEnabled && !offline)) {

@@ -1,4 +1,10 @@
-import { ENTITY_TABLES, getDatabase, withTransaction } from '@/database';
+import {
+  ENTITY_TABLES,
+  getDatabase,
+  pruneApiCache,
+  withExclusiveTransaction,
+  withTransaction,
+} from '@/database';
 import type { EntityName } from '@/database/entities';
 import { isSalesman } from '@/core/navigation/role.utils';
 import {
@@ -30,6 +36,8 @@ const LAST_SYNC_KEY = 'last_sync_time_v11';
 const BATCH_SIZE = 50;
 const MAX_RETRIES = 8;
 const BASE_RETRY_MS = 2_000;
+/** Items that used up MAX_RETRIES are retried again after this long. */
+const EXHAUSTED_RETRY_INTERVAL_MS = 30 * 60_000;
 
 type QueueRow = {
   id: string;
@@ -587,32 +595,42 @@ const download = async (downloadOwnerId = ownerId()) => {
       throw new Error(response.message ?? 'Download failed');
     }
 
-    for (const record of response.data.records) {
-      const repository = repositories[record.entity];
+    /**
+     * One transaction per downloaded page instead of one per record (each
+     * single write waits for a disk flush). If the page fails it rolls back;
+     * the watermark is not advanced, so the next sync downloads it again.
+     * Logs are written after the transaction so they never wait on its lock.
+     */
+    const skippedEntities: string[] = [];
+    let failedEntity = '';
 
-      if (!repository) {
-        await log(
-          'DOWNLOAD',
-          String(record.entity),
-          'SKIPPED',
-          `Missing local repository for entity: ${String(record.entity)}`,
-        );
+    try {
+      await withExclusiveTransaction(async (connection) => {
+        for (const record of response.data!.records) {
+          const repository = repositories[record.entity];
 
-        continue;
-      }
+          if (!repository) {
+            skippedEntities.push(String(record.entity));
+            continue;
+          }
 
-      try {
-        await repository.upsertRemote(downloadOwnerId, record);
-      } catch (error) {
-        await log(
-          'DOWNLOAD',
-          String(record.entity),
-          'FAILED',
-          error instanceof Error ? error.message : 'Failed to save remote record',
-        );
+          failedEntity = String(record.entity);
+          await repository.upsertRemote(downloadOwnerId, record, connection);
+        }
+      });
+    } catch (error) {
+      await log(
+        'DOWNLOAD',
+        failedEntity || 'ALL',
+        'FAILED',
+        error instanceof Error ? error.message : 'Failed to save remote record',
+      );
 
-        throw error;
-      }
+      throw error;
+    }
+
+    for (const entity of skippedEntities) {
+      await log('DOWNLOAD', entity, 'SKIPPED', `Missing local repository for entity: ${entity}`);
     }
 
     cursor = response.data.hasMore ? response.data.cursor : undefined;
@@ -635,6 +653,54 @@ const download = async (downloadOwnerId = ownerId()) => {
 };
 
 export const syncService = {
+  /** Queue counts, oldest unsent item and last upload, for the diagnostics heartbeat. */
+  async getQueueStats() {
+    if (!enabled() || !ownerId()) return { pending: 0, failed: 0, syncing: 0, oldestPendingAt: null, lastUploadAt: null };
+    const database = await getDatabase();
+    const rows = await database.getAllAsync<{ status: string; count: number; oldest: string | null }>(
+      `SELECT status, COUNT(*) AS count, MIN(created_at) AS oldest FROM sync_queue
+       WHERE owner_id = ? AND status IN ('PENDING', 'FAILED', 'SYNCING') GROUP BY status`,
+      ownerId(),
+    );
+    const synced = await database.getFirstAsync<{ last: string | null }>(
+      `SELECT MAX(updated_at) AS last FROM sync_queue WHERE owner_id = ? AND status = 'SYNCED'`,
+      ownerId(),
+    );
+    const count = (status: string) => rows.find((row) => row.status === status)?.count ?? 0;
+    const oldest = rows.map((row) => row.oldest).filter(Boolean).sort()[0] ?? null;
+    return {
+      pending: count('PENDING'),
+      failed: count('FAILED'),
+      syncing: count('SYNCING'),
+      oldestPendingAt: oldest,
+      lastUploadAt: synced?.last ?? null,
+    };
+  },
+
+  /** Recent queue rows without payloads (they can hold customer data), for diagnostic reports. */
+  async getQueueSnapshot(limit = 200) {
+    if (!ownerId()) return [];
+    const database = await getDatabase();
+    return database.getAllAsync<Record<string, unknown>>(
+      `SELECT id, entity, record_id, operation, status, retry_count, error, next_retry_at, created_at, updated_at
+       FROM sync_queue WHERE owner_id = ? AND status != 'SYNCED'
+       ORDER BY created_at DESC LIMIT ?`,
+      ownerId(),
+      limit,
+    );
+  },
+
+  /**
+   * Forget the download watermark so the next sync downloads everything
+   * again (requested from MIS). Unsent local changes are never overwritten.
+   */
+  async resetDownloadWatermark() {
+    if (!enabled() || !ownerId()) return;
+    const database = await getDatabase();
+    await database.runAsync('DELETE FROM settings WHERE owner_id = ? AND key = ?', ownerId(), LAST_SYNC_KEY);
+    await this.sync();
+  },
+
   async getPendingCount() {
     // Purely-online users have nothing to upload
     if (!enabled()) return 0;
@@ -838,6 +904,12 @@ export const syncService = {
 
     useOfflineStore.getState().setLastSyncTime(setting?.value ?? null);
 
+    try {
+      await pruneApiCache(ownerId());
+    } catch {
+      // Cache cleanup is housekeeping; never block start-up on it
+    }
+
     await updatePendingCount();
   },
 
@@ -911,11 +983,11 @@ export const syncService = {
 
         await log('SYNC', 'ALL', 'FAILED', message);
       } finally {
-        if (ownerId() !== syncOwnerId) return;
-
+        // Always clear the flag; only one sync runs at a time, so this cannot
+        // hide another user's sync. Their pending count is not refreshed here.
         useOfflineStore.getState().setSyncing(false);
 
-        await updatePendingCount();
+        if (ownerId() === syncOwnerId) await updatePendingCount();
       }
     })().finally(() => {
       activeSync = null;
@@ -929,6 +1001,42 @@ export const syncService = {
     });
 
     return activeSync;
+  },
+
+  /**
+   * Routine retry (timer / app resume). Failed items follow their backoff;
+   * items that used up MAX_RETRIES get a fresh round only every
+   * EXHAUSTED_RETRY_INTERVAL_MS, so nothing is abandoned but a record the
+   * server keeps rejecting is not re-sent every few minutes.
+   */
+  async retryDue() {
+    if (activeSync) {
+      await this.sync();
+
+      return;
+    }
+
+    const database = await getDatabase();
+
+    await database.runAsync(
+      `UPDATE sync_queue
+       SET status = 'PENDING',
+           retry_count = 0,
+           next_retry_at = NULL,
+           error = NULL
+       WHERE owner_id = ?
+         AND (
+           status = 'SYNCING'
+           OR (status = 'FAILED' AND retry_count >= ? AND updated_at <= ?)
+         )`,
+      ownerId(),
+      MAX_RETRIES,
+      new Date(Date.now() - EXHAUSTED_RETRY_INTERVAL_MS).toISOString(),
+    );
+
+    await updatePendingCount();
+
+    await this.sync();
   },
 
   async retryFailed() {

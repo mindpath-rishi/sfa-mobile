@@ -2,13 +2,6 @@ import { Route } from 'expo-router';
 import { ActivityHistoryEntry, ActivityType, TodayActivity } from './activity.types';
 import { Van } from './van.types';
 
-// export interface ActivityType {
-//   id: string;
-//   name: string;
-//   icon: string;
-//   color: string;
-// }
-
 export interface OtherWorkOption {
   id: string;
   name: string;

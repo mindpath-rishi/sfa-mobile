@@ -70,7 +70,7 @@ export const OutletCard: React.FC<Props> = ({ outlet, index, onPress }) => {
 
   return (
     <Animated.View
-      entering={FadeInUp.delay(index * 35)
+      entering={FadeInUp.delay(Math.min(index, 8) * 35)
         .springify()
         .damping(14)}
       style={animatedStyle}

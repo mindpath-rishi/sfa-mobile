@@ -26,7 +26,8 @@ export const ProductItem: React.FC<ProductItemProps> = ({
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
 
-  const { addItems, removeItem } = useCartStore();
+  const addItems = useCartStore((state) => state.addItems);
+  const removeItem = useCartStore((state) => state.removeItem);
   const schemeBenefit = useCartStore((state) => state.schemeDiscounts[product.productId]);
 
   const handleAddToCart = useCallback(
@@ -89,7 +90,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
 
   return (
     <Animated.View
-      entering={FadeInDown.delay(index * 50).springify()}
+      entering={FadeInDown.delay(Math.min(index, 8) * 50).springify()}
       style={{
         backgroundColor: colors.surface,
         borderRadius: 10,
@@ -185,7 +186,9 @@ export const ProductItem: React.FC<ProductItemProps> = ({
           </View>
 
           {/* Selected quantities */}
-          {(product.caseQty > 0 || product.pieceQty > 0 || (mode === 'topup' && totalWeight > 0)) && (
+          {(product.caseQty > 0 ||
+            product.pieceQty > 0 ||
+            (mode === 'topup' && totalWeight > 0)) && (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
               {[
                 product.caseQty > 0 && `${product.caseQty} ${unitLabel(product.caseQty, 'CASE')}`,
@@ -220,9 +223,10 @@ export const ProductItem: React.FC<ProductItemProps> = ({
                   key={applied.schemeId}
                   style={{
                     flexDirection: 'row',
-                    alignItems: 'center',
+                    alignItems: 'flex-start',
                     gap: 4,
                     maxWidth: '100%',
+                    flexShrink: 1,
                     paddingHorizontal: 7,
                     paddingVertical: 3,
                     borderRadius: 10,
@@ -235,14 +239,23 @@ export const ProductItem: React.FC<ProductItemProps> = ({
                     name={(applied.freeQty ?? 0) > 0 ? 'gift' : 'pricetag'}
                     size={11}
                     color={colors.success}
+                    style={{ marginTop: 2 }}
                   />
                   <Text
-                    numberOfLines={1}
-                    style={{ flexShrink: 1, fontSize: 11, fontWeight: '600', color: colors.success }}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    style={{
+                      flex: 1,
+                      flexShrink: 1,
+                      minWidth: 0,
+                      fontSize: 11,
+                      fontWeight: '600',
+                      color: colors.success,
+                    }}
                   >
                     {applied.schemeName}
                     {(applied.freeQty ?? 0) > 0
-                      ? ` · ${applied.freeQty} ${unitLabel(applied.freeQty ?? 0, applied.freeUnit)} free`
+                      ? ` · ${applied.freeProductName || 'Free item'}: ${applied.freeQty} ${unitLabel(applied.freeQty ?? 0, applied.freeUnit)} free`
                       : ''}
                   </Text>
                 </View>

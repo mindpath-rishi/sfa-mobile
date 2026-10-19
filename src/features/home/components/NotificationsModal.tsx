@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   ActivityIndicator,
   Image,
@@ -89,11 +90,7 @@ const formatFullDate = (value?: string) => {
 
 const mapNotification = (item: ApiNotificationItem): NotificationItem => {
   const rawCategory = String(
-    item.data?.category ||
-      item.data?.notificationType ||
-      item.data?.type ||
-      item.category ||
-      '',
+    item.data?.category || item.data?.notificationType || item.data?.type || item.category || '',
   )
     .trim()
     .toLowerCase()
@@ -103,8 +100,8 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
     : rawCategory.startsWith('route_change')
       ? 'route_change'
       : rawCategory === 'outlet_approval_result'
-      ? 'outlet_approval'
-      : rawCategory || 'system';
+        ? 'outlet_approval'
+        : rawCategory || 'system';
   const type: NotificationType = [
     'order',
     'route',
@@ -180,8 +177,9 @@ const isPendingRouteChangeApproval = (item: NotificationItem) => {
 };
 
 const getRouteChangeStatus = (item: NotificationItem) => {
-  const status = String(item.data?.routeChangeStatus || item.data?.status || item.data?.action || '')
-    .toUpperCase();
+  const status = String(
+    item.data?.routeChangeStatus || item.data?.status || item.data?.action || '',
+  ).toUpperCase();
   return ['APPROVED', 'REJECTED'].includes(status) ? status : '';
 };
 
@@ -325,7 +323,7 @@ function NotificationDetail({
   insets: { top: number; bottom: number };
 }) {
   const styles = createDetailStyles(colors, insets);
-  const { user } = useAuthStore();
+  const { user } = useAuthStore(useShallow((state) => ({ user: state.user })));
   // Any non-salesman role (team leader, manager, ...) can act on approvals
   const isManager = isManagerUser(user);
   const isVanChange = isPendingVanChangeApproval(item);
@@ -612,8 +610,8 @@ function NotificationDetail({
                   : isRouteChange
                     ? 'Review the requested route change, then approve or reject the request.'
                     : isStockUnload
-                    ? 'Approving this request will unload all current van stock. Rejecting it will leave the stock unchanged.'
-                    : 'This van change request is pending your approval. Please review the details above before taking action.'}
+                      ? 'Approving this request will unload all current van stock. Rejecting it will leave the stock unchanged.'
+                      : 'This van change request is pending your approval. Please review the details above before taking action.'}
             </AppText>
             <View style={styles.approvalButtons}>
               <Pressable
@@ -855,7 +853,7 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
   const [selectedItem, setSelectedItem] = useState<NotificationItem | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuthStore();
+  const { user } = useAuthStore(useShallow((state) => ({ user: state.user })));
   // Any non-salesman role (team leader, manager, ...) can act on approvals
   const isManager = isManagerUser(user);
   const [processing, setProcessing] = useState<{ id: string; action: 'approve' | 'reject' } | null>(

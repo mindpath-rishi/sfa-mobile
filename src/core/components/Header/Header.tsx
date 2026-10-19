@@ -15,7 +15,7 @@ import Animated, {
 
 import { useHeaderStyles } from './Header.styles';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { useHeader } from '@/shared/contexts/HeaderContext';
+import { useHeaderConfig } from '@/shared/contexts/HeaderContext';
 import { router } from 'expo-router';
 
 import { useOfflineStore } from '@/core/offline/offline.store';
@@ -25,7 +25,7 @@ import { isSalesman } from '@/core/navigation/role.utils';
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const Header: React.FC = () => {
-  const { config } = useHeader();
+  const config = useHeaderConfig();
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();

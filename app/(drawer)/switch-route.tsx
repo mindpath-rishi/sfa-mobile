@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   View,
   ScrollView,
@@ -93,7 +94,9 @@ const ESTIMATED_TIME_PER_OUTLET = 5;
 export default function Routes() {
   const { colors } = useTheme();
   const { setHeader } = useHeader();
-  const { selectedRoute, van } = useRouteStore();
+  const { selectedRoute, van } = useRouteStore(
+    useShallow((state) => ({ selectedRoute: state.selectedRoute, van: state.van })),
+  );
   const workSessionId = useAuthStore((state) => state.workSessionId);
   const insets = useSafeAreaInsets();
   const pathname = usePathname();

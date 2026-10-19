@@ -13,7 +13,7 @@ export const usePaymentCollectionStyles = () => {
 
     scrollContent: {
       padding: 16,
-      paddingBottom: 100,
+      paddingBottom: 20,
       gap: 12,
     } as ViewStyle,
 
@@ -128,11 +128,6 @@ export const usePaymentCollectionStyles = () => {
       paddingVertical: 6,
     } as ViewStyle,
 
-    fullAmountText: {
-      fontSize: 12,
-      fontWeight: '600',
-    } as TextStyle,
-
     remarksInput: {
       borderWidth: 1,
       borderRadius: 12,
@@ -143,10 +138,6 @@ export const usePaymentCollectionStyles = () => {
     } as TextStyle,
 
     bottomBar: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
       paddingHorizontal: 16,
       paddingTop: 12,
       backgroundColor: colors.background,

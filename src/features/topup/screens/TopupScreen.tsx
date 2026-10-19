@@ -1,5 +1,6 @@
 // app/topup/index.tsx
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -42,7 +43,7 @@ export default function TopupScreen({
   hideFilters = false,
 }: TopupScreenProps) {
   const { colors } = useTheme();
-  const { user } = useAuthStore();
+  const { user } = useAuthStore(useShallow((state) => ({ user: state.user })));
   const van = useRouteStore((state) => state.van);
   const styles = useTopupStyles();
   const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);

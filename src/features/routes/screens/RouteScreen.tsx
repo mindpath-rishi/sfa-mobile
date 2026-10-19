@@ -8,19 +8,19 @@ import {
   Modal,
   Alert,
   Platform,
-  Animated,
   TouchableWithoutFeedback,
   LayoutAnimation,
   UIManager,
   Linking,
   TextInput,
   RefreshControl,
+  FlatList,
 } from 'react-native';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { AppButton, AppModal, Skeleton } from '@/core/components';
+import { AppButton, AppModal } from '@/core/components';
 import { outletService } from '@/features/outlet/services/outlet.service';
 import { homeService } from '@/features/home/services/home.service';
 import { router, useFocusEffect } from 'expo-router';
@@ -36,8 +36,6 @@ import { CustomerCreateModal } from '@/shared/components/models/CustomerCreateMo
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { FilterModal } from '@/shared/components/models/Filter.modal';
 import { FilterSection } from '@/shared/types/filter.types';
-import { formatCurrency as formatCurrencyCommon } from '@/shared/utils/currenty.utils';
-import { ConfirmationModal } from '@/features/routes/components/ConfirmationModal';
 import {
   DEFAULT_CURRENT_LOCATION,
   ROUTE_OUTLETS_LIMIT,
@@ -47,63 +45,18 @@ import type { Outlet } from '@/features/routes/types/route.types';
 import { getDistance, isInsideGeofence } from '@/shared/utils/geofence.utils';
 import { captureCurrentLocation } from '@/shared/services/location.service';
 import { useLoaderStore } from '@/core/loader/loader.store';
-
-// ============= UTILITY FUNCTIONS =============
-const formatCurrency = (amount: number): string => {
-  return formatCurrencyCommon(amount, {
-    prefix: 'K',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-};
-
-const getOutletCoordinate = (outlet: Outlet) => {
-  const latitude = Number(outlet.geoTag?.lat);
-  const longitude = Number(outlet.geoTag?.lng);
-
-  if (
-    !Number.isFinite(latitude) ||
-    !Number.isFinite(longitude) ||
-    latitude < -90 ||
-    latitude > 90 ||
-    longitude < -180 ||
-    longitude > 180
-  )
-    return null;
-  return { latitude, longitude };
-};
-
-const getOutletDisplayName = (outlet: any): string => {
-  const name =
-    outlet?.name ??
-    outlet?.customerName ??
-    outlet?.outletName ??
-    outlet?.shopName ??
-    outlet?.businessName ??
-    outlet?.legalName ??
-    outlet?.companyName ??
-    outlet?.customer?.name ??
-    outlet?.customer?.customerName ??
-    outlet?.ownerName;
-
-  const normalizedName = String(name ?? '').trim();
-  return normalizedName || 'Unnamed Outlet';
-};
-
-const normalizeFilterText = (value: unknown) =>
-  String(value ?? '')
-    .trim()
-    .toLowerCase();
-
-const hasNoOrderInLast30Days = (outlet: Outlet) => {
-  if (!outlet.lastOrderDate) return true;
-
-  const lastOrderTime = new Date(outlet.lastOrderDate).getTime();
-  if (Number.isNaN(lastOrderTime)) return true;
-
-  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-  return lastOrderTime < thirtyDaysAgo;
-};
+import { OutletCardComponent } from '@/features/routes/components/OutletCard';
+import {
+  EmptyStateComponent,
+  LoadingSkeleton,
+} from '@/features/routes/components/RouteScreenStates';
+import {
+  formatCurrency,
+  getOutletCoordinate,
+  getOutletDisplayName,
+  hasNoOrderInLast30Days,
+  normalizeFilterText,
+} from '@/features/routes/utils/route-outlet.utils';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -138,251 +91,6 @@ type RouteAccessMessage = {
   title: string;
   message: string;
 };
-
-// ============= LOADING STATES COMPONENTS =============
-const LoadingSkeleton = ({ colors, styles }: any) => (
-  <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
-    <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.header}>
-      <View style={styles.progressContainer}>
-        <View style={styles.progressHeader}>
-          <Skeleton height={14} width={120} borderRadius={7} />
-          <Skeleton height={26} width={54} borderRadius={10} />
-        </View>
-        <Skeleton height={8} width="100%" borderRadius={4} />
-        <Skeleton height={12} width={168} borderRadius={6} style={{ marginTop: 12 }} />
-      </View>
-
-      <View style={styles.headerMetricsGrid}>
-        {[1, 2, 3, 4].map((item) => (
-          <React.Fragment key={item}>
-            <View style={styles.headerMetricItem}>
-              <Skeleton height={16} width={16} variant="circle" />
-              <Skeleton height={18} width={44} borderRadius={8} style={{ marginTop: 8 }} />
-              <Skeleton height={10} width={38} borderRadius={5} style={{ marginTop: 8 }} />
-            </View>
-            {item < 4 && <View style={styles.headerMetricDivider} />}
-          </React.Fragment>
-        ))}
-      </View>
-    </LinearGradient>
-
-    <View style={styles.searchBarContainer}>
-      <Skeleton height={44} width="83%" borderRadius={12} />
-      <Skeleton height={44} width={44} borderRadius={12} />
-    </View>
-
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
-    >
-      {[72, 90, 104, 96].map((item) => (
-        <Skeleton
-          key={item}
-          height={34}
-          width={item}
-          borderRadius={14}
-          style={{ marginRight: 12 }}
-        />
-      ))}
-    </ScrollView>
-
-    <View style={styles.outletList}>
-      {[1, 2, 3, 4, 5].map((item) => (
-        <View key={item} style={styles.expandableCard}>
-          <View style={styles.cardHeader}>
-            <View style={styles.headerLeft}>
-              <Skeleton height={44} width={44} variant="circle" />
-              <View style={{ flex: 1 }}>
-                <View style={styles.nameRow}>
-                  <Skeleton height={16} width="64%" borderRadius={8} />
-                  <Skeleton height={24} width={64} borderRadius={8} />
-                </View>
-                <View style={styles.detailsRow}>
-                  <Skeleton height={12} width="58%" borderRadius={6} />
-                  <Skeleton height={22} width={72} borderRadius={11} />
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-      ))}
-    </View>
-  </ScrollView>
-);
-
-const EmptyStateComponent = ({
-  icon,
-  title,
-  message,
-  actionText,
-  onAction,
-  colors,
-  styles,
-}: any) => (
-  <View style={styles.emptyState}>
-    <Ionicons name={icon} size={64} color={colors.textSecondary} />
-    <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>{title}</Text>
-    <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>{message}</Text>
-    {actionText && onAction && (
-      <TouchableOpacity onPress={onAction} style={styles.emptyStateButton}>
-        <Text style={[styles.emptyStateButtonText, { color: colors.primary }]}>{actionText}</Text>
-      </TouchableOpacity>
-    )}
-  </View>
-);
-
-// ============= SEPARATE OUTLET CARD COMPONENT =============
-const OutletCardComponent = React.memo(
-  ({
-    outlet,
-    index,
-    onPress,
-    onNavigate,
-    onComplete,
-    colors,
-    styles,
-  }: {
-    outlet: any;
-    index: number;
-    onPress: (outlet: Outlet) => void;
-    onNavigate: (outlet: Outlet) => void;
-    onComplete: (outletId: string) => Promise<void>;
-    colors: any;
-    styles: any;
-  }) => {
-    const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
-    const visitStatus = outlet.visitStatus;
-    const isActive = visitStatus === 'ACTIVE';
-    const isCompleted = visitStatus === 'COMPLETED';
-    const isInside = outlet.isInsideGeofence;
-    const isVerificationPending = outlet.status === 'VERIFICATION_PENDING';
-    const isRejected = outlet.status === 'REJECTED';
-
-    const statusColors = isRejected
-      ? { bg: colors.error + '15', text: colors.error }
-      : isVerificationPending
-        ? { bg: colors.warning + '15', text: colors.warning }
-        : isCompleted
-          ? { bg: colors.success + '15', text: colors.success }
-          : isActive
-            ? { bg: colors.primary + '15', text: colors.primary }
-            : { bg: colors.warning + '15', text: colors.warning };
-
-    const statusLabel = isRejected
-      ? 'Rejected'
-      : isVerificationPending
-        ? 'Verification Pending'
-        : isCompleted
-          ? 'Done'
-          : isActive
-            ? 'Active'
-            : 'Pending';
-
-    const handleComplete = useCallback(() => {
-      setShowCompleteConfirm(false);
-      void onComplete(outlet._id).catch((error) => {
-        console.error('Failed to complete outlet visit:', error);
-      });
-    }, [outlet._id, onComplete]);
-
-    return (
-      <View
-        style={[
-          styles.expandableCard,
-          isActive && styles.expandableCardCurrent,
-          isCompleted && styles.expandableCardCompleted,
-          isInside && !isCompleted && !isActive && styles.expandableCardNearby,
-        ]}
-      >
-        <ConfirmationModal
-          visible={showCompleteConfirm}
-          title="Complete Visit"
-          message={`Mark "${getOutletDisplayName(outlet)}" as completed?`}
-          onConfirm={handleComplete}
-          onCancel={() => setShowCompleteConfirm(false)}
-          confirmText="Yes, Complete"
-          cancelText="Cancel"
-          confirmVariant="success"
-        />
-
-        <TouchableOpacity
-          style={styles.cardHeader}
-          onPress={() => onPress(outlet)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.headerLeft}>
-            <View style={[styles.statusIndicator, { backgroundColor: statusColors.bg }]}>
-              {isCompleted ? (
-                <Ionicons name="checkmark-circle" size={24} color={statusColors.text} />
-              ) : (
-                <Text style={[styles.statusNumber, { color: statusColors.text }]}>{index + 1}</Text>
-              )}
-            </View>
-
-            <View style={styles.headerInfo}>
-              <View style={styles.nameRow}>
-                <Text style={styles.outletName} numberOfLines={2}>
-                  {getOutletDisplayName(outlet)}
-                </Text>
-              </View>
-              <View style={styles.detailsRow}>
-                <Text style={styles.stopAddress} numberOfLines={1}>
-                  {outlet.address?.line1}
-                </Text>
-                <View style={styles.distanceBadge}>
-                  <Feather name="map-pin" size={12} color={colors.textSecondary} />
-                  <Text style={styles.distanceText}>
-                    {((outlet.distance ?? 0) / 1000).toFixed(1)} km
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.cardMetaRow}>
-                <View style={styles.cardBadgesRow}>
-                  <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
-                    <Text style={[styles.statusBadgeText, { color: statusColors.text }]}>
-                      {statusLabel}
-                    </Text>
-                  </View>
-                  {isInside && !isCompleted && !isActive && (
-                    <View style={styles.nearbyBadge}>
-                      <Ionicons name="location" size={12} color={colors.success} />
-                      <Text style={styles.nearbyBadgeText}>Nearby</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.headerIconsRow}>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      if (outlet.phoneNumber) {
-                        Linking.openURL(`tel:${outlet.phoneNumber}`);
-                      } else {
-                        Alert.alert('Error', 'Phone number not available');
-                      }
-                    }}
-                    style={styles.headerIconButton}
-                  >
-                    <Ionicons name="call-outline" size={20} color={colors.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      onNavigate(outlet);
-                    }}
-                    style={styles.headerIconButton}
-                  >
-                    <Ionicons name="navigate-outline" size={20} color={colors.info} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        </TouchableOpacity>
-      </View>
-    );
-  },
-);
 
 // ============= MAIN COMPONENT =============
 export default function RouteScreen() {
@@ -1348,6 +1056,22 @@ export default function RouteScreen() {
   ]);
 
   // Show loading state
+  // Outlet cards are virtualised: routes can hold hundreds of outlets
+  const renderOutletCard = useCallback(
+    ({ item, index }: { item: (typeof outletsWithDistance)[number]; index: number }) => (
+      <OutletCardComponent
+        outlet={item}
+        index={index}
+        onPress={handleCardPress}
+        onNavigate={handleNavigation}
+        onComplete={markComplete}
+        colors={colors}
+        styles={styles}
+      />
+    ),
+    [handleCardPress, handleNavigation, markComplete, colors, styles],
+  );
+
   if ((isLoading || isCheckingRouteAccess) && !refreshing && !routeAccessMessage) {
     return (
       <SafeAreaView style={styles.container}>
@@ -1390,100 +1114,113 @@ export default function RouteScreen() {
   // ========== RENDER ==========
   return (
     <SafeAreaView style={styles.container}>
-      <Animated.ScrollView
+      <FlatList
+        data={outletsWithDistance}
+        keyExtractor={(outlet) => outlet._id}
+        renderItem={renderOutletCard}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 16) + 48 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
-      >
-        {/* Header */}
-        <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.header}>
-          <View style={styles.progressContainer}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Today's Progress</Text>
-              <Text style={styles.progressPercent}>{Math.round(summaryStats.completionRate)}%</Text>
-            </View>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${summaryStats.completionRate}%` }]} />
-            </View>
-            <Text style={styles.progressStats}>
-              {summaryStats.visitedCount} of {summaryStats.totalOutlets} outlets completed
-            </Text>
-          </View>
-
-          {/* Metrics Grid */}
-          <View style={styles.headerMetricsGrid}>
-            <View style={styles.headerMetricItem}>
-              <Ionicons name="call" size={16} color={colors.surface} />
-              <Text style={styles.headerMetricValue}>{summaryStats.productiveCalls}</Text>
-              <Text style={styles.headerMetricLabel}>PC</Text>
-            </View>
-            <View style={styles.headerMetricDivider} />
-            <View style={styles.headerMetricItem}>
-              <MaterialIcons name="attach-money" size={16} color={colors.surface} />
-              <Text style={styles.headerMetricValue}>
-                {formatCurrency(summaryStats.totalOrderValue)}
-              </Text>
-              <Text style={styles.headerMetricLabel}>Pipeline</Text>
-            </View>
-            <View style={styles.headerMetricDivider} />
-            <View style={styles.headerMetricItem}>
-              <Feather name="package" size={16} color={colors.surface} />
-              <Text style={styles.headerMetricValue}>{summaryStats.totalQuantity.toFixed(1)}</Text>
-              <Text style={styles.headerMetricLabel}>Cases</Text>
-            </View>
-            <View style={styles.headerMetricDivider} />
-            <View style={styles.headerMetricItem}>
-              <MaterialIcons name="inventory" size={16} color={colors.surface} />
-              <Text style={styles.headerMetricValue}>{summaryStats.lpsc.toFixed(1)}</Text>
-              <Text style={styles.headerMetricLabel}>LPSC</Text>
-            </View>
-          </View>
-        </LinearGradient>
-
-        {/* Search Bar */}
-        <View style={styles.searchBarContainer}>
-          <View style={[styles.searchBar, { borderColor: colors.divider }]}>
-            <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search by name, owner, or phone..."
-              placeholderTextColor={colors.textSecondary}
-              value={searchText}
-              onChangeText={setSearchText}
-            />
-            {searchText.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchText('')}>
-                <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
-            <LinearGradient
-              colors={[colors.primary, colors.primaryDark]}
-              style={styles.filterGradient}
-            >
-              <Ionicons name="filter-outline" size={18} color={colors.surface} />
-              {(filters.status.length > 0 ||
-                filters.visitStatus.length > 0 ||
-                filters.priority.length > 0) && (
-                <View style={styles.filterBadge}>
-                  <Text style={styles.filterBadgeText}>
-                    {filters.status.length + filters.visitStatus.length + filters.priority.length}
+        ListHeaderComponent={
+          <>
+            {/* Header */}
+            <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.header}>
+              <View style={styles.progressContainer}>
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressTitle}>Today's Progress</Text>
+                  <Text style={styles.progressPercent}>
+                    {Math.round(summaryStats.completionRate)}%
                   </Text>
                 </View>
-              )}
+                <View style={styles.progressBar}>
+                  <View
+                    style={[styles.progressFill, { width: `${summaryStats.completionRate}%` }]}
+                  />
+                </View>
+                <Text style={styles.progressStats}>
+                  {summaryStats.visitedCount} of {summaryStats.totalOutlets} outlets completed
+                </Text>
+              </View>
+
+              {/* Metrics Grid */}
+              <View style={styles.headerMetricsGrid}>
+                <View style={styles.headerMetricItem}>
+                  <Ionicons name="call" size={16} color={colors.surface} />
+                  <Text style={styles.headerMetricValue}>{summaryStats.productiveCalls}</Text>
+                  <Text style={styles.headerMetricLabel}>PC</Text>
+                </View>
+                <View style={styles.headerMetricDivider} />
+                <View style={styles.headerMetricItem}>
+                  <MaterialIcons name="attach-money" size={16} color={colors.surface} />
+                  <Text style={styles.headerMetricValue}>
+                    {formatCurrency(summaryStats.totalOrderValue)}
+                  </Text>
+                  <Text style={styles.headerMetricLabel}>Pipeline</Text>
+                </View>
+                <View style={styles.headerMetricDivider} />
+                <View style={styles.headerMetricItem}>
+                  <Feather name="package" size={16} color={colors.surface} />
+                  <Text style={styles.headerMetricValue}>
+                    {summaryStats.totalQuantity.toFixed(1)}
+                  </Text>
+                  <Text style={styles.headerMetricLabel}>Cases</Text>
+                </View>
+                <View style={styles.headerMetricDivider} />
+                <View style={styles.headerMetricItem}>
+                  <MaterialIcons name="inventory" size={16} color={colors.surface} />
+                  <Text style={styles.headerMetricValue}>{summaryStats.lpsc.toFixed(1)}</Text>
+                  <Text style={styles.headerMetricLabel}>LPSC</Text>
+                </View>
+              </View>
             </LinearGradient>
-          </TouchableOpacity>
-        </View>
 
-        {/* Quick Filter Tabs */}
-        {QuickFilterTabs}
+            {/* Search Bar */}
+            <View style={styles.searchBarContainer}>
+              <View style={[styles.searchBar, { borderColor: colors.divider }]}>
+                <Ionicons name="search-outline" size={20} color={colors.textSecondary} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search by name, owner, or phone..."
+                  placeholderTextColor={colors.textSecondary}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                />
+                {searchText.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchText('')}>
+                    <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+              </View>
+              <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(true)}>
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDark]}
+                  style={styles.filterGradient}
+                >
+                  <Ionicons name="filter-outline" size={18} color={colors.surface} />
+                  {(filters.status.length > 0 ||
+                    filters.visitStatus.length > 0 ||
+                    filters.priority.length > 0) && (
+                    <View style={styles.filterBadge}>
+                      <Text style={styles.filterBadgeText}>
+                        {filters.status.length +
+                          filters.visitStatus.length +
+                          filters.priority.length}
+                      </Text>
+                    </View>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
 
-        {/* Outlet List */}
-        <View style={styles.outletList}>
-          {outlets.length === 0 && !isLoading ? (
+            {/* Quick Filter Tabs */}
+            {QuickFilterTabs}
+            <View style={{ marginTop: styles.outletList.marginTop }} />
+          </>
+        }
+        ListEmptyComponent={
+          isLoading ? null : outlets.length === 0 ? (
             <EmptyStateComponent
               icon="storefront-outline"
               title="No outlets found"
@@ -1493,7 +1230,7 @@ export default function RouteScreen() {
               colors={colors}
               styles={styles}
             />
-          ) : outletsWithDistance.length === 0 && !isLoading ? (
+          ) : (
             <EmptyStateComponent
               icon="filter-outline"
               title="No results found"
@@ -1503,22 +1240,14 @@ export default function RouteScreen() {
               colors={colors}
               styles={styles}
             />
-          ) : (
-            outletsWithDistance.map((outlet, index) => (
-              <OutletCardComponent
-                key={outlet._id}
-                outlet={outlet}
-                index={index}
-                onPress={handleCardPress}
-                onNavigate={handleNavigation}
-                onComplete={markComplete}
-                colors={colors}
-                styles={styles}
-              />
-            ))
-          )}
-        </View>
-      </Animated.ScrollView>
+          )
+        }
+        ListFooterComponent={<View style={{ paddingBottom: styles.outletList.paddingBottom }} />}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
+      />
 
       {/* End Route Modal */}
       <Modal

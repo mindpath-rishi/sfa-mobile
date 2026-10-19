@@ -1,5 +1,5 @@
 // FilterContext.tsx
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react';
 
 interface FilterContextType {
   // Products
@@ -213,66 +213,95 @@ export const FilterProvider = ({ children }: { children: ReactNode }) => {
 
   /* ================= PROVIDER ================= */
 
-  return (
-    <FilterContext.Provider
-      value={{
-        // Products
-        productsFilterCount,
-        updateProductsFilterCount,
-        resetProductsFilterCount,
+  const value = useMemo(
+    () => ({
+      // Products
+      productsFilterCount,
+      updateProductsFilterCount,
+      resetProductsFilterCount,
 
-        // Outlets
-        outletsFilterCount,
-        updateOutletsFilterCount,
-        resetOutletsFilterCount,
+      // Outlets
+      outletsFilterCount,
+      updateOutletsFilterCount,
+      resetOutletsFilterCount,
 
-        // Reports
-        reportsFilterCount,
-        updateReportsFilterCount,
-        resetReportsFilterCount,
+      // Reports
+      reportsFilterCount,
+      updateReportsFilterCount,
+      resetReportsFilterCount,
 
-        // Payments
-        paymentsFilterCount,
-        updatePaymentsFilterCount,
-        resetPaymentsFilterCount,
+      // Payments
+      paymentsFilterCount,
+      updatePaymentsFilterCount,
+      resetPaymentsFilterCount,
 
-        // Top-up
-        topupFilterCount,
-        updateTopupFilterCount,
-        resetTopupFilterCount,
+      // Top-up
+      topupFilterCount,
+      updateTopupFilterCount,
+      resetTopupFilterCount,
 
-        // Stock Count
-        stockCountFilterCount,
-        updateStockCountFilterCount,
-        resetStockCountFilterCount,
+      // Stock Count
+      stockCountFilterCount,
+      updateStockCountFilterCount,
+      resetStockCountFilterCount,
 
-        // Product Filter
-        openProductFilter,
-        setOpenProductFilterHandler,
+      // Product Filter
+      openProductFilter,
+      setOpenProductFilterHandler,
 
-        // Outlet Filter
-        openOutletFilter,
-        setOpenOutletFilterHandler,
+      // Outlet Filter
+      openOutletFilter,
+      setOpenOutletFilterHandler,
 
-        // Payment Filter
-        openPaymentFilter,
-        setOpenPaymentFilterHandler,
+      // Payment Filter
+      openPaymentFilter,
+      setOpenPaymentFilterHandler,
 
-        // Top-up Filter
-        openTopupFilter,
-        setOpenTopupFilterHandler,
+      // Top-up Filter
+      openTopupFilter,
+      setOpenTopupFilterHandler,
 
-        // Stock Count Filter
-        openStockCountFilter,
-        setOpenStockCountFilterHandler,
+      // Stock Count Filter
+      openStockCountFilter,
+      setOpenStockCountFilterHandler,
 
-        // Reset all
-        resetAllFilters,
-      }}
-    >
-      {children}
-    </FilterContext.Provider>
+      // Reset all
+      resetAllFilters,
+    }),
+    [
+      productsFilterCount,
+      updateProductsFilterCount,
+      resetProductsFilterCount,
+      outletsFilterCount,
+      updateOutletsFilterCount,
+      resetOutletsFilterCount,
+      reportsFilterCount,
+      updateReportsFilterCount,
+      resetReportsFilterCount,
+      paymentsFilterCount,
+      updatePaymentsFilterCount,
+      resetPaymentsFilterCount,
+      topupFilterCount,
+      updateTopupFilterCount,
+      resetTopupFilterCount,
+      stockCountFilterCount,
+      updateStockCountFilterCount,
+      resetStockCountFilterCount,
+      openProductFilter,
+      setOpenProductFilterHandler,
+      openOutletFilter,
+      setOpenOutletFilterHandler,
+      openPaymentFilter,
+      setOpenPaymentFilterHandler,
+      openTopupFilter,
+      setOpenTopupFilterHandler,
+      openStockCountFilter,
+      setOpenStockCountFilterHandler,
+      resetAllFilters,
+    ],
   );
+
+  return <FilterContext.Provider value={value}>{children}</FilterContext.Provider>;
 };
 
 /* ================= HOOK ================= */

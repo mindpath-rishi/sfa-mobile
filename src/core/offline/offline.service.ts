@@ -10,7 +10,8 @@ const online = (state: Network.NetworkState) =>
 
 export const isOffline = async () => !online(await Network.getNetworkStateAsync());
 
-export const syncOfflineQueue = () => syncService.retryFailed();
+/** Routine background retry; respects each failed item's backoff. */
+export const syncOfflineQueue = () => syncService.retryDue();
 
 export const initialiseOffline = async () => {
   await syncService.initialise();

@@ -19,12 +19,6 @@ export default function SaleConfirmationPage() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <CustomerOutstandingScreen
-      // initialProducts={products}
-      // orderId={orderId}
-      // customerId={customerId}
-      // customerName={customerName}
-      // totalAmount={totalAmount}
-      // totalUnits={totalUnits}
       />
     </View>
   );

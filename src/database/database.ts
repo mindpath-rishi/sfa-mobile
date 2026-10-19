@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 import { DATABASE_SCHEMA, DATABASE_SCHEMA_VERSION } from './schema';
 
@@ -17,6 +18,23 @@ export const getDatabase = async () => {
     });
   }
   return databasePromise;
+};
+
+/**
+ * Runs `work` in an exclusive transaction on its own connection, so writes
+ * made elsewhere at the same time are not pulled into (or rolled back with)
+ * it. Web has no exclusive transactions; there the work runs without one.
+ */
+export const withExclusiveTransaction = async <T>(
+  work: (database: SQLite.SQLiteDatabase) => Promise<T>,
+) => {
+  const database = await getDatabase();
+  if (Platform.OS === 'web') return work(database);
+  let result!: T;
+  await database.withExclusiveTransactionAsync(async (transaction) => {
+    result = await work(transaction);
+  });
+  return result;
 };
 
 export const withTransaction = async <T>(work: (database: SQLite.SQLiteDatabase) => Promise<T>) => {

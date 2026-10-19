@@ -118,7 +118,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
     : null;
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 70).springify()}>
+    <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 70).springify()}>
       <TouchableOpacity onPress={onPress} activeOpacity={0.75}>
         <View
           style={[

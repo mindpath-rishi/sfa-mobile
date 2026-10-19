@@ -6,6 +6,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   View,
   FlatList,
@@ -79,7 +80,15 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   const styles = useProductsScreenStyles();
   const { setHeader } = useHeader();
   const { setOpenProductFilterHandler, resetProductsFilterCount } = useFilterContext();
-  const { items, addItems, clearCart, refreshSchemeDiscounts, schemeDiscounts } = useCartStore();
+  const { items, addItems, clearCart, refreshSchemeDiscounts, schemeDiscounts } = useCartStore(
+    useShallow((state) => ({
+      items: state.items,
+      addItems: state.addItems,
+      clearCart: state.clearCart,
+      refreshSchemeDiscounts: state.refreshSchemeDiscounts,
+      schemeDiscounts: state.schemeDiscounts,
+    })),
+  );
   const customerCategoryId = useRouteStore((state) =>
     getRouteCustomerCategoryId(state.selectedRoute),
   );
@@ -147,8 +156,9 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
   }, [items, mode, refreshSchemeDiscounts]);
 
   const productsWithCart = useMemo(() => {
+    const cartItemByProductId = new Map(items.map((item) => [item.productId, item]));
     return products.map((product) => {
-      const cartItem = items.find((i) => i.productId === product.productId);
+      const cartItem = cartItemByProductId.get(product.productId);
       return {
         ...product,
         caseQty: cartItem?.caseQty || 0,

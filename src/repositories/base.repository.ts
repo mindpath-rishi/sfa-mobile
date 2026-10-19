@@ -80,6 +80,9 @@ const addToQueue = async (
   );
 };
 
+/** Rows read per query by findAll. */
+const FIND_ALL_CHUNK_SIZE = 200;
+
 export class BaseRepository<T extends Record<string, unknown>> {
   readonly table: string;
 
@@ -101,17 +104,28 @@ export class BaseRepository<T extends Record<string, unknown>> {
   async findAll(ownerId: string, options: { search?: string; page?: number; limit?: number } = {}) {
     const database = await getDatabase();
     const page = Math.max(1, options.page ?? 1);
-    const limit = Math.min(200, Math.max(1, options.limit ?? 50));
+    // Callers may ask for thousands of rows (dashboards, reports). Return all
+    // of them, read in chunks so no single query pulls an unbounded result.
+    const limit = Math.max(1, options.limit ?? 50);
     const query = options.search?.trim().toLocaleLowerCase();
-    const rows = await database.getAllAsync<EntityRow>(
-      `SELECT * FROM ${this.table} WHERE owner_id = ? AND deleted_at IS NULL
-       AND (? = '' OR search_text LIKE ?) ORDER BY updated_at DESC LIMIT ? OFFSET ?`,
-      ownerId,
-      query ?? '',
-      `%${query ?? ''}%`,
-      limit,
-      (page - 1) * limit,
-    );
+    const offset = (page - 1) * limit;
+    const rows: EntityRow[] = [];
+
+    while (rows.length < limit) {
+      const chunkSize = Math.min(FIND_ALL_CHUNK_SIZE, limit - rows.length);
+      const chunk = await database.getAllAsync<EntityRow>(
+        `SELECT * FROM ${this.table} WHERE owner_id = ? AND deleted_at IS NULL
+         AND (? = '' OR search_text LIKE ?) ORDER BY updated_at DESC, uuid LIMIT ? OFFSET ?`,
+        ownerId,
+        query ?? '',
+        `%${query ?? ''}%`,
+        chunkSize,
+        offset + rows.length,
+      );
+      rows.push(...chunk);
+      if (chunk.length < chunkSize) break;
+    }
+
     return rows.map(mapRow<T>);
   }
 
@@ -219,8 +233,9 @@ export class BaseRepository<T extends Record<string, unknown>> {
     });
   }
 
-  async upsertRemote(ownerId: string, record: DownloadRecord) {
-    const database = await getDatabase();
+  /** `connection` lets the sync download write a whole page in one transaction. */
+  async upsertRemote(ownerId: string, record: DownloadRecord, connection?: SQLiteDatabase) {
+    const database = connection ?? (await getDatabase());
     const existing = await database.getFirstAsync<EntityRow>(
       `SELECT * FROM ${this.table} WHERE owner_id = ? AND (uuid = ? OR server_id = ?)`,
       ownerId,

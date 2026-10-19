@@ -1,5 +1,6 @@
 // SalesExecutiveScreen.tsx - Fixed Full Width Van Card
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Alert,
   View,
@@ -61,7 +62,7 @@ import { useAppEventsStore } from '@/core/store/appEvents.store';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { leaveService } from '@/features/leave/services/leave.service';
 import type { LeaveType } from '@/features/leave/types/leave.types';
-import { useLoaderStore } from '@/core/loader/loader.store';
+import { useLoaderActions } from '@/core/loader/loader.store';
 import {
   captureCurrentLocation,
   ensureBackgroundLocationDisclosure,
@@ -144,7 +145,14 @@ export default function SalesExecutiveScreen() {
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
   const activeVisit = useOutletStore.getState().activeVisit;
   const clearVisit = useOutletStore((s) => s.clearVisit);
-  const { setSelectedRoute, selectedRoute, van, setVan } = useRouteStore();
+  const { setSelectedRoute, selectedRoute, van, setVan } = useRouteStore(
+    useShallow((state) => ({
+      setSelectedRoute: state.setSelectedRoute,
+      selectedRoute: state.selectedRoute,
+      van: state.van,
+      setVan: state.setVan,
+    })),
+  );
   const [showDayEndConfirm, setShowDayEndConfirm] = useState<boolean>(false);
   const currency = 'K';
   const [dayEndSummary, setDayEndSummary] = useState<any>(null);
@@ -153,8 +161,13 @@ export default function SalesExecutiveScreen() {
   const [finalConfirmation, setFinalConfirmation] = useState(false);
   const { setHeader } = useHeader();
   const user = useAuthStore((state) => state.user);
-  const { setWorkSessionId, workSessionId } = useAuthStore();
-  const loader = useLoaderStore();
+  const { setWorkSessionId, workSessionId } = useAuthStore(
+    useShallow((state) => ({
+      setWorkSessionId: state.setWorkSessionId,
+      workSessionId: state.workSessionId,
+    })),
+  );
+  const loader = useLoaderActions();
 
   const { guard } = useVisitGuard();
   const dashboardRefreshTick = useAppEventsStore((s) => s.dashboardRefreshTick);

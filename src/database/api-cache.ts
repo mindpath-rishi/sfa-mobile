@@ -65,3 +65,16 @@ export const setCachedApiResponse = async <T>(
     new Date().toISOString(),
   );
 };
+
+/** Cached responses are refreshed whenever online; drop ones long out of date. */
+export const API_CACHE_MAX_AGE_MS = 90 * 24 * 60 * 60 * 1000;
+
+export const pruneApiCache = async (ownerId: string, maxAgeMs = API_CACHE_MAX_AGE_MS) => {
+  if (!ownerId) return;
+  const database = await getDatabase();
+  await database.runAsync(
+    'DELETE FROM api_cache WHERE owner_id = ? AND updated_at < ?',
+    ownerId,
+    new Date(Date.now() - maxAgeMs).toISOString(),
+  );
+};

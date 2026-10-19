@@ -9,10 +9,3 @@ export interface RouteSelectionModalProps {
   onClose: () => void;
   onSelectRoute: (route: Route) => void;
 }
-
-// export interface Route {
-//   routeId: string;
-//   name: string;
-//   totalShops: number;
-//   distance: string;
-// }
