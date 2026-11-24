@@ -69,7 +69,7 @@ export const createTopupDetailStyles = (colors: any) =>
     },
 
     productStatusText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
     },
 
@@ -114,13 +114,13 @@ export const createTopupDetailStyles = (colors: any) =>
     },
 
     productPriceText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '500',
       color: colors.textSecondary,
     },
     productFlowLabel: {
       width: '100%',
-      fontSize: 8,
+      fontSize: 10,
       fontWeight: '800',
       letterSpacing: 0.7,
       color: colors.textTertiary,
@@ -203,7 +203,7 @@ export const createTopupDetailStyles = (colors: any) =>
       alignItems: 'center',
     },
     heroLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: '#FFFFFF',
       opacity: 0.72,
       letterSpacing: 1.1,
@@ -253,7 +253,7 @@ export const createTopupDetailStyles = (colors: any) =>
       alignItems: 'center',
     },
     heroQtyValue: { color: '#FFFFFF', fontSize: 20, fontWeight: '800' },
-    heroQtyLabel: { color: 'rgba(255,255,255,0.72)', fontSize: 10, marginTop: 1 },
+    heroQtyLabel: { color: 'rgba(255,255,255,0.72)', fontSize: 11, marginTop: 1 },
 
     // ==================== TABS ====================
     tabsContainer: {
@@ -340,12 +340,12 @@ export const createTopupDetailStyles = (colors: any) =>
       backgroundColor: colors.primary + '0D',
     },
     detailInfoCopy: { flex: 1 },
-    detailInfoLabel: { fontSize: 10, color: colors.textTertiary, marginBottom: 2 },
+    detailInfoLabel: { fontSize: 11, color: colors.textTertiary, marginBottom: 2 },
     detailInfoValue: { fontSize: 13, fontWeight: '700', color: colors.textPrimary },
     detailInfoDivider: { height: 1, backgroundColor: colors.borderLight, marginLeft: 45 },
     comparisonLegend: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     legendDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 4 },
-    legendText: { fontSize: 9, color: colors.textTertiary },
+    legendText: { fontSize: 10, color: colors.textTertiary },
     metricTable: {
       backgroundColor: colors.surface,
       borderRadius: 16,
@@ -389,7 +389,7 @@ export const createTopupDetailStyles = (colors: any) =>
     },
     timelineCopy: { flex: 1 },
     timelineTitle: { fontSize: 12, fontWeight: '700', color: colors.textPrimary },
-    timelineDate: { fontSize: 10, color: colors.textTertiary, marginTop: 2 },
+    timelineDate: { fontSize: 11, color: colors.textTertiary, marginTop: 2 },
     modernRemarkCard: {
       marginTop: 10,
       padding: 14,
@@ -490,7 +490,7 @@ export const createTopupDetailStyles = (colors: any) =>
       color: colors.textPrimary,
     },
     diffText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '500',
       marginTop: 2,
     },
@@ -694,7 +694,7 @@ export const createTopupDetailStyles = (colors: any) =>
     },
 
     productMiniText: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '600',
     },
 
@@ -718,7 +718,7 @@ export const createTopupDetailStyles = (colors: any) =>
     },
 
     productStatLabel: {
-      fontSize: 8,
+      fontSize: 10,
       color: colors.textTertiary,
       fontWeight: '500',
       textTransform: 'uppercase',

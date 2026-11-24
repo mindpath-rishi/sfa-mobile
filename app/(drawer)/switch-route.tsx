@@ -30,8 +30,8 @@ import {
 import { useAuthStore } from '@/core/store/auth.store';
 import { homeService } from '@/features/home/services/home.service';
 import { outletService } from '@/features/outlet/services/outlet.service';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
-const { width } = Dimensions.get('window');
 const isWeb = Platform.OS === 'web';
 
 const toast = {
@@ -418,7 +418,7 @@ export default function Routes() {
     });
   };
 
-  const handleSubmitChange = async () => {
+  const [handleSubmitChange] = useSingleFlight(async () => {
     if (!validateWorkSession()) return;
 
     if (!selectedVanRoute) {
@@ -468,7 +468,7 @@ export default function Routes() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  });
 
   const onRefresh = async () => {
     if (!validateWorkSession()) {
@@ -987,7 +987,7 @@ const getStyles = (colors: any, insets: any) =>
     },
     liveBadgeText: {
       color: colors.success,
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '800',
       lineHeight: 12,
       letterSpacing: 0.5,
@@ -1160,7 +1160,7 @@ const getStyles = (colors: any, insets: any) =>
       borderRadius: 8,
     },
     outletListStatusText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
     },
     reviewSection: {
@@ -1228,7 +1228,7 @@ const getStyles = (colors: any, insets: any) =>
     },
     routeChangeLabel: {
       color: colors.textTertiary,
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '800',
       letterSpacing: 0.7,
     },
@@ -1279,7 +1279,7 @@ const getStyles = (colors: any, insets: any) =>
     },
     selectedBadgeText: {
       color: colors.primary,
-      fontSize: 8,
+      fontSize: 10,
       fontWeight: '800',
       letterSpacing: 0.4,
     },
@@ -1318,7 +1318,7 @@ const getStyles = (colors: any, insets: any) =>
       backgroundColor: colors.primary,
     },
     comparisonBadgeText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.textSecondary,
     },
@@ -1389,7 +1389,7 @@ const getStyles = (colors: any, insets: any) =>
       color: colors.textPrimary,
     },
     statCardLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
       fontWeight: '600',
     },

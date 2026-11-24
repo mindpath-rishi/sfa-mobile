@@ -329,6 +329,10 @@ const uploadMediaItem = async (item: QueueRow) => {
     uri?: string;
     extension?: string;
     isPrimary?: boolean;
+    mimeType?: string;
+    mediaType?: string;
+    purpose?: string;
+    title?: string;
   };
 
   if (!payload.customerId || !payload.uri) {
@@ -344,9 +348,10 @@ const uploadMediaItem = async (item: QueueRow) => {
   }
 
   const extension = payload.extension || 'jpg';
-  const mimeType = extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
+  const mimeType =
+    payload.mimeType || (extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg');
 
-  const fileName = `outlet-${payload.customerId}-${Date.now()}.${extension}`;
+  const fileName = `${payload.purpose === 'DOCUMENT' ? 'kyc' : 'outlet'}-${payload.customerId}-${Date.now()}.${extension}`;
   const formData = new FormData();
 
   if (Platform.OS === 'web') {
@@ -363,9 +368,9 @@ const uploadMediaItem = async (item: QueueRow) => {
 
   formData.append('ownerType', 'CUSTOMER');
   formData.append('ownerId', payload.customerId);
-  formData.append('mediaType', 'IMAGE');
-  formData.append('purpose', payload.isPrimary ? 'PROFILE' : 'PROOF');
-  formData.append('title', 'Outlet Photo');
+  formData.append('mediaType', payload.mediaType || 'IMAGE');
+  formData.append('purpose', payload.purpose || (payload.isPrimary ? 'PROFILE' : 'PROOF'));
+  formData.append('title', payload.title || 'Outlet Photo');
   formData.append('isPrimary', String(Boolean(payload.isPrimary)));
 
   const response = await uploadFormData<any>('/media/upload', formData, {

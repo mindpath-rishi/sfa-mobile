@@ -2,14 +2,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Platform,
   BackHandler,
   LayoutChangeEvent,
 } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -21,6 +20,7 @@ import * as Sharing from 'expo-sharing';
 import { ConfirmationModal } from '@/core/components';
 import { useInvoiceStore } from '@/core/store/invoice.store';
 import { PageSkeleton } from '@/shared/components/PageSkeleton';
+import { appAlert } from '@/core/alert/appAlert';
 
 export default function InvoiceSharingScreen() {
   const { colors } = useTheme();
@@ -422,7 +422,7 @@ export default function InvoiceSharingScreen() {
       if (Platform.OS === 'web') {
         const newWindow = window.open('', '_blank');
         if (!newWindow) {
-          Alert.alert('Error', 'Popup blocked. Please allow popups.');
+          appAlert('Error', 'Popup blocked. Please allow popups.');
           return;
         }
         newWindow.document.write(html);
@@ -440,7 +440,7 @@ export default function InvoiceSharingScreen() {
       });
 
       if (!(await Sharing.isAvailableAsync())) {
-        Alert.alert('Error', 'Sharing is not available on this device');
+        appAlert('Error', 'Sharing is not available on this device');
         return;
       }
 
@@ -451,7 +451,7 @@ export default function InvoiceSharingScreen() {
       });
     } catch (error) {
       console.error('Share error:', error);
-      Alert.alert('Error', 'Failed to share invoice. Please try again.');
+      appAlert('Error', 'Failed to share invoice. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -478,7 +478,13 @@ export default function InvoiceSharingScreen() {
           },
         ]}
       >
-        <TouchableOpacity onPress={handleBackNavigation} style={styles.backButton}>
+        <TouchableOpacity
+          hitSlop={10}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          onPress={handleBackNavigation}
+          style={styles.backButton}
+        >
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>Share Invoice</Text>
@@ -662,7 +668,7 @@ export default function InvoiceSharingScreen() {
         cancelText="Not Yet"
         onConfirm={() => {
           setShowConfirmation(false);
-          Alert.alert('Success', 'Invoice processed successfully', [
+          appAlert('Success', 'Invoice processed successfully', [
             { text: 'OK', onPress: () => handleBackNavigation() },
           ]);
         }}

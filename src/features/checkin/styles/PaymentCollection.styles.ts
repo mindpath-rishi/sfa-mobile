@@ -87,7 +87,7 @@ export const usePaymentCollectionStyles = () => {
     } as TextStyle,
 
     paymentModeSubLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textTertiary,
       marginTop: 2,
     } as TextStyle,

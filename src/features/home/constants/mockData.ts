@@ -1,7 +1,6 @@
 import { ActivityType } from '../types/activity.types';
 import { LoadSummaryData } from '../types/loadSummaryModal.types';
 import { QuickAction } from '../types/quickaction.types';
-import { Route } from '../types/route.types';
 import { OtherWorkOption } from '../types/salesExecutive.types';
 import { Van } from '../types/van.types';
 
@@ -36,14 +35,6 @@ export const OTHER_WORK_OPTIONS: OtherWorkOption[] = [
   { id: 'office', name: 'Office Work', icon: 'business', color: '#11998e' },
   // { id: 'collection', name: 'Collection', icon: 'cash', color: '#FF512F' },
   { id: 'meeting', name: 'Meetings', icon: 'people', color: '#F37335' },
-];
-
-export const RETAILING_ROUTES: Route[] = [
-  { routeId: 'route1', name: 'Andheri East Route', totalShops: 12, distance: '8.5 km' },
-  { routeId: 'route2', name: 'Bandra West Route', totalShops: 15, distance: '10.2 km' },
-  { routeId: 'route3', name: 'Juhu Circle Route', totalShops: 8, distance: '6.3 km' },
-  { routeId: 'route4', name: 'Dadar Route', totalShops: 10, distance: '7.8 km' },
-  { routeId: 'route5', name: 'Malad Route', totalShops: 14, distance: '9.1 km' },
 ];
 
 export const ASSIGNED_VAN: Van = {

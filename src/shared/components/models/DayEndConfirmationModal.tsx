@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
+import { appAlert } from '@/core/alert/appAlert';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -50,7 +50,7 @@ export const DayEndConfirmationModal: React.FC<DayEndModalProps> = ({
       }, 3000);
     } catch (error) {
       setProcessing(false);
-      Alert.alert('Error', 'Failed to process day end. Please try again.');
+      appAlert('Error', 'Failed to process day end. Please try again.');
     }
   };
 

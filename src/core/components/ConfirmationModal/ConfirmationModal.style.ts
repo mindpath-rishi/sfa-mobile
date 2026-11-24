@@ -1,9 +1,10 @@
 // ConfirmationModal.style.ts
-import { StyleSheet, ViewStyle, TextStyle, Dimensions } from 'react-native';
+import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+/** Dialogs shouldn't stretch across a tablet screen. */
+const MAX_DIALOG_WIDTH = 420;
 
-export const createConfirmationModalStyles = (colors: any) => {
+export const createConfirmationModalStyles = (colors: any, screenWidth: number) => {
   return StyleSheet.create({
     overlay: {
       flex: 1,
@@ -16,7 +17,7 @@ export const createConfirmationModalStyles = (colors: any) => {
       borderRadius: 28,
       padding: 24,
       backgroundColor: colors.surface || colors.background,
-      width: SCREEN_WIDTH - 48,
+      width: Math.min(screenWidth - 48, MAX_DIALOG_WIDTH),
       maxWidth: 400,
       shadowColor: '#000',
       shadowOffset: {

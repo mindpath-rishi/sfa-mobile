@@ -24,6 +24,8 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { isManager as isManagerUser } from '@/core/navigation/role.utils';
 import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
 import { outletService } from '@/features/outlet/services/outlet.service';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { resolveMediaUrl } from '@/shared/utils/media-url.utils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -451,7 +453,13 @@ function NotificationDetail({
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={onBack}>
+        <Pressable
+          hitSlop={10}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          style={styles.backButton}
+          onPress={onBack}
+        >
           <Ionicons name="chevron-back" size={24} color={colors.surface} />
         </Pressable>
         <AppText style={styles.headerTitle}>Notification Detail</AppText>
@@ -551,7 +559,7 @@ function NotificationDetail({
                     <AppText style={[styles.unloadQuantityValue, { color: colors.primary }]}>
                       {Number(stockItem.quantity || 0).toLocaleString()}
                     </AppText>
-                    <AppText style={{ color: colors.textTertiary, fontSize: 10 }}>
+                    <AppText style={{ color: colors.textTertiary, fontSize: 11 }}>
                       {Number(stockItem.cases || 0)} cases · {Number(stockItem.pieces || 0)} pieces
                     </AppText>
                   </View>
@@ -572,7 +580,11 @@ function NotificationDetail({
             </AppText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {item.data.imageUrls.map((url: string) => (
-                <Image key={url} source={{ uri: url }} style={styles.outletImage} />
+                <Image
+                  key={url}
+                  source={{ uri: resolveMediaUrl(url) }}
+                  style={styles.outletImage}
+                />
               ))}
             </ScrollView>
           </View>
@@ -734,7 +746,7 @@ const createDetailStyles = (colors: any, insets: { top: number; bottom: number }
     },
     unreadPillText: {
       color: '#fff',
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       textTransform: 'uppercase',
     },
@@ -746,7 +758,7 @@ const createDetailStyles = (colors: any, insets: { top: number; bottom: number }
       gap: 6,
     },
     sectionLabel: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
@@ -937,84 +949,211 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
     setSelectedItem(null);
   };
 
-  const handleNotificationAction = async (
-    item: NotificationItem,
-    action: 'approve' | 'reject',
-    confirmed = false,
-  ) => {
-    if (isPendingOutletApproval(item)) {
-      const customerId = String(item.data?.customerId || '');
-      const outletVerificationId = String(item.data?.outletVerificationId || '') || undefined;
-      if (!customerId || processing) return;
-      setProcessing({ id: item.id, action });
-      try {
-        const response =
-          action === 'approve'
-            ? await notificationService.approveOutlet(customerId, outletVerificationId)
-            : await notificationService.rejectOutlet(
-                customerId,
-                'Rejected by reporting manager',
-                outletVerificationId,
-              );
-        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-          toast.error(response?.message || `Failed to ${action} outlet`);
-          return;
-        }
-        toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
-        setNotifications((current) =>
-          current.map((notification) =>
-            notification.id === item.id
-              ? {
-                  ...notification,
-                  unread: false,
-                  data: {
-                    ...notification.data,
-                    action: action === 'approve' ? 'ACTIVE' : 'REJECTED',
-                    status: action === 'approve' ? 'ACTIVE' : 'REJECTED',
-                  },
-                }
-              : notification,
-          ),
-        );
-        await notificationService.markAsRead(item.id);
-        navigateBack();
-        loadNotifications();
-      } catch (error: any) {
-        console.warn(`Failed to ${action} outlet:`, error);
-        toast.error(error?.response?.data?.message || `Failed to ${action} outlet`);
-      } finally {
-        setProcessing(null);
-      }
-      return;
-    }
-
-    if (isPendingTopupAcceptance(item)) {
-      const topupId = item.data?.vanInventoryTopupId;
-      if (!topupId || processing) return;
-
-      if (!confirmed) {
-        setConfirmTopupAction({ item, action });
-        return;
-      }
-
-      setProcessing({ id: item.id, action });
-      try {
-        const response =
-          action === 'approve'
-            ? await notificationService.acceptTopup(String(topupId))
-            : await notificationService.rejectTopup(String(topupId), {
-                reason: 'Rejected by salesman',
-              });
-
-        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-          toast.error(
-            response?.message || `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`,
+  const [handleNotificationAction] = useSingleFlight(
+    async (item: NotificationItem, action: 'approve' | 'reject', confirmed = false) => {
+      if (isPendingOutletApproval(item)) {
+        const customerId = String(item.data?.customerId || '');
+        const outletVerificationId = String(item.data?.outletVerificationId || '') || undefined;
+        if (!customerId || processing) return;
+        setProcessing({ id: item.id, action });
+        try {
+          const response =
+            action === 'approve'
+              ? await notificationService.approveOutlet(customerId, outletVerificationId)
+              : await notificationService.rejectOutlet(
+                  customerId,
+                  'Rejected by reporting manager',
+                  outletVerificationId,
+                );
+          if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+            toast.error(response?.message || `Failed to ${action} outlet`);
+            return;
+          }
+          toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
+          setNotifications((current) =>
+            current.map((notification) =>
+              notification.id === item.id
+                ? {
+                    ...notification,
+                    unread: false,
+                    data: {
+                      ...notification.data,
+                      action: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                      status: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                    },
+                  }
+                : notification,
+            ),
           );
+          await notificationService.markAsRead(item.id);
+          navigateBack();
+          loadNotifications();
+        } catch (error: any) {
+          console.warn(`Failed to ${action} outlet:`, error);
+          toast.error(error?.response?.data?.message || `Failed to ${action} outlet`);
+        } finally {
+          setProcessing(null);
+        }
+        return;
+      }
+
+      if (isPendingTopupAcceptance(item)) {
+        const topupId = item.data?.vanInventoryTopupId;
+        if (!topupId || processing) return;
+
+        if (!confirmed) {
+          setConfirmTopupAction({ item, action });
           return;
         }
 
-        toast.success(action === 'approve' ? 'Top-up accepted' : 'Top-up rejected');
-        setConfirmTopupAction(null);
+        setProcessing({ id: item.id, action });
+        try {
+          const response =
+            action === 'approve'
+              ? await notificationService.acceptTopup(String(topupId))
+              : await notificationService.rejectTopup(String(topupId), {
+                  reason: 'Rejected by salesman',
+                });
+
+          if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+            toast.error(
+              response?.message || `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`,
+            );
+            return;
+          }
+
+          toast.success(action === 'approve' ? 'Top-up accepted' : 'Top-up rejected');
+          setConfirmTopupAction(null);
+          setNotifications((current) =>
+            current.map((notification) =>
+              notification.id === item.id
+                ? {
+                    ...notification,
+                    unread: false,
+                    data: {
+                      ...notification.data,
+                      action: action === 'approve' ? 'ACCEPTED' : 'DECLINED',
+                      status: action === 'approve' ? 'ACCEPTED' : 'DECLINED',
+                    },
+                  }
+                : notification,
+            ),
+          );
+          await notificationService.markAsRead(item.id);
+          navigateBack();
+          loadNotifications();
+        } catch (error: any) {
+          console.warn(`Failed to ${action} top-up:`, error);
+          toast.error(
+            error?.response?.data?.message ||
+              `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`,
+          );
+        } finally {
+          setProcessing(null);
+        }
+        return;
+      }
+
+      if (isPendingStockUnloadApproval(item)) {
+        const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
+        if (!unloadRequestId || processing) {
+          toast.error('Stock unload request ID not found');
+          return;
+        }
+
+        setProcessing({ id: item.id, action });
+        try {
+          const response =
+            action === 'approve'
+              ? await notificationService.approveStockUnload(String(unloadRequestId))
+              : await notificationService.rejectStockUnload(String(unloadRequestId));
+          if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+            toast.error(response?.message || `Failed to ${action} stock unload request`);
+            return;
+          }
+          toast.success(
+            action === 'approve'
+              ? 'Stock unload approved and van stock reset'
+              : 'Stock unload request rejected',
+          );
+          await notificationService.markAsRead(item.id);
+          navigateBack();
+          loadNotifications();
+        } catch (error: any) {
+          toast.error(error?.response?.data?.message || `Failed to ${action} stock unload request`);
+        } finally {
+          setProcessing(null);
+        }
+        return;
+      }
+
+      if (isPendingRouteChangeApproval(item)) {
+        const routeChangeRequestId = item.data?.routeChangeRequestId || item.data?.requestId;
+        if (!routeChangeRequestId || processing) {
+          toast.error('Route change request ID not found');
+          return;
+        }
+
+        setProcessing({ id: item.id, action });
+        try {
+          const response =
+            action === 'approve'
+              ? await notificationService.approveRouteChange(String(routeChangeRequestId))
+              : await notificationService.rejectRouteChange(String(routeChangeRequestId));
+          if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+            toast.error(response?.message || `Failed to ${action} route change`);
+            return;
+          }
+
+          const status = action === 'approve' ? 'APPROVED' : 'REJECTED';
+          toast.success(`Route change ${action === 'approve' ? 'approved' : 'rejected'}`);
+          setNotifications((current) =>
+            current.map((notification) =>
+              notification.id === item.id
+                ? {
+                    ...notification,
+                    unread: false,
+                    data: {
+                      ...notification.data,
+                      action: status,
+                      status,
+                      routeChangeStatus: status,
+                    },
+                  }
+                : notification,
+            ),
+          );
+          await notificationService.markAsRead(item.id);
+          navigateBack();
+          loadNotifications();
+        } catch (error: any) {
+          console.warn(`Failed to ${action} route change:`, error);
+          toast.error(error?.response?.data?.message || `Failed to ${action} route change`);
+        } finally {
+          setProcessing(null);
+        }
+        return;
+      }
+
+      const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
+      if (!vanChangeRequestId || processing) {
+        toast.error('Van change request ID not found');
+        return;
+      }
+
+      setProcessing({ id: item.id, action });
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveVanChange(String(vanChangeRequestId))
+            : await notificationService.rejectVanChange(String(vanChangeRequestId));
+
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} request`);
+          return;
+        }
+
+        toast.success(action === 'approve' ? 'Van change approved' : 'Van change rejected');
         setNotifications((current) =>
           current.map((notification) =>
             notification.id === item.id
@@ -1023,8 +1162,8 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
                   unread: false,
                   data: {
                     ...notification.data,
-                    action: action === 'approve' ? 'ACCEPTED' : 'DECLINED',
-                    status: action === 'approve' ? 'ACCEPTED' : 'DECLINED',
+                    action: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                    vanChangeStatus: action === 'approve' ? 'APPROVED' : 'REJECTED',
                   },
                 }
               : notification,
@@ -1034,137 +1173,13 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
         navigateBack();
         loadNotifications();
       } catch (error: any) {
-        console.warn(`Failed to ${action} top-up:`, error);
-        toast.error(
-          error?.response?.data?.message ||
-            `Failed to ${action === 'approve' ? 'accept' : 'reject'} top-up`,
-        );
+        console.warn(`Failed to ${action} van change:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action} request`);
       } finally {
         setProcessing(null);
       }
-      return;
-    }
-
-    if (isPendingStockUnloadApproval(item)) {
-      const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
-      if (!unloadRequestId || processing) {
-        toast.error('Stock unload request ID not found');
-        return;
-      }
-
-      setProcessing({ id: item.id, action });
-      try {
-        const response =
-          action === 'approve'
-            ? await notificationService.approveStockUnload(String(unloadRequestId))
-            : await notificationService.rejectStockUnload(String(unloadRequestId));
-        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-          toast.error(response?.message || `Failed to ${action} stock unload request`);
-          return;
-        }
-        toast.success(
-          action === 'approve'
-            ? 'Stock unload approved and van stock reset'
-            : 'Stock unload request rejected',
-        );
-        await notificationService.markAsRead(item.id);
-        navigateBack();
-        loadNotifications();
-      } catch (error: any) {
-        toast.error(error?.response?.data?.message || `Failed to ${action} stock unload request`);
-      } finally {
-        setProcessing(null);
-      }
-      return;
-    }
-
-    if (isPendingRouteChangeApproval(item)) {
-      const routeChangeRequestId = item.data?.routeChangeRequestId || item.data?.requestId;
-      if (!routeChangeRequestId || processing) {
-        toast.error('Route change request ID not found');
-        return;
-      }
-
-      setProcessing({ id: item.id, action });
-      try {
-        const response =
-          action === 'approve'
-            ? await notificationService.approveRouteChange(String(routeChangeRequestId))
-            : await notificationService.rejectRouteChange(String(routeChangeRequestId));
-        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-          toast.error(response?.message || `Failed to ${action} route change`);
-          return;
-        }
-
-        const status = action === 'approve' ? 'APPROVED' : 'REJECTED';
-        toast.success(`Route change ${action === 'approve' ? 'approved' : 'rejected'}`);
-        setNotifications((current) =>
-          current.map((notification) =>
-            notification.id === item.id
-              ? {
-                  ...notification,
-                  unread: false,
-                  data: { ...notification.data, action: status, status, routeChangeStatus: status },
-                }
-              : notification,
-          ),
-        );
-        await notificationService.markAsRead(item.id);
-        navigateBack();
-        loadNotifications();
-      } catch (error: any) {
-        console.warn(`Failed to ${action} route change:`, error);
-        toast.error(error?.response?.data?.message || `Failed to ${action} route change`);
-      } finally {
-        setProcessing(null);
-      }
-      return;
-    }
-
-    const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
-    if (!vanChangeRequestId || processing) {
-      toast.error('Van change request ID not found');
-      return;
-    }
-
-    setProcessing({ id: item.id, action });
-    try {
-      const response =
-        action === 'approve'
-          ? await notificationService.approveVanChange(String(vanChangeRequestId))
-          : await notificationService.rejectVanChange(String(vanChangeRequestId));
-
-      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-        toast.error(response?.message || `Failed to ${action} request`);
-        return;
-      }
-
-      toast.success(action === 'approve' ? 'Van change approved' : 'Van change rejected');
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === item.id
-            ? {
-                ...notification,
-                unread: false,
-                data: {
-                  ...notification.data,
-                  action: action === 'approve' ? 'APPROVED' : 'REJECTED',
-                  vanChangeStatus: action === 'approve' ? 'APPROVED' : 'REJECTED',
-                },
-              }
-            : notification,
-        ),
-      );
-      await notificationService.markAsRead(item.id);
-      navigateBack();
-      loadNotifications();
-    } catch (error: any) {
-      console.warn(`Failed to ${action} van change:`, error);
-      toast.error(error?.response?.data?.message || `Failed to ${action} request`);
-    } finally {
-      setProcessing(null);
-    }
-  };
+    },
+  );
 
   const renderNotificationSkeleton = () => (
     <View style={styles.list}>
@@ -1197,7 +1212,13 @@ export function NotificationsModal({ visible, onClose }: NotificationsModalProps
           <View style={{ flex: 1 }}>
             {/* Header */}
             <View style={styles.header}>
-              <Pressable style={styles.headerBtn} onPress={onClose}>
+              <Pressable
+                hitSlop={10}
+                accessibilityLabel="Back"
+                accessibilityRole="button"
+                style={styles.headerBtn}
+                onPress={onClose}
+              >
                 <Ionicons name="chevron-back" size={24} color={colors.surface} />
               </Pressable>
               <AppText style={styles.headerTitle}>Notifications</AppText>
@@ -1652,7 +1673,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       borderRadius: 4,
     },
     cardTime: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
     },
     cardMessage: {
@@ -1665,7 +1686,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       lineHeight: 17,
     },
     cardStatus: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       textTransform: 'uppercase',
     },
@@ -1681,7 +1702,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       borderRadius: 12,
     },
     typePillText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
     },
     // Inline manager actions on list

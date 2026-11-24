@@ -1,4 +1,3 @@
-
 import { CartItemWithDetails } from '@/features/product';
 import { create } from 'zustand';
 import { storage } from '../storage';
@@ -258,7 +257,7 @@ export const useCartStore = create<CartStore>((set, get) => {
               applicableSchemes:
                 newItem.applicableSchemes ?? updated[index].applicableSchemes ?? [],
             };
-            const existing = updated[index] as Record<string, unknown>;
+            const existing: Record<string, unknown> = { ...updated[index] };
             if (
               Object.keys(merged).some(
                 (key) => !Object.is((merged as Record<string, unknown>)[key], existing[key]),

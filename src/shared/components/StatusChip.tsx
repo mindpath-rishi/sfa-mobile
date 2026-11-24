@@ -33,8 +33,7 @@ export function StatusChip({
       {showDot ? (
         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }} />
       ) : null}
-      <AppText style={{ fontSize: 10, fontWeight: '600', color }}>{label}</AppText>
+      <AppText style={{ fontSize: 11, fontWeight: '600', color }}>{label}</AppText>
     </View>
   );
 }
-

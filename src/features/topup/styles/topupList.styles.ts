@@ -150,7 +150,7 @@ export const useTopupListStyles = () => {
     approvedBlock: { backgroundColor: colors.success + '0D' } as ViewStyle,
 
     amountLabel: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       textTransform: 'uppercase',
       letterSpacing: 0.5,
@@ -166,7 +166,7 @@ export const useTopupListStyles = () => {
     } as TextStyle,
 
     quantityText: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
     } as TextStyle,
 

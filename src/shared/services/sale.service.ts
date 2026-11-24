@@ -2,6 +2,11 @@ import { api } from '@/core/network';
 import type { ApiResponse } from '@/core/network/api.types';
 import { isSalesman } from '@/core/navigation/role.utils';
 import { isOfflineMode } from '@/core/offline/offline.store';
+import {
+  collectFreeGoods,
+  freeGoodPieces,
+  type FreeGood,
+} from '@/shared/utils/free-goods.utils';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
 import { createSchemaId } from '@/utils/uuid';
@@ -118,6 +123,81 @@ const isToday = (value: unknown) => {
     date.getMonth() === today.getMonth() &&
     date.getDate() === today.getDate(),
   );
+};
+
+export type FreeStockShortage = {
+  productId: string;
+  productName?: string;
+  required: number;
+  available: number;
+};
+
+/**
+ * Free SKUs whose van stock (from the local daily stock of this work session)
+ * cannot cover the sold + free quantity. Products without local stock rows are
+ * skipped here; the server still validates them.
+ */
+export const checkFreeGoodsStock = async (
+  items: Array<{ productId: string; caseQty?: number; pieceQty?: number; unitQtyInCase?: number }>,
+  freeGoods: FreeGood[],
+  vanId: string,
+): Promise<FreeStockShortage[]> => {
+  if (!freeGoods.length) return [];
+  const ownerId = useAuthStore.getState().user?.userId ?? '';
+  const workSessionId = String(useAuthStore.getState().workSessionId || '');
+  if (!ownerId) return [];
+
+  let records: Record<string, any>[] = [];
+  try {
+    records = await loadAllLocalRecords(repositories.vanDailyStock, ownerId);
+  } catch {
+    return [];
+  }
+  const stockOf = (productId: string) =>
+    records.find(
+      (record) =>
+        String(record.productId || '') === productId &&
+        String(record.vanId || '') === String(vanId) &&
+        (!workSessionId || String(record.workSessionId || '') === workSessionId) &&
+        record.isDeleted !== true &&
+        !record.deletedAt,
+    );
+
+  const required = new Map<string, { productName?: string; pieces: number; free: boolean }>();
+  for (const item of items) {
+    const pieces =
+      (Number(item.caseQty) || 0) * Math.max(Number(item.unitQtyInCase) || 1, 1) +
+      (Number(item.pieceQty) || 0);
+    const entry = required.get(item.productId) ?? { pieces: 0, free: false };
+    entry.pieces += pieces;
+    required.set(item.productId, entry);
+  }
+  for (const good of freeGoods) {
+    const record = stockOf(good.productId);
+    const pieces = freeGoodPieces(good, Number(record?.unitQtyInCase) || 1);
+    const entry = required.get(good.productId) ?? { pieces: 0, free: false };
+    entry.pieces += pieces;
+    entry.free = true;
+    entry.productName = entry.productName || good.productName;
+    required.set(good.productId, entry);
+  }
+
+  const shortages: FreeStockShortage[] = [];
+  for (const [productId, entry] of required) {
+    if (!entry.free) continue;
+    const record = stockOf(productId);
+    if (!record) continue;
+    const available = Number(record.closingQty) || 0;
+    if (available < entry.pieces) {
+      shortages.push({
+        productId,
+        productName: entry.productName || record.productName,
+        required: entry.pieces,
+        available,
+      });
+    }
+  }
+  return shortages;
 };
 
 /** Keep offline records consistent with the calculations applied by SaleService.create. */
@@ -397,6 +477,36 @@ export const saleService: SaleService = {
     }
 
     /**
+     * Free SKUs (scheme free goods) leave the van too: add them to the stock
+     * check and deduction, priced 0.
+     */
+    const freeGoodQuantities = new Map<string, number>();
+    for (const good of collectFreeGoods(calculatedPayload.items as any, calculatedPayload.groupSchemes as any)) {
+      const stockRecord = dailyStockRecords.find(
+        (record: any) =>
+          String(record.productId || '') === good.productId &&
+          String(record.vanId || '') === String(vanId) &&
+          String(record.workSessionId || '') === String(workSessionId),
+      );
+      const unitQtyInCase = Math.max(toNumber(stockRecord?.unitQtyInCase, 1), 1);
+      const pieces = freeGoodPieces(good, unitQtyInCase);
+      freeGoodQuantities.set(good.productId, (freeGoodQuantities.get(good.productId) ?? 0) + pieces);
+      const existing = productSalesMap.get(good.productId);
+      if (existing) {
+        existing.soldQuantity += pieces;
+      } else {
+        productSalesMap.set(good.productId, {
+          productId: good.productId,
+          productName: good.productName,
+          soldQuantity: pieces,
+          caseQty: 0,
+          pieceQty: 0,
+          unitQtyInCase,
+        });
+      }
+    }
+
+    /**
      * ======================================================
      * VALIDATE STOCK AGAINST VAN DAILY STOCK
      *
@@ -521,6 +631,28 @@ export const saleService: SaleService = {
          * Business status is POSTED.
          * Sync pending state is handled by sync_queue.
          */
+        status: 'POSTED',
+      } as unknown as Record<string, unknown>);
+    }
+
+    for (const [productId, quantity] of freeGoodQuantities) {
+      const transactionId = createSchemaId('InventoryTransaction');
+      await repositories.inventoryTransactions.create(ownerId, {
+        uuid: transactionId,
+        transactionId,
+        productId,
+        vanId,
+        employeeId,
+        workSessionId,
+        saleId,
+        referenceNo: saleId,
+        transactionType: 'SALE',
+        direction: 'OUT',
+        quantity,
+        cases: 0,
+        pieces: quantity,
+        remark: 'Free goods (scheme) deducted from offline sale',
+        transactionDate: saleDate,
         status: 'POSTED',
       } as unknown as Record<string, unknown>);
     }

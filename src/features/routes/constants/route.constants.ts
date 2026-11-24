@@ -1,4 +1,5 @@
-export const ROUTE_OUTLETS_LIMIT = 500;
+/** Outlets per request; the Route screen loads further pages in the background. */
+export const ROUTE_OUTLETS_PAGE_SIZE = 50;
 
 export const DEFAULT_CURRENT_LOCATION = {
   latitude: 22.7443,

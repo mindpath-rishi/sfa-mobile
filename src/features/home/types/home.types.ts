@@ -8,6 +8,7 @@ export type DayStartPayload = {
   routeName?: string;
   customerCategoryId?: string;
   vanId?: string;
+  vanName?: string;
   vanChangeReason?: string;
   vanChangeNote?: string;
   requestedVanId?: string;

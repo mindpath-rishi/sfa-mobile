@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useProductPriceStyles } from '../../styles/ProductPrice.styles';
 import { AppText } from '@/core/components';

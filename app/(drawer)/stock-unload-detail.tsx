@@ -1,12 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +8,7 @@ import { AppText } from '@/core/components';
 import { notificationService } from '@/features/notification/services/notification.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { toast } from '@/core/utils';
+import { SkeletonList } from '@/core/components/Skeleton';
 
 type UnloadItem = {
   productId: string;
@@ -70,8 +64,8 @@ export default function StockUnloadDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <SafeAreaView style={{ flex: 1, padding: 16, backgroundColor: colors.background }}>
+        <SkeletonList rows={6} />
       </SafeAreaView>
     );
   }
@@ -79,7 +73,13 @@ export default function StockUnloadDetailScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.primary }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity
+          hitSlop={10}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          onPress={() => router.back()}
+          style={styles.backButton}
+        >
           <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <AppText style={styles.headerTitle}>Stock Unload Details</AppText>

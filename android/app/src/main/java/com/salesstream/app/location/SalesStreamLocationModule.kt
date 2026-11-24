@@ -24,6 +24,8 @@ class SalesStreamLocationModule(
         if (options.hasKey("intervalMs")) options.getDouble("intervalMs").toLong() else 5000L
       val distanceMeters =
         if (options.hasKey("distanceMeters")) options.getDouble("distanceMeters").toFloat() else 5f
+      val accuracy =
+        if (options.hasKey("accuracy")) options.getString("accuracy") ?: "HIGH" else "HIGH"
       val notificationTitle =
         if (options.hasKey("notificationTitle")) options.getString("notificationTitle") else
           "Sales Stream live location active"
@@ -53,6 +55,7 @@ class SalesStreamLocationModule(
         putExtra(SalesStreamLocationService.EXTRA_BASE_URL, baseUrl)
         putExtra(SalesStreamLocationService.EXTRA_INTERVAL_MS, intervalMs)
         putExtra(SalesStreamLocationService.EXTRA_DISTANCE_METERS, distanceMeters)
+        putExtra(SalesStreamLocationService.EXTRA_ACCURACY, accuracy)
         putExtra(SalesStreamLocationService.EXTRA_NOTIFICATION_TITLE, notificationTitle)
         putExtra(SalesStreamLocationService.EXTRA_NOTIFICATION_BODY, notificationBody)
       }

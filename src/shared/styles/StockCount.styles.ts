@@ -14,6 +14,35 @@ export const useStockCountStyles = () => {
     listContent: {
       paddingBottom: 100,
     },
+    filterChipsContainer: {
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    filterChipsContent: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    filterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 20,
+    },
+    filterChipText: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    skeletonCard: {
+      height: 96,
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     footerLoader: {
       paddingVertical: 20,
       alignItems: 'center',

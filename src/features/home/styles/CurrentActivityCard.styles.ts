@@ -1,8 +1,13 @@
 // CurrentActivityCard.styles.ts
-import { StyleSheet, ViewStyle, TextStyle, Dimensions, Platform } from 'react-native';
+import {
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  Dimensions,
+  Platform,
+  useWindowDimensions,
+} from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
-
-const { width } = Dimensions.get('window');
 
 export const useCurrentActivityCardStyles = ({
   selectedActivity,
@@ -10,6 +15,7 @@ export const useCurrentActivityCardStyles = ({
   selectedActivity: string;
 }) => {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
 
   return StyleSheet.create({
     container: {
@@ -67,7 +73,7 @@ export const useCurrentActivityCardStyles = ({
     } as ViewStyle,
 
     statusText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       letterSpacing: 0.5,
     } as TextStyle,

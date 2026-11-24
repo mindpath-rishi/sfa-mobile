@@ -1,11 +1,12 @@
 // shared/components/StockCountDetailModal.tsx
 import React from 'react';
-import { View, Modal, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Modal, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppText } from '@/core/components';
 import { format } from 'date-fns';
+import { SkeletonList } from '@/core/components/Skeleton';
 
 interface StockCountDetailModalProps {
   visible: boolean;
@@ -89,7 +90,12 @@ export const StockCountDetailModal: React.FC<StockCountDetailModalProps> = ({
             <AppText style={{ fontSize: 18, fontWeight: '600', color: colors.textPrimary }}>
               Stock Count Details
             </AppText>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity
+              hitSlop={10}
+              accessibilityLabel="Close"
+              accessibilityRole="button"
+              onPress={onClose}
+            >
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -339,7 +345,7 @@ export const StockCountDetailModal: React.FC<StockCountDetailModalProps> = ({
                   Products ({detailItems.length})
                 </AppText>
                 {isLoading ? (
-                  <ActivityIndicator size="large" color={colors.primary} />
+                  <SkeletonList rows={4} />
                 ) : (
                   detailItems.map((item, idx) => (
                     <View

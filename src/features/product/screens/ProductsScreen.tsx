@@ -9,15 +9,17 @@ import React, {
 import { useShallow } from 'zustand/react/shallow';
 import {
   View,
-  FlatList,
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
-  Alert,
   ScrollView,
   Dimensions,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { getCachedScreenData, setCachedScreenData } from '@/shared/providers/queryClient';
+import { useAuthStore } from '@/core/store/auth.store';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,12 +45,11 @@ import { toast } from '@/shared/utils/toast';
 import { toBusinessId } from '@/shared/utils/business-id.utils';
 import { ProductsScreenRef, ProductsScreenProps } from '../types/product.types';
 import { EmptyState } from '@/core/components/EmptyState';
+import { appAlert } from '@/core/alert/appAlert';
 
-const { width } = Dimensions.get('window');
 const PAGE_SIZE = 20;
 const LOAD_MORE_THRESHOLD = 0.5;
 const CATEGORY_WIDTH = 60;
-const PRODUCT_WIDTH = width - CATEGORY_WIDTH - 16;
 
 type QuickFilterType = 'all' | 'focused';
 
@@ -76,6 +77,8 @@ const getInitials = (name: string) => {
 };
 
 function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<ProductsScreenRef>) {
+  const { width: windowWidth } = useWindowDimensions();
+  const PRODUCT_WIDTH = windowWidth - CATEGORY_WIDTH - 16;
   const { colors } = useTheme();
   const styles = useProductsScreenStyles();
   const { setHeader } = useHeader();
@@ -197,16 +200,10 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     async (page: number = 1, shouldAppend: boolean = false, isSearch: boolean = false) => {
       if (!routeHydrated) return;
 
-      try {
-        if (isSearch || (page === 1 && !shouldAppend)) {
-          setIsLoading(true);
-          setProducts([]); // Clear products immediately to show skeleton
-        } else if (!shouldAppend) {
-          setIsLoading(true);
-        } else {
-          setIsLoadingMore(true);
-        }
+      let cached: { products: any[]; total: number } | undefined;
+      let cacheKey: unknown[] = [];
 
+      try {
         let categoryIds = filters.categories.map((c) => c.categoryId);
         if (selectedCategory) {
           categoryIds = [selectedCategory.categoryId];
@@ -272,6 +269,28 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           params.minPrice = '0.0001';
         }
 
+        // First pages are cached per exact query: revisits (and repeated filter
+        // combinations) render instantly, then refresh in the background.
+        cacheKey = ['products', useAuthStore.getState().user?.userId, mode, params];
+        cached =
+          page === 1 && !shouldAppend
+            ? getCachedScreenData<{ products: any[]; total: number }>(cacheKey)
+            : undefined;
+
+        if (cached) {
+          setProducts(cached.products);
+          setTotalCount(cached.total);
+          setHasMore(PAGE_SIZE < cached.total);
+          setCurrentPage(1);
+        } else if (isSearch || (page === 1 && !shouldAppend)) {
+          setIsLoading(true);
+          setProducts([]); // Clear products immediately to show skeleton
+        } else if (!shouldAppend) {
+          setIsLoading(true);
+        } else {
+          setIsLoadingMore(true);
+        }
+
         const response = await productService.fetchProducts(params);
 
         if (response?.success) {
@@ -282,10 +301,14 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           setTotalCount(total);
           setHasMore(page * PAGE_SIZE < total);
           setCurrentPage(page);
+          if (page === 1 && !shouldAppend) {
+            setCachedScreenData(cacheKey, { products: newProducts, total });
+          }
         }
       } catch (error) {
         console.error('Error fetching products:', error);
-        if (page === 1) setProducts([]);
+        // Keep showing cached products if the background refresh fails.
+        if (page === 1 && !cached) setProducts([]);
       } finally {
         if (page === 1 || isSearch) setIsLoading(false);
         if (shouldAppend) setIsLoadingMore(false);
@@ -442,7 +465,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
 
   const handleSubmit = useCallback(() => {
     if (items.length === 0) {
-      Alert.alert('Cart Empty', 'Please add items to your cart before proceeding');
+      appAlert('Cart Empty', 'Please add items to your cart before proceeding');
       return;
     }
 
@@ -804,7 +827,7 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
           {products.length === 0 ? (
             renderEmptyState()
           ) : (
-            <FlatList
+            <FlashList
               data={productsWithCart}
               keyExtractor={(item) => item.productId}
               renderItem={renderProductItem}
@@ -821,9 +844,6 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
               onEndReached={loadMore}
               onEndReachedThreshold={LOAD_MORE_THRESHOLD}
               ListFooterComponent={renderFooter}
-              maxToRenderPerBatch={10}
-              windowSize={5}
-              removeClippedSubviews={true}
             />
           )}
         </View>
@@ -846,6 +866,8 @@ function ProductsScreenComponent(props: ProductsScreenProps, ref: React.Ref<Prod
     </View>
   );
 }
+
+export type { ProductsScreenRef, ProductsScreenProps };
 
 export const ProductsScreen = forwardRef(ProductsScreenComponent);
 ProductsScreen.displayName = 'ProductsScreen';

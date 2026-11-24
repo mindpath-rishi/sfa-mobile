@@ -14,7 +14,7 @@ export const createManagerTargetsBaseStyles = (colors: AppColors) =>
     },
     metricLabel: {
       marginTop: 3,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.textTertiary,
     },
@@ -169,7 +169,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
     },
     breakdownHeaderText: {
       flex: 1,
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '900',
       textTransform: 'uppercase',
       textAlign: 'right',
@@ -340,7 +340,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       backgroundColor: `${colors.success}12`,
     },
     percentBadgeText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       color: colors.success,
     },
@@ -368,12 +368,12 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
     },
     userPosition: {
       marginTop: 2,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.textTertiary,
     },
     drillText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.textQuaternary,
     },
@@ -397,7 +397,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       gap: 8,
     },
     progressMetaText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.textTertiary,
     },
@@ -418,7 +418,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       backgroundColor: colors.textQuaternary,
     },
     rateLabel: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.textTertiary,
     },
@@ -433,7 +433,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       backgroundColor: colors.infoLight,
     },
     categoryButtonText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.primary,
     },
@@ -459,7 +459,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
     },
     categoryPanelSubtitle: {
       marginTop: 2,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.textTertiary,
     },
@@ -469,7 +469,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       paddingVertical: 4,
       backgroundColor: colors.infoLight,
       color: colors.primary,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       overflow: 'hidden',
     },
@@ -493,7 +493,7 @@ export const createManagerTargetsStyles = (colors: AppColors) =>
       color: colors.textPrimary,
     },
     categoryPercent: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       color: colors.primary,
     },

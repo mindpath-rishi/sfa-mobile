@@ -52,7 +52,7 @@ export const useProductCardStyles = () => {
     } as TextStyle,
 
     productCategory: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '500',
       color: colors.textTertiary,
       lineHeight: 14,
@@ -66,12 +66,12 @@ export const useProductCardStyles = () => {
     } as ViewStyle,
 
     skuText: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textTertiary,
     } as TextStyle,
 
     unitText: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textTertiary,
     } as TextStyle,
 

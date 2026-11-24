@@ -1,14 +1,8 @@
 // src/core/components/Button/Button.tsx
-import React, { useMemo, useCallback } from 'react';
-import {
-  View,
-  Pressable,
-  ActivityIndicator,
-  Text,
-  ViewStyle,
-  TextStyle,
-  Platform,
-} from 'react-native';
+import React, { useMemo, useCallback, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
+import { View, Pressable, ActivityIndicator, ViewStyle, TextStyle, Platform } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { ButtonProps } from './Button.types';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { createButtonStyles } from './Button.styles';
@@ -42,6 +36,8 @@ import { createButtonStyles } from './Button.styles';
  * />
  * ```
  */
+const REPEAT_TAP_GUARD_MS = 600;
+
 const Button: React.FC<ButtonProps> = ({
   title = '',
   loading = false,
@@ -63,7 +59,12 @@ const Button: React.FC<ButtonProps> = ({
 }) => {
   const { colors } = useTheme();
   const styles = createButtonStyles(colors);
-  const isDisabled = disabled || loading;
+  // Ignore repeat taps while an async onPress is running (shows the spinner), and
+  // for a short window after sync handlers, so actions can't be submitted twice.
+  const [pending, setPending] = useState(false);
+  const inFlightRef = useRef(false);
+  const isLoading = loading || pending;
+  const isDisabled = disabled || isLoading;
 
   // Get button colors based on variant and state
   const getButtonColors = useCallback(() => {
@@ -194,10 +195,27 @@ const Button: React.FC<ButtonProps> = ({
 
   // Handle press with haptic feedback
   const handlePress = useCallback(() => {
-    if (!isDisabled && onPress) {
-      if (hapticFeedback && Platform.OS !== 'web') {
-      }
-      onPress();
+    if (isDisabled || !onPress || inFlightRef.current) return;
+
+    if (hapticFeedback && Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    }
+
+    inFlightRef.current = true;
+    const result = onPress() as unknown;
+
+    if (result instanceof Promise) {
+      setPending(true);
+      result
+        .catch(() => undefined)
+        .finally(() => {
+          inFlightRef.current = false;
+          setPending(false);
+        });
+    } else {
+      setTimeout(() => {
+        inFlightRef.current = false;
+      }, REPEAT_TAP_GUARD_MS);
     }
   }, [isDisabled, onPress, hapticFeedback]);
 
@@ -232,7 +250,7 @@ const Button: React.FC<ButtonProps> = ({
   );
 
   // Loading state
-  if (loading) {
+  if (isLoading) {
     return (
       <View
         style={[
@@ -306,7 +324,7 @@ const Button: React.FC<ButtonProps> = ({
       accessibilityLabel={accessibilityLabel || title}
       accessibilityHint={accessibilityHint}
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled, busy: loading }}
+      accessibilityState={{ disabled: isDisabled, busy: isLoading }}
     >
       {({ pressed }) => (
         <View style={[styles.buttonContent]}>

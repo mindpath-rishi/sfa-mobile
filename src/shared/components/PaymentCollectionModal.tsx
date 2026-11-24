@@ -2,15 +2,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Text, TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppCard } from '@/core/components/Card';
@@ -22,6 +20,8 @@ import { toast } from '@/core/utils';
 import { usePaymentCollectionStyles } from '@/features/checkin/styles/PaymentCollection.styles';
 import { saleService } from '../services/sale.service';
 import { useRouteStore } from '@/core/store/route.store';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { appAlert } from '@/core/alert/appAlert';
 
 interface PaymentCollectionModalProps {
   visible: boolean;
@@ -34,7 +34,7 @@ interface PaymentCollectionModalProps {
 type PaymentMode = 'cash' | 'card' | 'cheque' | 'mobile_money' | 'bank_transfer';
 
 const PAYMENT_MODES: PaymentMode[] = ['cash', 'card', 'cheque', 'mobile_money', 'bank_transfer'];
-const MODE_ICONS: Record<PaymentMode, string> = {
+const MODE_ICONS: Record<PaymentMode, React.ComponentProps<typeof Ionicons>['name']> = {
   cash: 'cash-outline',
   card: 'card-outline',
   cheque: 'document-text-outline',
@@ -84,7 +84,7 @@ export const PaymentCollectionModal: React.FC<PaymentCollectionModalProps> = ({
 
   const handleCollectPayment = () => {
     if (!isValidAmount) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount greater than 0');
+      appAlert('Invalid Amount', 'Please enter a valid amount greater than 0');
       return;
     }
 
@@ -96,7 +96,7 @@ export const PaymentCollectionModal: React.FC<PaymentCollectionModalProps> = ({
     setAmount(outstanding);
   }, [outstanding]);
 
-  const processPayment = async () => {
+  const [processPayment] = useSingleFlight(async () => {
     if (!user) {
       toast.error('Error', 'User not loaded');
       return;
@@ -160,7 +160,7 @@ export const PaymentCollectionModal: React.FC<PaymentCollectionModalProps> = ({
       setShowConfirm(false);
       toast.error('Error', 'Failed to process payment');
     }
-  };
+  });
 
   // Reset form when modal opens
   useEffect(() => {
@@ -303,7 +303,7 @@ export const PaymentCollectionModal: React.FC<PaymentCollectionModalProps> = ({
         </KeyboardAvoidingView>
 
         {/* Bottom Button */}
-        <View style={[styles.modalBottomBar, { paddingBottom: insets.bottom || 16 }]}>
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom || 16 }]}>
           <TouchableOpacity
             style={[
               styles.collectButton,

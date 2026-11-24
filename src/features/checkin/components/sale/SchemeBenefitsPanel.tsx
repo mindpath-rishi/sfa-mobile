@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import type { GroupSchemeBenefit } from '@/shared/services/group-scheme.engine';
@@ -49,9 +50,7 @@ const toFreeGoodsRows = (
 ): FreeGoodsRow[] => [
   ...lineBenefits
     .filter(
-      (benefit) =>
-        LINE_FREE_GOODS_TYPES.includes(benefit.schemeType) &&
-        (benefit.freeQty ?? 0) > 0,
+      (benefit) => LINE_FREE_GOODS_TYPES.includes(benefit.schemeType) && (benefit.freeQty ?? 0) > 0,
     )
     .map((benefit) => ({
       key: `line-${benefit.schemeId}-${benefit.freeProductId}`,

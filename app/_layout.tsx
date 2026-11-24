@@ -1,7 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import { startDeviceHeartbeat } from '@/core/device/device-heartbeat.service';
+import React, { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-router';
-import { ActivityIndicator, AppState, Platform, View } from 'react-native';
+import { AppState, InteractionManager, Platform, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as NavigationBar from 'expo-navigation-bar';
 import Toast from 'react-native-toast-message';
@@ -20,6 +21,9 @@ import { useGlobalErrorStore } from '@/core/store/error.store';
 
 import AppErrorScreen from '@/core/screens/error/Error';
 import LoaderOverlay from '@/core/screens/LoaderOverlay';
+import { AppSplash } from '@/core/screens/AppSplash';
+import { AppAlertHost } from '@/core/alert/AppAlertHost';
+import { retryPendingVisitCompletions } from '@/features/outlet/services/outlet.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { BackgroundLocationDisclosureModal } from '@/shared/components/models/BackgroundLocationDisclosureModal';
 
@@ -70,6 +74,7 @@ export default function RootLayout() {
 
   const locationStartInProgressRef = useRef(false);
   const lastLocationStartAtRef = useRef(0);
+  const [splashDone, setSplashDone] = useState(false);
 
   /* ======================================================
    * STORES
@@ -138,30 +143,43 @@ export default function RootLayout() {
     void initialiseOffline();
   }, [authHydrated, authUser?.userId, hydrateCart, hydrateRoute]);
 
+  /* Battery %, last active time and offline periods for managers. */
+  useEffect(() => {
+    if (!authHydrated || !authUser?.userId) return;
+    return startDeviceHeartbeat();
+  }, [authHydrated, authUser?.userId]);
+
   /* App errors → MIS System Logs (warnings/errors, and crashes). */
   useEffect(() => installErrorReporter(), []);
 
   useEffect(() => {
     if (!token) return;
 
-    void syncOfflineQueue();
-    // Phone health check-in for MIS → Devices & App; also returns update
-    // status and any command MIS queued for this phone.
-    void sendHeartbeat();
+    // Run after the first screen has rendered so launch isn't competing with
+    // network/SQLite work. Phone health check-in for MIS → Devices & App; also
+    // returns update status and any command MIS queued for this phone.
+    const initialRun = InteractionManager.runAfterInteractions(() => {
+      void syncOfflineQueue();
+      void sendHeartbeat();
+      void retryPendingVisitCompletions();
+    });
 
     const timer = setInterval(() => {
       void syncOfflineQueue();
       void sendHeartbeat();
+      void retryPendingVisitCompletions();
     }, 5 * 60_000);
 
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         void syncOfflineQueue();
         void sendHeartbeat();
+        void retryPendingVisitCompletions();
       }
     });
 
     return () => {
+      initialRun.cancel();
       clearInterval(timer);
       appStateSubscription.remove();
     };
@@ -293,14 +311,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (Platform.OS === 'android' && themeHydrated) {
-      NavigationBar.setBackgroundColorAsync(colors.background + '00').catch((error) =>
-        console.error('NavBar BG error:', error),
-      );
-    }
-  }, [themeHydrated, colors.background]);
-
-  useEffect(() => {
-    if (Platform.OS === 'android' && themeHydrated) {
       NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch((error) =>
         console.error('NavBar Style error:', error),
       );
@@ -339,20 +349,19 @@ export default function RootLayout() {
    * LOADING STATE
    * ====================================================== */
 
-  if (!themeHydrated || !languageHydrated || !authHydrated) {
+  // Full-screen splash stays on top until stores hydrate, then fades out. It is
+  // always the last child so it isn't remounted when the content below changes.
+  const hydrated = themeHydrated && languageHydrated && authHydrated;
+  const splash = splashDone ? null : (
+    <AppSplash ready={hydrated} onHidden={() => setSplashDone(true)} />
+  );
+
+  if (!hydrated) {
     return (
-      <SafeAreaProvider>
-        <View
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: colors.background,
-          }}
-        >
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SafeAreaProvider>
+      <>
+        <View style={{ flex: 1, backgroundColor: colors.background }} />
+        {splash}
+      </>
     );
   }
 
@@ -362,11 +371,14 @@ export default function RootLayout() {
 
   if (errorType) {
     return (
-      <SafeAreaProvider>
-        <ThemeProvider>
-          <AppErrorScreen type={errorType} onRetry={clearError} />
-        </ThemeProvider>
-      </SafeAreaProvider>
+      <>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            <AppErrorScreen type={errorType} onRetry={clearError} />
+          </ThemeProvider>
+        </SafeAreaProvider>
+        {splash}
+      </>
     );
   }
 
@@ -375,29 +387,33 @@ export default function RootLayout() {
    * ====================================================== */
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <AppProviders>
-          <FilterProvider>
-            <HeaderProvider>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                }}
-              >
-                <Stack.Screen name="(auth)" />
-                <Stack.Screen name="(drawer)" />
-              </Stack>
-            </HeaderProvider>
+    <>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <AppProviders>
+            <FilterProvider>
+              <HeaderProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                  }}
+                >
+                  <Stack.Screen name="(auth)" />
+                  <Stack.Screen name="(drawer)" />
+                </Stack>
+              </HeaderProvider>
 
-            <OfflineSyncGate />
-            <LoaderOverlay />
-            <BackgroundLocationDisclosureModal />
-            <UpdateGate />
-            <Toast position="top" />
-          </FilterProvider>
-        </AppProviders>
-      </ThemeProvider>
-    </SafeAreaProvider>
+              <OfflineSyncGate />
+              <LoaderOverlay />
+              <BackgroundLocationDisclosureModal />
+              <UpdateGate />
+              <AppAlertHost />
+              <Toast position="top" />
+            </FilterProvider>
+          </AppProviders>
+        </ThemeProvider>
+      </SafeAreaProvider>
+      {splash}
+    </>
   );
 }

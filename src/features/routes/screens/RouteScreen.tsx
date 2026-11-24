@@ -1,21 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
   Modal,
-  Alert,
   Platform,
   TouchableWithoutFeedback,
   LayoutAnimation,
   UIManager,
   Linking,
-  TextInput,
   RefreshControl,
-  FlatList,
+  ActivityIndicator,
 } from 'react-native';
+import { Text, TextInput } from '@/core/components/Text/ScaledText';
+import { FlashList } from '@shopify/flash-list';
 import { Ionicons, Feather, MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,14 +30,18 @@ import {
 } from '@/core/store/route.store';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { useAuthStore } from '@/core/store/auth.store';
+import { getCachedScreenData, setCachedScreenData } from '@/shared/providers/queryClient';
 import { toast } from '@/core/utils';
-import { CustomerCreateModal } from '@/shared/components/models/CustomerCreateModal';
+import {
+  CustomerCreateModal,
+  type KycDocument,
+} from '@/shared/components/models/CustomerCreateModal';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { FilterModal } from '@/shared/components/models/Filter.modal';
 import { FilterSection } from '@/shared/types/filter.types';
 import {
   DEFAULT_CURRENT_LOCATION,
-  ROUTE_OUTLETS_LIMIT,
+  ROUTE_OUTLETS_PAGE_SIZE,
 } from '@/features/routes/constants/route.constants';
 import { useRouteScreenStyles } from '@/features/routes/styles/RouteScreen.styles';
 import type { Outlet } from '@/features/routes/types/route.types';
@@ -57,6 +60,8 @@ import {
   hasNoOrderInLast30Days,
   normalizeFilterText,
 } from '@/features/routes/utils/route-outlet.utils';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { appAlert } from '@/core/alert/appAlert';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -148,6 +153,9 @@ export default function RouteScreen() {
   const locationInterval = useRef<NodeJS.Timeout | null>(null);
   const isDataLoadedRef = useRef(false);
   const mapRef = useRef<any>(null);
+  // Bumped on every outlets load so a stale background page loop stops appending.
+  const outletsLoadTokenRef = useRef(0);
+  const [loadingMoreOutlets, setLoadingMoreOutlets] = useState(false);
   const activeVisist = useOutletStore((s) => s.activeVisit);
   const setActiveVisit = useOutletStore((s) => s.setActiveVisit);
   const setSelectedOutlet = useOutletStore((s) => s.setSelectedOutlet);
@@ -651,27 +659,14 @@ export default function RouteScreen() {
 
       routeIdRef.current = currentRouteId;
       isDataLoadedRef.current = false;
-      setIsLoading(true);
       setError(null);
 
-      const payload: any = {
-        routeId: currentRouteId,
-        page: 1,
-        limit: ROUTE_OUTLETS_LIMIT,
-        filters: [],
-        searchText: '',
-        routeSessionId: resolvedRoute.routeSessionId,
-      };
+      const applyOutletsData = (data: any, offset = 0) => {
+        const outletsData = data?.data || [];
+        const summary = data?.summary || {};
 
-      try {
-        const response = await outletService.getRouteOutlets(payload);
-        if (!isMountedRef.current) return;
-
-        if (response.statusCode === 200) {
-          const outletsData = response.data?.data || [];
-          const summary = response.data?.summary || {};
-
-          // Update route summary from API response
+        // Summary covers the whole route, so the first page carries it.
+        if (offset === 0)
           setRouteSummary({
             totalOrderValue: summary.totalOrderValue || 0,
             totalCases: summary.totalCases || 0,
@@ -680,7 +675,9 @@ export default function RouteScreen() {
             LPSC: summary.LPSC || 0,
           });
 
-          const transformedOutlets: Outlet[] = outletsData.map((outlet: any, index: number) => ({
+        const transformedOutlets: Outlet[] = outletsData.map((outlet: any, pageIndex: number) => {
+          const index = offset + pageIndex;
+          return {
             ...outlet,
             _id: outlet._id,
             customerId: outlet.customerId,
@@ -705,17 +702,82 @@ export default function RouteScreen() {
             priority:
               outlet.priority || (index % 3 === 0 ? 'high' : index % 2 === 0 ? 'medium' : 'low'),
             geofenceRadius: 100,
-          }));
+          };
+        });
+        setOutlets((previous) =>
+          offset === 0 ? transformedOutlets : [...previous, ...transformedOutlets],
+        );
+      };
 
-          setOutlets(transformedOutlets);
+      // Show the last outlets for this route instantly; refresh below in the background.
+      const cacheKey = [
+        'routeOutlets',
+        useAuthStore.getState().user?.userId,
+        currentRouteId,
+        resolvedRoute.routeSessionId,
+      ];
+      const cached = forceRefresh ? undefined : getCachedScreenData<any>(cacheKey);
+      if (cached) applyOutletsData(cached);
+      else setIsLoading(true);
+
+      const payload: any = {
+        routeId: currentRouteId,
+        page: 1,
+        limit: ROUTE_OUTLETS_PAGE_SIZE,
+        filters: [],
+        searchText: '',
+        routeSessionId: resolvedRoute.routeSessionId,
+      };
+
+      try {
+        const response = await outletService.getRouteOutlets(payload);
+        if (!isMountedRef.current) return;
+
+        if (response.statusCode === 200) {
+          // Paint the first page right away, then fetch the rest page by page so a
+          // long route doesn't block the screen on one large response.
+          const loadToken = ++outletsLoadTokenRef.current;
+          const firstPage = response.data?.data || [];
+          const total = Number(response.meta?.total) || firstPage.length;
+          applyOutletsData(response.data);
           isDataLoadedRef.current = true;
           setError(null);
-        } else {
+          setIsLoading(false);
+          setRefreshing(false);
+
+          const allRows = [...firstPage];
+          let lastPageSize = firstPage.length;
+          if (allRows.length < total && lastPageSize === ROUTE_OUTLETS_PAGE_SIZE) {
+            setLoadingMoreOutlets(true);
+          }
+          try {
+            for (
+              let page = 2;
+              allRows.length < total && lastPageSize === ROUTE_OUTLETS_PAGE_SIZE;
+              page += 1
+            ) {
+              const next = await outletService.getRouteOutlets({ ...payload, page });
+              if (!isMountedRef.current || loadToken !== outletsLoadTokenRef.current) return;
+              if (next.statusCode !== 200) break;
+              const rows = next.data?.data || [];
+              lastPageSize = rows.length;
+              if (!rows.length) break;
+              applyOutletsData({ data: rows }, allRows.length);
+              allRows.push(...rows);
+            }
+          } finally {
+            if (isMountedRef.current && loadToken === outletsLoadTokenRef.current) {
+              setLoadingMoreOutlets(false);
+            }
+          }
+          setCachedScreenData(cacheKey, { ...response.data, data: allRows });
+        } else if (!cached) {
           setError(response.message || 'Failed to load outlets');
         }
       } catch (error) {
         console.error('Error fetching route outlets:', error);
-        if (isMountedRef.current) {
+        // Keep showing cached outlets if the background refresh fails.
+        if (isMountedRef.current && !cached) {
           setError('Failed to load outlets. Please check your connection and try again.');
         }
       } finally {
@@ -757,14 +819,14 @@ export default function RouteScreen() {
   const handleCardPress = useCallback(
     (outlet: Outlet) => {
       if (outlet.status === 'VERIFICATION_PENDING') {
-        Alert.alert(
+        appAlert(
           'Verification Pending',
           'This outlet is awaiting verification. You can open and visit it after it has been approved.',
         );
         return;
       }
       if (outlet.status === 'REJECTED') {
-        Alert.alert(
+        appAlert(
           'Outlet Rejected',
           'This outlet was rejected during verification and cannot be opened. Please contact your supervisor for help.',
         );
@@ -779,143 +841,172 @@ export default function RouteScreen() {
     [setSelectedOutlet],
   );
 
-  const handleCreateCustomer = useCallback(
-    async (formValue: any, photos?: string[]) => {
-      if (isCreatingCustomer) return;
-      setIsCreatingCustomer(true);
-      showLoader({ message: 'Preparing customer creation…' });
+  const [handleCreateCustomer] = useSingleFlight(
+    useCallback(
+      async (formValue: any, photos?: string[], kycDocuments?: KycDocument[]) => {
+        if (isCreatingCustomer) return;
+        setIsCreatingCustomer(true);
+        showLoader({ message: 'Preparing customer creation…' });
 
-      try {
-        let resolvedRoute = activeRoute;
-        let routeLocationIds = getRouteLocationIds(resolvedRoute);
-
-        if (
-          activeRoute?.routeId &&
-          (!routeLocationIds.marketId ||
-            !routeLocationIds.provinceId ||
-            !routeLocationIds.countryId)
-        ) {
-          try {
-            const mappedRoutesResponse: any = await homeService.getVanMappedRoutes();
-            const mappedRoute = mappedRoutesResponse?.data?.routes?.find(
-              (item: any) =>
-                item?.routeId === activeRoute.routeId ||
-                item?.route?.routeId === activeRoute.routeId,
-            );
-            if (mappedRoute) {
-              resolvedRoute = { ...activeRoute, ...mappedRoute, route: mappedRoute.route };
-              routeLocationIds = getRouteLocationIds(resolvedRoute);
-              useRouteStore.getState().setSelectedRoute(resolvedRoute);
-            }
-          } catch (error) {
-            console.warn('Failed to resolve route location IDs before customer creation:', error);
-          }
-        }
-
-        if (
-          !routeLocationIds.marketId ||
-          !routeLocationIds.provinceId ||
-          !routeLocationIds.countryId
-        ) {
-          toast.error(
-            'Route location missing',
-            'The selected route does not contain country, province, and market IDs. Please reselect the route.',
-          );
-          return;
-        }
-
-        formValue.routeId = activeRoute?.routeId;
-        formValue.marketId = routeLocationIds.marketId || formValue.marketId;
-        formValue.provinceId = routeLocationIds.provinceId || formValue.provinceId;
-        formValue.countryId = routeLocationIds.countryId || formValue.countryId;
-        formValue.customerCategoryId =
-          getRouteCustomerCategoryId(resolvedRoute) || formValue.customerCategoryId;
-        showLoader({ message: 'Getting customer location…' });
-        const location = await captureCurrentLocation();
-        if (location) {
-          formValue.geoTag = { lat: location.latitude, lng: location.longitude };
-        }
-        let response;
         try {
-          showLoader({ message: 'Creating customer…' });
-          response = await outletService.createCustomer(formValue);
-        } catch (error: any) {
-          console.error('Failed to create customer:', error);
-          toast.error(
-            'Error',
-            error?.response?.data?.message || error?.message || 'Failed to create customer',
-          );
-          return;
-        }
+          let resolvedRoute = activeRoute;
+          let routeLocationIds = getRouteLocationIds(resolvedRoute);
 
-        const isCustomerCreated =
-          response?.success === true && [200, 201, 202].includes(Number(response?.statusCode));
-
-        if (isCustomerCreated) {
-          // Customer creation responses have used both a direct data object and
-          // a nested data object. Resolve either shape so media is not silently
-          // skipped after a successful creation.
-          const createdCustomer = response.data?.data ?? response.data?.customer ?? response.data;
-          const customerId =
-            createdCustomer?.customerId ??
-            createdCustomer?._id ??
-            createdCustomer?.uuid ??
-            response.data?.customerId;
-
-          if (photos?.length && customerId) {
-            showLoader({
-              message:
-                photos.length === 1
-                  ? 'Uploading customer image…'
-                  : `Uploading ${photos.length} customer images…`,
-            });
+          if (
+            activeRoute?.routeId &&
+            (!routeLocationIds.marketId ||
+              !routeLocationIds.provinceId ||
+              !routeLocationIds.countryId)
+          ) {
             try {
-              const uploadResponses = await Promise.all(
-                photos.map((photo, index) =>
-                  outletService.uploadCustomerImage(customerId, photo, index === 0),
-                ),
+              const mappedRoutesResponse: any = await homeService.getVanMappedRoutes();
+              const mappedRoute = mappedRoutesResponse?.data?.routes?.find(
+                (item: any) =>
+                  item?.routeId === activeRoute.routeId ||
+                  item?.route?.routeId === activeRoute.routeId,
               );
-              const failedUpload = uploadResponses.find(
-                (uploadResponse) => uploadResponse?.success !== true,
-              );
-              if (failedUpload) {
-                throw new Error(failedUpload.message || 'Photo upload failed');
+              if (mappedRoute) {
+                resolvedRoute = { ...activeRoute, ...mappedRoute, route: mappedRoute.route };
+                routeLocationIds = getRouteLocationIds(resolvedRoute);
+                useRouteStore.getState().setSelectedRoute(resolvedRoute);
               }
             } catch (error) {
-              console.error('Outlet created but photo upload failed:', error);
+              console.warn('Failed to resolve route location IDs before customer creation:', error);
+            }
+          }
+
+          if (
+            !routeLocationIds.marketId ||
+            !routeLocationIds.provinceId ||
+            !routeLocationIds.countryId
+          ) {
+            toast.error(
+              'Route location missing',
+              'The selected route does not contain country, province, and market IDs. Please reselect the route.',
+            );
+            return;
+          }
+
+          formValue.routeId = activeRoute?.routeId;
+          formValue.marketId = routeLocationIds.marketId || formValue.marketId;
+          formValue.provinceId = routeLocationIds.provinceId || formValue.provinceId;
+          formValue.countryId = routeLocationIds.countryId || formValue.countryId;
+          formValue.customerCategoryId =
+            getRouteCustomerCategoryId(resolvedRoute) || formValue.customerCategoryId;
+          // Geo tag is mandatory: use the one captured (and shown on the map) in the form.
+          if (!formValue.geoTag?.lat || !formValue.geoTag?.lng) {
+            showLoader({ message: 'Getting customer location…' });
+            const location = await captureCurrentLocation();
+            if (location) {
+              formValue.geoTag = { lat: location.latitude, lng: location.longitude };
+            }
+          }
+          if (!formValue.geoTag?.lat || !formValue.geoTag?.lng) {
+            toast.error('Geo tag missing', 'Capture the outlet location before creating it.');
+            return;
+          }
+          formValue.geoTag = { lat: formValue.geoTag.lat, lng: formValue.geoTag.lng };
+          if (!formValue.tinNumber) delete formValue.tinNumber;
+          let response;
+          try {
+            showLoader({ message: 'Creating customer…' });
+            response = await outletService.createCustomer(formValue);
+          } catch (error: any) {
+            console.error('Failed to create customer:', error);
+            toast.error(
+              'Error',
+              error?.response?.data?.message || error?.message || 'Failed to create customer',
+            );
+            return;
+          }
+
+          const isCustomerCreated =
+            response?.success === true && [200, 201, 202].includes(Number(response?.statusCode));
+
+          if (isCustomerCreated) {
+            // Customer creation responses have used both a direct data object and
+            // a nested data object. Resolve either shape so media is not silently
+            // skipped after a successful creation.
+            const createdCustomer = response.data?.data ?? response.data?.customer ?? response.data;
+            const customerId =
+              createdCustomer?.customerId ??
+              createdCustomer?._id ??
+              createdCustomer?.uuid ??
+              response.data?.customerId;
+
+            if (photos?.length && customerId) {
+              showLoader({
+                message:
+                  photos.length === 1
+                    ? 'Uploading customer image…'
+                    : `Uploading ${photos.length} customer images…`,
+              });
+              try {
+                const uploadResponses = await Promise.all(
+                  photos.map((photo, index) =>
+                    outletService.uploadCustomerImage(customerId, photo, index === 0),
+                  ),
+                );
+                const failedUpload = uploadResponses.find(
+                  (uploadResponse) => uploadResponse?.success !== true,
+                );
+                if (failedUpload) {
+                  throw new Error(failedUpload.message || 'Photo upload failed');
+                }
+              } catch (error) {
+                console.error('Outlet created but photo upload failed:', error);
+                toast.error(
+                  'Photo upload',
+                  'Outlet was created, but its photo could not be uploaded.',
+                );
+              }
+            } else if (photos?.length) {
+              console.error('Outlet created but no customer ID was returned:', response.data);
               toast.error(
                 'Photo upload',
-                'Outlet was created, but its photo could not be uploaded.',
+                'Outlet was created, but the server did not return an ID for its photo upload.',
               );
             }
-          } else if (photos?.length) {
-            console.error('Outlet created but no customer ID was returned:', response.data);
-            toast.error(
-              'Photo upload',
-              'Outlet was created, but the server did not return an ID for its photo upload.',
-            );
+            if (kycDocuments?.length && customerId) {
+              showLoader({ message: 'Uploading KYC documents…' });
+              try {
+                const results = await Promise.all(
+                  kycDocuments.map((document) =>
+                    outletService.uploadCustomerDocument(customerId, document),
+                  ),
+                );
+                const failed = results.find((result) => result?.success !== true);
+                if (failed) throw new Error(failed.message || 'KYC upload failed');
+              } catch (error) {
+                console.error('Outlet created but KYC upload failed:', error);
+                toast.error(
+                  'KYC upload',
+                  'Outlet was created, but its KYC documents could not be uploaded.',
+                );
+              }
+            }
+            showLoader({ message: 'Refreshing route outlets…' });
+            // Reset data loaded flag to allow reload
+            isDataLoadedRef.current = false;
+            routeIdRef.current = undefined;
+            await getRouteOutlets();
+            toast.success(response.message || 'Customer created successfully');
+            setShowCustomerCreateModal(false);
+          } else {
+            toast.error('Error', response?.message || 'Failed to create customer');
           }
-          showLoader({ message: 'Refreshing route outlets…' });
-          // Reset data loaded flag to allow reload
-          isDataLoadedRef.current = false;
-          routeIdRef.current = undefined;
-          await getRouteOutlets();
-          toast.success(response.message || 'Customer created successfully');
-          setShowCustomerCreateModal(false);
-        } else {
-          toast.error('Error', response?.message || 'Failed to create customer');
+        } finally {
+          setIsCreatingCustomer(false);
+          hideLoader();
         }
-      } finally {
-        setIsCreatingCustomer(false);
-        hideLoader();
-      }
-    },
-    [activeRoute, getRouteOutlets, hideLoader, isCreatingCustomer, showLoader],
+      },
+      [activeRoute, getRouteOutlets, hideLoader, isCreatingCustomer, showLoader],
+    ),
   );
 
   const handleNavigation = useCallback((outlet: Outlet) => {
     if (outlet.status === 'VERIFICATION_PENDING' || outlet.status === 'REJECTED') {
-      Alert.alert(
+      appAlert(
         outlet.status === 'REJECTED' ? 'Outlet Rejected' : 'Verification Pending',
         outlet.status === 'REJECTED'
           ? 'Navigation is unavailable because this outlet was rejected during verification.'
@@ -924,7 +1015,7 @@ export default function RouteScreen() {
       return;
     }
     if (!outlet.geoTag?.lat || !outlet.geoTag?.lng) {
-      Alert.alert('Error', 'Location not available for this outlet');
+      appAlert('Error', 'Location not available for this outlet');
       return;
     }
 
@@ -935,13 +1026,13 @@ export default function RouteScreen() {
     });
 
     if (url) {
-      Linking.openURL(url).catch(() => Alert.alert('Error', 'Unable to open maps application'));
+      Linking.openURL(url).catch(() => appAlert('Error', 'Unable to open maps application'));
     }
   }, []);
 
   const endRoute = useCallback(() => {
     setShowEndRouteConfirm(false);
-    Alert.alert(
+    appAlert(
       'Route Completed',
       `Great job! You have completed ${summaryStats.visitedCount} out of ${outlets.length} visits.\nTotal Order Value: ${formatCurrency(summaryStats.totalOrderValue)}`,
     );
@@ -1114,7 +1205,7 @@ export default function RouteScreen() {
   // ========== RENDER ==========
   return (
     <SafeAreaView style={styles.container}>
-      <FlatList
+      <FlashList
         data={outletsWithDistance}
         keyExtractor={(outlet) => outlet._id}
         renderItem={renderOutletCard}
@@ -1188,7 +1279,12 @@ export default function RouteScreen() {
                   onChangeText={setSearchText}
                 />
                 {searchText.length > 0 && (
-                  <TouchableOpacity onPress={() => setSearchText('')}>
+                  <TouchableOpacity
+                    hitSlop={13}
+                    accessibilityLabel="Clear"
+                    accessibilityRole="button"
+                    onPress={() => setSearchText('')}
+                  >
                     <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
                   </TouchableOpacity>
                 )}
@@ -1242,11 +1338,13 @@ export default function RouteScreen() {
             />
           )
         }
-        ListFooterComponent={<View style={{ paddingBottom: styles.outletList.paddingBottom }} />}
-        initialNumToRender={8}
-        maxToRenderPerBatch={8}
-        windowSize={7}
-        removeClippedSubviews
+        ListFooterComponent={
+          <View style={{ paddingBottom: styles.outletList.paddingBottom }}>
+            {loadingMoreOutlets ? (
+              <ActivityIndicator color={colors.primary} style={{ marginVertical: 16 }} />
+            ) : null}
+          </View>
+        }
       />
 
       {/* End Route Modal */}
@@ -1384,6 +1482,9 @@ export default function RouteScreen() {
           </View>
 
           <TouchableOpacity
+            hitSlop={10}
+            accessibilityLabel="Close"
+            accessibilityRole="button"
             onPress={() => {
               setIsMapReady(false);
               setShowMapModal(false);

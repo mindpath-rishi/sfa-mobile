@@ -1,16 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
-  TextInput,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Text, TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -21,9 +19,18 @@ import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
 import { useOutletStore } from '@/core/store/outlet.store';
 import { useCartStore } from '@/core/store/cart.store';
 import { getRouteCustomerCategoryId, useRouteStore } from '@/core/store/route.store';
-import { saleService } from '@/shared/services/sale.service';
-import { outletService } from '@/features/outlet/services/outlet.service';
-import { captureCurrentLocation } from '@/shared/services/location.service';
+import { checkFreeGoodsStock, saleService } from '@/shared/services/sale.service';
+import { collectFreeGoods } from '@/shared/utils/free-goods.utils';
+import {
+  completeVisitInBackground,
+  outletService,
+} from '@/features/outlet/services/outlet.service';
+import {
+  captureBestEffortLocation,
+  type CapturedLocation,
+} from '@/shared/services/location.service';
+import { isOfflineMode } from '@/core/offline/offline.store';
+import { isSalesman } from '@/core/navigation/role.utils';
 import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { ConfirmationModal } from '@/core/components';
@@ -41,6 +48,8 @@ import {
   type SplitPayment,
   type SplitPaymentItem,
 } from '../components/payment/SplitPaymentModal';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { appAlert } from '@/core/alert/appAlert';
 
 const formatCustomerAddress = (address: unknown): string => {
   if (typeof address === 'string') return address.trim();
@@ -52,6 +61,9 @@ const formatCustomerAddress = (address: unknown): string => {
     .map((part) => part.trim())
     .join(', ');
 };
+
+/** Max time the sale waits for the check-out GPS fix before sending without it. */
+const CHECKOUT_LOCATION_WAIT_MS = 3000;
 
 export default function PaymentCollectionScreen() {
   const { colors } = useTheme();
@@ -83,8 +95,15 @@ export default function PaymentCollectionScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const clientSaleIdRef = useRef<{ signature: string; id: string } | null>(null);
+  // Check-out location is captured while the user reviews payment, so it is
+  // usually ready (and sent with the sale) by the time they confirm.
+  const checkOutLocationRef = useRef<Promise<CapturedLocation | undefined> | null>(null);
   const [showSplitPaymentModal, setShowSplitPaymentModal] = useState(false);
   const activeVisit = useOutletStore.getState().activeVisit;
+
+  useEffect(() => {
+    checkOutLocationRef.current = captureBestEffortLocation();
+  }, []);
 
   // Re-resolve category/sub-category/product/province/route/van wise schemes in case
   // cart contents changed since the sales summary screen last refreshed them.
@@ -109,6 +128,41 @@ export default function PaymentCollectionScreen() {
   );
 
   const currency = 'K';
+
+  // Free SKUs earned by schemes: shown at price 0 and deducted from van stock.
+  const freeGoods = useMemo(
+    () =>
+      collectFreeGoods(
+        items.map((item) => ({
+          productId: item.productId,
+          productName: item.productName,
+          appliedSchemes: appliedSchemesOf(schemeDiscounts[item.productId]),
+        })),
+        groupSchemeBenefits as any,
+      ),
+    [items, schemeDiscounts, groupSchemeBenefits],
+  );
+  const freeGoodsText = freeGoods
+    .map(
+      (good) =>
+        `🎁 ${good.productName || good.productId}: ${good.qty} ${
+          good.unit === 'CASE' ? 'case' : 'pc'
+        }${good.qty === 1 ? '' : 's'} @ ${currency}0.00`,
+    )
+    .join('\n');
+
+  const showFreeStockAlert = (
+    shortages: { productId: string; productName?: string; required: number; available: number }[],
+  ) =>
+    appAlert(
+      'Free Stock Not Available',
+      `Not enough van stock for the free items of this order:\n\n${shortages
+        .map(
+          (shortage) =>
+            `• ${shortage.productName || shortage.productId}: need ${shortage.required} pcs, available ${shortage.available} pcs`,
+        )
+        .join('\n')}\n\nTop up the van or change the order quantity.`,
+    );
 
   const creditInfo: CreditInfo = {
     creditLimit: outlet?.creditLimit || 0,
@@ -151,7 +205,7 @@ export default function PaymentCollectionScreen() {
     // For credit sales
     if (isCreditSelected) {
       if (willExceedCredit) {
-        Alert.alert(
+        appAlert(
           'Credit Limit Exceeded',
           `Order amount (${currency}${orderTotal.toFixed(2)}) exceeds available credit (${currency}${creditInfo.availableCredit.toFixed(2)}).\n\nPlease reduce order amount or use split payment.`,
           [
@@ -162,12 +216,11 @@ export default function PaymentCollectionScreen() {
         return;
       }
       processPayment();
-
     }
 
     // For regular payments
     if (!isValidAmount) {
-      Alert.alert(
+      appAlert(
         'Invalid Amount',
         `Please enter a valid amount between 0 and ${amountDue.toFixed(2)}`,
       );
@@ -175,7 +228,7 @@ export default function PaymentCollectionScreen() {
     }
 
     if (parsedAmount < amountDue) {
-      Alert.alert(
+      appAlert(
         'Partial Payment',
         `You're paying ${currency}${(amountDue - parsedAmount).toFixed(2)} less than the total amount due. Do you want to proceed with partial payment?`,
         [
@@ -194,7 +247,7 @@ export default function PaymentCollectionScreen() {
     const validPayments = otherPayments.filter((p) => p.amount > 0);
 
     if (validPayments.length === 0 && creditAmount === 0) {
-      Alert.alert('Invalid', 'Please specify at least one payment method');
+      appAlert('Invalid', 'Please specify at least one payment method');
       return;
     }
 
@@ -215,10 +268,10 @@ export default function PaymentCollectionScreen() {
     });
     paymentDetailsText += `\nTotal: ${currency}${orderTotal.toFixed(2)}`;
 
-    Alert.alert('Split Payment Configured', paymentDetailsText);
+    appAlert('Split Payment Configured', paymentDetailsText);
   };
 
-  const processPayment = () => {
+  const processPayment = async () => {
     if (!user) {
       toast.error('Error', 'User not loaded');
       return;
@@ -229,10 +282,18 @@ export default function PaymentCollectionScreen() {
       return;
     }
 
+    if (freeGoods.length) {
+      const shortages = await checkFreeGoodsStock(items as any, freeGoods, String(van.vanId || ''));
+      if (shortages.length) {
+        showFreeStockAlert(shortages);
+        return;
+      }
+    }
+
     setShowConfirm(true);
   };
 
-  const confirmPayment = async () => {
+  const [confirmPayment] = useSingleFlight(async () => {
     if (isSubmitting) return;
     setShowConfirm(false);
 
@@ -487,14 +548,35 @@ export default function PaymentCollectionScreen() {
 
       loader.show({ message: 'Creating sale...' });
 
-      // Start the checkout GPS fix now so it is ready when the visit completes
-      const checkOutLocationPromise = captureCurrentLocation();
+      const checkOutLocationPromise =
+        checkOutLocationRef.current ?? (checkOutLocationRef.current = captureBestEffortLocation());
+
+      // Online, the server closes the visit in the same transaction as the sale
+      // (check-out time = sale time), so nothing is left to do after checkout.
+      // Wait briefly for the check-out location; never hold the sale for GPS.
+      const isOfflineSale =
+        isSalesman(user) && user?.offlineAccessAllowed === true && isOfflineMode();
+      if (!isOfflineSale) {
+        const checkOutLocation = await Promise.race([
+          checkOutLocationPromise.catch(() => undefined),
+          new Promise<undefined>((resolve) =>
+            setTimeout(() => resolve(undefined), CHECKOUT_LOCATION_WAIT_MS),
+          ),
+        ]);
+        payload.completeVisit = true;
+        if (checkOutLocation) payload.checkOutLocation = checkOutLocation;
+      }
 
       const response: any = await saleService.createSale(payload, {
         showLoader: false,
       });
 
       if (!response?.success) {
+        if (/free product/i.test(String(response?.message || ''))) {
+          appAlert('Free Stock Not Available', String(response.message));
+          setShowConfirm(false);
+          return;
+        }
         toast.error('Error', response?.message || 'Failed to create sale');
         setShowConfirm(false);
         return;
@@ -565,8 +647,8 @@ export default function PaymentCollectionScreen() {
         },
         van: {
           id: van?.vanId,
-          name: van?.vanNumber || 'Van',
-          number: van?.vanNumber,
+          name: van?.vanId || 'Van',
+          number: van?.vanId,
         },
         employee: {
           id: user?.userId,
@@ -580,18 +662,18 @@ export default function PaymentCollectionScreen() {
       useInvoiceStore.getState().setLatestInvoice(invoiceData);
       setShowConfirm(false);
 
-      loader.show({ message: 'Completing visit...' });
-
       clearCart();
 
       const completedVisit = useOutletStore.getState().activeVisit;
 
       if (completedVisit?.visitId) {
-        try {
-          await outletService.completeVisit(completedVisit.visitId, checkOutLocationPromise);
-          useOutletStore.getState().setActiveVisit(null);
-        } catch (error) {
-          console.error('Error completing visit:', error);
+        useOutletStore.getState().setActiveVisit(null);
+        if (isOfflineSale) {
+          // Offline: the visit is closed in the local DB (synced later). Persisted
+          // first and retried on next launch if the app is closed meanwhile.
+          completeVisitInBackground(completedVisit.visitId, checkOutLocationPromise).catch(
+            (error) => console.warn('Visit completion will be retried:', error),
+          );
         }
       }
 
@@ -605,6 +687,12 @@ export default function PaymentCollectionScreen() {
     } catch (error: any) {
       console.error('Sale creation failed:', error);
 
+      const failureMessage = String(error?.response?.data?.message || error?.message || '');
+      if (/free product/i.test(failureMessage)) {
+        appAlert('Free Stock Not Available', failureMessage);
+        return;
+      }
+
       toast.error(
         'Error',
         error?.response?.data?.message || error?.message || 'Failed to create sale',
@@ -613,11 +701,11 @@ export default function PaymentCollectionScreen() {
       setIsSubmitting(false);
       loader.hide();
     }
-  };
+  });
 
   const handleSetFullAmount = () => {
     if (isCreditSelected) {
-      Alert.alert(
+      appAlert(
         'Credit Sale',
         'For credit sales, the full amount will be added to outstanding balance.',
       );
@@ -698,7 +786,7 @@ export default function PaymentCollectionScreen() {
                 </Text>
               )}
             </View>
-            {/* <TouchableOpacity onPress={() => router.back()}>
+            {/* <TouchableOpacity hitSlop={10} accessibilityLabel="Close" accessibilityRole="button" onPress={() => router.back()}>
               <Ionicons name="close-outline" size={24} color={colors.primary} />
             </TouchableOpacity> */}
           </View>
@@ -828,6 +916,30 @@ export default function PaymentCollectionScreen() {
             {(orderDiscount > 0 ||
               Object.keys(schemeDiscounts).length > 0 ||
               groupSchemeBenefits.length > 0) && <View style={styles.summaryDivider} />}
+
+            {freeGoods.length > 0 && (
+              <>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                  <Ionicons name="gift" size={14} color={colors.success} />
+                  <Text style={[styles.summaryLabel, { color: colors.success, fontWeight: '700' }]}>
+                    Free Items
+                  </Text>
+                </View>
+                {freeGoods.map((good) => (
+                  <View key={`${good.productId}-${good.unit}`} style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel} numberOfLines={1}>
+                      {good.productName || good.productId} × {good.qty}{' '}
+                      {good.unit === 'CASE' ? 'case' : 'pc'}
+                      {good.qty === 1 ? '' : 's'}
+                    </Text>
+                    <Text style={[styles.summaryValue, { color: colors.success }]}>
+                      {formatCurrency(0)}
+                    </Text>
+                  </View>
+                ))}
+                <View style={styles.summaryDivider} />
+              </>
+            )}
 
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total Amount Due</Text>
@@ -1025,6 +1137,9 @@ export default function PaymentCollectionScreen() {
                   ))}
                 </View>
                 <TouchableOpacity
+                  hitSlop={12}
+                  accessibilityLabel="Clear"
+                  accessibilityRole="button"
                   onPress={() => {
                     setSplitPayment(null);
                     setSelectedMode('cash');
@@ -1079,6 +1194,7 @@ export default function PaymentCollectionScreen() {
                   placeholderTextColor={colors.textTertiary}
                 />
                 <TouchableOpacity
+                  hitSlop={12}
                   onPress={handleSetFullAmount}
                   style={styles.fullAmountButton}
                   accessibilityRole="button"
@@ -1172,7 +1288,7 @@ export default function PaymentCollectionScreen() {
               : 'Confirm Payment'
         }
         message={
-          isSplitPayment
+          (isSplitPayment
             ? (() => {
                 let msg = '';
                 if (splitPayment.creditAmount > 0) {
@@ -1196,7 +1312,8 @@ export default function PaymentCollectionScreen() {
               })()
             : isCreditSelected
               ? `🏦 Amount: ${currency} ${orderTotal.toFixed(2)}\n📋 Type: CREDIT\n\n⚠️ This amount will be added to the customer's outstanding balance.`
-              : `💵 Amount: ${currency} ${parsedAmount.toFixed(2)}\n💳 Type: ${selectedMode.toUpperCase()}`
+              : `💵 Amount: ${currency} ${parsedAmount.toFixed(2)}\n💳 Type: ${selectedMode.toUpperCase()}`) +
+          (freeGoodsText ? `\n\nFree items:\n${freeGoodsText}` : '')
         }
         confirmText="Confirm"
         cancelText="Cancel"

@@ -108,7 +108,7 @@ export const useProductsScreenStyles = () => {
     } as TextStyle,
 
     categoryItemName: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '500',
       color: colors.textSecondary,
       textAlign: 'center',
@@ -121,7 +121,7 @@ export const useProductsScreenStyles = () => {
     } as TextStyle,
 
     categoryItemCount: {
-      fontSize: 8,
+      fontSize: 10,
       fontWeight: '400',
       color: colors.textTertiary,
       textAlign: 'center',

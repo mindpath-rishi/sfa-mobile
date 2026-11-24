@@ -22,6 +22,8 @@ import { toast } from '@/core/utils';
 import { TopupActionConfirmSheet } from '@/features/topup/components/TopupActionConfirmSheet';
 import { StockUnloadDetailModal } from '@/features/notification/components/StockUnloadDetailModal';
 import { outletService } from '@/features/outlet/services/outlet.service';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { resolveMediaUrl } from '@/shared/utils/media-url.utils';
 
 type NotificationItem = {
   id: string;
@@ -65,11 +67,7 @@ const formatRelativeTime = (value?: string) => {
 
 const mapNotification = (item: ApiNotificationItem): NotificationItem => {
   const rawCategory = String(
-    item.data?.category ||
-      item.data?.notificationType ||
-      item.data?.type ||
-      item.category ||
-      '',
+    item.data?.category || item.data?.notificationType || item.data?.type || item.category || '',
   )
     .trim()
     .toLowerCase()
@@ -79,8 +77,8 @@ const mapNotification = (item: ApiNotificationItem): NotificationItem => {
     : rawCategory.startsWith('route_change')
       ? 'route_change'
       : rawCategory === 'outlet_approval_result'
-      ? 'outlet_approval'
-      : rawCategory || 'system';
+        ? 'outlet_approval'
+        : rawCategory || 'system';
 
   return {
     id: item._id || item.id || `${item.title}-${item.createdAt || item.sentAt || Date.now()}`,
@@ -180,7 +178,11 @@ const isPendingRouteChangeApproval = (item: NotificationItem) => {
 };
 
 const getRouteChangeStatus = (item: NotificationItem) => {
-  if (!String(item.data?.category || item.type || '').toLowerCase().startsWith('route_change'))
+  if (
+    !String(item.data?.category || item.type || '')
+      .toLowerCase()
+      .startsWith('route_change')
+  )
     return '';
 
   const action = String(item.data?.action || '').toUpperCase();
@@ -313,224 +315,234 @@ export default function NotificationsScreen() {
     setConfirmTopupAction({ item, action });
   };
 
-  const performTopupAction = async (item: NotificationItem, action: 'accept' | 'reject') => {
-    const topupId = item.data?.vanInventoryTopupId;
-    if (!topupId || processingId) return;
+  const [performTopupAction] = useSingleFlight(
+    async (item: NotificationItem, action: 'accept' | 'reject') => {
+      const topupId = item.data?.vanInventoryTopupId;
+      if (!topupId || processingId) return;
 
-    setProcessingId(item.id);
-    try {
-      const response =
-        action === 'accept'
-          ? await notificationService.acceptTopup(String(topupId))
-          : await notificationService.rejectTopup(String(topupId), {
-              reason: 'Rejected by salesman',
-            });
+      setProcessingId(item.id);
+      try {
+        const response =
+          action === 'accept'
+            ? await notificationService.acceptTopup(String(topupId))
+            : await notificationService.rejectTopup(String(topupId), {
+                reason: 'Rejected by salesman',
+              });
 
-      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-        toast.error(response?.message || `Failed to ${action} top-up`);
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} top-up`);
+          return;
+        }
+
+        toast.success(action === 'accept' ? 'Top-up accepted' : 'Top-up rejected');
+        setConfirmTopupAction(null);
+
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === item.id
+              ? {
+                  ...notification,
+                  unread: false,
+                  data: {
+                    ...notification.data,
+                    action: action === 'accept' ? 'ACCEPTED' : 'DECLINED',
+                    status: action === 'accept' ? 'ACCEPTED' : 'DECLINED',
+                  },
+                }
+              : notification,
+          ),
+        );
+
+        await notificationService.markAsRead(item.id);
+        await loadNotifications(true);
+      } catch (error: any) {
+        console.warn(`Failed to ${action} top-up:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action} top-up`);
+      } finally {
+        setProcessingId(null);
+      }
+    },
+  );
+
+  const [handleVanChangeAction] = useSingleFlight(
+    async (item: NotificationItem, action: 'approve' | 'reject') => {
+      const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
+      if (!vanChangeRequestId || processingId) {
+        toast.error('Van change request ID not found');
         return;
       }
 
-      toast.success(action === 'accept' ? 'Top-up accepted' : 'Top-up rejected');
-      setConfirmTopupAction(null);
+      setProcessingId(item.id);
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveVanChange(String(vanChangeRequestId))
+            : await notificationService.rejectVanChange(String(vanChangeRequestId));
 
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === item.id
-            ? {
-                ...notification,
-                unread: false,
-                data: {
-                  ...notification.data,
-                  action: action === 'accept' ? 'ACCEPTED' : 'DECLINED',
-                  status: action === 'accept' ? 'ACCEPTED' : 'DECLINED',
-                },
-              }
-            : notification,
-        ),
-      );
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} request`);
+          return;
+        }
 
-      await notificationService.markAsRead(item.id);
-      await loadNotifications(true);
-    } catch (error: any) {
-      console.warn(`Failed to ${action} top-up:`, error);
-      toast.error(error?.response?.data?.message || `Failed to ${action} top-up`);
-    } finally {
-      setProcessingId(null);
-    }
-  };
+        if (action === 'approve') {
+          toast.success('Van change approved');
+        } else {
+          toast.success('Van change rejected');
+        }
 
-  const handleVanChangeAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
-    const vanChangeRequestId = item.data?.vanChangeRequestId || item.data?.requestId;
-    if (!vanChangeRequestId || processingId) {
-      toast.error('Van change request ID not found');
-      return;
-    }
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === item.id
+              ? {
+                  ...notification,
+                  unread: false,
+                  data: {
+                    ...notification.data,
+                    action: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                    vanChangeStatus: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                  },
+                }
+              : notification,
+          ),
+        );
 
-    setProcessingId(item.id);
-    try {
-      const response =
-        action === 'approve'
-          ? await notificationService.approveVanChange(String(vanChangeRequestId))
-          : await notificationService.rejectVanChange(String(vanChangeRequestId));
+        await notificationService.markAsRead(item.id);
+        await loadNotifications(true);
+      } catch (error: any) {
+        console.warn(`Failed to ${action} van change:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action} request`);
+      } finally {
+        setProcessingId(null);
+      }
+    },
+  );
 
-      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-        toast.error(response?.message || `Failed to ${action} request`);
+  const [handleRouteChangeAction] = useSingleFlight(
+    async (item: NotificationItem, action: 'approve' | 'reject') => {
+      const routeChangeRequestId = item.data?.routeChangeRequestId || item.data?.requestId;
+      if (!routeChangeRequestId || processingId) {
+        toast.error('Route change request ID not found');
         return;
       }
 
-      if (action === 'approve') {
-        toast.success('Van change approved');
-      } else {
-        toast.success('Van change rejected');
+      setProcessingId(item.id);
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveRouteChange(String(routeChangeRequestId))
+            : await notificationService.rejectRouteChange(String(routeChangeRequestId));
+
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} route change`);
+          return;
+        }
+
+        toast.success(action === 'approve' ? 'Route change approved' : 'Route change rejected');
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === item.id
+              ? {
+                  ...notification,
+                  unread: false,
+                  data: {
+                    ...notification.data,
+                    action: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                    status: action === 'approve' ? 'APPROVED' : 'REJECTED',
+                  },
+                }
+              : notification,
+          ),
+        );
+
+        await notificationService.markAsRead(item.id);
+        await loadNotifications(true);
+      } catch (error: any) {
+        console.warn(`Failed to ${action} route change:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action} route change`);
+      } finally {
+        setProcessingId(null);
       }
+    },
+  );
 
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === item.id
-            ? {
-                ...notification,
-                unread: false,
-                data: {
-                  ...notification.data,
-                  action: action === 'approve' ? 'APPROVED' : 'REJECTED',
-                  vanChangeStatus: action === 'approve' ? 'APPROVED' : 'REJECTED',
-                },
-              }
-            : notification,
-        ),
-      );
+  const [handleOutletAction] = useSingleFlight(
+    async (item: NotificationItem, action: 'approve' | 'reject') => {
+      const customerId = String(item.data?.customerId || '');
+      const outletVerificationId = String(item.data?.outletVerificationId || '') || undefined;
+      if (!customerId || processingId) return;
+      setProcessingId(item.id);
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveOutlet(customerId, outletVerificationId)
+            : await notificationService.rejectOutlet(
+                customerId,
+                'Rejected by reporting manager',
+                outletVerificationId,
+              );
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} outlet`);
+          return;
+        }
+        toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
+        setNotifications((current) =>
+          current.map((notification) =>
+            notification.id === item.id
+              ? {
+                  ...notification,
+                  unread: false,
+                  data: {
+                    ...notification.data,
+                    action: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                    status: action === 'approve' ? 'ACTIVE' : 'REJECTED',
+                  },
+                }
+              : notification,
+          ),
+        );
+        await notificationService.markAsRead(item.id);
+        await loadNotifications(true);
+      } catch (error: any) {
+        console.warn(`Failed to ${action} outlet:`, error);
+        toast.error(error?.response?.data?.message || `Failed to ${action} outlet`);
+      } finally {
+        setProcessingId(null);
+      }
+    },
+  );
 
-      await notificationService.markAsRead(item.id);
-      await loadNotifications(true);
-    } catch (error: any) {
-      console.warn(`Failed to ${action} van change:`, error);
-      toast.error(error?.response?.data?.message || `Failed to ${action} request`);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleRouteChangeAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
-    const routeChangeRequestId = item.data?.routeChangeRequestId || item.data?.requestId;
-    if (!routeChangeRequestId || processingId) {
-      toast.error('Route change request ID not found');
-      return;
-    }
-
-    setProcessingId(item.id);
-    try {
-      const response =
-        action === 'approve'
-          ? await notificationService.approveRouteChange(String(routeChangeRequestId))
-          : await notificationService.rejectRouteChange(String(routeChangeRequestId));
-
-      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-        toast.error(response?.message || `Failed to ${action} route change`);
+  const [handleStockUnloadAction] = useSingleFlight(
+    async (item: NotificationItem, action: 'approve' | 'reject') => {
+      const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
+      if (!unloadRequestId || processingId) {
+        toast.error('Stock unload request ID not found');
         return;
       }
 
-      toast.success(action === 'approve' ? 'Route change approved' : 'Route change rejected');
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === item.id
-            ? {
-                ...notification,
-                unread: false,
-                data: {
-                  ...notification.data,
-                  action: action === 'approve' ? 'APPROVED' : 'REJECTED',
-                  status: action === 'approve' ? 'APPROVED' : 'REJECTED',
-                },
-              }
-            : notification,
-        ),
-      );
-
-      await notificationService.markAsRead(item.id);
-      await loadNotifications(true);
-    } catch (error: any) {
-      console.warn(`Failed to ${action} route change:`, error);
-      toast.error(error?.response?.data?.message || `Failed to ${action} route change`);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleOutletAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
-    const customerId = String(item.data?.customerId || '');
-    const outletVerificationId = String(item.data?.outletVerificationId || '') || undefined;
-    if (!customerId || processingId) return;
-    setProcessingId(item.id);
-    try {
-      const response =
-        action === 'approve'
-          ? await notificationService.approveOutlet(customerId, outletVerificationId)
-          : await notificationService.rejectOutlet(
-              customerId,
-              'Rejected by reporting manager',
-              outletVerificationId,
-            );
-      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-        toast.error(response?.message || `Failed to ${action} outlet`);
-        return;
+      setProcessingId(item.id);
+      try {
+        const response =
+          action === 'approve'
+            ? await notificationService.approveStockUnload(String(unloadRequestId))
+            : await notificationService.rejectStockUnload(String(unloadRequestId));
+        if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
+          toast.error(response?.message || `Failed to ${action} stock unload request`);
+          return;
+        }
+        toast.success(
+          action === 'approve'
+            ? 'Stock unload approved and van stock reset'
+            : 'Stock unload request rejected',
+        );
+        await notificationService.markAsRead(item.id);
+        await loadNotifications(true);
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || `Failed to ${action} stock unload request`);
+      } finally {
+        setProcessingId(null);
       }
-      toast.success(`Outlet ${action === 'approve' ? 'approved' : 'rejected'}`);
-      setNotifications((current) =>
-        current.map((notification) =>
-          notification.id === item.id
-            ? {
-                ...notification,
-                unread: false,
-                data: {
-                  ...notification.data,
-                  action: action === 'approve' ? 'ACTIVE' : 'REJECTED',
-                  status: action === 'approve' ? 'ACTIVE' : 'REJECTED',
-                },
-              }
-            : notification,
-        ),
-      );
-      await notificationService.markAsRead(item.id);
-      await loadNotifications(true);
-    } catch (error: any) {
-      console.warn(`Failed to ${action} outlet:`, error);
-      toast.error(error?.response?.data?.message || `Failed to ${action} outlet`);
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const handleStockUnloadAction = async (item: NotificationItem, action: 'approve' | 'reject') => {
-    const unloadRequestId = item.data?.unloadRequestId || item.data?.requestId;
-    if (!unloadRequestId || processingId) {
-      toast.error('Stock unload request ID not found');
-      return;
-    }
-
-    setProcessingId(item.id);
-    try {
-      const response =
-        action === 'approve'
-          ? await notificationService.approveStockUnload(String(unloadRequestId))
-          : await notificationService.rejectStockUnload(String(unloadRequestId));
-      if (response?.success === false || ![200, 201].includes(Number(response?.statusCode))) {
-        toast.error(response?.message || `Failed to ${action} stock unload request`);
-        return;
-      }
-      toast.success(
-        action === 'approve'
-          ? 'Stock unload approved and van stock reset'
-          : 'Stock unload request rejected',
-      );
-      await notificationService.markAsRead(item.id);
-      await loadNotifications(true);
-    } catch (error: any) {
-      toast.error(error?.response?.data?.message || `Failed to ${action} stock unload request`);
-    } finally {
-      setProcessingId(null);
-    }
-  };
+    },
+  );
 
   const renderNotificationSkeleton = () => (
     <View style={styles.list}>
@@ -616,7 +628,11 @@ export default function NotificationsScreen() {
                           {!!item.data?.imageUrls?.length && (
                             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                               {item.data.imageUrls.map((url: string) => (
-                                <Image key={url} source={{ uri: url }} style={styles.outletImage} />
+                                <Image
+                                  key={url}
+                                  source={{ uri: resolveMediaUrl(url) }}
+                                  style={styles.outletImage}
+                                />
                               ))}
                             </ScrollView>
                           )}

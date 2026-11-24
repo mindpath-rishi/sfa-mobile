@@ -3,12 +3,15 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
-  FlatList,
   ActivityIndicator,
   Animated,
   RefreshControl,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
+import { FlashList, type FlashListRef } from '@shopify/flash-list';
+import { useAuthStore } from '@/core/store/auth.store';
+import { getCachedScreenData, setCachedScreenData } from '@/shared/providers/queryClient';
 import { useRoute } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
 
@@ -28,7 +31,8 @@ import { useHeader } from '@/shared/contexts/HeaderContext';
 import { InventoryHistorySheet } from '../components/InventoryHistorySheet';
 
 export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber }) => {
-  const styles = createStockStyles(useTheme().colors);
+  const { width: screenWidth } = useWindowDimensions();
+  const styles = createStockStyles(useTheme().colors, screenWidth);
   const { colors } = useTheme();
   const route = useRoute();
   const van = useRouteStore((state) => state.van);
@@ -55,7 +59,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
 
   // Animations
   const opacityAnim = useState(new Animated.Value(0))[0];
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlashListRef<StockItem>>(null);
   const loadingMoreRef = useRef(false);
   const { setHeader } = useHeader();
   const vanName = van?.vanName || van?.name || van?.vanNumber || 'Van';
@@ -84,9 +88,32 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         return;
       }
 
+      const applyFirstPage = (data: any, total: number) => {
+        setStock(data?.products || []);
+        setTotalItems(total);
+        setSummary({
+          totalCases: data?.totalCases || 0,
+          totalPiece: data?.totalPieces || 0,
+          totalValue: data?.totalValue || 0,
+          totalNetWeight: data?.totalNetWeight || 0,
+          totalItems: (data?.totalCases || 0) + (data?.totalPieces || 0),
+        });
+      };
+
+      // The unfiltered first page is shown from cache instantly on revisit,
+      // then refreshed in the background.
+      const isDefaultFirstPage = page === 1 && !search;
+      const cacheKey = ['vanStock', useAuthStore.getState().user?.userId, van.vanId];
+      const cached =
+        isDefaultFirstPage && !isRefresh
+          ? getCachedScreenData<{ data: any; total: number }>(cacheKey)
+          : undefined;
+
       try {
         if (isRefresh) {
           setRefreshing(true);
+        } else if (cached) {
+          applyFirstPage(cached.data, cached.total);
         } else if (isSearchAction || page === 1) {
           setIsLoading(true);
           setStock([]);
@@ -108,15 +135,8 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         const totalPages = Math.ceil(total / PAGINATION.LIMIT);
 
         if (page === 1 || isSearchAction) {
-          setStock(products);
-          setTotalItems(total);
-          setSummary({
-            totalCases: data?.totalCases || 0,
-            totalPiece: data?.totalPieces || 0,
-            totalValue: data?.totalValue || 0,
-            totalNetWeight: data?.totalNetWeight || 0,
-            totalItems: (data?.totalCases || 0) + (data?.totalPieces || 0),
-          });
+          applyFirstPage(data, total);
+          if (isDefaultFirstPage) setCachedScreenData(cacheKey, { data, total });
         } else {
           setStock((prev) => [...prev, ...products]);
         }
@@ -131,7 +151,8 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         }).start();
       } catch (error) {
         console.error('Error fetching stock:', error);
-        if (page === 1) {
+        // Keep showing cached stock if the background refresh fails.
+        if (page === 1 && !cached) {
           setStock([]);
           setTotalItems(0);
         }
@@ -279,7 +300,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
           loading={isLoading && stock.length > 0}
         />
       </View>
-      <FlatList
+      <FlashList
         ref={flatListRef}
         data={stock}
         renderItem={renderProductItem}
@@ -304,8 +325,7 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
         ListHeaderComponent={renderHeader()}
         ListFooterComponent={renderFooter()}
         ListEmptyComponent={
-          !isLoading &&
-          !refreshing && (
+          !isLoading && !refreshing ? (
             <EmptyState
               title={searchQuery ? 'No products found' : 'No stock available'}
               description={
@@ -318,14 +338,10 @@ export const StockPage: React.FC<StockPageProps> = ({ loadNumber: propLoadNumber
               onAction={searchQuery ? clearSearch : undefined}
               size="small"
             />
-          )
+          ) : null
         }
         onEndReached={handleLoadMore}
         onEndReachedThreshold={PAGINATION.ON_END_REACHED_THRESHOLD}
-        initialNumToRender={PAGINATION.LIMIT}
-        maxToRenderPerBatch={PAGINATION.LIMIT}
-        windowSize={10}
-        removeClippedSubviews={Platform.OS === 'android'}
       />
       <InventoryHistorySheet
         visible={Boolean(historyItem)}

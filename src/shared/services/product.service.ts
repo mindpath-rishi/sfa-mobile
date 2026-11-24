@@ -1,7 +1,7 @@
 import type { ApiResponse } from '@/core/network/api.types';
 import { api } from '@/core/network';
 import { isSalesman } from '@/core/navigation/role.utils';
-import { isOfflineMode } from '@/core/offline/offline.store';
+import { isOfflineMode, useOfflineStore } from '@/core/offline/offline.store';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
 import { getApplicableSchemeRecords } from '@/shared/services/scheme.service';
@@ -50,6 +50,42 @@ const loadAll = async (
 };
 
 /**
+ * Product master and price lists only change when a sync download lands, so reuse them
+ * until the sync watermark moves instead of re-reading SQLite on every page, search or
+ * filter change. Stock is always read fresh because local sales change it.
+ */
+const MAX_MASTER_DATA_CACHE_ENTRIES = 20;
+const masterDataCache = new Map<string, Promise<Record<string, any>[]>>();
+
+const loadCachedMasterData = (
+  repository: typeof repositories.products | typeof repositories.categories,
+  ownerId: string,
+  search?: string,
+) => {
+  const { lastSyncTime } = useOfflineStore.getState();
+  const key = [repository.entity, ownerId, search ?? '', lastSyncTime ?? ''].join('|');
+
+  let cached = masterDataCache.get(key);
+  if (!cached) {
+    if (masterDataCache.size >= MAX_MASTER_DATA_CACHE_ENTRIES) masterDataCache.clear();
+    cached = loadAll(repository, ownerId, search).catch((error) => {
+      masterDataCache.delete(key);
+      throw error;
+    });
+    masterDataCache.set(key, cached);
+  }
+
+  return cached;
+};
+
+/** Cached product master, shared by screens/services that need a product lookup. */
+export const loadCachedProducts = (ownerId: string) =>
+  loadCachedMasterData(repositories.products, ownerId);
+
+export const loadCachedCategories = (ownerId: string) =>
+  loadCachedMasterData(repositories.categories, ownerId);
+
+/**
  * Thin service layer (only API calls)
  */
 export const productService: ProductService = {
@@ -66,8 +102,8 @@ export const productService: ProductService = {
     }
     const ownerId = user?.userId ?? '';
     const [allProducts, priceCandidates, stock] = await Promise.all([
-      loadAll(repositories.products, ownerId),
-      loadAll(repositories.priceLists, ownerId, customerCategoryId),
+      loadCachedMasterData(repositories.products, ownerId),
+      loadCachedMasterData(repositories.priceLists, ownerId, customerCategoryId),
       loadAll(repositories.stock, ownerId),
     ]);
 
@@ -86,8 +122,16 @@ export const productService: ProductService = {
     for (const price of prices) {
       if (!priceByProduct.has(price.productId)) priceByProduct.set(price.productId, price);
     }
+    // Index once: scanning all stock per product was O(products × stock) per fetch.
+    const stockByProduct = new Map<string, Record<string, any>[]>();
+    for (const item of stock) {
+      const key = String(item.productId);
+      const bucket = stockByProduct.get(key);
+      if (bucket) bucket.push(item);
+      else stockByProduct.set(key, [item]);
+    }
     const inventoryForProduct = (productId: string) => {
-      const candidates = stock.filter((item) => String(item.productId) === String(productId));
+      const candidates = stockByProduct.get(String(productId)) ?? [];
       if (!params.vanId) return candidates[0];
       return (
         candidates.find((item) => String(item.vanId) === String(params.vanId)) ??

@@ -14,6 +14,9 @@ export type HeaderConfig = {
 
   showSearch?: boolean;
   showFilter?: boolean;
+  /** Show the search bar below the header row. */
+  showSearchBar?: boolean;
+  autoFocusSearch?: boolean;
 
   searchValue?: string;
   searchPlaceholder?: string;
@@ -36,6 +39,14 @@ export type HeaderConfig = {
   hidden?: boolean;
 
   backgroundColor?: string;
+
+  useGradient?: boolean;
+  gradientColors?: readonly [string, string, ...string[]];
+
+  elevated?: boolean;
+  centeredTitle?: boolean;
+  transparent?: boolean;
+  showBorder?: boolean;
 
   size?: 'small' | 'medium' | 'large' | 'sm' | 'md' | 'lg';
 };

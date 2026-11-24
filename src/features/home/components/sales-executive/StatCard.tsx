@@ -12,7 +12,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 220; // Fixed width for horizontal scrolling
 const CARD_HEIGHT = 118;
 
@@ -98,7 +97,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           </AppText>
 
           {trend !== undefined && trend !== 0 && (
-            <View style={styles.trendWrapper}>
+            <View style={[styles.trendWrapper, { backgroundColor: colors.backgroundSecondary }]}>
               <MaterialCommunityIcons
                 name={trend > 0 ? 'arrow-up' : 'arrow-down'}
                 size={10}
@@ -244,7 +243,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   trendText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '600',
   },
   subtitle: {

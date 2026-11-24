@@ -1,5 +1,12 @@
 import 'dotenv/config';
-import { withAndroidManifest, AndroidConfig } from 'expo/config-plugins';
+import {
+  withAndroidManifest,
+  withAndroidStyles,
+  withAppBuildGradle,
+  withMainActivity,
+  AndroidConfig,
+} from 'expo/config-plugins';
+import { mergeContents } from '@expo/config-plugins/build/utils/generateCode';
 import packageJson from './package.json';
 
 /**
@@ -25,19 +32,99 @@ const withMlkitFaceDetectionDependency = (config: any) =>
       (item: any) => item.$['android:name'] === metaDataName,
     );
 
+    // `tools:replace` isn't in the typed attribute set, so merge via a plain object.
+    const attributes = {
+      'android:name': metaDataName,
+      'android:value': metaDataValue,
+      'tools:replace': 'android:value',
+    };
+
     if (existing) {
-      existing.$['android:value'] = metaDataValue;
-      existing.$['tools:replace'] = 'android:value';
+      Object.assign(existing.$, attributes);
     } else {
-      mainApplication['meta-data'].push({
-        $: {
-          'android:name': metaDataName,
-          'android:value': metaDataValue,
-          'tools:replace': 'android:value',
-        },
-      });
+      mainApplication['meta-data'].push({ $: attributes });
     }
 
+    return config;
+  });
+
+/**
+ * Android 15 edge-to-edge: window status-bar colours are deprecated and flagged by
+ * Play ("deprecated APIs for edge-to-edge"). Prebuild adds one to AppTheme; drop it.
+ */
+const withoutStatusBarColor = (config: any) =>
+  withAndroidStyles(config, (config) => {
+    config.modResults = AndroidConfig.Styles.removeStylesItem({
+      name: 'android:statusBarColor',
+      xml: config.modResults,
+      parent: AndroidConfig.Styles.getAppThemeGroup(),
+    });
+    return config;
+  });
+
+/**
+ * Large-screen support: no orientation lock in the manifest (Play requirement), but
+ * keep phones in portrait at runtime. Tablets/foldables/ChromeOS rotate freely.
+ */
+const withPhonePortraitLock = (config: any) =>
+  withMainActivity(config, (config) => {
+    config.modResults.contents = mergeContents({
+      src: config.modResults.contents,
+      newSrc: [
+        '    if (resources.configuration.smallestScreenWidthDp < 600) {',
+        '      requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT',
+        '    }',
+      ].join('\n'),
+      tag: 'salesstream-phone-portrait-lock',
+      anchor: /super\.onCreate\(/,
+      offset: 1,
+      comment: '//',
+    }).contents;
+    return config;
+  });
+
+/**
+ * Release signing with the Play upload key. Credentials come from the developer's
+ * ~/.gradle/gradle.properties (never the repo):
+ *   SALESSTREAM_UPLOAD_STORE_FILE=/abs/path/sales-stream-upload-key.keystore
+ *   SALESSTREAM_UPLOAD_STORE_PASSWORD=...
+ *   SALESSTREAM_UPLOAD_KEY_ALIAS=...
+ *   SALESSTREAM_UPLOAD_KEY_PASSWORD=...
+ * Without them, release builds stay debug-signed (as before).
+ */
+const withReleaseSigning = (config: any) =>
+  withAppBuildGradle(config, (config) => {
+    let src = config.modResults.contents;
+    src = mergeContents({
+      src,
+      newSrc: [
+        "        if (project.hasProperty('SALESSTREAM_UPLOAD_STORE_FILE')) {",
+        '            release {',
+        '                storeFile file(SALESSTREAM_UPLOAD_STORE_FILE)',
+        '                storePassword SALESSTREAM_UPLOAD_STORE_PASSWORD',
+        '                keyAlias SALESSTREAM_UPLOAD_KEY_ALIAS',
+        '                keyPassword SALESSTREAM_UPLOAD_KEY_PASSWORD',
+        '            }',
+        '        }',
+      ].join('\n'),
+      tag: 'salesstream-release-signing-config',
+      anchor: /signingConfigs\s*\{/,
+      offset: 1,
+      comment: '//',
+    }).contents;
+    src = mergeContents({
+      src,
+      newSrc: [
+        "            if (signingConfigs.findByName('release') != null) {",
+        '                signingConfig signingConfigs.release',
+        '            }',
+      ].join('\n'),
+      tag: 'salesstream-release-signing-use',
+      anchor: /def enableShrinkResources = findProperty/,
+      offset: 0,
+      comment: '//',
+    }).contents;
+    config.modResults.contents = src;
     return config;
   });
 
@@ -57,7 +144,7 @@ export default ({ config }: any) => {
     scheme: 'expojwttabsultimate',
     version: '1.0.2',
     icon: './assets/images/sales-stream-logo.png',
-    orientation: 'portrait',
+    orientation: 'default',
     userInterfaceStyle: 'automatic',
     jsEngine: 'hermes',
 
@@ -67,10 +154,32 @@ export default ({ config }: any) => {
       [
         'expo-splash-screen',
         {
-          image: './assets/images/sales-stream-splash.png',
-          imageWidth: 941,
-          resizeMode: 'cover',
-          backgroundColor: '#0B46F6',
+          // App icon from the very first frame (shown while the JS bundle loads);
+          // src/core/screens/AppSplash.tsx draws the same screen so the hand-off is seamless.
+          image: './assets/images/sales-stream-logo.png',
+          imageWidth: 200,
+          resizeMode: 'contain',
+          backgroundColor: '#FFFFFF',
+        },
+      ],
+
+      [
+        'expo-build-properties',
+        {
+          android: {
+            // R8 shrinking/obfuscation (Play "DEX optimization" check).
+            enableMinifyInReleaseBuilds: true,
+            enableShrinkResourcesInReleaseBuilds: true,
+            // No 32-bit x86: Play serves per-ABI splits; x86_64 kept for emulators.
+            buildArchs: ['armeabi-v7a', 'arm64-v8a', 'x86_64'],
+            // expo-modules-core loads headless app loaders by name from the
+            // manifest (expo-task-manager / expo-background-fetch).
+            extraProguardRules: [
+              '-keep class * implements expo.modules.apploader.HeadlessAppLoader {',
+              '    <init>(android.content.Context);',
+              '}',
+            ].join('\n'),
+          },
         },
       ],
 
@@ -244,5 +353,7 @@ export default ({ config }: any) => {
     },
   };
 
-  return withMlkitFaceDetectionDependency(expoConfig);
+  return withReleaseSigning(
+    withPhonePortraitLock(withoutStatusBarColor(withMlkitFaceDetectionDependency(expoConfig))),
+  );
 };

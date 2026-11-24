@@ -42,5 +42,11 @@ module.exports = function (api) {
       // MUST be last
       'react-native-reanimated/plugin',
     ],
+    env: {
+      production: {
+        // Drop debug logging from release bundles; keep warnings/errors for diagnostics.
+        plugins: [['transform-remove-console', { exclude: ['error', 'warn'] }]],
+      },
+    },
   };
 };

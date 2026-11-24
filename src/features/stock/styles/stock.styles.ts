@@ -1,8 +1,6 @@
-import { StyleSheet, Dimensions, Platform } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 
-const { width } = Dimensions.get('window');
-
-export const createStockStyles = (colors: any) =>
+export const createStockStyles = (colors: any, width: number) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -190,7 +188,7 @@ export const createStockStyles = (colors: any) =>
     },
 
     outOfStockText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.error,
     },

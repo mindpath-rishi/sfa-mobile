@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import type { FlatListProps, ListRenderItem, StyleProp, ViewStyle } from 'react-native';
-import { FlatList, RefreshControl, View, TouchableOpacity } from 'react-native';
+import type { StyleProp, ViewStyle } from 'react-native';
+import { RefreshControl, View, TouchableOpacity } from 'react-native';
+import { FlashList, type FlashListProps, type ListRenderItem } from '@shopify/flash-list';
 
 import { EmptyState } from '@/core/components/EmptyState';
 import { Skeleton } from '@/core/components/Skeleton';
@@ -25,9 +26,9 @@ export type CommonListingProps<TItem> = {
   onEndReachedThreshold?: number;
 
   contentContainerStyle?: StyleProp<ViewStyle>;
-  ListHeaderComponent?: FlatListProps<TItem>['ListHeaderComponent'];
-  ListFooterComponent?: FlatListProps<TItem>['ListFooterComponent'];
-  ListEmptyComponent?: FlatListProps<TItem>['ListEmptyComponent'];
+  ListHeaderComponent?: FlashListProps<TItem>['ListHeaderComponent'];
+  ListFooterComponent?: FlashListProps<TItem>['ListFooterComponent'];
+  ListEmptyComponent?: FlashListProps<TItem>['ListEmptyComponent'];
   emptyState?: any;
   testID?: string;
 
@@ -63,7 +64,7 @@ export type CommonListingProps<TItem> = {
   >;
 
   listProps?: Omit<
-    FlatListProps<TItem>,
+    FlashListProps<TItem>,
     | 'data'
     | 'renderItem'
     | 'keyExtractor'
@@ -235,7 +236,7 @@ export function CommonListing<TItem>(props: CommonListingProps<TItem>) {
         )}
 
         {/* LIST */}
-        <FlatList
+        <FlashList
           testID={testID}
           data={data}
           keyExtractor={keyExtractor}

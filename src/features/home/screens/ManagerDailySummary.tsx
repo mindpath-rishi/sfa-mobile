@@ -1,15 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Image,
+  ActivityIndicator,
   Linking,
+  Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   RefreshControl,
   ScrollView,
-  TextInput,
+  StyleSheet,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 
@@ -28,14 +32,21 @@ import type {
   TimelineLocation,
 } from '../services/home.service';
 import { ManagerDatePickerModal } from '../components/models/ManagerDatePickerModal';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { ZoomableImage, type ZoomableImageHandle } from '@/shared/components/ZoomableImage';
 import {
   createBaseStyles,
   createManagerDailySummaryStyles,
 } from '../styles/ManagerDailySummary.styles';
+import { resolveMediaUrl } from '@/shared/utils/media-url.utils';
+import { appAlert } from '@/core/alert/appAlert';
 
 type SummaryStatus = 'retailing' | 'official-work' | 'leave' | 'absent';
 type DailyView = 'summary' | 'users' | 'timeline' | 'order';
 type TimelineTab = 'timeline' | 'mtd' | 'route';
+
+/** Timeline activities / route stops rendered per scroll-to-end step. */
+const LIST_PAGE_SIZE = 20;
 
 type UserMetric = {
   label: string;
@@ -431,6 +442,11 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   const [loadingMtdSummary, setLoadingMtdSummary] = useState(false);
   const [loadingRoutePlan, setLoadingRoutePlan] = useState(false);
   const [activeTab, setActiveTab] = useState<TimelineTab>('timeline');
+  const [selfiePreviewVisible, setSelfiePreviewVisible] = useState(false);
+  const [selfiePreviewLoading, setSelfiePreviewLoading] = useState(false);
+  const selfieViewerRef = useRef<ZoomableImageHandle>(null);
+  const [visibleActivities, setVisibleActivities] = useState(LIST_PAGE_SIZE);
+  const [visibleStops, setVisibleStops] = useState(LIST_PAGE_SIZE);
   const isFetchingManagerStatsRef = useRef(false);
   const isFetchingTimelineRef = useRef(false);
 
@@ -521,7 +537,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     ];
   }, [routeStops, selectedRouteDate, selectedUser]);
   const selectedTimeline = userId ? timelinesByUser[userId] : undefined;
-  const dayStartImageUrl = selectedTimeline?.dayStartImageUrl;
+  const dayStartImageUrl = resolveMediaUrl(selectedTimeline?.dayStartImageUrl);
 
   useFocusEffect(
     useCallback(() => {
@@ -671,10 +687,10 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       userId && (view === 'timeline' || view === 'order')
         ? fetchUserTimeline(userId, selectedRouteDate)
         : Promise.resolve(),
-      userId && (view === 'timeline' || view === 'order')
+      userId && view === 'timeline' && activeTab === 'mtd'
         ? fetchUserMtdSummary(userId, selectedRouteDate)
         : Promise.resolve(),
-      userId && (view === 'timeline' || view === 'order')
+      userId && view === 'timeline' && activeTab === 'route'
         ? fetchUserRoutePlan(userId, selectedRouteDate)
         : Promise.resolve(),
     ]);
@@ -696,10 +712,21 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
   useEffect(() => {
     if (userId && (view === 'timeline' || view === 'order')) {
       fetchUserTimeline(userId, selectedRouteDate);
-      fetchUserMtdSummary(userId, selectedRouteDate);
-      fetchUserRoutePlan(userId, selectedRouteDate);
     }
-  }, [fetchUserMtdSummary, fetchUserRoutePlan, fetchUserTimeline, selectedRouteDate, userId, view]);
+  }, [fetchUserTimeline, selectedRouteDate, userId, view]);
+
+  // MTD and route plan are only fetched once their tab is opened, so opening a
+  // user's timeline waits on one request instead of three.
+  useEffect(() => {
+    if (!userId || view !== 'timeline') return;
+    if (activeTab === 'mtd') fetchUserMtdSummary(userId, selectedRouteDate);
+    if (activeTab === 'route') fetchUserRoutePlan(userId, selectedRouteDate);
+  }, [activeTab, fetchUserMtdSummary, fetchUserRoutePlan, selectedRouteDate, userId, view]);
+
+  useEffect(() => {
+    setVisibleActivities(LIST_PAGE_SIZE);
+    setVisibleStops(LIST_PAGE_SIZE);
+  }, [selectedRouteDate, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -824,7 +851,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       await Linking.openURL(canOpenWhatsApp ? whatsappUrl : browserUrl);
     } catch (error) {
       console.warn('Failed to open WhatsApp', error);
-      Alert.alert('Error', 'Unable to open WhatsApp for this number.');
+      appAlert('Error', 'Unable to open WhatsApp for this number.');
     }
   };
 
@@ -840,22 +867,18 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       await Linking.openURL(`tel:${phone}`);
     } catch (error) {
       console.warn('Failed to open dialer', error);
-      Alert.alert('Error', 'Unable to start a phone call.');
+      appAlert('Error', 'Unable to start a phone call.');
     }
   };
 
-  const openDayStartSelfie = async () => {
+  const openDayStartSelfie = () => {
     if (!dayStartImageUrl) {
       toast.info('Day start selfie not available');
       return;
     }
 
-    try {
-      await Linking.openURL(dayStartImageUrl);
-    } catch (error) {
-      console.warn('Failed to open day start selfie', error);
-      Alert.alert('Error', 'Unable to open day start selfie.');
-    }
+    setSelfiePreviewLoading(true);
+    setSelfiePreviewVisible(true);
   };
 
   const hasLocation = (location?: TimelineLocation | null) =>
@@ -902,7 +925,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
         await Linking.openURL(fallbackUrl || '');
       } catch (fallbackError) {
         console.warn('Failed to open map navigation', fallbackError);
-        Alert.alert('Error', 'Unable to open map navigation.');
+        appAlert('Error', 'Unable to open map navigation.');
       }
     }
   };
@@ -940,6 +963,19 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
     );
   };
 
+  // Render long timeline / route lists in pages, adding the next page as the
+  // user scrolls near the bottom.
+  const handleListScroll = ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+    if (layoutMeasurement.height + contentOffset.y < contentSize.height - 300) return;
+    if (view !== 'timeline' || !selectedUser) return;
+    if (activeTab === 'timeline' && selectedUser.activities.length > visibleActivities) {
+      setVisibleActivities((count) => count + LIST_PAGE_SIZE);
+    } else if (activeTab === 'route' && routeFallbackStops.length > visibleStops) {
+      setVisibleStops((count) => count + LIST_PAGE_SIZE);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
@@ -955,6 +991,77 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
 
   return (
     <View style={styles.container}>
+      <Modal
+        visible={selfiePreviewVisible && Boolean(dayStartImageUrl)}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setSelfiePreviewVisible(false)}
+      >
+        <GestureHandlerRootView style={styles.selfiePreviewBackdrop}>
+          {dayStartImageUrl ? (
+            <ZoomableImage
+              ref={selfieViewerRef}
+              uri={dayStartImageUrl}
+              style={styles.selfiePreviewImage}
+              onLoadEnd={() => setSelfiePreviewLoading(false)}
+              onError={() => {
+                setSelfiePreviewLoading(false);
+                toast.error('Unable to load day start selfie');
+              }}
+            />
+          ) : null}
+          {selfiePreviewLoading ? (
+            <ActivityIndicator
+              size="large"
+              color="#FFFFFF"
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          ) : null}
+          <View style={styles.selfiePreviewHeader} pointerEvents="box-none">
+            <View style={{ flex: 1 }}>
+              <AppText style={styles.selfiePreviewTitle}>Day Start Selfie</AppText>
+              {selectedTimeline?.dayStartTime ? (
+                <AppText style={styles.selfiePreviewSubtitle}>
+                  {selectedUser?.name ? `${selectedUser.name} · ` : ''}
+                  {selectedTimeline.dayStartTime}
+                </AppText>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              hitSlop={12}
+              onPress={() => setSelfiePreviewVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              style={styles.selfiePreviewClose}
+            >
+              <Ionicons name="close" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.selfiePreviewToolbar}>
+            {(
+              [
+                ['remove', 'Zoom out', () => selfieViewerRef.current?.zoomOut()],
+                ['add', 'Zoom in', () => selfieViewerRef.current?.zoomIn()],
+                ['arrow-undo', 'Rotate left', () => selfieViewerRef.current?.rotateLeft()],
+                ['arrow-redo', 'Rotate right', () => selfieViewerRef.current?.rotateRight()],
+                ['refresh', 'Reset', () => selfieViewerRef.current?.reset()],
+              ] as const
+            ).map(([icon, label, onPress]) => (
+              <TouchableOpacity
+                key={label}
+                onPress={onPress}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                style={styles.selfiePreviewToolButton}
+              >
+                <Ionicons name={icon} size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </GestureHandlerRootView>
+      </Modal>
       <ManagerDatePickerModal
         visible={showDatePicker}
         value={selectedDate}
@@ -965,6 +1072,8 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
+        onScroll={handleListScroll}
+        scrollEventThrottle={200}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.primary]} />
         }
@@ -1083,7 +1192,13 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 style={styles.searchInput}
               />
               {searchKey ? (
-                <TouchableOpacity activeOpacity={0.7} onPress={() => setSearchKey('')}>
+                <TouchableOpacity
+                  hitSlop={15}
+                  accessibilityLabel="Clear"
+                  accessibilityRole="button"
+                  activeOpacity={0.7}
+                  onPress={() => setSearchKey('')}
+                >
                   <Ionicons name="close-circle" size={14} color={colors.textTertiary} />
                 </TouchableOpacity>
               ) : (
@@ -1139,6 +1254,9 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                       </View>
                       <View style={styles.iconActions}>
                         <TouchableOpacity
+                          hitSlop={15}
+                          accessibilityLabel="WhatsApp"
+                          accessibilityRole="button"
                           style={styles.whatsappButton}
                           activeOpacity={0.7}
                           onPress={(event) => {
@@ -1149,6 +1267,9 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                           <Ionicons name="logo-whatsapp" size={14} color="#25D366" />
                         </TouchableOpacity>
                         <TouchableOpacity
+                          hitSlop={15}
+                          accessibilityLabel="Call"
+                          accessibilityRole="button"
                           style={styles.callButton}
                           activeOpacity={0.7}
                           onPress={(event) => {
@@ -1324,11 +1445,19 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                           selectedTimeline?.dayStartLocation,
                         )}
                         {dayStartImageUrl ? (
-                          <TouchableOpacity activeOpacity={0.8} onPress={openDayStartSelfie}>
+                          <TouchableOpacity
+                            activeOpacity={0.8}
+                            onPress={openDayStartSelfie}
+                            accessibilityRole="imagebutton"
+                            accessibilityLabel="Preview day start selfie"
+                          >
                             <Image
                               source={{ uri: dayStartImageUrl }}
                               style={styles.dayStartImage}
                             />
+                            <View style={styles.dayStartImageZoomBadge}>
+                              <Ionicons name="expand" size={10} color="#FFFFFF" />
+                            </View>
                           </TouchableOpacity>
                         ) : (
                           <View style={styles.dayStartImagePlaceholder}>
@@ -1353,7 +1482,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                 ) : selectedUser.activities.length === 0 ? (
                   <AppText style={styles.emptyText}>No timeline data found for this date.</AppText>
                 ) : (
-                  selectedUser.activities.map((activity) => (
+                  selectedUser.activities.slice(0, visibleActivities).map((activity) => (
                     <TouchableOpacity
                       key={activity.id}
                       style={styles.activityCardWrapper}
@@ -1499,7 +1628,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                   ) : routeFallbackStops.length === 0 ? (
                     <AppText style={styles.emptyText}>No route plan found for this date.</AppText>
                   ) : (
-                    routeFallbackStops.map((stop, index) => (
+                    routeFallbackStops.slice(0, visibleStops).map((stop, index) => (
                       <View key={stop.id} style={styles.routeStopItem}>
                         <View style={styles.routeStopLine}>
                           {index === 0 && <View style={styles.routeLineTop} />}

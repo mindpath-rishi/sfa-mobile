@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, ActivityIndicator, Text } from 'react-native';
+import { View, ActivityIndicator } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { LoaderStyleProps } from './Loader.types';
 import { useLoaderStyles } from './Loader.styles';
 import { useTheme } from '@/shared/hooks/useTheme';

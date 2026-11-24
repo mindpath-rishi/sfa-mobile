@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { jwtDecode } from 'jwt-decode';
 
@@ -38,6 +37,7 @@ type AuthUser = {
   reportingEmployeeId?: string;
   reportingEmployeeName?: string;
   vanId?: string | null;
+  vanName?: string;
   avatar?: string | null;
   profileImage?: string | null;
   profileImageUrl?: string | null;
@@ -255,6 +255,13 @@ export const useAuthStore = create<AuthStore>((set) => ({
       ['clear tokens', () => clearTokens()],
       ['remove stored user', () => storage.removeItem(AUTH_USER_KEY)],
       ['reset stores', () => resetAllStores()],
+      [
+        'clear screen cache',
+        async () => {
+          const { queryClient } = await import('@/shared/providers/queryClient');
+          queryClient.clear();
+        },
+      ],
     ];
     for (const [label, step] of steps) {
       try {

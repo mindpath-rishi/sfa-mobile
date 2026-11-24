@@ -1,6 +1,7 @@
 // components/non-sale/NonSaleCategoryScreen.tsx
 import React, { useState } from 'react';
-import { View, FlatList, Text } from 'react-native';
+import { View, FlatList } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';

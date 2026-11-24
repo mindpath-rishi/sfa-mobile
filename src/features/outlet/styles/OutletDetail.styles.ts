@@ -158,7 +158,7 @@ export const useOutletDetailStyles = () => {
     } as TextStyle,
 
     statSubLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
       textAlign: 'center',
     } as TextStyle,
@@ -276,7 +276,7 @@ export const useOutletDetailStyles = () => {
     } as ViewStyle,
 
     salesTableHeaderText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.textSecondary,
       letterSpacing: 0.4,
@@ -290,7 +290,7 @@ export const useOutletDetailStyles = () => {
     } as TextStyle,
 
     salesTableUnitText: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
       marginTop: 2,
     } as TextStyle,
@@ -357,7 +357,7 @@ export const useOutletDetailStyles = () => {
     } as TextStyle,
 
     invoiceAmountLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
       marginTop: 2,
     } as TextStyle,
@@ -377,7 +377,7 @@ export const useOutletDetailStyles = () => {
     } as ViewStyle,
 
     invoiceDetailLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
       marginBottom: 3,
     } as TextStyle,
@@ -406,7 +406,7 @@ export const useOutletDetailStyles = () => {
     } as ViewStyle,
 
     invoiceStatusText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
     } as TextStyle,
 
@@ -766,7 +766,7 @@ export const useOutletDetailStyles = () => {
     } as ViewStyle,
 
     detailMetaChipText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.primary,
     } as TextStyle,
@@ -853,7 +853,7 @@ export const useOutletDetailStyles = () => {
     } as ViewStyle,
 
     invoiceModalSummaryLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
       marginBottom: 4,
     } as TextStyle,
@@ -892,7 +892,7 @@ export const useOutletDetailStyles = () => {
 
     invoiceProductCategory: {
       marginTop: 2,
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
     } as TextStyle,
 

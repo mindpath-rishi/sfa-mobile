@@ -21,6 +21,11 @@ class MainActivity : ReactActivity() {
     SplashScreenManager.registerOnActivity(this)
     // @generated end expo-splashscreen
     super.onCreate(null)
+// @generated begin salesstream-phone-portrait-lock - expo prebuild (DO NOT MODIFY) sync-3ef075fa4c750a4f8bb5ef4f04dd1e1f385eb805
+    if (resources.configuration.smallestScreenWidthDp < 600) {
+      requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+    }
+// @generated end salesstream-phone-portrait-lock
   }
 
   /**

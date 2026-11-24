@@ -23,8 +23,6 @@ export function ListingCard({
 }: ListingCardProps) {
   const { colors } = useTheme();
 
-  const resolvedOnPress = touchableProps?.onPress ?? onPress;
-
   return (
     <TouchableOpacity
       testID={testID}
@@ -42,9 +40,9 @@ export function ListingCard({
         },
         style,
       ]}
-      activeOpacity={resolvedOnPress ? activeOpacity : 1}
-      onPress={resolvedOnPress}
-      disabled={!resolvedOnPress}
+      activeOpacity={onPress ? activeOpacity : 1}
+      onPress={onPress}
+      disabled={!onPress}
       {...touchableProps}
     >
       {children}

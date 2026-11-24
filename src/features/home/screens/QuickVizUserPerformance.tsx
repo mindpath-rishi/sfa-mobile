@@ -271,7 +271,7 @@ export default function QuickVizUserPerformanceScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
-        <TouchableOpacity style={styles.backButton} activeOpacity={0.78} onPress={() => router.back()}>
+        <TouchableOpacity hitSlop={12} accessibilityLabel="Back" accessibilityRole="button" style={styles.backButton} activeOpacity={0.78} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color={colors.info} />
         </TouchableOpacity>
         <View style={styles.titleWrap}>
@@ -281,7 +281,7 @@ export default function QuickVizUserPerformanceScreen() {
         <View style={styles.dateChip}>
           <AppText style={styles.dateChipText}>01 Nov 2025-16 Nov 2025</AppText>
         </View>
-        <TouchableOpacity style={styles.filterButton} activeOpacity={0.78}>
+        <TouchableOpacity hitSlop={13} accessibilityLabel="Filter" accessibilityRole="button" style={styles.filterButton} activeOpacity={0.78}>
           <Ionicons name="filter" size={18} color={colors.info} />
         </TouchableOpacity>
       </View>
@@ -385,7 +385,7 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.infoLight,
     },
     dateChipText: {
-      fontSize: 8,
+      fontSize: 10,
       fontWeight: '800',
       color: colors.info,
     },
@@ -436,13 +436,13 @@ const createStyles = (colors: any) =>
       paddingTop: 4,
     },
     tableHeadText: {
-      fontSize: 10,
+      fontSize: 11,
       lineHeight: 12,
       fontWeight: '900',
       color: colors.textPrimary,
     },
     tableText: {
-      fontSize: 9,
+      fontSize: 10,
       lineHeight: 12,
       fontWeight: '800',
       color: colors.textPrimary,
@@ -480,7 +480,7 @@ const createStyles = (colors: any) =>
     },
     donutValue: {
       marginTop: 12,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       color: colors.textPrimary,
     },
@@ -500,13 +500,13 @@ const createStyles = (colors: any) =>
     },
     legendLabel: {
       width: 50,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.textSecondary,
     },
     legendValue: {
       flex: 1,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.textSecondary,
     },
@@ -530,7 +530,7 @@ const createStyles = (colors: any) =>
       height: 13,
     },
     chartLegendText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.textSecondary,
     },
@@ -563,7 +563,7 @@ const createStyles = (colors: any) =>
       alignItems: 'flex-end',
     },
     barValue: {
-      fontSize: 9,
+      fontSize: 10,
       lineHeight: 12,
       fontWeight: '700',
       color: colors.textPrimary,

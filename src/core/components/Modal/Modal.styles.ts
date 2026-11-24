@@ -1,10 +1,14 @@
-
-import { ViewStyle, TextStyle, Dimensions, Platform, StyleSheet } from 'react-native';
+import {
+  ViewStyle,
+  TextStyle,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
 import { createStyles, StyleUtils } from '@/shared/theme/styles';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { ModalSize, ModalPosition } from './Modal.types';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export const useModalStyles = (
   size: ModalSize = 'md',
@@ -15,6 +19,7 @@ export const useModalStyles = (
   contentStyle?: ViewStyle,
 ) => {
   const { colors } = useTheme();
+  const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = useWindowDimensions();
 
   const styleGenerator = createStyles((utils: StyleUtils) => {
     // ── Width ──────────────────────────────────────────────────────────────

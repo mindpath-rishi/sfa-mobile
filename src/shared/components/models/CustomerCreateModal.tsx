@@ -2,7 +2,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
-  TextInput,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
@@ -10,15 +9,17 @@ import {
   Image,
   Keyboard,
   FlatList,
-  Alert,
   BackHandler,
 } from 'react-native';
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import * as NavigationBar from 'expo-navigation-bar';
 import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCustomerCreateStyles } from '@/shared/styles/CustomerCreateModal.styles';
 import CameraModal from '@/core/components/Camera/CameraModal';
+import * as DocumentPicker from 'expo-document-picker';
+import { OutletGeoTagSection, type OutletGeoTag } from './OutletGeoTagSection';
 import {
   getRouteCustomerCategoryId,
   getRouteLocationIds,
@@ -32,15 +33,32 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import LoaderOverlay from '@/core/screens/LoaderOverlay';
 import { useLoaderStore } from '@/core/loader/loader.store';
+import { appAlert } from '@/core/alert/appAlert';
 
 interface CustomerCreateModalProps {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (data: CustomerData, photos?: string[]) => void | Promise<void>;
+  onSubmit: (
+    data: CustomerData,
+    photos?: string[],
+    kycDocuments?: KycDocument[],
+  ) => void | Promise<void>;
   loading?: boolean;
 }
 
+/** Optional KYC document picked while creating an outlet. */
+export interface KycDocument {
+  uri: string;
+  name: string;
+  mimeType: string;
+}
+
+/** TIN is optional; when given it must have exactly this many digits. */
+export const TIN_LENGTH = 9;
+
 export interface CustomerData {
+  tinNumber?: string;
+  geoTag?: OutletGeoTag;
   name: string;
   ownerName: string;
   phoneNumber: string;
@@ -62,7 +80,7 @@ export interface CustomerData {
 interface FormField {
   key: string;
   label: string;
-  type: 'text' | 'number' | 'phone' | 'dropdown' | 'address';
+  type: 'text' | 'number' | 'phone' | 'dropdown' | 'address' | 'tin';
   icon: keyof typeof Ionicons.glyphMap;
   placeholder: string;
   required: boolean;
@@ -173,6 +191,14 @@ const FORM_SECTIONS: FormSection[] = [
         required: true,
       },
       {
+        key: 'tinNumber',
+        label: 'TIN Number',
+        type: 'tin',
+        icon: 'document-text-outline',
+        placeholder: `Optional, ${TIN_LENGTH} digits`,
+        required: false,
+      },
+      {
         key: 'addressLine1',
         label: 'Street Address',
         type: 'address',
@@ -265,6 +291,8 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   const [currentStep, setCurrentStep] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
+  const [kycDocuments, setKycDocuments] = useState<KycDocument[]>([]);
+  const [geoTagError, setGeoTagError] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [touchedFields, setTouchedFields] = useState<Set<string>>(new Set());
 
@@ -285,6 +313,8 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
   const [formData, setFormData] = useState<CustomerData>({
     name: '',
+    tinNumber: '',
+    geoTag: undefined,
     ownerName: '',
     phoneNumber: '',
     address: { line1: '', line2: '' },
@@ -349,14 +379,8 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   useEffect(() => {
     if (Platform.OS !== 'android' || !visible) return;
 
-    void NavigationBar.setBackgroundColorAsync(colors.surface).catch(() => undefined);
     void NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch(() => undefined);
-
-    return () => {
-      void NavigationBar.setBackgroundColorAsync(colors.background + '00').catch(() => undefined);
-      void NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark').catch(() => undefined);
-    };
-  }, [colors.background, colors.surface, isDark, visible]);
+  }, [isDark, visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -378,6 +402,13 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
       if (!phoneRegex.test(value.replace(/\s/g, ''))) {
         return 'Invalid phone number (10-15 digits)';
+      }
+    }
+
+    if (field.key === 'tinNumber' && value && String(value).trim()) {
+      const tinRegex = new RegExp(`^\\d{${TIN_LENGTH}}$`);
+      if (!tinRegex.test(String(value).trim())) {
+        return `TIN number must be exactly ${TIN_LENGTH} digits`;
       }
     }
 
@@ -436,15 +467,25 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
   const handleSubmit = () => {
     if (loading || submittingRef.current || !validateCurrentSection()) return;
+    if (!formData.geoTag) {
+      setGeoTagError('Geo tag is mandatory. Capture the outlet location.');
+      return;
+    }
 
     submittingRef.current = true;
     useLoaderStore.getState().show({ message: 'Preparing customer creation…' });
 
     Keyboard.dismiss();
 
+    const tinNumber = formData.tinNumber?.trim();
     void onSubmit(
-      { ...formData, segmentation: formData.segmentation.trim() },
+      {
+        ...formData,
+        tinNumber: tinNumber || undefined,
+        segmentation: formData.segmentation.trim(),
+      },
       capturedPhotos.length ? capturedPhotos : undefined,
+      kycDocuments.length ? kycDocuments : undefined,
     );
   };
 
@@ -507,7 +548,7 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
   };
 
   const handleRemovePhoto = (photoUri: string) => {
-    Alert.alert('Remove Photo', 'Are you sure you want to remove this photo?', [
+    appAlert('Remove Photo', 'Are you sure you want to remove this photo?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -517,14 +558,89 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
     ]);
   };
 
+  const handleGeoTagChange = useCallback((geoTag?: OutletGeoTag) => {
+    setFormData((previous) => ({ ...previous, geoTag }));
+    if (geoTag) setGeoTagError('');
+  }, []);
+
+  const pickKycDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['image/*', 'application/pdf'],
+        multiple: true,
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled) return;
+      setKycDocuments((previous) => [
+        ...previous,
+        ...result.assets.map((asset) => ({
+          uri: asset.uri,
+          name: asset.name,
+          mimeType: asset.mimeType || 'application/octet-stream',
+        })),
+      ]);
+    } catch (error) {
+      console.warn('KYC document pick failed:', error);
+    }
+  };
+
+  const removeKycDocument = (uri: string) =>
+    setKycDocuments((previous) => previous.filter((document) => document.uri !== uri));
+
+  const renderKycSection = () => (
+    <View style={styles.photoSectionContainer}>
+      <View style={styles.photoSectionHeader}>
+        <Ionicons name="shield-checkmark" size={22} color={colors.primary} />
+        <View style={styles.photoSectionTitleContainer}>
+          <AppText style={styles.photoSectionTitle}>KYC Documents</AppText>
+          <AppText style={styles.photoSectionDescription}>
+            Optional. Upload ID / business documents (image or PDF)
+          </AppText>
+        </View>
+      </View>
+      <View style={styles.photoSourceActions}>
+        <TouchableOpacity
+          style={styles.photoSourceButton}
+          onPress={() => void pickKycDocument()}
+          disabled={loading}
+        >
+          <Ionicons name="cloud-upload-outline" size={18} color={colors.primary} />
+          <AppText style={styles.photoSourceButtonText}>Upload document</AppText>
+        </TouchableOpacity>
+      </View>
+      {kycDocuments.map((document) => (
+        <View
+          key={document.uri}
+          style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6 }}
+        >
+          <Ionicons
+            name={document.mimeType === 'application/pdf' ? 'document-outline' : 'image-outline'}
+            size={18}
+            color={colors.textSecondary}
+          />
+          <AppText numberOfLines={1} style={{ flex: 1, marginLeft: 8, color: colors.textPrimary }}>
+            {document.name}
+          </AppText>
+          <TouchableOpacity onPress={() => removeKycDocument(document.uri)} disabled={loading}>
+            <Ionicons name="close-circle" size={20} color={colors.error} />
+          </TouchableOpacity>
+        </View>
+      ))}
+    </View>
+  );
+
   const resetForm = () => {
     const latestRouteLocationIds = getRouteLocationIds(selectedRoute);
 
     setCurrentStep(0);
     setCapturedPhotos([]);
+    setKycDocuments([]);
+    setGeoTagError('');
 
     setFormData({
       name: '',
+      tinNumber: '',
+      geoTag: undefined,
       ownerName: '',
       phoneNumber: '',
       address: { line1: '', line2: '' },
@@ -656,8 +772,11 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
                 ? 'phone-pad'
                 : field.type === 'number'
                   ? 'decimal-pad'
-                  : 'default'
+                  : field.type === 'tin'
+                    ? 'number-pad'
+                    : 'default'
             }
+            maxLength={field.type === 'tin' ? TIN_LENGTH : undefined}
             editable={!loading}
           />
         </View>
@@ -697,6 +816,9 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
 
               <View style={styles.photoActions}>
                 <TouchableOpacity
+                  hitSlop={14}
+                  accessibilityLabel="Delete"
+                  accessibilityRole="button"
                   style={[styles.photoActionButton, styles.photoRemoveButton]}
                   onPress={() => handleRemovePhoto(photoUri)}
                   disabled={loading}
@@ -839,7 +961,18 @@ export const CustomerCreateModal: React.FC<CustomerCreateModalProps> = ({
               )}
             </View>
 
+            {isLastStep && (
+              <OutletGeoTagSection
+                visible={visible}
+                value={formData.geoTag}
+                error={geoTagError}
+                onChange={handleGeoTagChange}
+              />
+            )}
+
             {isLastStep && renderPhotoSection()}
+
+            {isLastStep && renderKycSection()}
 
             {isLastStep && renderSummary()}
 

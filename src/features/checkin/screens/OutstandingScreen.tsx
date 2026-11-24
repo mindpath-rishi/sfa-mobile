@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { Card } from '@/core/components/Card';
+import Card from '@/core/components/Card';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCustomerOutstandingStyles } from '../styles/Outstanding.styles';
 import Animated, { FadeInDown, FadeIn, SlideInDown } from 'react-native-reanimated';

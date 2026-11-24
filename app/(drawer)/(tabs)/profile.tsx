@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Linking, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Image, Linking, Platform, InteractionManager } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,7 +20,7 @@ import {
   setPushNotificationsEnabledAsync,
 } from '@/shared/services/push-notification.service';
 import { isSalesman } from '@/core/navigation/role.utils';
-import { saveOfflinePreference, useOfflineStore } from '@/core/offline/offline.store';
+import { isOfflineMode, saveOfflinePreference, useOfflineStore } from '@/core/offline/offline.store';
 import { OfflineStatusBanner } from '@/core/offline/OfflineStatusBanner';
 import { syncService } from '@/sync';
 import {
@@ -675,12 +676,12 @@ export default function ProfileScreen() {
   const performLogout = async () => {
     setUnsentOnLogout(0);
     setLoggingOut(true);
-    try {
-      await logout();
-    } finally {
-      setLoggingOut(false);
-      router.replace('/(auth)');
-    }
+    // Leave the signed-in screens first: clearing stores and the query cache while
+    // they are still mounted (e.g. route/outlet screens after a sale) makes them
+    // re-render and refetch with no session, which crashed the app.
+    router.replace('/(auth)');
+    await new Promise<void>((resolve) => InteractionManager.runAfterInteractions(() => resolve()));
+    await logout();
   };
 
   /**
@@ -690,13 +691,20 @@ export default function ProfileScreen() {
    */
   const handleLogout = async () => {
     if (loggingOut) return;
+    // Online-only users have no device queue: log out straight away.
+    if (!isOfflineMode()) {
+      await performLogout();
+      return;
+    }
     setLoggingOut(true);
     let pending = 0;
     try {
       pending = await syncService.getPendingCount();
       const online = useOfflineStore.getState();
       if (pending > 0 && online.isConnected && online.isInternetReachable) {
-        await syncService.sync().catch(() => undefined);
+        // Upload only: a full sync also re-downloads all master data just before
+        // it is discarded, which is slow and memory-heavy right after a sale.
+        await syncService.uploadPendingBeforeSettlement().catch(() => undefined);
         pending = await syncService.getPendingCount();
       }
     } catch {

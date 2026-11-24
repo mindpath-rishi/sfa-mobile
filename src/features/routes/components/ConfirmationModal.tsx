@@ -2,16 +2,15 @@ import React from 'react';
 import {
   Dimensions,
   Modal,
-  Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  useWindowDimensions,
 } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '@/shared/hooks/useTheme';
-
-const { width } = Dimensions.get('window');
 
 export type ConfirmationVariant = 'primary' | 'error' | 'success';
 
@@ -36,6 +35,7 @@ export function ConfirmationModal({
   cancelText = 'Cancel',
   confirmVariant = 'primary',
 }: ConfirmationModalProps) {
+  const { width } = useWindowDimensions();
   const { colors } = useTheme();
 
   if (!visible) return null;
@@ -75,7 +75,7 @@ export function ConfirmationModal({
                 backgroundColor: colors.surface,
                 borderRadius: 16,
                 padding: 24,
-                width: width * 0.85,
+                width: Math.min(width * 0.85, 420),
                 maxWidth: 320,
                 alignItems: 'center',
               }}

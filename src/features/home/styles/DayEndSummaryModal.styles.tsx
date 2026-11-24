@@ -10,7 +10,7 @@ export const useDayEndSummaryModalStyles = () => {
 
     // Product Stats - Increased font sizes
     productStatLabel: {
-      fontSize: 10,
+      fontSize: 11,
       marginBottom: 3,
       color: colors.textSecondary,
       fontWeight: '500',
@@ -38,7 +38,7 @@ export const useDayEndSummaryModalStyles = () => {
 
     // Product Code
     productCode: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
     } as TextStyle,
 
@@ -322,7 +322,7 @@ export const useDayEndSummaryModalStyles = () => {
       marginBottom: 12,
       backgroundColor: colors.warning + '18',
       color: colors.warning,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       letterSpacing: 1,
     } as TextStyle,
@@ -379,7 +379,7 @@ export const useDayEndSummaryModalStyles = () => {
 
     unacceptedStockMetricLabel: {
       color: colors.textSecondary,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
     } as TextStyle,
 
@@ -641,14 +641,14 @@ export const useDayEndSummaryModalStyles = () => {
 
     productListHeaderName: {
       flex: 1.35,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       textTransform: 'uppercase',
     } as TextStyle,
 
     productListHeaderQty: {
       width: 44,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       textAlign: 'center',
       textTransform: 'uppercase',
@@ -707,7 +707,7 @@ export const useDayEndSummaryModalStyles = () => {
     productCompactValue: {
       flexShrink: 1,
       textAlign: 'right',
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
     } as TextStyle,
 
@@ -894,7 +894,7 @@ export const useDayEndSummaryModalStyles = () => {
     } as ViewStyle,
 
     closingLabel: {
-      fontSize: 10,
+      fontSize: 11,
       marginBottom: 2,
       color: colors.textSecondary,
     } as TextStyle,
@@ -930,7 +930,7 @@ export const useDayEndSummaryModalStyles = () => {
     } as ViewStyle,
 
     currentStockLabel: {
-      fontSize: 10,
+      fontSize: 11,
       marginBottom: 2,
       color: colors.textSecondary,
     } as TextStyle,

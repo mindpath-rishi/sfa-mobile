@@ -1,13 +1,12 @@
 // src/components/camera/CameraModal/styles/CameraModel.style.ts
 import { createStyles, StyleUtils } from '@/shared/theme/styles';
-import { ViewStyle, TextStyle, Dimensions } from 'react-native';
+import { ViewStyle, TextStyle, ImageStyle, Dimensions, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/shared/hooks/useTheme';
 
-const { width, height } = Dimensions.get('window');
-
 export const useCameraModalStyles = () => {
   const { colors } = useTheme();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   const styleGenerator = createStyles((utils: StyleUtils) => ({
@@ -387,7 +386,7 @@ export const useCameraModalStyles = () => {
       flex: 1,
       width: '100%',
       height: '100%',
-    } as ViewStyle,
+    } as ImageStyle,
 
     previewHeader: {
       position: 'absolute',

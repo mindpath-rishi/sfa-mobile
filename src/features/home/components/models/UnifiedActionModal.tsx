@@ -273,6 +273,8 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
             </AppText>
           </View>
           <TouchableOpacity
+            accessibilityLabel="Close"
+            accessibilityRole="button"
             onPress={onClose}
             style={styles.routeCloseButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -435,7 +437,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
                       style={[styles.vanNumber, { color: colors.textSecondary }]}
                       numberOfLines={1}
                     >
-                      {item?.vanNumber || item?.registrationNumber || ''}
+                      {item?.vanId || item?.registrationNumber || ''}
                     </AppText>
                   </View>
                 </View>
@@ -507,6 +509,8 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           </AppText>
         </View>
         <TouchableOpacity
+          accessibilityLabel="Close"
+          accessibilityRole="button"
           onPress={onClose}
           style={styles.routeCloseButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -532,7 +536,7 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
             </AppText>
             <AppText style={[styles.vanInfoValue, { color: colors.textPrimary }]}>
               {assignedVan.name || assignedVan.vanName || 'Van'}
-              {assignedVan.vanNumber ? ` • ${assignedVan.vanNumber}` : ''}
+              {assignedVan.vanId ? ` • ${assignedVan.vanId}` : ''}
             </AppText>
             {vanChangeReason && vanChangeReason !== 'Yes, Same Van' && (
               <View style={styles.vanChangeBadge}>
@@ -759,7 +763,13 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
             Choose leave category to continue
           </AppText>
         </View>
-        <TouchableOpacity onPress={onClose} style={styles.routeCloseButton}>
+        <TouchableOpacity
+          hitSlop={10}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.routeCloseButton}
+        >
           <Ionicons name="close" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -770,17 +780,19 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           <TouchableOpacity
             key={item.id}
             onPress={() => onLeaveTypeSelect?.(item)}
-            style={[
-              styles.modalItem,
-              isSelected && { borderColor: colors.primary, borderWidth: 1 },
-            ]}
+            style={[styles.modalItem, { borderBottomWidth: 0 }]}
             activeOpacity={0.8}
           >
             <LinearGradient colors={[item.color, item.color + 'CC']} style={styles.modalItemIcon}>
               <Ionicons name={item.icon as any} size={24} color="white" />
             </LinearGradient>
             <View style={styles.itemContent}>
-              <AppText style={[styles.itemTitle, { color: colors.textPrimary }]}>
+              <AppText
+                style={[
+                  styles.itemTitle,
+                  { color: isSelected ? colors.primary : colors.textPrimary },
+                ]}
+              >
                 {item.name}
               </AppText>
               <AppText style={[styles.itemSubtitle, { color: colors.textTertiary }]}>
@@ -791,13 +803,6 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
           </TouchableOpacity>
         );
       })}
-
-      <TouchableOpacity onPress={onLeaveBack} style={styles.backButton}>
-        <Ionicons name="arrow-back" size={20} color={colors.primary} />
-        <AppText style={[styles.backButtonText, { color: colors.primary }]}>
-          BACK TO ACTIVITIES
-        </AppText>
-      </TouchableOpacity>
     </>
   );
 
@@ -807,7 +812,12 @@ export const UnifiedActionModal: React.FC<UnifiedActionModalProps> = ({
         <AppText style={[styles.titleSmall, { color: colors.textPrimary }]}>
           {getModalTitle()}
         </AppText>
-        <TouchableOpacity onPress={onClose}>
+        <TouchableOpacity
+          hitSlop={10}
+          accessibilityLabel="Close"
+          accessibilityRole="button"
+          onPress={onClose}
+        >
           <Ionicons name="close" size={24} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>

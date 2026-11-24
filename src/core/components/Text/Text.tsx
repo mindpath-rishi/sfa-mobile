@@ -3,6 +3,7 @@ import { Text as RNText } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { styleUtils } from '@/shared/theme/styles';
 import { CoreTextProps, TextVariant, TextWeight } from './Text.types';
+import { MAX_FONT_SCALE } from './ScaledText';
 
 /**
  * Typography system
@@ -58,6 +59,7 @@ function AppText({
 
   return (
     <RNText
+      maxFontSizeMultiplier={MAX_FONT_SCALE}
       {...props}
       numberOfLines={numberOfLines}
       ellipsizeMode={ellipsizeMode}

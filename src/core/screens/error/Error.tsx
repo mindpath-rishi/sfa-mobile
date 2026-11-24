@@ -1,5 +1,6 @@
 import React, { FC } from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppErrorType } from '../../errors/error.enums';
 import { ERROR_MESSAGES } from '../../errors/error.constants';

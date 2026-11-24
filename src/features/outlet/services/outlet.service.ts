@@ -4,8 +4,13 @@ import { uploadFormData } from '@/core/network/upload';
 import { isSalesman } from '@/core/navigation/role.utils';
 import { isOfflineMode } from '@/core/offline/offline.store';
 import { useAuthStore } from '@/core/store/auth.store';
+import { storage } from '@/core/storage';
 import { repositories } from '@/repositories';
-import { captureCurrentLocation, type CapturedLocation } from '@/shared/services/location.service';
+import {
+  captureBestEffortLocation,
+  captureCurrentLocation,
+  type CapturedLocation,
+} from '@/shared/services/location.service';
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { createSchemaId } from '@/utils/uuid';
@@ -77,12 +82,17 @@ export interface OutletService {
   completeVisit(
     visitId: string | undefined,
     checkOutLocation?: Promise<CapturedLocation | undefined>,
+    checkOutTime?: string,
   ): Promise<ApiResponse<any>>;
   createCustomer(payload: any): Promise<ApiResponse<any>>;
   uploadCustomerImage(
     customerId: string,
     uri: string,
     isPrimary?: boolean,
+  ): Promise<ApiResponse<any>>;
+  uploadCustomerDocument(
+    customerId: string,
+    document: { uri: string; name: string; mimeType: string },
   ): Promise<ApiResponse<any>>;
   getVisitHistory(payload: any): Promise<ApiResponse<any>>;
   changeRoute(payload: any): Promise<ApiResponse<any>>;
@@ -605,15 +615,16 @@ export const outletService: OutletService = {
   },
 
   /** Pass a location capture already in flight to avoid waiting for GPS again */
-  completeVisit: async (visitId, preCapturedLocation) => {
+  completeVisit: async (visitId, preCapturedLocation, checkOutTime = new Date().toISOString()) => {
+    // Fall back to an approximate fix indoors instead of leaving the visit open.
     const checkOutLocation =
-      (await preCapturedLocation?.catch(() => undefined)) ?? (await captureCurrentLocation());
+      (await preCapturedLocation?.catch(() => undefined)) ?? (await captureBestEffortLocation());
     if (!checkOutLocation) throw new Error('Current GPS location is required to complete a visit');
     const user = useAuthStore.getState().user;
     if (isSalesman(user) && isOfflineMode() && visitId) {
       const record = await repositories.visits.update(user?.userId ?? '', visitId, {
         status: 'COMPLETED',
-        checkOutTime: new Date().toISOString(),
+        checkOutTime,
         checkOutLocation,
       });
       return {
@@ -625,7 +636,7 @@ export const outletService: OutletService = {
     }
     return api.patch<any>(`shop-visit/${visitId}`, {
       status: 'COMPLETED',
-      checkOutTime: new Date().toISOString(),
+      checkOutTime,
       checkOutLocation,
     }) as Promise<ApiResponse<any>>;
   },
@@ -700,6 +711,61 @@ export const outletService: OutletService = {
     return uploadFormData<any>('media/upload', formData);
   },
 
+  /** Upload a KYC document (image or PDF) for an outlet; queued for sync when offline. */
+  uploadCustomerDocument: async (
+    customerId: string,
+    document: { uri: string; name: string; mimeType: string },
+  ) => {
+    const user = useAuthStore.getState().user;
+    const cleanName = document.name.split('?')[0];
+    const extension = cleanName.includes('.') ? cleanName.split('.').pop() || 'pdf' : 'pdf';
+    const isImage = document.mimeType.startsWith('image/');
+
+    if (isSalesman(user) && isOfflineMode()) {
+      const mediaId = createSchemaId('Media');
+      let storedUri = document.uri;
+      if (Platform.OS !== 'web' && FileSystem.documentDirectory) {
+        const directory = `${FileSystem.documentDirectory}offline-media/`;
+        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+        storedUri = `${directory}${mediaId}.${extension}`;
+        await FileSystem.copyAsync({ from: document.uri, to: storedUri });
+      }
+      const record = await repositories.mediaUploads.create(user?.userId ?? '', {
+        customerId: String(customerId),
+        uri: storedUri,
+        extension,
+        isPrimary: false,
+        mimeType: document.mimeType,
+        mediaType: isImage ? 'IMAGE' : 'DOCUMENT',
+        purpose: 'DOCUMENT',
+        title: 'KYC Document',
+      });
+      return {
+        success: true,
+        statusCode: 202,
+        message: 'KYC document saved for sync',
+        data: record,
+      } as ApiResponse<any>;
+    }
+
+    const formData = new FormData();
+    const fileName = `kyc-${customerId}-${Date.now()}.${extension}`;
+    if (Platform.OS === 'web') {
+      const blob = await fetch(document.uri).then((response) => response.blob());
+      formData.append('file', blob, fileName);
+    } else {
+      formData.append('file', { uri: document.uri, name: fileName, type: document.mimeType } as any);
+    }
+    formData.append('ownerType', 'CUSTOMER');
+    formData.append('ownerId', customerId);
+    formData.append('mediaType', isImage ? 'IMAGE' : 'DOCUMENT');
+    formData.append('purpose', 'DOCUMENT');
+    formData.append('title', 'KYC Document');
+    formData.append('isPrimary', 'false');
+
+    return uploadFormData<any>('media/upload', formData);
+  },
+
   getVisitHistory: async (payload: any) => {
     return api.get<any>(`shop-visit`, { params: payload }) as Promise<ApiResponse<any>>;
   },
@@ -746,4 +812,114 @@ export const outletService: OutletService = {
 
     return api.post<any>('route-change-request', payload) as Promise<ApiResponse<any>>;
   },
+};
+
+/*
+ * After a sale the visit is closed in the background (check-out GPS can take
+ * seconds). Persist it first so it is retried on the next launch if the app is
+ * closed before the server confirms; the original check-out time is kept.
+ */
+const PENDING_VISIT_COMPLETIONS_KEY = 'pending_visit_completions';
+const PENDING_VISIT_MAX_AGE_MS = 24 * 60 * 60_000;
+
+type PendingVisitCompletion = {
+  visitId: string;
+  userId: string;
+  checkOutTime: string;
+  checkOutLocation?: CapturedLocation;
+};
+
+const readPendingVisitCompletions = async (): Promise<PendingVisitCompletion[]> => {
+  try {
+    const parsed = JSON.parse((await storage.getItem(PENDING_VISIT_COMPLETIONS_KEY)) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+// Serialise read-modify-write so concurrent updates don't drop entries.
+let pendingVisitWrite: Promise<void> = Promise.resolve();
+const updatePendingVisitCompletions = (
+  update: (items: PendingVisitCompletion[]) => PendingVisitCompletion[],
+) => {
+  pendingVisitWrite = pendingVisitWrite
+    .catch(() => undefined)
+    .then(async () => {
+      const items = update(await readPendingVisitCompletions());
+      await storage.setItem(PENDING_VISIT_COMPLETIONS_KEY, JSON.stringify(items));
+    });
+  return pendingVisitWrite;
+};
+
+const removePendingVisitCompletion = (visitId: string) =>
+  updatePendingVisitCompletions((items) => items.filter((item) => item.visitId !== visitId));
+
+export const completeVisitInBackground = async (
+  visitId: string,
+  preCapturedLocation?: Promise<CapturedLocation | undefined>,
+) => {
+  const userId = useAuthStore.getState().user?.userId ?? '';
+  const checkOutTime = new Date().toISOString();
+
+  await updatePendingVisitCompletions((items) => [
+    ...items.filter((item) => item.visitId !== visitId),
+    { visitId, userId, checkOutTime },
+  ]);
+
+  const checkOutLocation =
+    (await preCapturedLocation?.catch(() => undefined)) ?? (await captureBestEffortLocation());
+  if (checkOutLocation) {
+    await updatePendingVisitCompletions((items) =>
+      items.map((item) => (item.visitId === visitId ? { ...item, checkOutLocation } : item)),
+    );
+  }
+
+  const response = await outletService.completeVisit(
+    visitId,
+    Promise.resolve(checkOutLocation),
+    checkOutTime,
+  );
+  if (response?.success === false) {
+    throw new Error(response.message || 'Visit completion failed');
+  }
+
+  await removePendingVisitCompletion(visitId);
+  return response;
+};
+
+let pendingVisitRetry: Promise<void> | null = null;
+
+/** Retry visit check-outs that didn't finish (e.g. app closed right after a sale). */
+export const retryPendingVisitCompletions = () => {
+  if (pendingVisitRetry) return pendingVisitRetry;
+
+  pendingVisitRetry = (async () => {
+    const userId = useAuthStore.getState().user?.userId;
+    if (!userId) return;
+
+    for (const item of await readPendingVisitCompletions()) {
+      if (item.userId !== userId) continue;
+
+      if (Date.now() - Date.parse(item.checkOutTime) > PENDING_VISIT_MAX_AGE_MS) {
+        await removePendingVisitCompletion(item.visitId);
+        continue;
+      }
+
+      try {
+        const response = await outletService.completeVisit(
+          item.visitId,
+          Promise.resolve(item.checkOutLocation),
+          item.checkOutTime,
+        );
+        if (response?.success !== false) await removePendingVisitCompletion(item.visitId);
+      } catch (error) {
+        console.warn('[Visit] Pending check-out retry failed:', error);
+      }
+    }
+  })().finally(() => {
+    pendingVisitRetry = null;
+  });
+
+  return pendingVisitRetry;
 };

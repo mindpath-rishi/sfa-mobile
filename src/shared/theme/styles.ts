@@ -121,14 +121,29 @@ export const shadow = {
   },
 } as const;
 
-const { width, height } = Dimensions.get('window');
-
+// Getters so styles built on re-render see the current window size (rotation,
+// foldables, tablet split-screen), not the size at app start.
 export const device = {
-  width,
-  height,
-  isSmall: width < 375,
-  isMedium: width >= 375 && width < 428,
-  isLarge: width >= 428,
+  get width() {
+    return Dimensions.get('window').width;
+  },
+  get height() {
+    return Dimensions.get('window').height;
+  },
+  get isSmall() {
+    return Dimensions.get('window').width < 375;
+  },
+  get isMedium() {
+    const { width } = Dimensions.get('window');
+    return width >= 375 && width < 428;
+  },
+  get isLarge() {
+    return Dimensions.get('window').width >= 428;
+  },
+  get isLandscape() {
+    const { width, height } = Dimensions.get('window');
+    return width > height;
+  },
 };
 
 // ✅ ALWAYS get RTL from store

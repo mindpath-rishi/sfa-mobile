@@ -1,6 +1,7 @@
 // components/TabBar.tsx
 import React from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { TabType } from '../../types/checkin.types';
 import { useTabBarStyles } from '../../styles/TabBar.styles';
 

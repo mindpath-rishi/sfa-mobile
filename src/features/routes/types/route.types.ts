@@ -24,6 +24,7 @@ export interface Outlet {
   lastOrderDate?: string | null;
   sequence: number;
   visitStatus?: 'ACTIVE' | 'COMPLETED' | 'NOT_VISITED';
+  isVisited?: boolean;
   orderValue?: number;
   priority?: 'high' | 'medium' | 'low';
   distance?: number;

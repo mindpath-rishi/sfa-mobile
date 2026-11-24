@@ -12,3 +12,9 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+
+# @generated begin expo-build-properties - expo prebuild (DO NOT MODIFY)
+-keep class * implements expo.modules.apploader.HeadlessAppLoader {
+    <init>(android.content.Context);
+}
+# @generated end expo-build-properties

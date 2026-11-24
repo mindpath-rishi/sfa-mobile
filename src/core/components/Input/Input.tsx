@@ -1,5 +1,6 @@
 import React, { forwardRef } from 'react';
-import { TextInput } from 'react-native';
+
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { CoreInputProps } from './Input.types';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useInputStyles } from './Input.styles';

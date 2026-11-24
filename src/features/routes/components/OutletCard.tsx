@@ -1,8 +1,10 @@
 /**
  * One outlet on the route list.
  */
-import React, { useCallback, useState } from 'react';
-import { Alert, Linking, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { useRecyclingState } from '@shopify/flash-list';
+import { Linking, TouchableOpacity, View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { ConfirmationModal } from '@/features/routes/components/ConfirmationModal';
 import type { Outlet } from '@/features/routes/types/route.types';
@@ -10,6 +12,7 @@ import {
   formatOutletDistanceKm,
   getOutletDisplayName,
 } from '@/features/routes/utils/route-outlet.utils';
+import { appAlert } from '@/core/alert/appAlert';
 
 type OutletCardProps = {
   outlet: any;
@@ -73,7 +76,7 @@ export const OutletCardComponent = React.memo(
     colors: any;
     styles: any;
   }) => {
-    const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+    const [showCompleteConfirm, setShowCompleteConfirm] = useRecyclingState(false, [outlet._id]);
     const visitStatus = outlet.visitStatus;
     const isActive = visitStatus === 'ACTIVE';
     const isCompleted = visitStatus === 'COMPLETED';
@@ -175,12 +178,15 @@ export const OutletCardComponent = React.memo(
                 </View>
                 <View style={styles.headerIconsRow}>
                   <TouchableOpacity
+                    hitSlop={12}
+                    accessibilityLabel="Call"
+                    accessibilityRole="button"
                     onPress={(e) => {
                       e.stopPropagation();
                       if (outlet.phoneNumber) {
                         Linking.openURL(`tel:${outlet.phoneNumber}`);
                       } else {
-                        Alert.alert('Error', 'Phone number not available');
+                        appAlert('Error', 'Phone number not available');
                       }
                     }}
                     style={styles.headerIconButton}
@@ -188,6 +194,9 @@ export const OutletCardComponent = React.memo(
                     <Ionicons name="call-outline" size={20} color={colors.primary} />
                   </TouchableOpacity>
                   <TouchableOpacity
+                    hitSlop={12}
+                    accessibilityLabel="Navigate"
+                    accessibilityRole="button"
                     onPress={(e) => {
                       e.stopPropagation();
                       onNavigate(outlet);

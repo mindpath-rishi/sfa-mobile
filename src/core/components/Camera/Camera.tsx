@@ -72,7 +72,7 @@ export const Camera = forwardRef<CameraRef, CameraProps>((props, ref) => {
 
   const cameraRef = useRef<CameraView>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const zoomTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
+  const zoomTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const styles = useCameraStyles({
     isReady: true, // Always consider camera ready
@@ -358,6 +358,8 @@ export const Camera = forwardRef<CameraRef, CameraProps>((props, ref) => {
         <View style={styles.topControls}>
           {currentFacing === 'back' && (
             <TouchableOpacity
+              hitSlop={10}
+              accessibilityRole="button"
               style={styles.controlButton}
               onPress={toggleFlash}
               disabled={disabled}
@@ -368,6 +370,8 @@ export const Camera = forwardRef<CameraRef, CameraProps>((props, ref) => {
           )}
 
           <TouchableOpacity
+            hitSlop={10}
+            accessibilityRole="button"
             style={styles.controlButton}
             onPress={switchCamera}
             disabled={disabled}

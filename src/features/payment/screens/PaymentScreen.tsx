@@ -225,6 +225,9 @@ export default function PaymentsScreen({
 
       {!hideFAB && (
         <TouchableOpacity
+          hitSlop={10}
+          accessibilityLabel="Add"
+          accessibilityRole="button"
           style={{
             position: 'absolute',
             bottom: 20,

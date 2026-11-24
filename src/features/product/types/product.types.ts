@@ -152,7 +152,7 @@ export interface UnitOption {
 }
 
 export interface ProductsScreenProps {
-  mode: 'sales' | 'topup';
+  mode?: 'sales' | 'topup';
   onProductsCountChange?: (count: number) => void;
   onCartUpdate?: (
     items: any[],

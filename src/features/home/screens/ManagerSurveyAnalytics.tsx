@@ -78,6 +78,9 @@ export default function ManagerSurveyAnalyticsScreen() {
           <View style={styles.questionHeader}>
             <AppText style={styles.questionText}>1. Take a picture of the number plate</AppText>
             <TouchableOpacity
+              hitSlop={13}
+              accessibilityLabel="Close"
+              accessibilityRole="button"
               style={styles.closeButton}
               activeOpacity={0.8}
               onPress={() => setView('list')}

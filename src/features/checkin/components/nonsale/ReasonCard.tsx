@@ -1,6 +1,7 @@
 // components/ui/ReasonCard.tsx
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppCard } from '@/core/components/Card/Card';

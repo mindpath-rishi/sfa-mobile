@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,9 +67,7 @@ export const BottomCTA: React.FC<BottomCTAProps> = ({
         activeOpacity={0.8}
       >
         {isProcessing ? (
-          <View
-            style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
-          >
+          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
             <ActivityIndicator color="white" size="small" />
             <Text style={{ color: 'white', fontSize: 14, fontWeight: '600', marginLeft: 8 }}>
               {mode === 'sales' ? 'Processing…' : 'Submitting top-up request…'}

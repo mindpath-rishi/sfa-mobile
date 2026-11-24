@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { View, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -15,6 +16,8 @@ import { useAuthStore } from '@/core/store/auth.store';
 import { toast } from '@/core/utils';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { allAppliedSchemes } from '@/shared/services/scheme.service';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { appAlert } from '@/core/alert/appAlert';
 
 type ScreenMode = 'sales' | 'topup';
 
@@ -34,8 +37,24 @@ export default function OrderSummary() {
   const { setHeader } = useHeader();
 
   // Zustand stores
-  const { items, summary, clearCart, refreshSchemeDiscounts, groupSchemeBenefits, schemeDiscounts } =
-    useCartStore();
+  // Select only what this screen reads so unrelated cart state changes don't re-render it.
+  const {
+    items,
+    summary,
+    clearCart,
+    refreshSchemeDiscounts,
+    groupSchemeBenefits,
+    schemeDiscounts,
+  } = useCartStore(
+    useShallow((state) => ({
+      items: state.items,
+      summary: state.summary,
+      clearCart: state.clearCart,
+      refreshSchemeDiscounts: state.refreshSchemeDiscounts,
+      groupSchemeBenefits: state.groupSchemeBenefits,
+      schemeDiscounts: state.schemeDiscounts,
+    })),
+  );
   const outlet = useOutletStore((s) => s.selectedOutlet);
   const van = useRouteStore.getState().van;
   const selectedRoute = useRouteStore.getState().selectedRoute;
@@ -205,50 +224,55 @@ export default function OrderSummary() {
   }, [items, van, displayVanName, user, activeWorkSessionId, selectedRoute]);
 
   /* ================= HANDLE TOP-UP SUBMIT ================= */
-  const handleTopupSubmit = useCallback(async () => {
-    if (submittingRef.current) return;
-    submittingRef.current = true;
-    // The confirmation stays open with its loader until the request finishes
-    setIsSubmitting(true);
+  const [handleTopupSubmit] = useSingleFlight(
+    useCallback(async () => {
+      if (submittingRef.current) return;
+      submittingRef.current = true;
+      // The confirmation stays open with its loader until the request finishes
+      setIsSubmitting(true);
 
-    try {
-      const payload = buildTopupPayload();
-      const missingHeader = [
-        ['van', payload.vanId],
-        ['van name', payload.vanName],
-        ['employee', payload.employeeId],
-        ['work session', payload.workSessionId],
-      ].find(([, value]) => !String(value ?? '').trim());
-      if (missingHeader) {
-        toast.error(
-          'Unable to create top-up',
-          `Missing ${missingHeader[0]}. Please return to Home, start your day, and try again.`,
-        );
-        return;
+      try {
+        const payload = buildTopupPayload();
+        const missingHeader = [
+          ['van', payload.vanId],
+          ['van name', payload.vanName],
+          ['employee', payload.employeeId],
+          ['work session', payload.workSessionId],
+        ].find(([, value]) => !String(value ?? '').trim());
+        if (missingHeader) {
+          toast.error(
+            'Unable to create top-up',
+            `Missing ${missingHeader[0]}. Please return to Home, start your day, and try again.`,
+          );
+          return;
+        }
+        const response = await vanService.createInventoryTopupRequest(payload);
+        if (!response?.success) {
+          toast.error(
+            'Top-up request failed',
+            response?.message || 'Please check the request data.',
+          );
+          return;
+        }
+        clearCart();
+        setShowConfirmation(false);
+        toast.success('Your top-up request was submitted successfully.');
+        router.replace('topup');
+      } catch (error) {
+        console.error('Error submitting top-up:', error);
+        appAlert('Error', 'Failed to submit top-up request. Please try again.');
+      } finally {
+        submittingRef.current = false;
+        setIsSubmitting(false);
       }
-      const response = await vanService.createInventoryTopupRequest(payload);
-      if (!response?.success) {
-        toast.error('Top-up request failed', response?.message || 'Please check the request data.');
-        return;
-      }
-      clearCart();
-      setShowConfirmation(false);
-      toast.success('Your top-up request was submitted successfully.');
-      router.replace('topup');
-    } catch (error) {
-      console.error('Error submitting top-up:', error);
-      Alert.alert('Error', 'Failed to submit top-up request. Please try again.');
-    } finally {
-      submittingRef.current = false;
-      setIsSubmitting(false);
-    }
-  }, [buildTopupPayload, clearCart]);
+    }, [buildTopupPayload, clearCart]),
+  );
 
   /* ================= HANDLE SUBMIT ================= */
   const handleSubmit = useCallback(() => {
     if (submittingRef.current) return;
     if (!hasItems) {
-      Alert.alert('No items', currentConfig.emptyMessage);
+      appAlert('No items', currentConfig.emptyMessage);
       return;
     }
 
@@ -272,7 +296,7 @@ export default function OrderSummary() {
         params: {
           items: JSON.stringify(orderItems),
           total: summary.totalValue,
-          outletId: outlet?.outletId,
+          outletId: outlet?.customerId,
           outletName: outlet?.name,
         },
       });

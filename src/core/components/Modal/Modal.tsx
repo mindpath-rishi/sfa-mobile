@@ -8,20 +8,19 @@ import {
   Platform,
   KeyboardAvoidingView,
   TouchableOpacity,
-  Text,
   ViewStyle,
   BackHandler,
   StatusBar,
   ScrollView,
   ActivityIndicator,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { ModalProps, ModalHeaderProps, ModalFooterProps, ModalContentProps } from './Modal.types';
 import { useModalStyles } from './Modal.styles';
-
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const SPRING = { tension: 55, friction: 9, useNativeDriver: true };
 const timing = (duration: number) => ({ duration, useNativeDriver: true });
@@ -86,6 +85,7 @@ export const Modal: React.FC<ModalProps> & {
 }) => {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = useWindowDimensions();
   const styles = useModalStyles(size, position, backdropOpacity, zIndex, style, contentStyle);
 
   const [modalMounted, setModalMounted] = useState(visible);

@@ -6,6 +6,8 @@ import { AppModal, AppText } from '@/core/components';
 import { notificationService } from '@/features/notification/services/notification.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { toast } from '@/core/utils';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { SkeletonList } from '@/core/components/Skeleton';
 
 type UnloadItem = {
   productId: string;
@@ -79,7 +81,7 @@ export const StockUnloadDetailModal: React.FC<StockUnloadDetailModalProps> = ({
     }
   }, [visible, loadDetail]);
 
-  const handleAction = async (action: 'approve' | 'reject') => {
+  const [handleAction] = useSingleFlight(async (action: 'approve' | 'reject') => {
     if (!unloadRequestId || resolving) return;
 
     setResolving(action);
@@ -104,7 +106,7 @@ export const StockUnloadDetailModal: React.FC<StockUnloadDetailModalProps> = ({
     } finally {
       setResolving(null);
     }
-  };
+  });
 
   const statusColor =
     request?.status === 'APPROVED'
@@ -126,9 +128,7 @@ export const StockUnloadDetailModal: React.FC<StockUnloadDetailModalProps> = ({
       contentStyle={styles.content}
     >
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <SkeletonList rows={4} />
       ) : !request ? (
         <View style={[styles.emptyCard, { backgroundColor: colors.surface }]}>
           <Ionicons name="alert-circle-outline" size={28} color={colors.textTertiary} />

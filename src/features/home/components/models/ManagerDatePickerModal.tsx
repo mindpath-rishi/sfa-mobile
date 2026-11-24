@@ -170,7 +170,14 @@ export function ManagerDatePickerModal({
                 </AppText>
               </View>
             </View>
-            <TouchableOpacity style={styles.closeButton} activeOpacity={0.78} onPress={onClose}>
+            <TouchableOpacity
+              hitSlop={13}
+              accessibilityLabel="Close"
+              accessibilityRole="button"
+              style={styles.closeButton}
+              activeOpacity={0.78}
+              onPress={onClose}
+            >
               <Ionicons name="close" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -178,6 +185,9 @@ export function ManagerDatePickerModal({
           <View style={styles.calendarWrap}>
             <View style={styles.monthHeader}>
               <TouchableOpacity
+                hitSlop={13}
+                accessibilityLabel="Back"
+                accessibilityRole="button"
                 style={styles.monthButton}
                 activeOpacity={0.78}
                 onPress={() => setVisibleMonth((current) => addMonths(current, -1))}
@@ -186,6 +196,9 @@ export function ManagerDatePickerModal({
               </TouchableOpacity>
               <AppText style={styles.monthTitle}>{formatMonthTitle(visibleMonth)}</AppText>
               <TouchableOpacity
+                hitSlop={13}
+                accessibilityLabel="Next"
+                accessibilityRole="button"
                 style={styles.monthButton}
                 activeOpacity={0.78}
                 disabled={!canGoNextMonth}
@@ -374,7 +387,7 @@ const createStyles = (colors: any) =>
     weekDay: {
       flex: 1,
       textAlign: 'center',
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.textTertiary,
     },

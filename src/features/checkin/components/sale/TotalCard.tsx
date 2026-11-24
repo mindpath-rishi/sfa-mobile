@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { useTheme } from '@/shared/hooks/useTheme';
 import type { GroupSchemeBenefit } from '@/shared/services/group-scheme.engine';
 import type { SchemeBenefit } from '@/shared/services/scheme.service';
@@ -99,7 +100,10 @@ export const TotalsCard: React.FC<TotalsCardProps> = ({
           alignItems: 'center',
           paddingHorizontal: 14,
           paddingVertical: 12,
-          marginTop: mode === 'sales' && (discount > 0 || lineRewards.length > 0 || freeGoods.length > 0) ? 12 : 0,
+          marginTop:
+            mode === 'sales' && (discount > 0 || lineRewards.length > 0 || freeGoods.length > 0)
+              ? 12
+              : 0,
           backgroundColor: hasItems ? colors.primary + '0C' : 'transparent',
         }}
       >

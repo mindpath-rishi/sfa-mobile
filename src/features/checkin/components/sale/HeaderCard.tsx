@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { useTheme } from '@/shared/hooks/useTheme';
 
 interface HeaderCardProps {
@@ -37,9 +38,7 @@ export const HeaderCard: React.FC<HeaderCardProps> = ({
   const displayTitle = title || (mode === 'sales' ? 'Sales Summary' : 'Top-up Summary');
   // Sales show only the outlet; top-ups show where the stock comes from
   const displaySubtitle =
-    mode === 'topup'
-      ? [warehouseName || warehouseId, date].filter(Boolean).join(' · ')
-      : address;
+    mode === 'topup' ? [warehouseName || warehouseId, date].filter(Boolean).join(' · ') : address;
 
   return (
     <View
@@ -109,7 +108,7 @@ const StatItem = ({
       >
         {value}
       </Text>
-      <Text style={{ fontSize: 10, letterSpacing: 0.3, color: colors.textTertiary }}>{label}</Text>
+      <Text style={{ fontSize: 11, letterSpacing: 0.3, color: colors.textTertiary }}>{label}</Text>
     </View>
   );
 };

@@ -1,12 +1,10 @@
 // StockMetrix.tsx
 
 import React from 'react';
-import { ScrollView, View, Dimensions } from 'react-native';
+import { ScrollView, View, Dimensions, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '@/core/components';
 import { StockMetricsProps } from '../types/stock.types';
-
-const { width } = Dimensions.get('window');
 
 export const StockMetrics: React.FC<StockMetricsProps> = ({
   summary,
@@ -14,6 +12,7 @@ export const StockMetrics: React.FC<StockMetricsProps> = ({
   colors,
   styles,
 }) => {
+  const { width } = useWindowDimensions();
   const metrics = [
     {
       id: 'cases',

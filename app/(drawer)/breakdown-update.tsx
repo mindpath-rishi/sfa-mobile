@@ -1,21 +1,17 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { TextInput } from '@/core/components/Text/ScaledText';
 
 import { AppButton, AppModal, AppText, SearchBar } from '@/core/components';
 import { useOfflineStore } from '@/core/offline/offline.store';
 import { vanService } from '@/shared/services/van.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { toast } from '@/shared/utils/toast';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { SkeletonList } from '@/core/components/Skeleton';
 
 type BreakdownReason =
   | 'ENGINE_ISSUE'
@@ -70,6 +66,32 @@ export default function BreakdownUpdateScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [workingVan, setWorkingVan] = useState<VanOption>();
+  const [workingRemark, setWorkingRemark] = useState('');
+  const [markingWorking, setMarkingWorking] = useState(false);
+
+  const [markWorking] = useSingleFlight(async () => {
+    if (!workingVan) return;
+    if (offline) {
+      toast.error('Internet connection required');
+      return;
+    }
+    setMarkingWorking(true);
+    try {
+      await vanService.resolveBreakdown({
+        vanIds: [workingVan.vanId],
+        remark: workingRemark.trim() || undefined,
+      });
+      toast.success('Vehicle marked as working', workingVan.name || workingVan.vanId);
+      setWorkingVan(undefined);
+      setWorkingRemark('');
+      await loadVans();
+    } catch (error) {
+      toast.error('Unable to mark as working', getApiMessage(error));
+    } finally {
+      setMarkingWorking(false);
+    }
+  });
 
   const loadVans = useCallback(
     async (isRefresh = false) => {
@@ -150,7 +172,7 @@ export default function BreakdownUpdateScreen() {
     });
   };
 
-  const submit = async () => {
+  const [submit] = useSingleFlight(async () => {
     if (!selectedVanIds.length) {
       toast.error('Select at least one vehicle');
       return;
@@ -195,7 +217,7 @@ export default function BreakdownUpdateScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
+  });
 
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(colors, insets.bottom), [colors, insets.bottom]);
@@ -227,10 +249,7 @@ export default function BreakdownUpdateScreen() {
           </AppText>
         </View>
       ) : loading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <AppText style={styles.messageText}>Loading vehicles...</AppText>
-        </View>
+        <SkeletonList rows={4} />
       ) : (
         <FlatList
           data={filteredVans}
@@ -278,7 +297,7 @@ export default function BreakdownUpdateScreen() {
                     {item.name || item.vanNumber || item.vanId}
                   </AppText>
                   <AppText style={styles.vanMeta}>
-                    {[item.vanNumber, item.vanId, item.driverName].filter(Boolean).join(' · ')}
+                    {[item.vanId, item.vanNumber, item.driverName].filter(Boolean).join(' · ')}
                   </AppText>
                   {item.status ? <AppText style={styles.vanStatus}>{item.status}</AppText> : null}
                   {item.status === 'BREAKDOWN' ? (
@@ -289,6 +308,20 @@ export default function BreakdownUpdateScreen() {
                         {currentBreakdownReason ? ` · ${currentBreakdownReason.label}` : ''}
                       </AppText>
                     </View>
+                  ) : null}
+                  {item.status === 'BREAKDOWN' ? (
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      style={styles.workingButton}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        setWorkingRemark('');
+                        setWorkingVan(item);
+                      }}
+                    >
+                      <MaterialCommunityIcons name="check-circle-outline" size={16} color="#fff" />
+                      <AppText style={styles.workingButtonText}>Mark as Working</AppText>
+                    </TouchableOpacity>
                   ) : null}
                   {selected ? (
                     <TouchableOpacity
@@ -345,6 +378,38 @@ export default function BreakdownUpdateScreen() {
           onPress={() => void submit()}
         />
       </View>
+
+      <AppModal
+        visible={Boolean(workingVan)}
+        onClose={() => setWorkingVan(undefined)}
+        title={`Mark ${workingVan?.name || workingVan?.vanId || 'vehicle'} as working`}
+        position="bottom"
+        animation="slide"
+        size="md"
+        showCloseButton
+      >
+        <View style={{ gap: 12, paddingBottom: 10 }}>
+          <AppText style={styles.messageText}>
+            The vehicle becomes available to users again once marked as working.
+          </AppText>
+          <TextInput
+            value={workingRemark}
+            onChangeText={setWorkingRemark}
+            placeholder="Remark (e.g. engine repaired)"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            maxLength={500}
+            style={styles.remarkInput}
+          />
+          <AppButton
+            title="Mark as Working"
+            fullWidth
+            loading={markingWorking}
+            disabled={markingWorking || offline}
+            onPress={() => void markWorking()}
+          />
+        </View>
+      </AppModal>
 
       <AppModal
         visible={reasonModalOpen}
@@ -491,7 +556,7 @@ const createStyles = (colors: any, bottomInset: number) =>
     vanStatus: {
       alignSelf: 'flex-start',
       color: colors.textSecondary,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       marginTop: 5,
     },
@@ -506,7 +571,28 @@ const createStyles = (colors: any, bottomInset: number) =>
       borderRadius: 8,
       backgroundColor: `${colors.error}12`,
     },
-    breakdownBadgeText: { color: colors.error, fontSize: 10, fontWeight: '700' },
+    breakdownBadgeText: { color: colors.error, fontSize: 11, fontWeight: '700' },
+    workingButton: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 9,
+      backgroundColor: colors.success,
+    },
+    workingButtonText: { color: '#fff', fontSize: 12, fontWeight: '700' },
+    remarkInput: {
+      minHeight: 80,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 12,
+      color: colors.textPrimary,
+      textAlignVertical: 'top',
+    },
     vanReasonButton: {
       minHeight: 42,
       marginTop: 10,

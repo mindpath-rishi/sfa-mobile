@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Platform, View, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { Platform, View, TouchableOpacity, ScrollView } from 'react-native';
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 
@@ -356,7 +357,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   autoFocus={false}
                 />
                 {section.searchValue && (
-                  <TouchableOpacity onPress={() => handleSearchChange(section.id, '')}>
+                  <TouchableOpacity
+                    hitSlop={13}
+                    accessibilityLabel="Clear"
+                    accessibilityRole="button"
+                    onPress={() => handleSearchChange(section.id, '')}
+                  >
                     <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
                   </TouchableOpacity>
                 )}
@@ -457,6 +463,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             )}
           </View>
           <TouchableOpacity
+            accessibilityLabel="Close"
+            accessibilityRole="button"
             onPress={onClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
@@ -477,7 +485,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 placeholderTextColor={colors.textTertiary}
               />
               {searchText ? (
-                <TouchableOpacity onPress={() => setSearchText('')}>
+                <TouchableOpacity
+                  hitSlop={13}
+                  accessibilityLabel="Clear"
+                  accessibilityRole="button"
+                  onPress={() => setSearchText('')}
+                >
                   <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
                 </TouchableOpacity>
               ) : null}

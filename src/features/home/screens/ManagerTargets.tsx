@@ -212,6 +212,7 @@ function TargetBreakdownModal({
             </View>
 
             <TouchableOpacity
+              hitSlop={12}
               style={styles.sheetCloseButton}
               activeOpacity={0.75}
               onPress={onClose}

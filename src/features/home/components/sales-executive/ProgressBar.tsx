@@ -1,7 +1,8 @@
 import { AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
 import React, { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 export const ProgressBar = ({ progress, label, value, color }: any) => {

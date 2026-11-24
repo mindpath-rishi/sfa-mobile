@@ -22,6 +22,11 @@ import {
   syncNativePendingLocationUploads,
 } from './native-location.service';
 import { requestBackgroundLocationDisclosure } from './backgroundLocationDisclosure.bridge';
+import {
+  getTrackingConfig,
+  loadTrackingConfig,
+  onTrackingConfigChange,
+} from '@/core/location/tracking-config';
 
 export const SALESMAN_BACKGROUND_LOCATION_TASK = 'salesman-background-location';
 
@@ -30,7 +35,8 @@ const ACTIVE_LOCATION_SESSION_KEY = 'active_location_work_session_id';
 const LAST_BACKGROUND_LOCATION_KEY = 'last_background_location';
 const LAST_BACKGROUND_LOCATION_ERROR_KEY = 'last_background_location_error';
 const BATTERY_OPTIMIZATION_PROMPTED_KEY = 'battery_optimization_prompted';
-const BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY = 'background_location_disclosure_acknowledged';
+const BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY =
+  'background_location_disclosure_acknowledged';
 
 /**
  * Real-time tracking settings
@@ -39,38 +45,53 @@ const BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY = 'background_location_dis
  * 0 interval is not reliable on Android background services.
  * OS/GPS may still throttle updates in background depending on device/battery/vendor.
  */
-const FOREGROUND_TRACKING_INTERVAL_MS = 1_000;
-const FOREGROUND_TRACKING_DISTANCE_METERS = 1;
+// Matches the native Android service cadence. 1s/1m produced a GPS callback + upload
+// every second, keeping the JS thread busy (UI jank) and draining battery.
 
-const BACKGROUND_TRACKING_INTERVAL_MS = 2_000;
-const BACKGROUND_TRACKING_DISTANCE_METERS = 1;
 
 /**
  * Native Android service interval.
  * 5s/5m is more stable than 1-2s in sleep mode and saves battery.
  */
-const NATIVE_BACKGROUND_TRACKING_INTERVAL_MS = 5_000;
 /**
  * Keep 0 while testing background delivery. Android will still throttle in deep sleep,
  * but this avoids missing updates when the phone moves less than 5 metres.
  * After testing, you can change this to 3 or 5 to save battery.
  */
-const NATIVE_BACKGROUND_TRACKING_DISTANCE_METERS = 0;
 
-const FOREGROUND_HEARTBEAT_INTERVAL_MS = 5_000;
-const BACKGROUND_HEARTBEAT_INTERVAL_MS = 10_000;
+// Fallback only: fires when no fix arrived in this window (e.g. stationary).
 
 /**
  * Background callbacks can arrive late on some Android devices.
  * Do not keep this too low, otherwise valid background points get rejected as stale.
  */
 const LOCATION_MAX_AGE_MS = 120_000;
-const LOCATION_MAX_ACCURACY_METERS = 100;
 // Browser geolocation often falls back to Wi-Fi/IP positioning, which can be
 // less precise than a native GPS fix. Accept those fixes for web workflows.
 const WEB_LOCATION_MAX_ACCURACY_METERS = 1_000;
+/*
+ * Tracking cadence, accuracy and filters come from the admin settings
+ * (portal → Live Tracking → Tracking settings), see core/location/tracking-config.
+ */
+const fgIntervalMs = () => getTrackingConfig().foregroundIntervalSec * 1000;
+const fgDistanceM = () => getTrackingConfig().foregroundDistanceM;
+const bgIntervalMs = () => getTrackingConfig().backgroundIntervalSec * 1000;
+const bgDistanceM = () => getTrackingConfig().backgroundDistanceM;
+const heartbeatMs = () => getTrackingConfig().heartbeatSec * 1000;
+const maxAccuracyM = () => getTrackingConfig().maxAccuracyM;
+const trackingAccuracy = () => {
+  switch (getTrackingConfig().accuracyMode) {
+    case 'BALANCED':
+      return Location.Accuracy.Balanced;
+    case 'LOW':
+      return Location.Accuracy.Low;
+    default:
+      return Location.Accuracy.BestForNavigation;
+  }
+};
+
 const getMaxLocationAccuracy = () =>
-  Platform.OS === 'web' ? WEB_LOCATION_MAX_ACCURACY_METERS : LOCATION_MAX_ACCURACY_METERS;
+  Platform.OS === 'web' ? WEB_LOCATION_MAX_ACCURACY_METERS : maxAccuracyM();
 
 const MAX_SPEED_METERS_PER_SECOND = 200 / 3.6;
 const UPLOAD_TIMEOUT_MS = 15_000;
@@ -957,11 +978,11 @@ const startWebLocationTracking = () => {
       const intervalReached =
         !lastWebLocation ||
         position.timestamp - new Date(lastWebLocation.capturedAt).getTime() >=
-          FOREGROUND_TRACKING_INTERVAL_MS;
+          fgIntervalMs();
 
       const distanceReached =
         !!lastWebLocation &&
-        distanceInMeters(lastWebLocation, location) >= FOREGROUND_TRACKING_DISTANCE_METERS;
+        distanceInMeters(lastWebLocation, location) >= fgDistanceM();
 
       if (intervalReached || distanceReached) {
         lastWebLocation = location;
@@ -1119,7 +1140,7 @@ const performLocationCapture = async (
 
       const lastKnown = await Location.getLastKnownPositionAsync({
         maxAge: LOCATION_MAX_AGE_MS,
-        requiredAccuracy: LOCATION_MAX_ACCURACY_METERS,
+        requiredAccuracy: maxAccuracyM(),
       });
 
       if (!lastKnown) throw freshLocationError;
@@ -1156,7 +1177,78 @@ export const captureCurrentLocation = async (
   }
 };
 
+/**
+ * Day end usually happens indoors at the depot while stationary, so the tracker's
+ * distance filter has produced no recent fix and a fresh high-accuracy fix often
+ * times out. Prefer a precise fix, then an approximate one (network/Wi-Fi), then the
+ * device's last known position. Its accuracy and capturedAt stay on the record so
+ * the backend can tell how good it is. Never blocks: may resolve to undefined.
+ */
+const DAY_END_PREFETCH_TTL_MS = LOCATION_MAX_AGE_MS;
+
+let dayEndLocationPromise: Promise<CapturedLocation | undefined> | null = null;
+let prefetchedDayEndLocation: { location: CapturedLocation; fetchedAt: number } | null = null;
+
+/** Precise → approximate → last known position; resolves undefined only if none exist. */
+export const captureBestEffortLocation = async (): Promise<CapturedLocation | undefined> => {
+  const precise = await captureCurrentLocation();
+  if (precise) return precise;
+
+  try {
+    const permission = await Location.getForegroundPermissionsAsync();
+    if (permission.status !== Location.PermissionStatus.GRANTED) return undefined;
+
+    const coarse = await withLocationTimeout(
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+      8_000,
+    ).catch(() => null);
+    const fallback = coarse ?? (await Location.getLastKnownPositionAsync());
+
+    if (!fallback) return undefined;
+
+    logLocation('Using approximate day-end location', {
+      accuracy: fallback.coords.accuracy,
+      capturedAt: new Date(fallback.timestamp).toISOString(),
+    });
+    return toCapturedLocation(fallback);
+  } catch (error) {
+    console.warn('[Location] Day-end fallback location unavailable:', error);
+    return undefined;
+  }
+};
+
+/**
+ * Start acquiring the day-end location early (e.g. when the day-end summary opens)
+ * so it is ready by the time the user confirms. Safe to call repeatedly.
+ */
+export const prefetchDayEndLocation = () => {
+  if (dayEndLocationPromise) return;
+
+  dayEndLocationPromise = captureBestEffortLocation()
+    .then((location) => {
+      if (location) prefetchedDayEndLocation = { location, fetchedAt: Date.now() };
+      return location;
+    })
+    .finally(() => {
+      dayEndLocationPromise = null;
+    });
+};
+
+export const captureDayEndLocation = async (): Promise<CapturedLocation | undefined> => {
+  if (dayEndLocationPromise) await dayEndLocationPromise;
+
+  const prefetched = prefetchedDayEndLocation;
+  prefetchedDayEndLocation = null;
+
+  if (prefetched && Date.now() - prefetched.fetchedAt <= DAY_END_PREFETCH_TTL_MS) {
+    return prefetched.location;
+  }
+
+  return captureBestEffortLocation();
+};
+
 const startForegroundTracking = async () => {
+  if (!getTrackingConfig().trackingEnabled) return;
   if (foregroundLocationSubscription && foregroundHeadingSubscription) return;
 
   if (foregroundTrackingStartPromise) return foregroundTrackingStartPromise;
@@ -1165,9 +1257,9 @@ const startForegroundTracking = async () => {
     if (!foregroundLocationSubscription) {
       foregroundLocationSubscription = await Location.watchPositionAsync(
         {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: FOREGROUND_TRACKING_INTERVAL_MS,
-          distanceInterval: FOREGROUND_TRACKING_DISTANCE_METERS,
+          accuracy: trackingAccuracy(),
+          timeInterval: fgIntervalMs(),
+          distanceInterval: fgDistanceM(),
           mayShowUserSettingsDialog: true,
         },
         (location) =>
@@ -1175,8 +1267,8 @@ const startForegroundTracking = async () => {
       );
 
       logLocation('Foreground tracking started', {
-        intervalMs: FOREGROUND_TRACKING_INTERVAL_MS,
-        distanceMeters: FOREGROUND_TRACKING_DISTANCE_METERS,
+        intervalMs: fgIntervalMs(),
+        distanceMeters: fgDistanceM(),
       });
     }
 
@@ -1211,8 +1303,8 @@ const restartHeartbeat = (workSessionId: string) => {
 
   const interval =
     currentAppState === 'active'
-      ? FOREGROUND_HEARTBEAT_INTERVAL_MS
-      : BACKGROUND_HEARTBEAT_INTERVAL_MS;
+      ? heartbeatMs()
+      : heartbeatMs();
 
   if (interval <= 0) return;
 
@@ -1310,16 +1402,17 @@ const startNativeAndroidBackgroundTracking = async (workSessionId: string) => {
   try {
     const started = await startNativeBackgroundLocation({
       workSessionId,
-      intervalMs: NATIVE_BACKGROUND_TRACKING_INTERVAL_MS,
-      distanceMeters: NATIVE_BACKGROUND_TRACKING_DISTANCE_METERS,
+      intervalMs: bgIntervalMs(),
+      distanceMeters: bgDistanceM(),
+      accuracy: getTrackingConfig().accuracyMode,
     });
 
     nativeBackgroundTrackingStarted = started === true;
 
     logLocation('Native background tracking start result', {
       started: nativeBackgroundTrackingStarted,
-      intervalMs: NATIVE_BACKGROUND_TRACKING_INTERVAL_MS,
-      distanceMeters: NATIVE_BACKGROUND_TRACKING_DISTANCE_METERS,
+      intervalMs: bgIntervalMs(),
+      distanceMeters: bgDistanceM(),
     });
 
     return nativeBackgroundTrackingStarted;
@@ -1378,12 +1471,12 @@ const startBackgroundTracking = async () => {
   }
 
   const baseOptions: Location.LocationTaskOptions = {
-    accuracy: Location.Accuracy.BestForNavigation,
+    accuracy: trackingAccuracy(),
     activityType: Location.ActivityType.AutomotiveNavigation,
-    timeInterval: BACKGROUND_TRACKING_INTERVAL_MS,
-    distanceInterval: BACKGROUND_TRACKING_DISTANCE_METERS,
-    deferredUpdatesInterval: BACKGROUND_TRACKING_INTERVAL_MS,
-    deferredUpdatesDistance: BACKGROUND_TRACKING_DISTANCE_METERS,
+    timeInterval: bgIntervalMs(),
+    distanceInterval: bgDistanceM(),
+    deferredUpdatesInterval: bgIntervalMs(),
+    deferredUpdatesDistance: bgDistanceM(),
     pausesUpdatesAutomatically: false,
     showsBackgroundLocationIndicator: true,
   };
@@ -1407,8 +1500,8 @@ const startBackgroundTracking = async () => {
   logLocation('Background task start result', {
     started,
     platform: Platform.OS,
-    intervalMs: BACKGROUND_TRACKING_INTERVAL_MS,
-    distanceMeters: BACKGROUND_TRACKING_DISTANCE_METERS,
+    intervalMs: bgIntervalMs(),
+    distanceMeters: bgDistanceM(),
   });
 };
 
@@ -1429,6 +1522,14 @@ const performStartSalesmanBackgroundLocation = async (
   }
 
   await storage.setItem(ACTIVE_LOCATION_SESSION_KEY, activeSessionId);
+
+  // Admin settings (cached when offline). Tracking switched off: keep the
+  // session key so tracking starts as soon as the admin switches it back on.
+  await loadTrackingConfig();
+  if (!getTrackingConfig().trackingEnabled) {
+    logLocation('Tracking disabled by admin settings');
+    return;
+  }
 
   startConnectivitySync();
 
@@ -1480,6 +1581,8 @@ const performStartSalesmanBackgroundLocation = async (
 
     if (!disclosureAccepted) {
       logLocation('Background location disclosure declined by user');
+    } else if (!getTrackingConfig().backgroundEnabled) {
+      logLocation('Background tracking disabled by admin settings');
     } else if (Platform.OS === 'android') {
       await startNativeAndroidBackgroundTracking(activeSessionId);
     } else if (Platform.OS === 'ios') {
@@ -1526,6 +1629,45 @@ export const startSalesmanBackgroundLocation = async (
 
   return locationTrackingStartPromise;
 };
+
+/**
+ * Admin changed the tracking settings: restart capture with the new cadence /
+ * accuracy (or stop it when tracking was switched off). Runs only while a
+ * work day is being tracked.
+ */
+const restartTrackingForConfig = async () => {
+  if (Platform.OS === 'web') return;
+  const sessionId = await storage.getItem(ACTIVE_LOCATION_SESSION_KEY);
+  if (!sessionId) return;
+  logLocation('Applying new tracking settings', getTrackingConfig());
+
+  stopForegroundTracking();
+  if (Platform.OS === 'android' && isNativeLocationAvailable()) {
+    try {
+      await stopNativeBackgroundLocation();
+    } catch (error) {
+      console.warn('[Location] Unable to stop native tracking for restart:', error);
+    }
+    nativeBackgroundTrackingStarted = false;
+  }
+  if (await Location.hasStartedLocationUpdatesAsync(SALESMAN_BACKGROUND_LOCATION_TASK)) {
+    await Location.stopLocationUpdatesAsync(SALESMAN_BACKGROUND_LOCATION_TASK);
+  }
+
+  if (!getTrackingConfig().trackingEnabled) {
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+    logLocation('Tracking stopped by admin settings');
+    return;
+  }
+
+  const user = useAuthStore.getState().user as LocationOwner | undefined;
+  await startSalesmanBackgroundLocation(user, { canPromptDisclosure: false });
+};
+
+onTrackingConfigChange(() => {
+  safeRun(restartTrackingForConfig(), 'Tracking settings restart failed');
+});
 
 export const stopSalesmanBackgroundLocation = async () => {
   await storage.removeItem(ACTIVE_LOCATION_SESSION_KEY);

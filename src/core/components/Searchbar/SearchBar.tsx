@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { View, TextInput, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator, Pressable } from 'react-native';
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 
 import { SearchBarProps } from './SearchBar.types';
@@ -65,7 +66,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
     if (clearable && localValue.length > 0) {
       return (
-        <TouchableOpacity onPress={handleClear}>
+        <TouchableOpacity
+          hitSlop={12}
+          accessibilityLabel="Clear"
+          accessibilityRole="button"
+          onPress={handleClear}
+        >
           <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
         </TouchableOpacity>
       );

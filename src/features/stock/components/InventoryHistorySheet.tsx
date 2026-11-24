@@ -143,14 +143,14 @@ export function InventoryHistorySheet({
                     <AppText style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700' }}>
                       {record.transactionType || 'Movement'}
                     </AppText>
-                    <AppText style={{ color: colors.textTertiary, fontSize: 10, marginTop: 2 }}>
+                    <AppText style={{ color: colors.textTertiary, fontSize: 11, marginTop: 2 }}>
                       {new Date(
                         record.transactionDate || record.createdAt || Date.now(),
                       ).toLocaleString()}
                       {record.referenceNo ? ` · ${record.referenceNo}` : ''}
                     </AppText>
                     {record.remark ? (
-                      <AppText style={{ color: colors.textSecondary, fontSize: 10, marginTop: 3 }}>
+                      <AppText style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>
                         {record.remark}
                       </AppText>
                     ) : null}
@@ -160,7 +160,7 @@ export function InventoryHistorySheet({
                       {incoming ? '+' : '-'}
                       {Number(record.quantity || 0)}
                     </AppText>
-                    <AppText style={{ color: colors.textTertiary, fontSize: 9 }}>
+                    <AppText style={{ color: colors.textTertiary, fontSize: 10 }}>
                       {Number(record.cases || 0)}C · {Number(record.pieces || 0)}P
                     </AppText>
                   </View>

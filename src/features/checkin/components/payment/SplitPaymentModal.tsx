@@ -2,20 +2,13 @@
  * Split a sale's payment across several payment modes.
  */
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  StyleSheet,
-  Platform,
-} from 'react-native';
+import { View, ScrollView, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { Text, TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { AppModal } from '@/core/components';
 import { FlatList } from 'react-native-gesture-handler';
+import { appAlert } from '@/core/alert/appAlert';
 
 export type PaymentMode = 'cash' | 'wallet' | 'card' | 'cheque' | 'credit' | 'split';
 
@@ -102,7 +95,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   const modesUsedByOthers = (selfId: string) =>
     payments.filter((p) => p.id !== selfId).map((p) => p.mode);
 
-  const availableModesFor = (selfId: string): PaymentMode[] =>
+  const availableModesFor = (selfId: string): Array<Exclude<PaymentMode, 'split'>> =>
     ALL_MODES.filter((m) => !modesUsedByOthers(selfId).includes(m));
 
   const nextAvailableMode = (): PaymentMode | null =>
@@ -155,7 +148,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   // ─── Mode select ──────────────────────────────────────────────────────────
 
   const selectMode = useCallback(
-    (rowId: string, mode: PaymentMode) => {
+    (rowId: string, mode: Exclude<PaymentMode, 'split'>) => {
       if (payments.find((p) => p.id !== rowId && p.mode === mode)) {
         setModePickerRow(null);
         return;
@@ -180,7 +173,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
         }
       }
 
-      setPayments((prev: any) => prev.map((p) => (p.id === rowId ? { ...p, mode } : p)));
+      setPayments((prev) => prev.map((p) => (p.id === rowId ? { ...p, mode } : p)));
       setModePickerRow(null);
     },
     [payments, availableCredit],
@@ -190,7 +183,7 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
 
   const addPaymentMethod = useCallback(() => {
     if (payments.length >= ALL_MODES.length) {
-      Alert.alert('Limit Reached', `Maximum ${ALL_MODES.length} payment methods allowed`);
+      appAlert('Limit Reached', `Maximum ${ALL_MODES.length} payment methods allowed`);
       return;
     }
     const mode = nextAvailableMode();
@@ -224,12 +217,12 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
   const handleConfirm = () => {
     if (!isValid) {
       if (creditExceeded) {
-        Alert.alert(
+        appAlert(
           'Credit Exceeded',
           `Credit used (${currency}${totalCreditUsed.toFixed(2)}) exceeds limit (${currency}${availableCredit.toFixed(2)})`,
         );
       } else {
-        Alert.alert(
+        appAlert(
           'Amount Mismatch',
           `Total (${currency}${totalPaid.toFixed(2)}) must equal order total (${currency}${orderTotal.toFixed(2)})`,
         );
@@ -492,6 +485,8 @@ export const SplitPaymentModal: React.FC<SplitPaymentModalProps> = ({
                     </Text>
                     {hasMultiple && (
                       <TouchableOpacity
+                        accessibilityLabel="Clear"
+                        accessibilityRole="button"
                         onPress={() => removePaymentMethod(payment.id)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >

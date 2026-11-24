@@ -7,6 +7,8 @@ type StartNativeLocationOptions = {
   workSessionId: string;
   intervalMs?: number;
   distanceMeters?: number;
+  /** HIGH = GPS, BALANCED = Wi-Fi / cell, LOW = coarse (admin setting) */
+  accuracy?: 'HIGH' | 'BALANCED' | 'LOW';
 };
 
 type SalesStreamLocationModule = {
@@ -16,6 +18,7 @@ type SalesStreamLocationModule = {
     baseUrl: string;
     intervalMs: number;
     distanceMeters: number;
+    accuracy: string;
     notificationTitle: string;
     notificationBody: string;
   }) => Promise<boolean>;
@@ -36,6 +39,7 @@ export const startNativeBackgroundLocation = async ({
   workSessionId,
   intervalMs = 1000,
   distanceMeters = 1,
+  accuracy = 'HIGH',
 }: StartNativeLocationOptions) => {
   if (!isNativeLocationAvailable()) return false;
 
@@ -49,6 +53,7 @@ export const startNativeBackgroundLocation = async ({
     baseUrl: getApiBaseUrl(),
     intervalMs,
     distanceMeters,
+    accuracy,
     notificationTitle: 'Sales Stream live location active',
     notificationBody: 'Your live location is shared while your work day is active.',
   });

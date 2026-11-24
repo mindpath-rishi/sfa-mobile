@@ -11,6 +11,8 @@ export interface DeviceInfo {
   browser?: string;
   appVersion: string;
   fcmToken?: string | null;
+  // Hardware / build details (see core/device/device-details)
+  [key: string]: unknown;
 }
 
 // Login Request Payload

@@ -17,9 +17,9 @@ export interface ModalProps {
   children?: React.ReactNode;
 
   title?: string;
-  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
-  position?: 'center' | 'top' | 'bottom' | 'left' | 'right';
-  animation?: 'none' | 'scale' | 'slide';
+  size?: ModalSize;
+  position?: ModalPosition;
+  animation?: ModalAnimation;
 
   showCloseButton?: boolean;
   showHeader?: boolean;

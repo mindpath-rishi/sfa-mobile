@@ -12,6 +12,9 @@ export type Van = {
   name?: string;
   vanName?: string;
   vanNumber?: string;
+  registrationNumber?: string;
+  type?: string;
+  capacity?: number | string;
   provinceId?: unknown;
   province?: unknown;
   market?: unknown;

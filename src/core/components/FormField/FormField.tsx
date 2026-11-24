@@ -1,5 +1,6 @@
 import React, { forwardRef, memo, useCallback, useState } from 'react';
-import { View, Pressable, Keyboard, TextInput } from 'react-native';
+import { View, Pressable, Keyboard } from 'react-native';
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 
 import Input from '../Input';
@@ -87,7 +88,12 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
     const renderLeftIcon = () => {
       if (icon && iconPosition === 'left') {
         return (
-          <Pressable onPress={onIconPress} disabled={!onIconPress || isDisabled} hitSlop={10}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onIconPress}
+            disabled={!onIconPress || isDisabled}
+            hitSlop={10}
+          >
             <Ionicons name={icon} size={20} color={getIconColor()} />
           </Pressable>
         );
@@ -111,7 +117,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
             <Ionicons
               name="close-circle"
               size={20}
-              color={hasError ? colors.error : iconColor ?? colors.textSecondary}
+              color={hasError ? colors.error : (iconColor ?? colors.textSecondary)}
             />
           </Pressable>,
         );
@@ -130,7 +136,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
             <Ionicons
               name={secure ? 'eye-off' : 'eye'}
               size={20}
-              color={isDisabled ? colors.textTertiary : iconColor ?? colors.textSecondary}
+              color={isDisabled ? colors.textTertiary : (iconColor ?? colors.textSecondary)}
             />
           </Pressable>,
         );
@@ -140,6 +146,7 @@ const FormField = forwardRef<TextInput, FormFieldProps>(
       if (icon && iconPosition === 'right') {
         icons.push(
           <Pressable
+            accessibilityRole="button"
             key="icon"
             onPress={onIconPress}
             disabled={!onIconPress || isDisabled}

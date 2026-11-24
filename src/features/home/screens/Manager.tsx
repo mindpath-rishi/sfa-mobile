@@ -307,7 +307,7 @@ function DonutChart({
         })}
       </Svg>
       <View style={stylesBase.donutCenter}>
-        <AppText style={{ fontSize: 10, color: colors.textTertiary }}>Total</AppText>
+        <AppText style={{ fontSize: 11, color: colors.textTertiary }}>Total</AppText>
         <AppText style={{ fontSize: 12, fontWeight: '800', color: colors.textPrimary }}>
           {total}
         </AppText>
@@ -953,11 +953,7 @@ export default function ManagerHomeScreen() {
                 <AppText style={styles.cardMeta}>{summaryDateRangeLabel}</AppText>
               </View>
               {userSummaryRows.map((item) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={styles.summaryRow}
-                  activeOpacity={0.75}
-                >
+                <TouchableOpacity key={item.label} style={styles.summaryRow} activeOpacity={0.75}>
                   <View style={styles.summaryLabelWrap}>
                     <View style={[styles.statusDot, { backgroundColor: item.color }]} />
                     <AppText style={styles.summaryLabel}>{item.label}</AppText>

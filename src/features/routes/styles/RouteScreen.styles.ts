@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
-import { Dimensions, type TextStyle, type ViewStyle } from 'react-native';
+import { Dimensions, type TextStyle, type ViewStyle, useWindowDimensions } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { createStyles } from '@/shared/theme/styles';
 
-const { width, height } = Dimensions.get('window');
-
 export const useRouteScreenStyles = () => {
   const { colors } = useTheme();
+  const { width, height } = useWindowDimensions();
 
   return useMemo(() => {
     const styleGenerator = createStyles((utils) => ({
@@ -207,7 +206,7 @@ export const useRouteScreenStyles = () => {
       } as ViewStyle,
 
       filterBadgeText: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 'bold',
         color: colors.surface,
       } as TextStyle,
@@ -521,7 +520,7 @@ export const useRouteScreenStyles = () => {
         backgroundColor: colors.surface,
         borderRadius: utils.borderRadius.xl,
         padding: utils.spacing[6],
-        width: width * 0.85,
+        width: Math.min(width * 0.85, 420),
         alignItems: 'center',
       } as ViewStyle,
 
@@ -585,7 +584,7 @@ export const useRouteScreenStyles = () => {
 
       // Detail Modal
       detailModal: {
-        width: width * 0.9,
+        width: Math.min(width * 0.9, 560),
         maxHeight: height * 0.8,
         backgroundColor: colors.surface,
         borderRadius: utils.borderRadius.xl,
@@ -812,7 +811,7 @@ export const useRouteScreenStyles = () => {
       } as ViewStyle,
 
       priorityText: {
-        fontSize: 10,
+        fontSize: 11,
         fontWeight: 'bold',
       } as TextStyle,
 
@@ -914,5 +913,5 @@ export const useRouteScreenStyles = () => {
     }));
 
     return styleGenerator(colors);
-  }, [colors]);
+  }, [colors, width, height]);
 };

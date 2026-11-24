@@ -16,6 +16,7 @@ import { nonSaleService } from '@/features/outlet/services/non-sale.service';
 import { BottomBar } from '../components/nonsale/BottomBar';
 import { ReasonCard } from '../components/nonsale/ReasonCard';
 import { SelectedCategoryBadge } from '../components/nonsale/SelectedItemBadge';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
 type FurtherReason = {
   id: string;
@@ -134,145 +135,148 @@ export const NonSaleFinalScreen: React.FC = () => {
     return () => backHandler.remove();
   }, [handleBack]);
 
-  const handleSubmit = useCallback(async () => {
-    if (submitLockRef.current || isSubmitting) return;
+  const [handleSubmit] = useSingleFlight(
+    useCallback(async () => {
+      if (submitLockRef.current || isSubmitting) return;
 
-    const finalReasonId = selectedReason || reasonId;
+      const finalReasonId = selectedReason || reasonId;
 
-    if (!finalReasonId || specificReasons.length === 0) {
-      toast.error('Reason required', 'Please select a valid No Sale reason.');
-      return;
-    }
-
-    submitLockRef.current = true;
-    setIsSubmitting(true);
-
-    try {
-      let visit = activeVisit;
-
-      if (!visit) {
-        const canStartVisit =
-          selectedOutlet?.customerId &&
-          activeInteraction &&
-          activeInteraction.customerId === selectedOutlet.customerId &&
-          selectedRoute?.routeSessionId &&
-          selectedRoute.workSessionId &&
-          van?.vanId;
-
-        if (!canStartVisit) {
-          toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
-          return;
-        }
-
-        showLoader({ message: 'Starting outlet visit...' });
-        await waitForUi();
-
-        const visitResponse = await outletService.startVisit(
-          {
-            routeSessionId: selectedRoute.routeSessionId,
-            workSessionId: selectedRoute.workSessionId,
-            vanId: van.vanId,
-            outletId: selectedOutlet.customerId,
-            visitType: activeInteraction.visitType,
-            interactionId: activeInteraction.interactionId,
-          },
-          { showLoader: false },
-        );
-
-        if (!visitResponse.success || !visitResponse.data?.visitId) {
-          toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
-          return;
-        }
-
-        visit = {
-          visitId: visitResponse.data.visitId,
-          outlet: selectedOutlet,
-          checkInTime: new Date(visitResponse.data.checkInTime || activeInteraction.arrivalTime),
-          status: 'ACTIVE',
-          routeSessionId: selectedRoute.routeSessionId,
-          customerId: selectedOutlet.customerId,
-          visitType: activeInteraction.visitType,
-        };
-
-        const outletStore = useOutletStore.getState();
-
-        outletStore.setActiveVisit(visit);
-        outletStore.setActiveInteraction({
-          ...activeInteraction,
-          status: 'CONVERTED',
-        });
-      }
-
-      const payload: any = {
-        visitId: visit.visitId,
-        vanId: van?.vanId ?? user?.vanId,
-        outletId: visit.outlet.customerId,
-        reasonId: finalReasonId,
-        reasonCategoryId: categoryId,
-        remark: reasonLabel,
-      };
-
-      showLoader({ message: 'Saving no sale...' });
-      await waitForUi();
-
-      const response = await nonSaleService.markNonSale(payload);
-
-      if (!response.success) {
-        toast.error('No Sale failed', response.message || 'Unable to save No Sale data.');
+      if (!finalReasonId || specificReasons.length === 0) {
+        toast.error('Reason required', 'Please select a valid No Sale reason.');
         return;
       }
 
-      /**
-       * Online no-sale creation already completes the visit on backend.
-       * Offline records need separate local visit completion.
-       */
-      if (response.offline) {
-        showLoader({ message: 'Completing outlet visit...' });
+      submitLockRef.current = true;
+      setIsSubmitting(true);
+
+      try {
+        let visit = activeVisit;
+
+        if (!visit) {
+          const canStartVisit =
+            selectedOutlet?.customerId &&
+            activeInteraction &&
+            activeInteraction.customerId === selectedOutlet.customerId &&
+            selectedRoute?.routeSessionId &&
+            selectedRoute.workSessionId &&
+            van?.vanId;
+
+          if (!canStartVisit) {
+            toast.error('Visit unavailable', 'Return to the outlet and capture arrival GPS first.');
+            return;
+          }
+
+          showLoader({ message: 'Starting outlet visit...' });
+          await waitForUi();
+
+          const visitResponse = await outletService.startVisit(
+            {
+              routeSessionId: selectedRoute.routeSessionId,
+              workSessionId: selectedRoute.workSessionId,
+              vanId: van.vanId,
+              outletId: selectedOutlet.customerId,
+              visitType: activeInteraction.visitType,
+              interactionId: activeInteraction.interactionId,
+            },
+            { showLoader: false },
+          );
+
+          if (!visitResponse.success || !visitResponse.data?.visitId) {
+            toast.error('Visit unavailable', visitResponse.message || 'Unable to start visit.');
+            return;
+          }
+
+          visit = {
+            visitId: visitResponse.data.visitId,
+            outlet: selectedOutlet,
+            checkInTime: new Date(visitResponse.data.checkInTime || activeInteraction.arrivalTime),
+            status: 'ACTIVE',
+            routeSessionId: selectedRoute.routeSessionId,
+            customerId: selectedOutlet.customerId,
+            visitType: activeInteraction.visitType,
+          };
+
+          const outletStore = useOutletStore.getState();
+
+          outletStore.setActiveVisit(visit);
+          outletStore.setActiveInteraction({
+            ...activeInteraction,
+            status: 'CONVERTED',
+          });
+        }
+
+        const payload: any = {
+          visitId: visit.visitId,
+          vanId: van?.vanId ?? user?.vanId,
+          outletId: visit.outlet.customerId,
+          reasonId: finalReasonId,
+          reasonCategoryId: categoryId,
+          remark: reasonLabel,
+        };
+
+        showLoader({ message: 'Saving no sale...' });
         await waitForUi();
 
-        const completionResponse = await outletService.completeVisit(visit.visitId);
+        const response = await nonSaleService.markNonSale(payload);
 
-        if (!completionResponse.success) {
-          toast.error(
-            'Visit completion failed',
-            completionResponse.message || 'No Sale was saved, but the local visit was not closed.',
-          );
+        if (!response.success) {
+          toast.error('No Sale failed', response.message || 'Unable to save No Sale data.');
           return;
         }
+
+        /**
+         * Online no-sale creation already completes the visit on backend.
+         * Offline records need separate local visit completion.
+         */
+        if (response.offline) {
+          showLoader({ message: 'Completing outlet visit...' });
+          await waitForUi();
+
+          const completionResponse = await outletService.completeVisit(visit.visitId);
+
+          if (!completionResponse.success) {
+            toast.error(
+              'Visit completion failed',
+              completionResponse.message ||
+                'No Sale was saved, but the local visit was not closed.',
+            );
+            return;
+          }
+        }
+
+        showLoader({ message: 'Updating route...' });
+        await waitForUi();
+
+        clearVisit();
+        router.replace('/route');
+      } catch (error) {
+        toast.error(
+          'No Sale failed',
+          error instanceof Error ? error.message : 'Unable to save No Sale data.',
+        );
+      } finally {
+        submitLockRef.current = false;
+        setIsSubmitting(false);
+        hideLoader();
       }
-
-      showLoader({ message: 'Updating route...' });
-      await waitForUi();
-
-      clearVisit();
-      router.replace('/route');
-    } catch (error) {
-      toast.error(
-        'No Sale failed',
-        error instanceof Error ? error.message : 'Unable to save No Sale data.',
-      );
-    } finally {
-      submitLockRef.current = false;
-      setIsSubmitting(false);
-      hideLoader();
-    }
-  }, [
-    activeInteraction,
-    activeVisit,
-    categoryId,
-    clearVisit,
-    hideLoader,
-    isSubmitting,
-    reasonId,
-    reasonLabel,
-    selectedOutlet,
-    selectedReason,
-    selectedRoute,
-    showLoader,
-    specificReasons.length,
-    user?.vanId,
-    van?.vanId,
-  ]);
+    }, [
+      activeInteraction,
+      activeVisit,
+      categoryId,
+      clearVisit,
+      hideLoader,
+      isSubmitting,
+      reasonId,
+      reasonLabel,
+      selectedOutlet,
+      selectedReason,
+      selectedRoute,
+      showLoader,
+      specificReasons.length,
+      user?.vanId,
+      van?.vanId,
+    ]),
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

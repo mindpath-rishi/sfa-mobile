@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, Pressable, TextInput, StatusBar } from 'react-native';
+import { View, Pressable, StatusBar } from 'react-native';
+import { Text, TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ import Animated, {
   useSharedValue,
   withSequence,
   withRepeat,
+  cancelAnimation,
 } from 'react-native-reanimated';
 
 import { useHeaderStyles } from './Header.styles';
@@ -101,7 +103,16 @@ const Header: React.FC = () => {
   const dotOpacity = useSharedValue(1);
   const dotScale = useSharedValue(1);
 
+  // Pulse only while syncing; an endless pulse on every screen kept the UI thread busy.
   React.useEffect(() => {
+    if (!isOfflineBusy) {
+      cancelAnimation(dotOpacity);
+      cancelAnimation(dotScale);
+      dotOpacity.value = withTiming(1, { duration: 200 });
+      dotScale.value = withTiming(1, { duration: 200 });
+      return;
+    }
+
     dotOpacity.value = withRepeat(
       withSequence(withTiming(0.25, { duration: 600 }), withTiming(1, { duration: 600 })),
       -1,
@@ -113,7 +124,7 @@ const Header: React.FC = () => {
       -1,
       true,
     );
-  }, [dotOpacity, dotScale]);
+  }, [dotOpacity, dotScale, isOfflineBusy]);
 
   const styles = useHeaderStyles({
     elevated: config.elevated ?? true,
@@ -203,11 +214,12 @@ const Header: React.FC = () => {
       ? gradientColors[0]
       : bgColor;
 
-  const statusBarStyle = useGradient || safeConfig.backgroundColor
-    ? 'light-content'
-    : isDark
+  const statusBarStyle =
+    useGradient || safeConfig.backgroundColor
       ? 'light-content'
-      : 'dark-content';
+      : isDark
+        ? 'light-content'
+        : 'dark-content';
 
   /* ============================
    * BADGES
@@ -261,7 +273,7 @@ const Header: React.FC = () => {
         <Text
           style={{
             color: '#fff',
-            fontSize: 8,
+            fontSize: 10,
             fontWeight: '700',
             lineHeight: 10,
           }}
@@ -363,7 +375,13 @@ const Header: React.FC = () => {
             />
 
             {safeConfig.searchValue && safeConfig.onSearchClear && (
-              <Pressable onPress={safeConfig.onSearchClear} style={styles.clearButtonInline}>
+              <Pressable
+                hitSlop={13}
+                accessibilityLabel="Clear"
+                accessibilityRole="button"
+                onPress={safeConfig.onSearchClear}
+                style={styles.clearButtonInline}
+              >
                 <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
               </Pressable>
             )}

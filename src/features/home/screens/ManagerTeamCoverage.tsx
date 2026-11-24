@@ -10,6 +10,7 @@ import { useTheme } from '@/shared/hooks/useTheme';
 import { homeService } from '../services/home.service';
 import type { ManagerTeamCoverageResponse } from '../services/home.service';
 import { createManagerTeamCoverageStyles } from '../styles/ManagerTeamCoverage.styles';
+import { UserStockModal } from '../components/UserStockModal';
 
 const INITIAL_TEAM_COVERAGE: ManagerTeamCoverageResponse = {
   users: 0,
@@ -42,8 +43,25 @@ type DetailListItem = {
   title: string;
   subtitle?: string;
   meta?: string;
+  /** Device line: battery %, last active, offline time */
+  status?: { text: string; online: boolean; lowBattery: boolean };
+  /** Tapping a user opens their stock with prices */
+  onPress?: () => void;
   icon: MCIconName;
 };
+
+const formatAgo = (iso?: string | null) => {
+  if (!iso) return 'never';
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ${minutes % 60}m ago`;
+  return new Date(iso).toLocaleString();
+};
+
+const formatMinutes = (minutes: number) =>
+  minutes >= 60 ? `${Math.floor(minutes / 60)}h ${Math.round(minutes % 60)}m` : `${Math.round(minutes)}m`;
 
 const clampPercentage = (value: number) => Math.max(0, Math.min(value, 100));
 
@@ -94,6 +112,7 @@ function TeamCoverageDetailModal({
               <AppText style={styles.modalSubtitle}>{formatNumber(count)} records</AppText>
             </View>
             <TouchableOpacity
+              hitSlop={12}
               style={styles.modalCloseButton}
               onPress={onClose}
               accessibilityRole="button"
@@ -121,7 +140,12 @@ function TeamCoverageDetailModal({
               </View>
             }
             renderItem={({ item }) => (
-              <View style={styles.modalRow}>
+              <TouchableOpacity
+                style={styles.modalRow}
+                activeOpacity={item.onPress ? 0.75 : 1}
+                disabled={!item.onPress}
+                onPress={item.onPress}
+              >
                 <View style={styles.modalRowIcon}>
                   <MaterialCommunityIcons name={item.icon} size={18} color={colors.primary} />
                 </View>
@@ -134,13 +158,34 @@ function TeamCoverageDetailModal({
                       {item.subtitle}
                     </AppText>
                   )}
+                  {!!item.status && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                      <View
+                        style={{
+                          width: 7,
+                          height: 7,
+                          borderRadius: 4,
+                          backgroundColor: item.status.online ? colors.success : colors.error,
+                        }}
+                      />
+                      <AppText
+                        style={[
+                          styles.modalRowSubtitle,
+                          item.status.lowBattery && { color: colors.error },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {item.status.text}
+                      </AppText>
+                    </View>
+                  )}
                 </View>
                 {!!item.meta && (
                   <AppText style={styles.modalRowMeta} numberOfLines={1}>
                     {item.meta}
                   </AppText>
                 )}
-              </View>
+              </TouchableOpacity>
             )}
           />
         </View>
@@ -211,6 +256,9 @@ export default function ManagerTeamCoverageScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [activeDetailType, setActiveDetailType] = useState<DetailType | null>(null);
+  const [stockUser, setStockUser] = useState<{ employeeId: string; name?: string } | null>(
+    null,
+  );
   const hasLoadedOnceRef = useRef(false);
   const isFetchingRef = useRef(false);
 
@@ -318,7 +366,35 @@ export default function ManagerTeamCoverageScreen() {
           id: user.employeeId || `user-${index}`,
           title: user.name || user.employeeId || 'Unnamed user',
           subtitle: user.positionId || user.employeeId,
-          meta: user.mobile,
+          meta: user.mobile ? `${user.mobile} · Stock ›` : 'Stock ›',
+          onPress: user.employeeId
+            ? () => {
+                // Close the list first: two RN modals cannot stack on iOS.
+                setActiveDetailType(null);
+                setTimeout(
+                  () => setStockUser({ employeeId: user.employeeId!, name: user.name }),
+                  350,
+                );
+              }
+            : undefined,
+          status: user.device
+            ? {
+                online: user.device.networkStatus === 'ONLINE',
+                lowBattery:
+                  user.device.batteryLevel !== null && user.device.batteryLevel <= 20,
+                text: [
+                  user.device.batteryLevel !== null
+                    ? `🔋 ${user.device.batteryLevel}%${user.device.isCharging ? ' ⚡' : ''}`
+                    : '🔋 -',
+                  `Active ${formatAgo(user.device.lastActiveAt)}`,
+                  user.device.offlineMinutesToday > 0
+                    ? `Offline today ${formatMinutes(user.device.offlineMinutesToday)}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              }
+            : { online: false, lowBattery: false, text: 'No device data yet' },
           icon: 'account-outline' as MCIconName,
         })),
       };
@@ -543,6 +619,8 @@ export default function ManagerTeamCoverageScreen() {
         colors={colors}
         onClose={() => setActiveDetailType(null)}
       />
+
+      <UserStockModal user={stockUser} onClose={() => setStockUser(null)} />
     </>
   );
 }

@@ -11,7 +11,6 @@ import {
   Modal,
   Image,
   Linking,
-  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +31,8 @@ import { getDistance, isInsideGeofence } from '@/shared/utils/geofence.utils';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { isSalesman } from '@/core/navigation/role.utils';
 import { captureCurrentLocation } from '@/shared/services/location.service';
+import { resolveMediaUrl } from '@/shared/utils/media-url.utils';
+import { appAlert } from '@/core/alert/appAlert';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export enum ShopVisitType {
@@ -130,7 +131,7 @@ const T = {
   body: { fontSize: 13, fontWeight: '400' as const, lineHeight: 19 },
   bodyM: { fontSize: 13, fontWeight: '500' as const },
   label: { fontSize: 11, fontWeight: '500' as const },
-  micro: { fontSize: 10, fontWeight: '600' as const },
+  micro: { fontSize: 11, fontWeight: '600' as const },
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -236,6 +237,9 @@ const BottomSheet = ({
               ) : null}
             </View>
             <TouchableOpacity
+              hitSlop={13}
+              accessibilityLabel="Close"
+              accessibilityRole="button"
               onPress={onClose}
               activeOpacity={0.7}
               style={{
@@ -288,7 +292,7 @@ export default function CustomerDetailScreen() {
   const [visitsTotal, setVisitsTotal] = useState(0);
   const [visitsLoaded, setVisitsLoaded] = useState(false);
 
-  const locationInterval = useRef<NodeJS.Timeout | null>(null);
+  const locationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const appStateListener = useRef<any>(null);
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -640,7 +644,7 @@ export default function CustomerDetailScreen() {
     if (!customer || isStartingSale || isRecordingInteraction) return;
 
     if (!isSalesman(user)) {
-      Alert.alert('Not allowed', 'Only a salesman can start a visit.');
+      appAlert('Not allowed', 'Only a salesman can start a visit.');
       return;
     }
 
@@ -650,7 +654,7 @@ export default function CustomerDetailScreen() {
     }
 
     if (!resolveGeoTag(customer.geoTag)) {
-      Alert.alert(
+      appAlert(
         'Outlet location missing',
         'This outlet does not have a valid geotag. Update the outlet location before starting a sale.',
       );
@@ -898,57 +902,60 @@ export default function CustomerDetailScreen() {
 }
 
 // ── Skeleton states ────────────────────────────────────────────────────────────
-const LoadingState = () => (
-  <View style={{ flex: 1, backgroundColor: '#F8F8F8' }}>
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <View style={{ padding: 16, gap: 10 }}>
-        <View style={{ backgroundColor: '#FFF', borderRadius: 16, padding: 16 }}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            <Skeleton height={52} width={52} variant="circle" />
-            <View style={{ flex: 1, gap: 8 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Skeleton height={16} width="55%" borderRadius={8} />
-                <Skeleton height={22} width={68} borderRadius={11} />
-              </View>
-              <Skeleton height={12} width="36%" borderRadius={6} />
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                <Skeleton height={24} width={94} borderRadius={12} />
-                <Skeleton height={24} width={106} borderRadius={12} />
+const LoadingState = () => {
+  const { colors } = useTheme();
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={{ padding: 16, gap: 10 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 16 }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Skeleton height={52} width={52} variant="circle" />
+              <View style={{ flex: 1, gap: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Skeleton height={16} width="55%" borderRadius={8} />
+                  <Skeleton height={22} width={68} borderRadius={11} />
+                </View>
+                <Skeleton height={12} width="36%" borderRadius={6} />
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <Skeleton height={24} width={94} borderRadius={12} />
+                  <Skeleton height={24} width={106} borderRadius={12} />
+                </View>
               </View>
             </View>
+            <Skeleton height={34} width="100%" borderRadius={10} style={{ marginTop: 12 }} />
           </View>
-          <Skeleton height={34} width="100%" borderRadius={10} style={{ marginTop: 12 }} />
-        </View>
-        <Skeleton height={56} width="100%" borderRadius={12} />
-        <Skeleton height={42} width="100%" borderRadius={0} />
-        <View style={{ gap: 12 }}>
-          <View style={{ flexDirection: 'row', gap: 12 }}>
-            {[1, 2].map((i) => (
-              <View
-                key={i}
-                style={{
-                  flex: 1,
-                  backgroundColor: '#FFF',
-                  borderRadius: 12,
-                  padding: 14,
-                  gap: 10,
-                  alignItems: 'center',
-                }}
-              >
-                <Skeleton height={22} width={22} variant="circle" />
-                <Skeleton height={20} width="72%" borderRadius={8} />
-                <Skeleton height={11} width="80%" borderRadius={6} />
-              </View>
+          <Skeleton height={56} width="100%" borderRadius={12} />
+          <Skeleton height={42} width="100%" borderRadius={0} />
+          <View style={{ gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {[1, 2].map((i) => (
+                <View
+                  key={i}
+                  style={{
+                    flex: 1,
+                    backgroundColor: colors.surface,
+                    borderRadius: 12,
+                    padding: 14,
+                    gap: 10,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Skeleton height={22} width={22} variant="circle" />
+                  <Skeleton height={20} width="72%" borderRadius={8} />
+                  <Skeleton height={11} width="80%" borderRadius={6} />
+                </View>
+              ))}
+            </View>
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} height={40} width="100%" borderRadius={8} />
             ))}
           </View>
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} height={40} width="100%" borderRadius={8} />
-          ))}
         </View>
-      </View>
-    </ScrollView>
-  </View>
-);
+      </ScrollView>
+    </View>
+  );
+};
 
 const DetailListSkeleton = ({ rows = 3 }: { rows?: number }) => {
   const { colors } = useTheme();
@@ -1219,7 +1226,7 @@ const SummaryTab = ({ customer, colors: c }: any) => {
     try {
       await Linking.openURL(url);
     } catch {
-      Alert.alert('Map unavailable', 'Unable to open this outlet location.');
+      appAlert('Map unavailable', 'Unable to open this outlet location.');
     }
   };
 
@@ -1253,7 +1260,7 @@ const SummaryTab = ({ customer, colors: c }: any) => {
             contentContainerStyle={{ paddingHorizontal: 14, gap: 10 }}
           >
             {images.map((image: any, index: number) => {
-              const uri = image.urls?.medium || image.urls?.small || image.url;
+              const uri = resolveMediaUrl(image.urls?.medium || image.urls?.small || image.url);
               return (
                 <Image
                   key={image.mediaId || `${uri}-${index}`}

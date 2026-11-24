@@ -4,15 +4,15 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Text, TextInput } from '@/core/components/Text/ScaledText';
 import { router } from 'expo-router';
 
 import { authService } from '@/features/auth/services/auth.service';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -73,7 +73,7 @@ export default function ChangePasswordScreen() {
     setErrors((current) => ({ ...current, [field]: undefined, form: undefined }));
   };
 
-  const handleSubmit = async () => {
+  const [handleSubmit] = useSingleFlight(async () => {
     setSuccessMessage('');
     if (!validate()) return;
 
@@ -103,7 +103,7 @@ export default function ChangePasswordScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
+  });
 
   return (
     <KeyboardAvoidingView

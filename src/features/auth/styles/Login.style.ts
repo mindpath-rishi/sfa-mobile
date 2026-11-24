@@ -1,7 +1,9 @@
 import { StyleSheet, Dimensions, Platform } from 'react-native';
 import { createStyles } from '@/shared/theme/styles';
 
-const { width, height } = Dimensions.get('window');
+/** Brand header takes half the screen in portrait, less in landscape so the form fits. */
+const heroRatio = () =>
+  Dimensions.get('window').width > Dimensions.get('window').height ? 0.32 : 0.5;
 
 export const useLoginStyles = createStyles((utils, colors) => ({
   container: {
@@ -15,12 +17,12 @@ export const useLoginStyles = createStyles((utils, colors) => ({
     top: 0,
     left: 0,
     right: 0,
-    height: Dimensions.get('window').height * 0.5,
+    height: utils.device.height * heroRatio(),
     zIndex: 0,
   },
 
   topSection: {
-    height: height * 0.5,
+    height: utils.device.height * heroRatio(),
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     justifyContent: 'center',
@@ -88,7 +90,7 @@ export const useLoginStyles = createStyles((utils, colors) => ({
     paddingHorizontal: 0,
     paddingTop: 0,
     paddingBottom: 0,
-    minHeight: height * 0.5 + 50,
+    minHeight: utils.device.height * heroRatio() + 50,
     flex: 0,
     zIndex: 15,
     ...Platform.select({

@@ -3,6 +3,7 @@ import { View, Image } from 'react-native';
 import { AppText } from '@/core/components';
 import { Outlet } from '../../types/outlet.types';
 import { useOutletAvatarStyles } from '../../styles/OutletAvatar.styles';
+import { resolveMediaUrl } from '@/shared/utils/media-url.utils';
 
 interface Props {
   outlet: Outlet;
@@ -11,7 +12,7 @@ interface Props {
 export const OutletAvatar: React.FC<Props> = ({ outlet }) => {
   const styles = useOutletAvatarStyles();
   const primaryImage = outlet.images?.find((image) => image.isPrimary) || outlet.images?.[0];
-  const imageUri = outlet.avatar || primaryImage?.urls?.small || primaryImage?.url;
+  const imageUri = resolveMediaUrl(outlet.avatar || primaryImage?.urls?.small || primaryImage?.url);
 
   return (
     <View style={styles.container}>

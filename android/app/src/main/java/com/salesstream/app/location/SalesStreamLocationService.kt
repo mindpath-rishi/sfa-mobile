@@ -51,6 +51,7 @@ class SalesStreamLocationService : Service() {
     const val EXTRA_BASE_URL = "baseUrl"
     const val EXTRA_INTERVAL_MS = "intervalMs"
     const val EXTRA_DISTANCE_METERS = "distanceMeters"
+    const val EXTRA_ACCURACY = "accuracy"
     const val EXTRA_NOTIFICATION_TITLE = "notificationTitle"
     const val EXTRA_NOTIFICATION_BODY = "notificationBody"
 
@@ -165,9 +166,16 @@ class SalesStreamLocationService : Service() {
 
     val intervalMs = intent.getLongExtra(EXTRA_INTERVAL_MS, 5000L)
     val distanceMeters = intent.getFloatExtra(EXTRA_DISTANCE_METERS, 5f)
+    // Admin controlled: HIGH (GPS), BALANCED (Wi-Fi / cell, ~100 m), LOW (~10 km)
+    val priority =
+      when (intent.getStringExtra(EXTRA_ACCURACY)) {
+        "BALANCED" -> Priority.PRIORITY_BALANCED_POWER_ACCURACY
+        "LOW" -> Priority.PRIORITY_LOW_POWER
+        else -> Priority.PRIORITY_HIGH_ACCURACY
+      }
 
     val request =
-      LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMs)
+      LocationRequest.Builder(priority, intervalMs)
         .setMinUpdateIntervalMillis(1000L)
         .setMinUpdateDistanceMeters(distanceMeters)
         .setWaitForAccurateLocation(false)

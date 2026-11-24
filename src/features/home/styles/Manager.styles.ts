@@ -184,7 +184,7 @@ export const createManagerStyles = (colors: AppColors) =>
       marginTop: 2,
     },
     sectionBadge: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       color: colors.primary,
       backgroundColor: colors.infoLight,
@@ -265,7 +265,7 @@ export const createManagerStyles = (colors: AppColors) =>
       minWidth: 0,
     },
     productivityCountLabel: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '700',
       color: colors.textTertiary,
     },
@@ -297,7 +297,7 @@ export const createManagerStyles = (colors: AppColors) =>
       color: colors.textPrimary,
     },
     cardMeta: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.textTertiary,
       marginTop: 2,
@@ -392,7 +392,7 @@ export const createManagerStyles = (colors: AppColors) =>
       color: colors.textPrimary,
     },
     callLabel: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.textSecondary,
       textAlign: 'center',
@@ -416,7 +416,7 @@ export const createManagerStyles = (colors: AppColors) =>
       color: colors.textPrimary,
     },
     metricLabel: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.textTertiary,
     },
@@ -427,7 +427,7 @@ export const createManagerStyles = (colors: AppColors) =>
       alignItems: 'center',
     },
     orderValueLabel: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '700',
       color: colors.primaryContrast,
       opacity: 0.85,
@@ -451,7 +451,7 @@ export const createManagerStyles = (colors: AppColors) =>
     },
     targetHintText: {
       flex: 1,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '700',
       color: colors.primaryContrast,
     },
@@ -459,7 +459,7 @@ export const createManagerStyles = (colors: AppColors) =>
       color: colors.textTertiary,
     },
     mtdBadge: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       color: colors.primary,
       backgroundColor: colors.infoLight,
@@ -488,7 +488,7 @@ export const createManagerStyles = (colors: AppColors) =>
       backgroundColor: colors.primary,
     },
     metricToggleText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.textSecondary,
     },
@@ -535,12 +535,12 @@ export const createManagerStyles = (colors: AppColors) =>
       color: colors.textPrimary,
     },
     legendValue: {
-      fontSize: 9,
+      fontSize: 10,
       fontWeight: '600',
       color: colors.textTertiary,
     },
     legendPercent: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       color: colors.textSecondary,
     },
@@ -599,7 +599,7 @@ export const createManagerStyles = (colors: AppColors) =>
     progressText: {
       alignSelf: 'flex-end',
       paddingRight: 8,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '900',
       color: colors.textPrimary,
     },

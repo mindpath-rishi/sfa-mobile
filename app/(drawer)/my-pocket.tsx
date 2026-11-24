@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, Animated, Share } from 'react-native';
+import { View, ScrollView, TouchableOpacity, StatusBar, Animated, Share } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -17,6 +18,7 @@ import { formatLocalApiDate } from '@/shared/utils/date.utils';
 import { AppModal, Skeleton } from '@/core/components';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { toast } from '@/shared/utils/toast';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
 // ── Typography scale ──────────────────────────────────────────────────────────
 const T = {
@@ -531,40 +533,42 @@ export default function PocketMISScreen() {
     void fetchDispatchStatus();
   }, [fetchDispatchStatus]);
 
-  const handleShareReport = useCallback(
-    async (type: ShareReportType) => {
-      setSharingType(type);
-      try {
-        const params = getRangeParams();
-        const response = await homeService.shareSalesmanReport(type, params);
+  const [handleShareReport] = useSingleFlight(
+    useCallback(
+      async (type: ShareReportType) => {
+        setSharingType(type);
+        try {
+          const params = getRangeParams();
+          const response = await homeService.shareSalesmanReport(type, params);
 
-        if (!response.success) {
-          toast.error(response.message || `Failed to share ${type}`);
-          return;
+          if (!response.success) {
+            toast.error(response.message || `Failed to share ${type}`);
+            return;
+          }
+
+          const data = response.data || {};
+          const reportUrl = data.url || data.reportUrl || data.fileUrl;
+          const message =
+            data.shareText ||
+            data.text ||
+            data.message ||
+            `${type} report for ${formatRangeLabel(selectedRange)}`;
+
+          await Share.share({
+            title: `${type} Report`,
+            message: reportUrl ? `${message}\n${reportUrl}` : message,
+            url: reportUrl,
+          });
+          toast.success(`${type} report ready to share`);
+        } catch (error) {
+          console.warn(`Failed to share ${type}:`, error);
+          toast.error(`Failed to share ${type}`);
+        } finally {
+          setSharingType(null);
         }
-
-        const data = response.data || {};
-        const reportUrl = data.url || data.reportUrl || data.fileUrl;
-        const message =
-          data.shareText ||
-          data.text ||
-          data.message ||
-          `${type} report for ${formatRangeLabel(selectedRange)}`;
-
-        await Share.share({
-          title: `${type} Report`,
-          message: reportUrl ? `${message}\n${reportUrl}` : message,
-          url: reportUrl,
-        });
-        toast.success(`${type} report ready to share`);
-      } catch (error) {
-        console.warn(`Failed to share ${type}:`, error);
-        toast.error(`Failed to share ${type}`);
-      } finally {
-        setSharingType(null);
-      }
-    },
-    [getRangeParams, selectedRange],
+      },
+      [getRangeParams, selectedRange],
+    ),
   );
 
   const getDayStatusDisplay = (item: DayWiseSummaryItem) => {
@@ -818,7 +822,12 @@ export default function PocketMISScreen() {
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            accessibilityLabel="Back"
+            accessibilityRole="button"
+            onPress={onClose}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Ionicons name="arrow-back" size={22} color={colors.primaryContrast} />
           </TouchableOpacity>
           <Text
@@ -895,7 +904,7 @@ export default function PocketMISScreen() {
           title="Product Sales"
           onClose={() => setShowProductWiseModal(false)}
           rightAction={
-            <TouchableOpacity>
+            <TouchableOpacity hitSlop={13} accessibilityLabel="Download" accessibilityRole="button">
               <Feather name="download" size={18} color={colors.primaryContrast} />
             </TouchableOpacity>
           }
@@ -1355,6 +1364,8 @@ export default function PocketMISScreen() {
           onClose={() => setShowDispatchModal(false)}
           rightAction={
             <TouchableOpacity
+              accessibilityLabel="Refresh"
+              accessibilityRole="button"
               onPress={fetchDispatchStatus}
               disabled={dispatchLoading}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { View, TouchableOpacity, ActivityIndicator, Text } from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -21,11 +22,13 @@ import { formatCurrency, formatDateSafe } from '@/shared/utils/currenty.utils';
 import { useHeader } from '@/shared/contexts/HeaderContext';
 import { FilterSection } from '@/shared/types/filter.types';
 import { homeService } from '@/features/home/services/home.service';
+import { prefetchDayEndLocation } from '@/shared/services/location.service';
 import { vanService } from '@/shared/services/van.service';
 import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSummaryModal';
 import { ConfirmationModal } from '@/core/components';
 import { useLoaderActions } from '@/core/loader/loader.store';
 import { TOPUP_STATUS } from '@/features/topup/constants/topup.constants';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
 
 const LIMIT = 15;
 
@@ -120,6 +123,7 @@ export default function StockCountScreen({
   });
 
   const handleEndDayFromSettlement = useCallback(async () => {
+    prefetchDayEndLocation();
     setSettlementTopupAlerts([]);
     try {
       loader.show({ message: 'Loading van settlement summary...' });
@@ -167,36 +171,38 @@ export default function StockCountScreen({
     }
   }, [loader, user?.vanId, vanId, workSessionId]);
 
-  const submitDayEnd = useCallback(async () => {
-    try {
-      setShowFinalConfirm(false);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      loader.show({ message: 'Completing van settlement...' });
-
-      const response: any = await homeService.dayComplete(carryForwardStock as any, {
-        showLoader: false,
-      });
-      if (response?.success || response?.statusCode === 200) {
-        loader.show({ message: 'Finalizing settlement...' });
-        toast.success(
-          (carryForwardStock
-            ? 'Your day successfully completed'
-            : 'Day completed. Stock unload request submitted for approval.') as any,
-        );
+  const [submitDayEnd] = useSingleFlight(
+    useCallback(async () => {
+      try {
         setShowFinalConfirm(false);
-        setShowSettlementOptions(false);
-        setShowDayEndSummary(false);
-        router.replace('/(drawer)/(tabs)/home');
-        return;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        loader.show({ message: 'Completing van settlement...' });
+
+        const response: any = await homeService.dayComplete(carryForwardStock as any, {
+          showLoader: false,
+        });
+        if (response?.success || response?.statusCode === 200) {
+          loader.show({ message: 'Finalizing settlement...' });
+          toast.success(
+            (carryForwardStock
+              ? 'Your day successfully completed'
+              : 'Day completed. Stock unload request submitted for approval.') as any,
+          );
+          setShowFinalConfirm(false);
+          setShowSettlementOptions(false);
+          setShowDayEndSummary(false);
+          router.replace('/(drawer)/(tabs)/home');
+          return;
+        }
+        toast.error((response?.message || 'Failed to complete day') as any);
+      } catch (error) {
+        console.error('Error completing day:', error);
+        toast.error('Failed to complete day. Please try again.' as any);
+      } finally {
+        loader.hide();
       }
-      toast.error((response?.message || 'Failed to complete day') as any);
-    } catch (error) {
-      console.error('Error completing day:', error);
-      toast.error('Failed to complete day. Please try again.' as any);
-    } finally {
-      loader.hide();
-    }
-  }, [carryForwardStock, loader]);
+    }, [carryForwardStock, loader]),
+  );
 
   const handleCreateStockCount = useCallback(() => {
     router.push('/stock-count/create');
@@ -518,6 +524,9 @@ export default function StockCountScreen({
                 Search: {searchQuery}
               </Text>
               <TouchableOpacity
+                hitSlop={14}
+                accessibilityLabel="Clear"
+                accessibilityRole="button"
                 onPress={() => {
                   setSearchQuery('');
                   updateStockCountFilterCount(activeFilterCount - 1);
@@ -538,6 +547,9 @@ export default function StockCountScreen({
                 Status: {status}
               </Text>
               <TouchableOpacity
+                hitSlop={14}
+                accessibilityLabel="Clear"
+                accessibilityRole="button"
                 onPress={() => {
                   setFilters((prev) => ({
                     ...prev,
@@ -558,6 +570,9 @@ export default function StockCountScreen({
                 Date: {filters.dateRange.start || 'any'} - {filters.dateRange.end || 'any'}
               </Text>
               <TouchableOpacity
+                hitSlop={14}
+                accessibilityLabel="Clear"
+                accessibilityRole="button"
                 onPress={() => {
                   setFilters((prev) => ({
                     ...prev,
@@ -578,6 +593,9 @@ export default function StockCountScreen({
                 Variance: {filters.minValue || '0'} - {filters.maxValue || '∞'} ZMW
               </Text>
               <TouchableOpacity
+                hitSlop={14}
+                accessibilityLabel="Clear"
+                accessibilityRole="button"
                 onPress={() => {
                   setFilters((prev) => ({
                     ...prev,
@@ -706,7 +724,7 @@ export default function StockCountScreen({
                 {item.status === 'APPROVED' && (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Ionicons name="shield-checkmark" size={12} color={colors.success} />
-                    <AppText style={{ fontSize: 10, color: colors.textTertiary }}>
+                    <AppText style={{ fontSize: 11, color: colors.textTertiary }}>
                       Approved by {item.approvedById || 'Manager'}
                     </AppText>
                   </View>
@@ -736,7 +754,7 @@ export default function StockCountScreen({
         loadingComponent={
           <View style={styles.listContent}>
             {[...Array(6)].map((_, i) => (
-              <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.skeleton }]}>
+              <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.surface }]}>
                 <ActivityIndicator color={colors.primary} size="small" />
               </View>
             ))}
@@ -759,6 +777,9 @@ export default function StockCountScreen({
 
       {!hideFAB && (
         <TouchableOpacity
+          hitSlop={10}
+          accessibilityLabel="Add"
+          accessibilityRole="button"
           style={[styles.fab, { backgroundColor: colors.primary }]}
           onPress={handleCreateStockCount}
           activeOpacity={0.8}

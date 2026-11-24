@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Drawer } from 'expo-router/drawer';
 import { useTheme } from '@/shared/hooks/useTheme';
-import { View, Text, Platform, StatusBar, TouchableOpacity } from 'react-native';
+import { View, Platform, StatusBar, TouchableOpacity } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { DrawerContentScrollView, DrawerItemList, DrawerItem } from '@react-navigation/drawer';
 import { router, useSegments } from 'expo-router';
@@ -12,6 +13,7 @@ import { Header } from '@/core/components/Header';
 import { AppModal, AppText, ConfirmationModal } from '@/core/components';
 import { vanService } from '@/shared/services/van.service';
 import { homeService } from '@/features/home/services/home.service';
+import { prefetchDayEndLocation } from '@/shared/services/location.service';
 import { useRouteStore } from '@/core/store/route.store';
 import { DayEndSummaryModal } from '@/features/home/components/models/DayEndSummaryModal';
 import { toast } from '@/core/utils';
@@ -192,6 +194,7 @@ const CustomDrawerContent = (props: any) => {
   }, [user]);
 
   const fetchDayEndSummary = useCallback(async () => {
+    prefetchDayEndLocation();
     try {
       loader.show({ message: 'Loading van settlement summary...' });
 

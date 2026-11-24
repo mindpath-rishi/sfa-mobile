@@ -69,7 +69,7 @@ export const useCommonListingStyles = () => {
       backgroundColor: colors.primary + '10',
       borderRadius: 14,
       paddingHorizontal: utils.spacing[2.5],
-      paddingVertical: utils.spacing[1.25],
+      paddingVertical: utils.getSpacing(1.25),
       gap: utils.spacing[1.5],
     } as ViewStyle,
 
@@ -85,7 +85,7 @@ export const useCommonListingStyles = () => {
       backgroundColor: colors.surface,
       borderRadius: 14,
       paddingHorizontal: utils.spacing[2.5],
-      paddingVertical: utils.spacing[1.25],
+      paddingVertical: utils.getSpacing(1.25),
       gap: utils.spacing[1.5],
       borderWidth: 0.5,
       borderColor: colors.border,

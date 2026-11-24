@@ -10,6 +10,7 @@ import { BottomBar } from '../components/nonsale/BottomBar';
 import { SelectedCategoryBadge } from '../components/nonsale/SelectedItemBadge';
 import { ReasonCard } from '../components/nonsale/ReasonCard';
 import { EmptyState } from '@/core/components/EmptyState';
+import { appAlert } from '@/core/alert/appAlert';
 
 interface ReasonScreenParams {
   customerId?: string;
@@ -104,7 +105,7 @@ export default function NonSaleReasonScreen() {
 
   const handleNext = () => {
     if (!selectedReason) {
-      Alert.alert('Selection Required', 'Please select a reason to continue');
+      appAlert('Selection Required', 'Please select a reason to continue');
       return;
     }
 

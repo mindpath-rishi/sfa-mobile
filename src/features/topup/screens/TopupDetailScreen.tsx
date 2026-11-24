@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Alert, View, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, StatusBar, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +19,8 @@ import { createTopupDetailStyles } from '../styles/topupDetail.styles';
 import { ActiveTab, TopupDetail } from '../types/topupDetail.types';
 import { TopupDetailOverview } from '../components/TopupDetailOverview';
 import { TopupActionConfirmSheet } from '../components/TopupActionConfirmSheet';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { appAlert } from '@/core/alert/appAlert';
 
 export const VanInventoryTopupDetail: React.FC = () => {
   const { colors } = useTheme();
@@ -48,11 +50,11 @@ export const VanInventoryTopupDetail: React.FC = () => {
       if (isSuccessResponse(response) && response?.data) {
         setDetail(response.data);
       } else {
-        Alert.alert('Error', response?.message || 'Failed to load details');
+        appAlert('Error', response?.message || 'Failed to load details');
       }
     } catch (error) {
       console.error('Error fetching topup detail:', error);
-      Alert.alert('Error', 'Failed to load top-up details');
+      appAlert('Error', 'Failed to load top-up details');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -85,33 +87,35 @@ export const VanInventoryTopupDetail: React.FC = () => {
     setActiveTab(tab);
   }, []);
 
-  const performTopupAction = useCallback(async () => {
-    if (!detail?.vanInventoryTopupId || !confirmAction || actionLoading) return;
+  const [performTopupAction] = useSingleFlight(
+    useCallback(async () => {
+      if (!detail?.vanInventoryTopupId || !confirmAction || actionLoading) return;
 
-    const action = confirmAction;
-    setActionLoading(action);
-    try {
-      const response =
-        action === 'accept'
-          ? await vanService.acceptInventoryTopupRequest(detail.vanInventoryTopupId)
-          : await vanService.rejectInventoryTopupRequest(detail.vanInventoryTopupId, {
-              reason: 'Rejected by salesman',
-            });
+      const action = confirmAction;
+      setActionLoading(action);
+      try {
+        const response =
+          action === 'accept'
+            ? await vanService.acceptInventoryTopupRequest(detail.vanInventoryTopupId)
+            : await vanService.rejectInventoryTopupRequest(detail.vanInventoryTopupId, {
+                reason: 'Rejected by salesman',
+              });
 
-      if (!isSuccessResponse(response)) {
-        Alert.alert('Error', response?.message || `Failed to ${action} top-up`);
-        return;
+        if (!isSuccessResponse(response)) {
+          appAlert('Error', response?.message || `Failed to ${action} top-up`);
+          return;
+        }
+
+        toast.success(action === 'accept' ? 'Top-up accepted' : 'Top-up rejected');
+        setConfirmAction(null);
+        await fetchDetail(true);
+      } catch (error: any) {
+        appAlert('Error', error?.response?.data?.message || `Failed to ${action} top-up`);
+      } finally {
+        setActionLoading(null);
       }
-
-      toast.success(action === 'accept' ? 'Top-up accepted' : 'Top-up rejected');
-      setConfirmAction(null);
-      await fetchDetail(true);
-    } catch (error: any) {
-      Alert.alert('Error', error?.response?.data?.message || `Failed to ${action} top-up`);
-    } finally {
-      setActionLoading(null);
-    }
-  }, [actionLoading, confirmAction, detail?.vanInventoryTopupId]);
+    }, [actionLoading, confirmAction, detail?.vanInventoryTopupId]),
+  );
 
   const handleAcceptTopup = useCallback(() => {
     if (!detail?.vanInventoryTopupId || actionLoading) return;

@@ -1,21 +1,27 @@
-
 import { api } from '@/core/network';
 import { uploadFormData } from '@/core/network/upload';
 import type { ApiRequestConfig, ApiResponse } from '@/core/network/api.types';
 import { CreateActivityPayload, DayStartPayload } from '../types/home.types';
 import { Platform } from 'react-native';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+
 import {
-  captureCurrentLocation,
+  captureDayEndLocation,
   stopSalesmanBackgroundLocation,
   type CapturedLocation,
 } from '@/shared/services/location.service';
 import { isSalesman } from '@/core/navigation/role.utils';
+import { loadCachedCategories, loadCachedProducts } from '@/shared/services/product.service';
 import { useAuthStore } from '@/core/store/auth.store';
 import { isOfflineMode, useOfflineStore } from '@/core/offline/offline.store';
 import { repositories } from '@/repositories';
 import { syncService } from '@/sync/sync.service';
 import { createSchemaId } from '@/utils/uuid';
 import { useLoaderStore } from '@/core/loader/loader.store';
+
+/** Day start selfie upload size: proof photo, not a portrait. */
+const DAY_START_SELFIE_WIDTH = 720;
+const DAY_START_SELFIE_QUALITY = 0.5;
 
 /**
  * Auth API contract used by the app.
@@ -129,11 +135,41 @@ export interface UserPrimaryCategoryTargetSummary {
   achievementPercentage: number;
 }
 
+export interface ManagerUserStockResponse {
+  employeeId: string;
+  name?: string;
+  vanId: string | null;
+  source?: 'DAILY_STOCK' | 'INVENTORY';
+  products: Array<{
+    productId: string;
+    name: string;
+    unitQtyInCase: number;
+    quantity: number;
+    cases: number;
+    pieces: number;
+    casePrice: number;
+    piecePrice: number;
+    value: number;
+    openingQty?: number;
+    inQty?: number;
+    outQty?: number;
+  }>;
+  totals: { products: number; cases: number; pieces: number; value: number } | null;
+}
+
 export interface UserUboTargetBreakdown {
   categoryId: string;
   category: string;
   target: number;
   achievement: number;
+  // Per-employee breakdown rows use these instead of category fields.
+  employeeId?: string;
+  employeeName?: string;
+  id?: string;
+  name?: string;
+  remaining?: number;
+  crr?: number;
+  rrr?: number;
 }
 
 export interface UserFocusedPackTargetBreakdown {
@@ -220,6 +256,15 @@ export interface ManagerTeamCoverageResponse {
     name?: string;
     mobile?: string;
     positionId?: string;
+    /** Latest heartbeat from the user's device */
+    device?: {
+      batteryLevel: number | null;
+      isCharging: boolean;
+      lastActiveAt: string | null;
+      networkStatus: 'ONLINE' | 'OFFLINE';
+      lastOfflineAt: string | null;
+      offlineMinutesToday: number;
+    } | null;
   }>;
   vanList?: Array<{
     vanId?: string;
@@ -516,7 +561,7 @@ export interface HomeService {
     },
     config?: ApiRequestConfig,
   ) => Promise<ApiResponse<{ mediaId: string; url: string }>>;
-  getDayStatus(workSessionId: string, config?: ApiRequestConfig): Promise<ApiResponse<any>>;
+  getDayStatus(workSessionId: string | null, config?: ApiRequestConfig): Promise<ApiResponse<any>>;
   getTodayActivities(workSessionId: string): Promise<ApiResponse<any>>;
   createActivity(payload: CreateActivityPayload): Promise<ApiResponse<any>>;
   getRoutes: (vanId: string) => Promise<ApiResponse<any>>;
@@ -625,6 +670,7 @@ export interface HomeService {
     endDate?: string;
   }) => Promise<ApiResponse<ManagerOrderSummaryResponse>>;
   getManagerTeamCoverage: () => Promise<ApiResponse<ManagerTeamCoverageResponse>>;
+  getManagerUserStock: (employeeId: string) => Promise<ApiResponse<ManagerUserStockResponse>>;
   getManagerBeatOMeter: () => Promise<ApiResponse<ManagerBeatOMeterResponse>>;
   getManagerFieldUsers: (params?: {
     date?: string;
@@ -1010,7 +1056,7 @@ export const homeService: HomeService = {
         /**
          * Product lookup same as backend $lookup product_master.
          */
-        const productRecords = await safeFindAll('products', 20000);
+        const productRecords = await loadCachedProducts(ownerId).catch(() => []);
 
         const productMap = new Map<string, any>(
           productRecords
@@ -1018,7 +1064,7 @@ export const homeService: HomeService = {
               String(item.productId || item.uuid || item.id || ''),
               item,
             ])
-            .filter(([id]) => Boolean(id)),
+            .filter(([id]: [string, any]) => Boolean(id)),
         );
 
         let openingStocks: Array<{
@@ -1053,7 +1099,7 @@ export const homeService: HomeService = {
                 pieceNetWeight: toNumber(product.pieceNetWeight || item.pieceNetWeight, 0),
               };
             })
-            .filter((item) => Boolean(item.productId) && toNumber(item.quantity) > 0);
+            .filter((item: any) => Boolean(item.productId) && toNumber(item.quantity) > 0);
         } else {
           /**
            * No ERP closing.
@@ -1084,7 +1130,7 @@ export const homeService: HomeService = {
               piecePrice: toNumber(item.piecePrice, 0),
               pieceNetWeight: toNumber(item.pieceNetWeight, 0),
             }))
-            .filter((item) => Boolean(item.productId) && toNumber(item.quantity) > 0);
+            .filter((item: any) => Boolean(item.productId) && toNumber(item.quantity) > 0);
         }
 
         for (const stock of openingStocks) {
@@ -1186,12 +1232,29 @@ export const homeService: HomeService = {
     } as ApiResponse<any>;
   },
 
-  uploadDayStartImage: async ({ uri, ownerId, subOwnerId }, config) => {
-    const formData = new FormData();
+  uploadDayStartImage: async ({ uri: originalUri, ownerId, subOwnerId }, config) => {
+    // Full-resolution camera files (several MB) are slow or time out on weak
+    // networks. A 720px JPEG at 50% (~50-120 KB) is still clear enough to
+    // identify the salesman, and uploads in a fraction of the time.
+    let uri = originalUri;
+    if (Platform.OS !== 'web') {
+      try {
+        const compressed = await manipulateAsync(
+          originalUri,
+          [{ resize: { width: DAY_START_SELFIE_WIDTH } }],
+          { compress: DAY_START_SELFIE_QUALITY, format: SaveFormat.JPEG },
+        );
+        uri = compressed.uri;
+      } catch (error) {
+        console.warn('[DayStart] Selfie compression failed, uploading original:', error);
+      }
+    }
+
     const cleanUri = uri.split('?')[0];
     const extension = cleanUri.includes('.') ? cleanUri.split('.').pop() || 'jpg' : 'jpg';
     const mimeType = extension.toLowerCase() === 'png' ? 'image/png' : 'image/jpeg';
     const fileName = `day-start-${Date.now()}.${extension}`;
+    const formData = new FormData();
 
     if (Platform.OS === 'web') {
       const blob = await fetch(uri).then((response) => response.blob());
@@ -1218,7 +1281,16 @@ export const homeService: HomeService = {
     formData.append('isPrimary', 'false');
     formData.append('subOwnerId', subOwnerId || '');
 
-    return uploadFormData<{ mediaId: string; url: string }>('/media/upload', formData, config);
+    const upload = () =>
+      uploadFormData<{ mediaId: string; url: string }>('/media/upload', formData, config);
+    const response = await upload();
+    // Retry once on a dropped connection / server hiccup (not on 4xx validation errors;
+    // a duplicate comes back as 400 with the existing media in `data`).
+    if (!response.success && (response.statusCode === 0 || response.statusCode >= 500)) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return upload();
+    }
+    return response;
   },
   getDayStatus: async (_workSessionId, config) => {
     const user = useAuthStore.getState().user;
@@ -1294,7 +1366,9 @@ export const homeService: HomeService = {
           vanId: activeRouteSession?.vanId ?? record?.vanId ?? user?.vanId,
         }
       : null;
-    const currentActivity = activities.find((item) => item.status === 'ongoing' && !item.endTime);
+    const currentActivity = activities.find(
+      (item: any) => item.status === 'ongoing' && !item.endTime,
+    );
     const activeActivity = currentActivity
       ? {
           ...currentActivity,
@@ -1555,7 +1629,7 @@ export const homeService: HomeService = {
         const [erpClosingRecords, stockRecords, productRecords] = await Promise.all([
           loadAll(repositories.vanErpClosing, 10000),
           loadAll(repositories.stock, 10000),
-          loadAll(repositories.products, 10000),
+          loadCachedProducts(ownerId),
         ]);
 
         const productById = new Map(
@@ -1908,6 +1982,14 @@ export const homeService: HomeService = {
       showLoader: false,
     }),
   dayComplete: async (carryForwardStock, config) => {
+    const hasCallerLocation =
+      carryForwardStock &&
+      typeof carryForwardStock === 'object' &&
+      'dayEndLocation' in carryForwardStock;
+
+    // Acquire GPS while pending entries upload rather than after.
+    const dayEndLocationPromise = hasCallerLocation ? null : captureDayEndLocation();
+
     const pendingEntries = await syncService.getPendingCount();
     if (pendingEntries > 0) {
       useLoaderStore.getState().show({
@@ -1919,15 +2001,17 @@ export const homeService: HomeService = {
         .show({ message: 'Pending entries uploaded. Completing settlement...' });
     }
 
-    const payload =
-      carryForwardStock &&
-      typeof carryForwardStock === 'object' &&
-      'dayEndLocation' in carryForwardStock
-        ? carryForwardStock
-        : {
-            carryForwardStock,
-            dayEndLocation: await captureCurrentLocation(),
-          };
+    const payload = hasCallerLocation
+      ? carryForwardStock
+      : {
+          carryForwardStock,
+          dayEndLocation: await dayEndLocationPromise,
+        };
+
+    if (!payload.dayEndLocation) {
+      // Never block day end on GPS; the record is just saved without a location.
+      console.warn('[DayEnd] No location available; completing day without dayEndLocation');
+    }
 
     const user = useAuthStore.getState().user;
     if (isSalesman(user) && isOfflineMode()) {
@@ -2450,7 +2534,7 @@ export const homeService: HomeService = {
     const leaveDayMap = new Map<string, any>();
     const workSessionDayMap = new Map<string, any>();
 
-    for (const item of activities) {
+    for (const item of activities as any[]) {
       const start = new Date(item.startTime || item.createdAt);
       const dayKey = formatCalendarDate(start);
 
@@ -2479,7 +2563,7 @@ export const homeService: HomeService = {
       activityDayMap.set(dayKey, existing);
     }
 
-    for (const item of totalVisits) {
+    for (const item of totalVisits as any[]) {
       const checkInTime = new Date(item.checkInTime || item.createdAt);
       const dayKey = formatCalendarDate(checkInTime);
 
@@ -2497,7 +2581,7 @@ export const homeService: HomeService = {
       visitDayMap.set(dayKey, existing);
     }
 
-    for (const item of sales) {
+    for (const item of sales as any[]) {
       const saleDate = new Date(item.date || item.createdAt);
       const dayKey = formatCalendarDate(saleDate);
 
@@ -2540,7 +2624,7 @@ export const homeService: HomeService = {
       leaveDayMap.set(dayKey, existing);
     }
 
-    for (const item of workSessions) {
+    for (const item of workSessions as any[]) {
       const dayStartTime = new Date(item.dayStartTime || item.createdAt);
       const dayKey = formatCalendarDate(dayStartTime);
 
@@ -2862,7 +2946,7 @@ export const homeService: HomeService = {
     const leaveDayMap = new Map<string, any>();
     const workSessionDayMap = new Map<string, any>();
 
-    for (const item of activities) {
+    for (const item of activities as any[]) {
       const start = new Date(item.startTime || item.createdAt);
       const dayKey = formatCalendarDate(start);
 
@@ -2891,7 +2975,7 @@ export const homeService: HomeService = {
       activityDayMap.set(dayKey, existing);
     }
 
-    for (const item of visits) {
+    for (const item of visits as any[]) {
       const checkInTime = new Date(item.checkInTime || item.createdAt);
       const dayKey = formatCalendarDate(checkInTime);
 
@@ -2909,7 +2993,7 @@ export const homeService: HomeService = {
       visitDayMap.set(dayKey, existing);
     }
 
-    for (const item of sales) {
+    for (const item of sales as any[]) {
       const saleDate = new Date(item.date || item.createdAt);
       const dayKey = formatCalendarDate(saleDate);
 
@@ -2950,7 +3034,7 @@ export const homeService: HomeService = {
       leaveDayMap.set(dayKey, existing);
     }
 
-    for (const item of workSessions) {
+    for (const item of workSessions as any[]) {
       const dayStartTime = new Date(item.dayStartTime || item.createdAt);
       const dayKey = formatCalendarDate(dayStartTime);
 
@@ -3118,15 +3202,9 @@ export const homeService: HomeService = {
           ? repositories.orderItems.findAll(ownerId, { limit: 10000 })
           : Promise.resolve([]),
         repositories.visits.findAll(ownerId, { limit: 5000 }),
-        repositories.products?.findAll
-          ? repositories.products.findAll(ownerId, { limit: 5000 })
-          : Promise.resolve([]),
-        repositories.categories?.findAll
-          ? repositories.categories.findAll(ownerId, { limit: 5000 })
-          : Promise.resolve([]),
+        loadCachedProducts(ownerId).catch(() => []),
+        loadCachedCategories(ownerId).catch(() => []),
       ]);
-
-    console.log(categoryRecords);
 
     const sales = orderRecords.filter(
       (item: any) =>
@@ -3442,6 +3520,11 @@ export const homeService: HomeService = {
     api.get<ManagerOrderSummaryResponse>(`/employee/manager/order-summary`, { params }) as Promise<
       ApiResponse<ManagerOrderSummaryResponse>
     >,
+  getManagerUserStock: (employeeId: string) =>
+    api.get<ManagerUserStockResponse>(`/employee/manager/user-stock`, {
+      params: { employeeId },
+      cache: false,
+    }) as Promise<ApiResponse<ManagerUserStockResponse>>,
   getManagerTeamCoverage: () =>
     api.get<ManagerTeamCoverageResponse>(`/employee/manager/team-coverage`, {}) as Promise<
       ApiResponse<ManagerTeamCoverageResponse>

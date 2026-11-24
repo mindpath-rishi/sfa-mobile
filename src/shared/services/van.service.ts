@@ -7,8 +7,9 @@ import { isToday } from 'date-fns';
 
 export interface VanService {
   updateBreakdown: (payload: { vanIds: string[]; reason: string }) => Promise<ApiResponse<any>>;
+  resolveBreakdown: (payload: { vanIds: string[]; remark?: string }) => Promise<ApiResponse<any>>;
   fetchAllVans: (params?: Record<string, any>) => Promise<ApiResponse<any>>;
-  fetchVanStocks: (vanId: string | undefined, params: any) => Promise<ApiResponse<any>>;
+  fetchVanStocks: (vanId: string | undefined, params?: any) => Promise<ApiResponse<any>>;
   createInventoryTopupRequest: (payload: any) => Promise<ApiResponse<any>>;
   fetchInventoryTopupRequests: (payload: any) => Promise<ApiResponse<any>>;
   fetchTodayStockSummary: (payload: any, config?: ApiRequestConfig) => Promise<ApiResponse<any>>;
@@ -21,6 +22,10 @@ export interface VanService {
 export const vanService: VanService = {
   updateBreakdown: (payload) =>
     api.patch<any>('/van/breakdown', payload, {
+      cache: false,
+    }) as Promise<ApiResponse<any>>,
+  resolveBreakdown: (payload) =>
+    api.patch<any>('/van/breakdown/resolve', payload, {
       cache: false,
     }) as Promise<ApiResponse<any>>,
   fetchAllVans: (params = {}) =>

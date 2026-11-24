@@ -1,12 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  Animated,
-  SafeAreaView,
-} from 'react-native';
+import { View, TouchableOpacity, FlatList, Animated, SafeAreaView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { LoadSummaryModalProps } from '../../types/loadSummaryModal.types';
@@ -15,6 +8,7 @@ import { vanService } from '@/shared/services/van.service';
 import { useRouteStore } from '@/core/store/route.store';
 import { AppModal, AppText } from '@/core/components';
 import { useTheme } from '@/shared/hooks/useTheme';
+import { SkeletonList } from '@/core/components/Skeleton';
 
 export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
   visible,
@@ -255,14 +249,7 @@ export const LoadSummaryModal: React.FC<LoadSummaryModalProps> = ({
     </Animated.View>
   );
 
-  const renderLoadingState = () => (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <AppText style={[styles.loadingText, { color: colors.textSecondary }]}>
-        Loading inventory...
-      </AppText>
-    </View>
-  );
+  const renderLoadingState = () => <SkeletonList rows={5} />;
 
   const renderFooter = () => (
     <Animated.View

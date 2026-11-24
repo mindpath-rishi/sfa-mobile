@@ -1,5 +1,5 @@
 // activity.types.ts
-import { Route } from './route.types';
+import { Route } from '@/core/store/route.store';
 import { OtherWorkOption } from './salesExecutive.types';
 import { Van } from './van.types';
 

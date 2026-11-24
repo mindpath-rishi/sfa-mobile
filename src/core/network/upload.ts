@@ -20,6 +20,9 @@ const BASE_URL = extra?.api?.baseURL ?? 'https://order.tradekings.app:4001/api/v
 const AUTH_HEADER_KEY = extra?.api?.authHeaderKey ?? 'Authorization';
 const TOKEN_PREFIX = extra?.api?.tokenPrefix ?? 'Bearer';
 
+/** A stalled upload on a weak network otherwise hangs until the OS gives up. */
+const UPLOAD_TIMEOUT_MS = 120_000;
+
 const normalizeUrl = (url: string) => {
   if (/^https?:\/\//i.test(url)) return url;
   const trimmedBase = BASE_URL.replace(/\/+$/, '');
@@ -44,11 +47,19 @@ export const uploadFormData = async <TResponse>(
       headers[AUTH_HEADER_KEY] = `${TOKEN_PREFIX} ${token}`;
     }
 
-    const response = await fetch(normalizeUrl(url), {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(normalizeUrl(url), {
+        method: 'POST',
+        headers,
+        body: formData,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     const text = await response.text();
     let parsed: any = null;
@@ -72,7 +83,8 @@ export const uploadFormData = async <TResponse>(
         success: false,
         statusCode: response.status,
         message,
-        data: null,
+        // Keep the server's payload: e.g. a duplicate upload returns the existing media.
+        data: parsed && typeof parsed === 'object' ? (parsed.data ?? null) : null,
       } as ApiResponse<TResponse>;
     }
 
@@ -85,7 +97,8 @@ export const uploadFormData = async <TResponse>(
       data,
     } as ApiResponse<TResponse>;
   } catch (error: any) {
-    const message = error?.message || 'Upload failed';
+    const message =
+      error?.name === 'AbortError' ? 'Upload timed out' : error?.message || 'Upload failed';
     return {
       success: false,
       statusCode: 0,

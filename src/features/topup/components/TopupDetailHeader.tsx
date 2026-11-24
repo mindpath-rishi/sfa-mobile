@@ -39,6 +39,9 @@ export const TopupDetailHeader: React.FC<HeaderProps> = ({
       >
         <View style={styles.heroTopRow}>
           <TouchableOpacity
+            hitSlop={10}
+            accessibilityLabel="Back"
+            accessibilityRole="button"
             style={styles.backButton}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}

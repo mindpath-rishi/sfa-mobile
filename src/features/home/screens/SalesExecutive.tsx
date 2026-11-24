@@ -1,18 +1,13 @@
 // SalesExecutiveScreen.tsx - Fixed Full Width Van Card
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import {
-  Alert,
-  View,
-  ScrollView,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { View, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useCameraPermissionCompat as useCameraPermission } from '@/shared/hooks/useCameraPermissionCompat';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSingleFlight } from '@/shared/hooks/useSingleFlight';
+import { appAlert } from '@/core/alert/appAlert';
 
 // Components
 import { Footer } from '../components/sales-executive/Footer';
@@ -65,7 +60,10 @@ import type { LeaveType } from '@/features/leave/types/leave.types';
 import { useLoaderActions } from '@/core/loader/loader.store';
 import {
   captureCurrentLocation,
+  captureBestEffortLocation,
+  captureDayEndLocation,
   ensureBackgroundLocationDisclosure,
+  prefetchDayEndLocation,
   startSalesmanBackgroundLocation,
   stopSalesmanBackgroundLocation,
 } from '@/shared/services/location.service';
@@ -211,8 +209,8 @@ export default function SalesExecutiveScreen() {
     if (!van) return null;
     return {
       fullName: van.name,
-      displayName: van.name?.length > 20 ? van.name.substring(0, 20) + '...' : van.name,
-      number: van.vanNumber,
+      displayName: van.name && van.name.length > 20 ? van.name.substring(0, 20) + '...' : van.name,
+      number: van.vanId,
       registration: van.registrationNumber,
       type: van.type || 'Standard',
       capacity: van.capacity,
@@ -307,6 +305,9 @@ export default function SalesExecutiveScreen() {
     setSelectedLeaveType(null);
   };
 
+  // In-flight route list fetch started when Retailing is picked.
+  const routesRequestRef = useRef<Promise<void> | null>(null);
+
   const handleActivitySelect = async (activity: ActivityType) => {
     console.log('Selected Activity:', activity);
     if (activity.name === 'Other Work') {
@@ -321,7 +322,8 @@ export default function SalesExecutiveScreen() {
       setUnifiedModalType('leave-type');
       setUnifiedModalVisible(true);
     } else if (activity.name === 'Retailing') {
-      await getRoutes();
+      // Open the van question immediately; routes load while the user answers.
+      routesRequestRef.current = getRoutes();
       setSelectedActivity(activity.name);
       setPendingActivity(activity);
       setUnifiedModalVisible(false);
@@ -345,13 +347,15 @@ export default function SalesExecutiveScreen() {
     openCamera();
   };
 
-  const handleVanChangeSubmit = () => {
+  const handleVanChangeSubmit = async () => {
     if (!vanChangeReason) {
       toast.error('Please select an option');
       return;
     }
 
     if (vanChangeReason === 'Yes, Same Van') {
+      // Usually finished already; only waits if the user answered very quickly.
+      await routesRequestRef.current;
       setUnifiedModalVisible(false);
       setUnifiedModalType('route-selection');
       setUnifiedModalVisible(true);
@@ -384,7 +388,7 @@ export default function SalesExecutiveScreen() {
   const getRequestedVanName = (selectedVan?: any) =>
     selectedVan?.name || selectedVan?.vanName || selectedVan?.vanNumber || '';
 
-  const handleActivityVanChangeRequest = async () => {
+  const [handleActivityVanChangeRequest] = useSingleFlight(async () => {
     const activeWorkSessionId = workSessionId || useAuthStore.getState().workSessionId;
 
     if (!activeWorkSessionId) {
@@ -419,7 +423,7 @@ export default function SalesExecutiveScreen() {
       console.error('Error requesting van change:', error);
       toast.error(error?.response?.data?.message || 'Failed to submit van change request');
     }
-  };
+  });
 
   const handleVanSelectionSubmit = () => {
     if (!selectedVanForChange || !vanChangeNote.trim()) {
@@ -472,7 +476,8 @@ export default function SalesExecutiveScreen() {
       setUnifiedModalVisible(true);
       setIsChangingActivity(true);
     } else if (activity.name === 'Retailing') {
-      await getRoutes();
+      // Open the van question immediately; routes load while the user answers.
+      routesRequestRef.current = getRoutes();
       setSelectedActivity(activity.name);
       setPendingActivity(activity);
       setUnifiedModalVisible(false);
@@ -514,7 +519,11 @@ export default function SalesExecutiveScreen() {
     });
   };
 
+  // Leave is submitted in a fire-and-forget block, so guard it with its own lock.
+  const leaveSubmittingRef = useRef(false);
   const handleLeaveTypeSelect = (leaveType: ActivityType) => {
+    if (leaveSubmittingRef.current) return;
+    leaveSubmittingRef.current = true;
     const leaveTypeName = leaveType.name;
     setSelectedLeaveType(leaveTypeName);
     setSelectedRoute(null);
@@ -550,7 +559,7 @@ export default function SalesExecutiveScreen() {
         if (response?.success || [200, 201, 202].includes(Number(response?.statusCode))) {
           setIsTodayLeave(true);
           await getDayStatus();
-          Alert.alert(
+          appAlert(
             'Leave Marked',
             `${leaveTypeName} has been marked successfully. Quick actions are disabled for today.`,
           );
@@ -560,6 +569,8 @@ export default function SalesExecutiveScreen() {
       } catch (error) {
         console.error('Error marking leave:', error);
         toast.error('Failed to mark leave. Please try again.');
+      } finally {
+        leaveSubmittingRef.current = false;
       }
     })();
   };
@@ -617,262 +628,272 @@ export default function SalesExecutiveScreen() {
     handleStartDay();
   };
 
-  const handleStartDay = async (options?: {
-    skipRouteValidation?: boolean;
-    forceVanChangePending?: boolean;
-    photoUri?: string;
-  }) => {
-    if (pendingStockUnloadRequest) {
-      setCameraVisible(false);
-      toast.error(
-        'Your previous day stock unload request is still pending manager approval. You cannot start a new day until it is resolved.',
-      );
-      setStockUnloadDetailVisible(true);
-      return;
-    }
-
-    console.log('Selected Activity:', selectedActivity);
-    console.log('Selected Route:', selectedRoute);
-    console.log('Van:', van);
-
-    const isVanChangePending =
-      Boolean(options?.forceVanChangePending) || Boolean(vanChangeRequestPending);
-
-    if (
-      selectedActivity === 'Retailing' &&
-      !selectedRoute &&
-      !isVanChangePending &&
-      !options?.skipRouteValidation
-    ) {
-      toast.error('Please select route');
-      return;
-    }
-
-    const needsBackgroundLocation =
-      selectedActivity === 'Retailing' || selectedActivity === 'Other Work';
-
-    if (needsBackgroundLocation) {
-      // Show the in-app background-location disclosure before the very first
-      // native location-permission prompt of the day, not just before the
-      // background-tracking request later in this flow — otherwise Android's
-      // foreground-location dialog (triggered by captureCurrentLocation below)
-      // appears first and the disclosure looks like it came too late. If the
-      // user declines here, the native permission popup must never appear and
-      // day-start must not proceed at all.
-      const disclosureAccepted = await ensureBackgroundLocationDisclosure();
-      if (!disclosureAccepted) {
-        toast.error('Background location access is required to start your day.');
-        return;
-      }
-    }
-
-    try {
-      loader.show({ message: 'Getting your start location...' });
-
-      let dayStartImage: { mediaId?: string; url?: string } | null = null;
-      let dayStartLocation = await captureCurrentLocation();
-
-      const dayStartPhotoUri = options?.photoUri || userPhoto;
-      if (dayStartPhotoUri) {
-        loader.show({ message: 'Uploading day start photo...' });
-
-        const mediaResponse = await homeService.uploadDayStartImage(
-          {
-            uri: dayStartPhotoUri,
-            ownerId: user?.employeeId || user?.id || 'day-start',
-            subOwnerId: workSessionId as any,
-          },
-          {
-            showLoader: false,
-          },
+  const [handleStartDay] = useSingleFlight(
+    async (options?: {
+      skipRouteValidation?: boolean;
+      forceVanChangePending?: boolean;
+      photoUri?: string;
+    }) => {
+      if (pendingStockUnloadRequest) {
+        setCameraVisible(false);
+        toast.error(
+          'Your previous day stock unload request is still pending manager approval. You cannot start a new day until it is resolved.',
         );
-
-        if (mediaResponse?.statusCode === 201 && mediaResponse.data) {
-          dayStartImage = {
-            mediaId: mediaResponse.data.mediaId,
-            url: mediaResponse.data.url,
-          };
-        }
-      }
-
-      if (!dayStartLocation) {
-        loader.show({ message: 'Confirming your start location...' });
-        dayStartLocation = await captureCurrentLocation();
-      }
-      if (!dayStartLocation) {
-        toast.error('A high-accuracy GPS location is required to start the day.');
+        setStockUnloadDetailVisible(true);
         return;
       }
 
-      const payload: DayStartPayload = {
-        activityName: selectedActivity,
-        routeId: selectedRoute?.routeId,
-        description: selectedRoute
-          ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${mappedVan?.name || ASSIGNED_VAN.name}`
-          : isVanChangePending
-            ? `Van change request pending. Requested Van: ${selectedVanForChange?.name || mappedVan?.name || ''}`
-            : selectedActivity === 'Leave'
-              ? `Leave: ${selectedLeaveType || 'Other'}`
-              : `Started ${pendingActivity?.name}`,
-        totalShops: selectedRoute?.totalShops,
-        routeName: selectedRoute?.name,
-        customerCategoryId: getRouteCustomerCategoryId(selectedRoute),
-        vanId: van?.vanId,
-        dayStartImageMediaId: dayStartImage?.mediaId,
-        dayStartImageUrl: dayStartImage?.url,
-        dayStartLocation,
-        // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
-      };
+      console.log('Selected Activity:', selectedActivity);
+      console.log('Selected Route:', selectedRoute);
+      console.log('Van:', van);
 
-      console.log('Day Start Payload:', payload);
+      const isVanChangePending =
+        Boolean(options?.forceVanChangePending) || Boolean(vanChangeRequestPending);
 
-      loader.show({ message: 'Starting your day...' });
+      if (
+        selectedActivity === 'Retailing' &&
+        !selectedRoute &&
+        !isVanChangePending &&
+        !options?.skipRouteValidation
+      ) {
+        toast.error('Please select route');
+        return;
+      }
 
-      const response: ApiResponse<any> = await homeService.dayStart(payload, {
-        showLoader: false,
-      });
+      const needsBackgroundLocation =
+        selectedActivity === 'Retailing' || selectedActivity === 'Other Work';
 
-      if ([201, 202].includes(Number(response?.statusCode))) {
-        const startedWorkSessionId =
-          response?.data?.workSessionId || workSessionId || useAuthStore.getState().workSessionId;
+      if (needsBackgroundLocation) {
+        // Show the in-app background-location disclosure before the very first
+        // native location-permission prompt of the day, not just before the
+        // background-tracking request later in this flow — otherwise Android's
+        // foreground-location dialog (triggered by captureCurrentLocation below)
+        // appears first and the disclosure looks like it came too late. If the
+        // user declines here, the native permission popup must never appear and
+        // day-start must not proceed at all.
+        const disclosureAccepted = await ensureBackgroundLocationDisclosure();
+        if (!disclosureAccepted) {
+          toast.error('Background location access is required to start your day.');
+          return;
+        }
+      }
 
-        if (isVanChangePending) {
-          if (!startedWorkSessionId) {
-            setVanChangeRequestPending(false);
-            setVanChangePendingBanner(false);
-            setPendingVanChangeName('');
-            setVanChangeRequestId('');
-            setUnifiedModalVisible(false);
-            toast.error(
-              'Day started, but its work session could not be identified. Please refresh.',
-            );
-            return;
-          }
+      try {
+        const dayStartPhotoUri = options?.photoUri || userPhoto;
+        loader.show({
+          message: dayStartPhotoUri
+            ? 'Getting your location and uploading photo...'
+            : 'Getting your start location...',
+        });
 
-          const requestedVanName = getRequestedVanName(selectedVanForChange);
-          const vanChangeResponse = await homeService.requestVanChange(startedWorkSessionId, {
-            requestedVanId: selectedVanForChange?.vanId,
-            requestedVanName,
-            vanChangeReason: vanChangeNote.trim(),
-          });
+        // GPS and photo upload don't depend on each other, so run them together.
+        // Location falls back to an approximate fix rather than blocking day start.
+        const [dayStartLocation, mediaResponse] = await Promise.all([
+          captureBestEffortLocation(),
+          dayStartPhotoUri
+            ? homeService.uploadDayStartImage(
+                {
+                  uri: dayStartPhotoUri,
+                  ownerId: user?.employeeId || user?.id || 'day-start',
+                  subOwnerId: workSessionId as any,
+                },
+                {
+                  showLoader: false,
+                },
+              )
+            : Promise.resolve(null),
+        ]);
 
-          if (
-            vanChangeResponse?.success === false ||
-            ![200, 201].includes(Number(vanChangeResponse?.statusCode))
-          ) {
-            setVanChangeRequestPending(false);
-            setVanChangePendingBanner(false);
-            setPendingVanChangeName('');
-            setVanChangeRequestId('');
-            setUnifiedModalVisible(false);
-            toast.error(
-              `Day started, but van change request failed: ${vanChangeResponse?.message || 'Please try again.'}`,
-            );
-          } else {
-            setVanChangeRequestPending(true);
-            setVanChangePendingBanner(true);
-            setPendingVanChangeName(requestedVanName);
-            setVanChangeRequestId(vanChangeResponse?.data?.vanChangeRequestId || '');
-            setUnifiedModalVisible(false);
-            setSelectedVanForChange(null);
-            setVanChangeNote('');
-            toast.success('Day started. Van change request pending approval.');
-          }
+        // A retried day start re-uploads the same selfie; the server rejects it as a
+        // duplicate but returns the existing media, which is reused here.
+        const uploadedMedia = mediaResponse?.data;
+        const dayStartImage = uploadedMedia?.mediaId
+          ? { mediaId: uploadedMedia.mediaId, url: uploadedMedia.url }
+          : null;
+        if (dayStartPhotoUri && !dayStartImage) {
+          toast.error('Selfie upload failed. Please check your connection and try again.');
+          return;
         }
 
-        loader.show({ message: 'Preparing today activity...' });
-        await getDayStatus({ showLoader: false });
-
-        if (selectedActivity === 'Retailing' || selectedActivity === 'Other Work') {
-          loader.show({ message: 'Starting location tracking...' });
-          await startSalesmanBackgroundLocation(user);
+        if (!dayStartLocation) {
+          toast.error('Unable to get your location. Turn on location/GPS and try again.');
+          return;
         }
 
-        if (!isVanChangePending) {
-          toast.success('Your day successfully started.');
-          if (selectedActivity === 'Retailing' && selectedRoute) {
-            router.push('/route');
+        const payload: DayStartPayload = {
+          activityName: selectedActivity,
+          routeId: selectedRoute?.routeId,
+          description: selectedRoute
+            ? `Started Retailing - Route: ${selectedRoute.name}, Van: ${mappedVan?.name || ASSIGNED_VAN.name}`
+            : isVanChangePending
+              ? `Van change request pending. Requested Van: ${selectedVanForChange?.name || mappedVan?.name || ''}`
+              : selectedActivity === 'Leave'
+                ? `Leave: ${selectedLeaveType || 'Other'}`
+                : `Started ${pendingActivity?.name}`,
+          totalShops: selectedRoute?.totalShops,
+          routeName: selectedRoute?.name,
+          customerCategoryId: getRouteCustomerCategoryId(selectedRoute),
+          vanId: van?.vanId,
+          dayStartImageMediaId: dayStartImage?.mediaId,
+          dayStartImageUrl: dayStartImage?.url,
+          dayStartLocation,
+          // vanChangeNote: isVanChangePending ? vanChangeNote.trim() : undefined,
+        };
+
+        console.log('Day Start Payload:', payload);
+
+        loader.show({ message: 'Starting your day...' });
+
+        const response: ApiResponse<any> = await homeService.dayStart(payload, {
+          showLoader: false,
+        });
+
+        if ([201, 202].includes(Number(response?.statusCode))) {
+          const startedWorkSessionId =
+            response?.data?.workSessionId || workSessionId || useAuthStore.getState().workSessionId;
+
+          if (isVanChangePending) {
+            if (!startedWorkSessionId) {
+              setVanChangeRequestPending(false);
+              setVanChangePendingBanner(false);
+              setPendingVanChangeName('');
+              setVanChangeRequestId('');
+              setUnifiedModalVisible(false);
+              toast.error(
+                'Day started, but its work session could not be identified. Please refresh.',
+              );
+              return;
+            }
+
+            const requestedVanName = getRequestedVanName(selectedVanForChange);
+            const vanChangeResponse = await homeService.requestVanChange(startedWorkSessionId, {
+              requestedVanId: selectedVanForChange?.vanId,
+              requestedVanName,
+              vanChangeReason: vanChangeNote.trim(),
+            });
+
+            if (
+              vanChangeResponse?.success === false ||
+              ![200, 201].includes(Number(vanChangeResponse?.statusCode))
+            ) {
+              setVanChangeRequestPending(false);
+              setVanChangePendingBanner(false);
+              setPendingVanChangeName('');
+              setVanChangeRequestId('');
+              setUnifiedModalVisible(false);
+              toast.error(
+                `Day started, but van change request failed: ${vanChangeResponse?.message || 'Please try again.'}`,
+              );
+            } else {
+              setVanChangeRequestPending(true);
+              setVanChangePendingBanner(true);
+              setPendingVanChangeName(requestedVanName);
+              setVanChangeRequestId(vanChangeResponse?.data?.vanChangeRequestId || '');
+              setUnifiedModalVisible(false);
+              setSelectedVanForChange(null);
+              setVanChangeNote('');
+              toast.success('Day started. Van change request pending approval.');
+            }
           }
+
+          loader.show({ message: 'Preparing today activity...' });
+          await getDayStatus({ showLoader: false });
+
+          if (selectedActivity === 'Retailing' || selectedActivity === 'Other Work') {
+            loader.show({ message: 'Starting location tracking...' });
+            await startSalesmanBackgroundLocation(user);
+          }
+
+          if (!isVanChangePending) {
+            toast.success('Your day successfully started.');
+            if (selectedActivity === 'Retailing' && selectedRoute) {
+              router.push('/route');
+            }
+          }
+        } else {
+          setVanChangeRequestPending(false);
+          setVanChangePendingBanner(false);
+          setPendingVanChangeName('');
+          setVanChangeRequestId('');
+          toast.error(response?.message || 'Failed to start day. Please try again.');
         }
-      } else {
+      } catch (error: any) {
+        console.error('Error starting day:', error);
         setVanChangeRequestPending(false);
         setVanChangePendingBanner(false);
         setPendingVanChangeName('');
         setVanChangeRequestId('');
-        toast.error(response?.message || 'Failed to start day. Please try again.');
+        toast.error(error?.response?.data?.message || error?.message || 'Failed to start day.');
+      } finally {
+        loader.hide();
       }
-    } catch (error: any) {
-      console.error('Error starting day:', error);
-      setVanChangeRequestPending(false);
-      setVanChangePendingBanner(false);
-      setPendingVanChangeName('');
-      setVanChangeRequestId('');
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to start day.');
-    } finally {
-      loader.hide();
-    }
-  };
+    },
+  );
 
-  const completeActivityChange = async (options?: {
-    activityName?: string;
-    pendingActivityValue?: ActivityType | OtherWorkOption | null;
-    route?: Route | null;
-  }) => {
-    const activityName = options?.activityName || selectedActivity;
-    const activityValue =
-      options && 'pendingActivityValue' in options ? options.pendingActivityValue : pendingActivity;
-    const activityRoute = options && 'route' in options ? options.route : selectedRoute;
+  const [completeActivityChange] = useSingleFlight(
+    async (options?: {
+      activityName?: string;
+      pendingActivityValue?: ActivityType | OtherWorkOption | null;
+      route?: Route | null;
+    }) => {
+      const activityName = options?.activityName || selectedActivity;
+      const activityValue =
+        options && 'pendingActivityValue' in options
+          ? options.pendingActivityValue
+          : pendingActivity;
+      const activityRoute = options && 'route' in options ? options.route : selectedRoute;
 
-    if (!activityName) {
-      toast.error('Please select activity');
-      return;
-    }
+      if (!activityName) {
+        toast.error('Please select activity');
+        return;
+      }
 
-    if (activityName === 'Retailing' && !activityRoute) {
-      toast.error('Please select route');
-      return;
-    }
+      if (activityName === 'Retailing' && !activityRoute) {
+        toast.error('Please select route');
+        return;
+      }
 
-    loader.show({ message: 'Changing your activity...' });
+      loader.show({ message: 'Changing your activity...' });
 
-    try {
-      const payload: CreateActivityPayload = {
-        name: activityName,
-        routeId: activityRoute?.routeId,
-        description: activityRoute
-          ? `Started Retailing - Route: ${activityRoute.name}, Van: ${mappedVan?.name || van?.name || ASSIGNED_VAN.name}`
-          : activityName === 'Leave'
-            ? `Leave: ${selectedLeaveType || 'Other'}`
-            : `Started ${activityValue?.name || activityName}`,
-        totalShops: activityRoute?.totalShops,
-        routeName: activityRoute?.name,
-        customerCategoryId: getRouteCustomerCategoryId(activityRoute),
-        workSessionId,
-        vanId: activityRoute?.vanId || van?.vanId,
-        vanName: mappedVan?.name || van?.name,
-        startLocation: await captureCurrentLocation({ preferCached: true, timeoutMs: 5000 }),
-      };
+      try {
+        const payload: CreateActivityPayload = {
+          name: activityName,
+          routeId: activityRoute?.routeId,
+          description: activityRoute
+            ? `Started Retailing - Route: ${activityRoute.name}, Van: ${mappedVan?.name || van?.name || ASSIGNED_VAN.name}`
+            : activityName === 'Leave'
+              ? `Leave: ${selectedLeaveType || 'Other'}`
+              : `Started ${activityValue?.name || activityName}`,
+          totalShops: activityRoute?.totalShops,
+          routeName: activityRoute?.name,
+          customerCategoryId: getRouteCustomerCategoryId(activityRoute),
+          workSessionId: workSessionId ?? undefined,
+          vanId: activityRoute?.vanId || van?.vanId,
+          vanName: mappedVan?.name || van?.name,
+          startLocation: await captureCurrentLocation({ preferCached: true, timeoutMs: 5000 }),
+        };
 
-      const response: any = await homeService.createActivity(payload);
+        const response: any = await homeService.createActivity(payload);
 
-      if ([201, 202].includes(Number(response.statusCode))) {
-        setIsChangingActivity(false);
-        setVanChangeApprovedRoutePrompt(false);
-        setCurrentActivity(activityName);
-        setStartTime(new Date().toISOString());
-        toast.success(`Activity changed to ${activityName}`);
-        await getDayStatus();
-        if (activityName === 'Retailing' && activityRoute) {
-          router.push('/route');
+        if ([201, 202].includes(Number(response.statusCode))) {
+          setIsChangingActivity(false);
+          setVanChangeApprovedRoutePrompt(false);
+          setCurrentActivity(activityName);
+          setStartTime(new Date().toISOString());
+          toast.success(`Activity changed to ${activityName}`);
+          await getDayStatus();
+          if (activityName === 'Retailing' && activityRoute) {
+            router.push('/route');
+          }
         }
+      } catch (error) {
+        console.error('Error changing activity:', error);
+        toast.error('Failed to change activity. Please try again.');
+      } finally {
+        loader.hide();
       }
-    } catch (error) {
-      console.error('Error changing activity:', error);
-      toast.error('Failed to change activity. Please try again.');
-    } finally {
-      loader.hide();
-    }
-  };
+    },
+  );
 
   const handleCloseUnifiedModal = () => {
     setUnifiedModalVisible(false);
@@ -974,14 +995,11 @@ export default function SalesExecutiveScreen() {
     }
   };
 
-  const handleEndDay = async (carryForwardStock?: boolean) => {
+  const [handleEndDay] = useSingleFlight(async (carryForwardStock?: boolean) => {
     try {
       loader.show({ message: 'Getting your end location...' });
-      const dayEndLocation = await captureCurrentLocation();
-      if (!dayEndLocation) {
-        toast.error('A high-accuracy GPS location is required to end the day.');
-        return;
-      }
+      // Precise → approximate → last known; never blocks day end.
+      const dayEndLocation = await captureDayEndLocation();
       const response = await homeService.dayComplete({ carryForwardStock, dayEndLocation });
 
       if (response.success) {
@@ -1017,9 +1035,9 @@ export default function SalesExecutiveScreen() {
     } finally {
       loader.hide();
     }
-  };
+  });
 
-  const handleCancelVanChangeRequest = async () => {
+  const [handleCancelVanChangeRequest] = useSingleFlight(async () => {
     if (!vanChangeRequestId) {
       toast.error('Van change request not found. Please refresh and try again.');
       return;
@@ -1050,7 +1068,7 @@ export default function SalesExecutiveScreen() {
     } finally {
       setCancelVanChangeLoading(false);
     }
-  };
+  });
 
   const getDayStatus = async (config?: ApiRequestConfig) => {
     try {
@@ -1234,6 +1252,7 @@ export default function SalesExecutiveScreen() {
   const getVan = async () => {
     try {
       const userId = useAuthStore.getState().user?.userId;
+      if (!userId) return;
       const response: any = await homeService.getVan(userId);
 
       if (response.statusCode === 200) {
@@ -1322,6 +1341,7 @@ export default function SalesExecutiveScreen() {
   };
 
   const handleDayEndConfirmation = async () => {
+    prefetchDayEndLocation();
     try {
       loader.show({ message: 'Loading day end summary...' });
       await fetchDayEndSummary();
@@ -1923,7 +1943,7 @@ const createStyles = (colors: any) =>
       borderRadius: 6,
     },
     vanTypeText: {
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '600',
     },
     vanInfoName: {

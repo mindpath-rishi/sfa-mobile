@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, TextInput, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { useSearchBarStyles } from '../../styles/SearchBar.styles';
@@ -33,7 +34,12 @@ export const SearchBar: React.FC<Props> = ({ searchQuery, setSearchQuery }) => {
           onChangeText={setSearchQuery}
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
+          <TouchableOpacity
+            hitSlop={12}
+            accessibilityLabel="Clear"
+            accessibilityRole="button"
+            onPress={() => setSearchQuery('')}
+          >
             <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
           </TouchableOpacity>
         )}

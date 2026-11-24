@@ -277,6 +277,9 @@ export const StatsOverviewSection: React.FC<Props> = ({
       <View style={styles.headerContainer}>
         <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
         <TouchableOpacity
+          hitSlop={13}
+          accessibilityLabel="Refresh"
+          accessibilityRole="button"
           onPress={handleRefresh}
           style={styles.refreshButton}
           activeOpacity={0.7}

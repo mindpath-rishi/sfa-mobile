@@ -20,8 +20,9 @@ export interface ButtonProps {
   loading?: boolean;
   /** Whether the button is disabled */
   disabled?: boolean;
-  /** Callback when button is pressed */
-  onPress?: () => void;
+  /** Callback when button is pressed. If it returns a promise, the button shows
+   * its loading state and ignores taps until the promise settles. */
+  onPress?: () => void | Promise<unknown>;
   /** Visual variant of the button */
   variant?: ButtonVariant;
   /** Size of the button */

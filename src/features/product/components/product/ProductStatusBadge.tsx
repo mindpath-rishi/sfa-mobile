@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { ProductStatus } from '../../types/product.types';
 import { useProductStatusBadgeStyles } from '../../styles/ProductStatusBadge.styles';

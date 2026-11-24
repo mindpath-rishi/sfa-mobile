@@ -98,6 +98,16 @@ android {
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
     signingConfigs {
+// @generated begin salesstream-release-signing-config - expo prebuild (DO NOT MODIFY) sync-e4ec5071adf887acecef598ed170d6134cdc4e84
+        if (project.hasProperty('SALESSTREAM_UPLOAD_STORE_FILE')) {
+            release {
+                storeFile file(SALESSTREAM_UPLOAD_STORE_FILE)
+                storePassword SALESSTREAM_UPLOAD_STORE_PASSWORD
+                keyAlias SALESSTREAM_UPLOAD_KEY_ALIAS
+                keyPassword SALESSTREAM_UPLOAD_KEY_PASSWORD
+            }
+        }
+// @generated end salesstream-release-signing-config
         debug {
             storeFile file('debug.keystore')
             storePassword 'android'
@@ -113,6 +123,11 @@ android {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
+// @generated begin salesstream-release-signing-use - expo prebuild (DO NOT MODIFY) sync-ff14fe360ea5ad59cbf34d9b2e52905ac2c5b3ec
+            if (signingConfigs.findByName('release') != null) {
+                signingConfig signingConfigs.release
+            }
+// @generated end salesstream-release-signing-use
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

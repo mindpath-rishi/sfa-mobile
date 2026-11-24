@@ -1,6 +1,8 @@
 // ProductUnitSelector.tsx
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, TextInput } from 'react-native';
+import React, { useEffect, useCallback } from 'react';
+import { useRecyclingState } from '@shopify/flash-list';
+import { View, TouchableOpacity } from 'react-native';
+import { TextInput } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { CartItemWithDetails } from '../../types/product.types';
@@ -34,8 +36,13 @@ export const ProductUnitSelector: React.FC<Props> = ({
   // For topup mode, we don't have stock limits
   const isUnlimitedMode = mode === 'topup';
 
-  const [caseQuantity, setCaseQuantity] = useState(product.caseQty || 0);
-  const [unitQuantity, setUnitQuantity] = useState(product.pieceQty || 0);
+  // Reset when a recycled list row is reused for a different product.
+  const [caseQuantity, setCaseQuantity] = useRecyclingState(product.caseQty || 0, [
+    product.productId,
+  ]);
+  const [unitQuantity, setUnitQuantity] = useRecyclingState(product.pieceQty || 0, [
+    product.productId,
+  ]);
 
   const totalUnits = caseQuantity * UNITS_PER_CASE + unitQuantity;
   const totalValue = caseQuantity * casePrice + unitQuantity * piecePrice;
@@ -170,6 +177,9 @@ export const ProductUnitSelector: React.FC<Props> = ({
           </View>
           <View style={styles.quantityControls}>
             <TouchableOpacity
+              hitSlop={14}
+              accessibilityLabel="Decrease"
+              accessibilityRole="button"
               onPress={decrementCase}
               disabled={caseQuantity === 0}
               style={[
@@ -197,6 +207,9 @@ export const ProductUnitSelector: React.FC<Props> = ({
               keyboardType="numeric"
             />
             <TouchableOpacity
+              hitSlop={14}
+              accessibilityLabel="Add"
+              accessibilityRole="button"
               onPress={incrementCase}
               disabled={!isUnlimitedMode && (isMaxStock || caseQuantity >= maxCases)}
               style={[
@@ -235,6 +248,9 @@ export const ProductUnitSelector: React.FC<Props> = ({
           </View>
           <View style={styles.quantityControls}>
             <TouchableOpacity
+              hitSlop={14}
+              accessibilityLabel="Decrease"
+              accessibilityRole="button"
               onPress={decrementUnit}
               disabled={unitQuantity === 0}
               style={[
@@ -262,6 +278,9 @@ export const ProductUnitSelector: React.FC<Props> = ({
               keyboardType="numeric"
             />
             <TouchableOpacity
+              hitSlop={14}
+              accessibilityLabel="Add"
+              accessibilityRole="button"
               onPress={incrementUnit}
               disabled={!isUnlimitedMode && (isMaxStock || unitQuantity >= maxUnits)}
               style={[

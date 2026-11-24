@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useTheme } from '@/shared/hooks/useTheme';
@@ -283,7 +284,7 @@ export const ProductItem: React.FC<ProductItemProps> = ({
                 {formatCurrency(netValue)}
               </Text>
               {schemeDiscount > 0 && (
-                <Text style={{ fontSize: 10, fontWeight: '600', color: colors.success }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.success }}>
                   Save {formatCurrency(schemeDiscount)}
                 </Text>
               )}

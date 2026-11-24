@@ -69,7 +69,7 @@ export const createManagerBeatOMeterStyles = (colors: AppColors) =>
     },
     summaryEyebrow: {
       color: colors.textTertiary,
-      fontSize: 10,
+      fontSize: 11,
       lineHeight: 13,
       fontWeight: '800',
       textTransform: 'uppercase',
@@ -101,7 +101,7 @@ export const createManagerBeatOMeterStyles = (colors: AppColors) =>
     },
     totalBadgeLabel: {
       color: colors.textTertiary,
-      fontSize: 9,
+      fontSize: 10,
       lineHeight: 12,
       fontWeight: '800',
       textTransform: 'uppercase',
@@ -149,7 +149,7 @@ export const createManagerBeatOMeterStyles = (colors: AppColors) =>
     },
     primaryMetricLabel: {
       color: colors.textTertiary,
-      fontSize: 10,
+      fontSize: 11,
       lineHeight: 13,
       fontWeight: '700',
       marginTop: 1,
@@ -219,7 +219,7 @@ export const createManagerBeatOMeterStyles = (colors: AppColors) =>
     },
     legendText: {
       color: colors.textTertiary,
-      fontSize: 10,
+      fontSize: 11,
       lineHeight: 13,
       fontWeight: '700',
     },
@@ -260,7 +260,7 @@ export const createManagerBeatOMeterStyles = (colors: AppColors) =>
     emptyText: {
       paddingVertical: 14,
       color: colors.textTertiary,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: '800',
       textAlign: 'center',
     },

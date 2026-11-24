@@ -14,6 +14,7 @@ import {
   Animated,
   Easing,
   Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 
 import { router } from 'expo-router';
@@ -21,6 +22,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useForm, Controller } from 'react-hook-form';
 import * as Haptics from 'expo-haptics';
 import * as Application from 'expo-application';
+import { getDeviceDetails } from '@/core/device/device-details';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 
@@ -40,10 +42,11 @@ import {
 import { getClientDeviceIdAsync } from '@/shared/services/device.service';
 
 const isWeb = Platform.OS === 'web';
-const { height: screenHeight } = Dimensions.get('window');
 
 const LoginScreen: React.FC<LoginScreenProps> = () => {
   const { colors } = useTheme();
+  // Re-render (and rebuild styles) when the window rotates or resizes.
+  useWindowDimensions();
   const styles = useLoginStyles(colors);
 
   // Animation refs
@@ -223,6 +226,7 @@ const LoginScreen: React.FC<LoginScreenProps> = () => {
     fcmToken: (await isPushNotificationsEnabledAsync())
       ? await getPushNotificationTokenAsync()
       : null,
+    ...(await getDeviceDetails()),
   });
 
   // Submit

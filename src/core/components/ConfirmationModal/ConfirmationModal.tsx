@@ -1,14 +1,13 @@
 // ConfirmationModal.tsx
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Animated, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Animated, TouchableOpacity, useWindowDimensions } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/shared/hooks/useTheme';
 import Button from '@/core/components/Button/Button';
 import { ConfirmationModalProps } from './ConfirmationModal.types';
 import { AppModal } from '..';
 import { createConfirmationModalStyles } from './ConfirmationModal.style';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   visible,
@@ -23,14 +22,18 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   variant = 'default',
   icon,
   type = 'warning', // 'success', 'error', 'warning', 'info'
+  hideCancel = false,
+  footerNote = 'This action cannot be undone',
 }) => {
   const { colors } = useTheme();
-  const styles = createConfirmationModalStyles(colors);
+  const { width: screenWidth } = useWindowDimensions();
+  const styles = createConfirmationModalStyles(colors, screenWidth);
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const wobbleRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -51,7 +54,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
       // Rotate animation for warning/error icons
       if (type === 'warning' || type === 'error') {
-        Animated.loop(
+        wobbleRef.current = Animated.loop(
           Animated.sequence([
             Animated.timing(rotateAnim, {
               toValue: 1,
@@ -69,13 +72,17 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               useNativeDriver: true,
             }),
           ]),
-        ).start();
+        );
+        wobbleRef.current.start();
       }
     } else {
-      // Reset animations
+      // Reset animations; stop the wobble so it doesn't keep running after close.
+      wobbleRef.current?.stop();
+      wobbleRef.current = null;
       scaleAnim.setValue(0.8);
       opacityAnim.setValue(0);
     }
+    return () => wobbleRef.current?.stop();
   }, [visible]);
 
   const getIconConfig = () => {
@@ -175,14 +182,16 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
       {/* Actions with better button styling */}
       <View style={styles.actions}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={onCancel}
-          style={[styles.cancelButton, loading && styles.disabledButton]}
-          disabled={loading}
-        >
-          <Text style={styles.cancelButtonText}>{cancelText}</Text>
-        </TouchableOpacity>
+        {!hideCancel && (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={onCancel}
+            style={[styles.cancelButton, loading && styles.disabledButton]}
+            disabled={loading}
+          >
+            <Text style={styles.cancelButtonText}>{cancelText}</Text>
+          </TouchableOpacity>
+        )}
 
         <TouchableOpacity
           activeOpacity={0.7}
@@ -208,7 +217,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       </View>
 
       {/* Optional footer note */}
-      <Text style={styles.footerNote}>This action cannot be undone</Text>
+      {footerNote ? <Text style={styles.footerNote}>{footerNote}</Text> : null}
       {/* </Animated.View> */}
     </AppModal>
   );

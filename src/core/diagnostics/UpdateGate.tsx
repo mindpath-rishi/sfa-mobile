@@ -1,5 +1,6 @@
 import React from 'react';
-import { Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { APP_VERSION } from './app-info';
 import { useAppUpdateStore } from './app-update.store';

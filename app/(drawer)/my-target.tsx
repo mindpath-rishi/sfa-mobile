@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Platform } from 'react-native';
+import { Text } from '@/core/components/Text/ScaledText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons, FontAwesome5 } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1159,7 +1160,7 @@ export default function TargetDashboard() {
                           />
                           <Text
                             style={{
-                              fontSize: 9,
+                              fontSize: 10,
                               fontWeight: '600',
                               color:
                                 targetProgress >= milestone ? colors.primary : colors.textSecondary,

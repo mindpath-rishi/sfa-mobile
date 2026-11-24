@@ -142,7 +142,7 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
     >
       <View style={[styles.cameraContainer, { overflow: 'hidden' }]}>
         {photoUri ? (
-          <Image source={{ uri: photoUri }} resizeMode="cover" style={styles.camera} />
+          <Image source={{ uri: photoUri }} resizeMode="cover" style={styles.previewImage} />
         ) : (
           React.createElement('video', {
             ref: videoRef,
@@ -161,7 +161,7 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
 
         <View pointerEvents="box-none" style={{ position: 'absolute', inset: 0, justifyContent: 'space-between', alignItems: 'center', padding: 24 }}>
           <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'flex-end' }}>
-            <TouchableOpacity
+            <TouchableOpacity hitSlop={9} accessibilityRole="button"
               onPress={onClose}
               accessibilityLabel="Close camera"
               style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }}
