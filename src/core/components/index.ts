@@ -9,4 +9,4 @@ export { SectionHeader } from './SectionHeader/SectionHeader';
 export { ConfirmationModal } from './ConfirmationModal';
 export { SearchBar } from './Searchbar';
 export { Skeleton } from './Skeleton';
-export { Loader } from './Loader'
+export { Loader } from './Loader';

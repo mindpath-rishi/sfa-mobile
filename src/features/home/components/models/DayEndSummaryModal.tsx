@@ -1,13 +1,6 @@
 // DayEndSummaryModal.tsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  FlatList,
-  Animated,
-  SafeAreaView,
-  ScrollView,
-} from 'react-native';
+import { View, TouchableOpacity, FlatList, Animated, SafeAreaView, ScrollView } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { AppModal, AppText, SearchBar } from '@/core/components';
@@ -631,18 +624,14 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
             <View style={styles.unacceptedStockIcon}>
               <MaterialCommunityIcons name="package-variant" size={34} color={colors.warning} />
             </View>
-            <AppText style={styles.unacceptedStockTitle}>
-              Approved stock awaits acceptance
-            </AppText>
+            <AppText style={styles.unacceptedStockTitle}>Approved stock awaits acceptance</AppText>
             <AppText style={styles.unacceptedStockDescription}>
               This approved quantity has not yet been accepted into your van inventory.
             </AppText>
 
             <View style={styles.unacceptedStockMetrics}>
               <View style={styles.unacceptedStockMetric}>
-                <AppText style={styles.unacceptedStockMetricValue}>
-                  {approvedTopups.length}
-                </AppText>
+                <AppText style={styles.unacceptedStockMetricValue}>{approvedTopups.length}</AppText>
                 <AppText style={styles.unacceptedStockMetricLabel}>
                   {approvedTopups.length === 1 ? 'Request' : 'Requests'}
                 </AppText>
@@ -658,11 +647,7 @@ export const DayEndSummaryModal: React.FC<DayEndSummaryModalProps> = ({
             </View>
 
             <View style={styles.unacceptedStockNote}>
-              <MaterialCommunityIcons
-                name="information-outline"
-                size={18}
-                color={colors.warning}
-              />
+              <MaterialCommunityIcons name="information-outline" size={18} color={colors.warning} />
               <AppText style={styles.unacceptedStockNoteText}>
                 If you end the day now, this approved quantity will not be included in today&apos;s
                 van stock.

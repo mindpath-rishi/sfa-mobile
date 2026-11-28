@@ -26,7 +26,8 @@ jest.mock('@/core/store/auth.store', () => ({
 }));
 jest.mock('@/repositories', () => ({ repositories: {} }));
 jest.mock('@/shared/services/location.service', () => ({
-  captureBestEffortLocation: (...args: unknown[]) => mockLocation.captureBestEffortLocation(...args),
+  captureBestEffortLocation: (...args: unknown[]) =>
+    mockLocation.captureBestEffortLocation(...args),
   captureCurrentLocation: (...args: unknown[]) => mockLocation.captureCurrentLocation(...args),
 }));
 
@@ -37,7 +38,12 @@ import {
 
 const KEY = 'pending_visit_completions';
 const pending = () => JSON.parse(mockStore.get(KEY) || '[]');
-const loc = { latitude: -15.4, longitude: 28.3, accuracy: 30, capturedAt: '2026-10-23T08:00:00.000Z' };
+const loc = {
+  latitude: -15.4,
+  longitude: 28.3,
+  accuracy: 30,
+  capturedAt: '2026-10-23T08:00:00.000Z',
+};
 
 beforeEach(() => {
   mockStore.clear();
@@ -93,7 +99,7 @@ describe('retryPendingVisitCompletions', () => {
   const seed = (items: any[]) => mockStore.set(KEY, JSON.stringify(items));
   const recent = new Date(Date.now() - 60_000).toISOString();
 
-  it("retries with the ORIGINAL check-out time and location, then removes the entry", async () => {
+  it('retries with the ORIGINAL check-out time and location, then removes the entry', async () => {
     seed([{ visitId: 'V1', userId: 'U1', checkOutTime: recent, checkOutLocation: loc }]);
     mockApi.patch.mockResolvedValue({ success: true, statusCode: 200 });
 
@@ -118,7 +124,11 @@ describe('retryPendingVisitCompletions', () => {
 
     expect(mockApi.patch).toHaveBeenCalledTimes(1);
     expect(mockApi.patch.mock.calls[0][0]).toBe('shop-visit/MINE');
-    expect(pending().map((i: any) => i.visitId).sort()).toEqual(['MINE', 'OTHER']);
+    expect(
+      pending()
+        .map((i: any) => i.visitId)
+        .sort(),
+    ).toEqual(['MINE', 'OTHER']);
   });
 
   it('drops entries older than 24 hours without calling the server', async () => {

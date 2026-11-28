@@ -27,4 +27,3 @@ export function formatDateSafe(dateString: string, dateFormat = 'dd MMM yyyy') {
     return 'Invalid date';
   }
 }
-

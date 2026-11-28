@@ -42,10 +42,7 @@ export default function TabsLayout() {
       showFilter: false,
       showBack: false,
       showMenu: true,
-      title:
-        activeTab === 'home'
-          ? user?.name || (salesman ? 'Sales Executive' : 'Manager')
-          : '',
+      title: activeTab === 'home' ? user?.name || (salesman ? 'Sales Executive' : 'Manager') : '',
       rightIcon: activeTab === 'home' ? 'bell' : undefined,
       badgeCount: activeTab === 'home' ? unreadCount : 0,
       onRightPress:

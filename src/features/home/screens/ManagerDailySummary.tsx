@@ -1608,7 +1608,7 @@ export default function ManagerDailySummaryScreen({ forcedView }: ManagerDailySu
                       size={18}
                       color={colors.primary}
                     />
-                    <AppText style={styles.routeHeaderTitle}>Today's Route Plan</AppText>
+                    <AppText style={styles.routeHeaderTitle}>Today&apos;s Route Plan</AppText>
                   </View>
                   <View style={styles.routeProgress}>
                     <AppText style={styles.routeProgressText}>

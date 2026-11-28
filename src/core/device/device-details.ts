@@ -49,6 +49,8 @@ export const getDeviceDetails = async () => {
   };
   // Drop empty values (the server validates types)
   return Object.fromEntries(
-    Object.entries(details).filter(([, value]) => value !== undefined && value !== null && value !== ''),
+    Object.entries(details).filter(
+      ([, value]) => value !== undefined && value !== null && value !== '',
+    ),
   );
 };

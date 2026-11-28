@@ -18,8 +18,7 @@ export default function SaleConfirmationPage() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <CustomerOutstandingScreen
-      />
+      <CustomerOutstandingScreen />
     </View>
   );
 }

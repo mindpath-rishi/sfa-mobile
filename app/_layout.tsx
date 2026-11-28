@@ -26,6 +26,7 @@ import { AppAlertHost } from '@/core/alert/AppAlertHost';
 import { retryPendingVisitCompletions } from '@/features/outlet/services/outlet.service';
 import { useTheme } from '@/shared/hooks/useTheme';
 import { BackgroundLocationDisclosureModal } from '@/shared/components/models/BackgroundLocationDisclosureModal';
+import { BackgroundTrackingSetupModal } from '@/shared/components/models/BackgroundTrackingSetupModal';
 
 import {
   addFirebaseNotificationListeners,
@@ -406,6 +407,7 @@ export default function RootLayout() {
               <OfflineSyncGate />
               <LoaderOverlay />
               <BackgroundLocationDisclosureModal />
+              <BackgroundTrackingSetupModal />
               <UpdateGate />
               <AppAlertHost />
               <Toast position="top" />

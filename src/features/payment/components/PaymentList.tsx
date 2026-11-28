@@ -13,11 +13,9 @@ import { PaymentItem, PaymentListProps } from '../types/payment.types';
 import { usePaymentsListStyles } from '../styles/paymentList.styles';
 import { getStatusConfig } from '../units/payments.utils';
 
-
-
 /**
  * PaymentsList Component
- * 
+ *
  * Displays a searchable, filterable list of payment transactions with:
  * - Payment mode icons and status badges
  * - Transaction details (amount, date, reference)
@@ -60,11 +58,11 @@ export const PaymentsList: React.FC<PaymentListProps> = ({
    */
   const getPaymentModeColor = (mode: string): string => {
     const colorMap: Record<string, string> = {
-      CASH: '#10B981',      // Emerald
-      CARD: '#8B5CF6',      // Violet
-      CHEQUE: '#3B82F6',    // Blue
+      CASH: '#10B981', // Emerald
+      CARD: '#8B5CF6', // Violet
+      CHEQUE: '#3B82F6', // Blue
       BANK_TRANSFER: '#EC4899', // Pink
-      UPI: '#F59E0B',       // Amber
+      UPI: '#F59E0B', // Amber
       MOBILE_MONEY: '#06B6D4', // Cyan
     };
     return colorMap[mode] || colors.primary;
@@ -78,17 +76,10 @@ export const PaymentsList: React.FC<PaymentListProps> = ({
     const paymentModeColor = getPaymentModeColor(item.paymentMode);
 
     return {
-      title: (
-        <AppText style={styles.title}>
-          {item.customerName || item.customerId}
-        </AppText>
-      ),
+      title: <AppText style={styles.title}>{item.customerName || item.customerId}</AppText>,
 
       leading: (
-        <IconTile
-          icon={getPaymentModeIcon(item.paymentMode) as any}
-          color={paymentModeColor}
-        />
+        <IconTile icon={getPaymentModeIcon(item.paymentMode) as any} color={paymentModeColor} />
       ),
 
       headerRight: (
@@ -99,13 +90,9 @@ export const PaymentsList: React.FC<PaymentListProps> = ({
         />
       ),
 
-      subtitle: (
-        <AppText style={styles.subtitle}>{item.paymentId}</AppText>
-      ),
+      subtitle: <AppText style={styles.subtitle}>{item.paymentId}</AppText>,
 
-      subtitleRight: (
-        <AppText style={styles.amount}>{formatCurrency(item.amount)}</AppText>
-      ),
+      subtitleRight: <AppText style={styles.amount}>{formatCurrency(item.amount)}</AppText>,
 
       children: (
         <View style={styles.metaContainer}>
@@ -116,9 +103,7 @@ export const PaymentsList: React.FC<PaymentListProps> = ({
               size={styles.metaIcon.size}
               color={styles.metaIcon.color}
             />
-            <AppText style={styles.metaText}>
-              {String(item.paymentMode).replace('_', ' ')}
-            </AppText>
+            <AppText style={styles.metaText}>{String(item.paymentMode).replace('_', ' ')}</AppText>
           </View>
 
           {/* Transaction Date */}
@@ -128,9 +113,7 @@ export const PaymentsList: React.FC<PaymentListProps> = ({
               size={styles.metaIcon.size}
               color={styles.metaIcon.color}
             />
-            <AppText style={styles.metaText}>
-              {formatDateSafe(item.date)}
-            </AppText>
+            <AppText style={styles.metaText}>{formatDateSafe(item.date)}</AppText>
           </View>
 
           {/* Reference Number (conditional) */}
@@ -152,9 +135,7 @@ export const PaymentsList: React.FC<PaymentListProps> = ({
               size={styles.metaIcon.size}
               color={styles.metaIcon.color}
             />
-            <AppText style={styles.metaText}>
-              {item.sales.length} sale(s)
-            </AppText>
+            <AppText style={styles.metaText}>{item.sales.length} sale(s)</AppText>
           </View>
         </View>
       ),

@@ -37,4 +37,3 @@ export type DownloadRecord = {
   deletedAt?: string | null;
   payload: Record<string, unknown>;
 };
-

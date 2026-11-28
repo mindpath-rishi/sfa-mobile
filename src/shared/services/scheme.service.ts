@@ -87,7 +87,7 @@ export interface SchemeBenefit {
 
 /** Each applied scheme of a line benefit (a single benefit is its own list). */
 export const appliedSchemesOf = (benefit?: SchemeBenefit | null): SchemeBenefit[] =>
-  benefit ? benefit.appliedSchemes ?? [benefit] : [];
+  benefit ? (benefit.appliedSchemes ?? [benefit]) : [];
 
 /** Every scheme applied across cart lines. */
 export const allAppliedSchemes = (benefits: Record<string, SchemeBenefit>) =>
@@ -291,7 +291,7 @@ const isBuyGetScheme = (scheme: SchemeRecord) =>
 
 /** Buy One Get One is always buy 1, get 1 of the same product. */
 const buyThreshold = (scheme: SchemeRecord) =>
-  scheme.schemeType === 'BUY_ONE_GET_ONE' ? 1 : scheme.buyQty ?? 0;
+  scheme.schemeType === 'BUY_ONE_GET_ONE' ? 1 : (scheme.buyQty ?? 0);
 
 /**
  * Every line scheme the cart line qualifies for. All of them apply together:
@@ -327,7 +327,8 @@ export const getApplicableSchemeBenefitsFromRecords = (
       const multiples = isBuyGetScheme(scheme)
         ? Math.floor(quantityIn(scheme.buyUnit) / Math.max(buyThreshold(scheme), 1))
         : 1;
-      const freeQtyPerMultiple = scheme.schemeType === 'BUY_ONE_GET_ONE' ? 1 : scheme.freeQty ?? 0;
+      const freeQtyPerMultiple =
+        scheme.schemeType === 'BUY_ONE_GET_ONE' ? 1 : (scheme.freeQty ?? 0);
       const benefit = computeDiscount(
         scheme,
         grossValue,
@@ -391,8 +392,7 @@ export const getSchemePreviewFromRecords = (
         : minimumQuantity;
       const thresholdUnit = isBuyGetScheme(scheme) ? scheme.buyUnit : scheme.minQtyUnit;
       const previewGrossValue =
-        threshold *
-        Math.max(thresholdUnit === 'CASE' ? casePrice : piecePrice, 0);
+        threshold * Math.max(thresholdUnit === 'CASE' ? casePrice : piecePrice, 0);
       return computeDiscount(scheme, previewGrossValue, casePrice, piecePrice);
     })
     .reduce((best, current) => (current.discountAmount > best.discountAmount ? current : best));

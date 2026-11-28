@@ -34,7 +34,8 @@ export function UserStockModal({ user, onClose }: Props) {
         else setError(response.message || 'Unable to load stock');
       })
       .catch((err: any) => {
-        if (!cancelled) setError(err?.response?.data?.message || err?.message || 'Unable to load stock');
+        if (!cancelled)
+          setError(err?.response?.data?.message || err?.message || 'Unable to load stock');
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -98,7 +99,9 @@ export function UserStockModal({ user, onClose }: Props) {
               <AppText style={text}>
                 {data.totals.cases} cs / {data.totals.pieces} pc
               </AppText>
-              <AppText style={[text, { fontWeight: '700' }]}>{formatCurrency(data.totals.value)}</AppText>
+              <AppText style={[text, { fontWeight: '700' }]}>
+                {formatCurrency(data.totals.value)}
+              </AppText>
             </View>
           ) : null}
 
@@ -125,7 +128,9 @@ export function UserStockModal({ user, onClose }: Props) {
                     <AppText style={[text, { flex: 1, fontWeight: '600' }]} numberOfLines={2}>
                       {item.name}
                     </AppText>
-                    <AppText style={[text, { fontWeight: '700' }]}>{formatCurrency(item.value)}</AppText>
+                    <AppText style={[text, { fontWeight: '700' }]}>
+                      {formatCurrency(item.value)}
+                    </AppText>
                   </View>
                   <AppText style={muted}>
                     {item.cases} cs {item.pieces} pc · Case {formatCurrency(item.casePrice)} · Pc{' '}

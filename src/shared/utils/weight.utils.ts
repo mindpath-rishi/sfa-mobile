@@ -26,41 +26,37 @@ const TO_KG_FACTORS: Record<WeightUnit, number> = {
 };
 
 // ============ Core Conversion Functions ============
-export const convertWeight = (
-  value: number,
-  fromUnit: WeightUnit,
-  toUnit: WeightUnit
-): number => {
+export const convertWeight = (value: number, fromUnit: WeightUnit, toUnit: WeightUnit): number => {
   if (value === null || value === undefined || isNaN(value)) return 0;
-  
+
   // Convert to kg first, then to target unit
   const inKg = value * TO_KG_FACTORS[fromUnit];
   return inKg * CONVERSION_FACTORS[toUnit];
 };
 
-export const toKg = (value: number, fromUnit: WeightUnit): number => 
+export const toKg = (value: number, fromUnit: WeightUnit): number =>
   convertWeight(value, fromUnit, 'kg');
 
-export const toGrams = (value: number, fromUnit: WeightUnit): number => 
+export const toGrams = (value: number, fromUnit: WeightUnit): number =>
   convertWeight(value, fromUnit, 'g');
 
-export const toPounds = (value: number, fromUnit: WeightUnit): number => 
+export const toPounds = (value: number, fromUnit: WeightUnit): number =>
   convertWeight(value, fromUnit, 'lb');
 
-export const toOunces = (value: number, fromUnit: WeightUnit): number => 
+export const toOunces = (value: number, fromUnit: WeightUnit): number =>
   convertWeight(value, fromUnit, 'oz');
 
 // ============ Formatting Functions ============
 export const formatWeight = (
   value: number | null | undefined,
-  options: WeightOptions = {}
+  options: WeightOptions = {},
 ): string => {
   const { unit = 'kg', decimals = 2, showUnit = true } = options;
-  
+
   if (value === null || value === undefined || isNaN(value)) {
     return showUnit ? `0 ${unit}` : '0';
   }
-  
+
   const formattedValue = value.toFixed(decimals);
   return showUnit ? `${formattedValue} ${unit}` : formattedValue;
 };
@@ -68,14 +64,14 @@ export const formatWeight = (
 export const formatWeightFromUnit = (
   value: number | null | undefined,
   fromUnit: WeightUnit,
-  options: WeightOptions = {}
+  options: WeightOptions = {},
 ): string => {
   const { unit = 'kg', decimals = 2, showUnit = true } = options;
-  
+
   if (value === null || value === undefined || isNaN(value)) {
     return showUnit ? `0 ${unit}` : '0';
   }
-  
+
   const converted = convertWeight(value, fromUnit, unit);
   const formattedValue = converted.toFixed(decimals);
   return showUnit ? `${formattedValue} ${unit}` : formattedValue;
@@ -84,7 +80,7 @@ export const formatWeightFromUnit = (
 // ============ Weight Calculation Functions ============
 export const sumWeights = (
   weights: Array<{ value: number; unit: WeightUnit }>,
-  targetUnit: WeightUnit = 'kg'
+  targetUnit: WeightUnit = 'kg',
 ): number => {
   return weights.reduce((sum, { value, unit }) => {
     return sum + convertWeight(value, unit, targetUnit);
@@ -93,7 +89,7 @@ export const sumWeights = (
 
 export const getTotalWeight = (
   items: Array<{ weightPerUnit: number; quantity: number; unit?: WeightUnit }>,
-  targetUnit: WeightUnit = 'kg'
+  targetUnit: WeightUnit = 'kg',
 ): number => {
   return items.reduce((total, { weightPerUnit, quantity, unit = 'kg' }) => {
     const itemWeight = weightPerUnit * quantity;
@@ -101,10 +97,7 @@ export const getTotalWeight = (
   }, 0);
 };
 
-export const getAverageWeight = (
-  weights: number[],
-  unit: WeightUnit = 'kg'
-): number => {
+export const getAverageWeight = (weights: number[], unit: WeightUnit = 'kg'): number => {
   if (!weights.length) return 0;
   const sum = weights.reduce((acc, w) => acc + w, 0);
   return sum / weights.length;
@@ -115,11 +108,11 @@ export const compareWeights = (
   value1: number,
   unit1: WeightUnit,
   value2: number,
-  unit2: WeightUnit
+  unit2: WeightUnit,
 ): number => {
   const inKg1 = convertWeight(value1, unit1, 'kg');
   const inKg2 = convertWeight(value2, unit2, 'kg');
-  
+
   if (inKg1 > inKg2) return 1;
   if (inKg1 < inKg2) return -1;
   return 0;
@@ -129,14 +122,14 @@ export const isHeavier = (
   value1: number,
   unit1: WeightUnit,
   value2: number,
-  unit2: WeightUnit
+  unit2: WeightUnit,
 ): boolean => compareWeights(value1, unit1, value2, unit2) > 0;
 
 export const isLighter = (
   value1: number,
   unit1: WeightUnit,
   value2: number,
-  unit2: WeightUnit
+  unit2: WeightUnit,
 ): boolean => compareWeights(value1, unit1, value2, unit2) < 0;
 
 export const isEqualWeight = (
@@ -144,7 +137,7 @@ export const isEqualWeight = (
   unit1: WeightUnit,
   value2: number,
   unit2: WeightUnit,
-  tolerance: number = 0.01
+  tolerance: number = 0.01,
 ): boolean => {
   const diff = Math.abs(convertWeight(value1, unit1, 'kg') - convertWeight(value2, unit2, 'kg'));
   return diff <= tolerance;
@@ -161,7 +154,7 @@ export const isValidWeightRange = (
   weight: number,
   min: number,
   max: number,
-  unit: WeightUnit = 'kg'
+  unit: WeightUnit = 'kg',
 ): boolean => {
   const weightInKg = convertWeight(weight, unit, 'kg');
   const minInKg = convertWeight(min, unit, 'kg');
@@ -179,7 +172,7 @@ export const getAppropriateUnit = (weightInKg: number): WeightUnit => {
 export const getReadableWeight = (weightInKg: number): string => {
   const unit = getAppropriateUnit(weightInKg);
   let value = weightInKg;
-  
+
   switch (unit) {
     case 'g':
       value = weightInKg * 1000;
@@ -191,7 +184,7 @@ export const getReadableWeight = (weightInKg: number): string => {
       value = weightInKg * 35.274;
       break;
   }
-  
+
   const decimals = unit === 'kg' ? 2 : 0;
   return `${value.toFixed(decimals)} ${unit}`;
 };
@@ -207,7 +200,7 @@ export interface CaseWeight {
 export const calculateCaseWeight = (
   pieceWeight: number,
   piecesPerCase: number,
-  unit: WeightUnit = 'kg'
+  unit: WeightUnit = 'kg',
 ): number => {
   return pieceWeight * piecesPerCase;
 };
@@ -217,7 +210,7 @@ export const calculateTotalWeight = (
   pieces: number,
   pieceWeight: number,
   caseWeight: number,
-  unit: WeightUnit = 'kg'
+  unit: WeightUnit = 'kg',
 ): number => {
   const casesWeight = cases * caseWeight;
   const piecesWeight = pieces * pieceWeight;
@@ -229,12 +222,12 @@ export const getWeightBreakdown = (
   pieces: number,
   pieceWeight: number,
   caseWeight: number,
-  unit: WeightUnit = 'kg'
+  unit: WeightUnit = 'kg',
 ) => {
   const fromCases = cases * caseWeight;
   const fromPieces = pieces * pieceWeight;
   const total = fromCases + fromPieces;
-  
+
   return {
     fromCases,
     fromPieces,
@@ -247,14 +240,14 @@ export const getWeightBreakdown = (
 // ============ Batch Processing ============
 export const batchConvertWeights = (
   weights: Array<{ value: number; fromUnit: WeightUnit }>,
-  toUnit: WeightUnit = 'kg'
+  toUnit: WeightUnit = 'kg',
 ): number[] => {
   return weights.map(({ value, fromUnit }) => convertWeight(value, fromUnit, toUnit));
 };
 
 export const batchFormatWeights = (
   weights: Array<number | null | undefined>,
-  options: WeightOptions = {}
+  options: WeightOptions = {},
 ): string[] => {
-  return weights.map(weight => formatWeight(weight, options));
+  return weights.map((weight) => formatWeight(weight, options));
 };

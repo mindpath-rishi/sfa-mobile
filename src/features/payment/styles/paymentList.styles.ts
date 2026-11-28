@@ -4,7 +4,7 @@ import { useTheme } from '@/shared/hooks/useTheme';
 
 /**
  * PaymentsList Styles Hook
- * 
+ *
  * Organized with semantic groupings:
  * 1. Card Content Sections (title, subtitle, amount)
  * 2. Meta Information (metadata container & individual items)

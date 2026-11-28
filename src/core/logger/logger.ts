@@ -21,7 +21,8 @@ export const safeStringify = (value: unknown) => {
   const seen = new WeakSet<object>();
   try {
     return JSON.stringify(value, (_key, item) => {
-      if (item instanceof Error) return { name: item.name, message: item.message, stack: item.stack };
+      if (item instanceof Error)
+        return { name: item.name, message: item.message, stack: item.stack };
       if (item && typeof item === 'object') {
         if (seen.has(item)) return '[circular]';
         seen.add(item);

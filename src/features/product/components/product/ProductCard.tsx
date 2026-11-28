@@ -39,8 +39,7 @@ const ProductCardComponent: React.FC<Props> = ({ product, onAddToCart, mode }) =
     [schemeBenefit, groupSchemeBenefits, product?.productId],
   );
 
-  const handlePress = useCallback(() => {
-  }, []);
+  const handlePress = useCallback(() => {}, []);
 
   const handleAddToCart = useCallback(
     (items: CartItemWithDetails[]) => {

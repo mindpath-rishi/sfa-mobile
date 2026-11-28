@@ -15,7 +15,9 @@ export const stockCountService: StockCountService = {
   fetchStockCounts: (params) =>
     api.get<any>(`/stock-count`, { params }) as Promise<ApiResponse<any>>,
   fetchStockCountItems: (stockCountId) =>
-    api.get<any>(`/stock-count-item/`, { params: {
-      stockCountId: stockCountId
-    }},) as Promise<ApiResponse<any>>,
+    api.get<any>(`/stock-count-item/`, {
+      params: {
+        stockCountId: stockCountId,
+      },
+    }) as Promise<ApiResponse<any>>,
 };

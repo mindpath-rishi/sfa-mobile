@@ -19,9 +19,7 @@ export default function CreateTopupScreen() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartSummary, setCartSummary] = useState<any | null>(null);
   const { setHeader } = useHeader();
-  const offline = useOfflineStore(
-    (state) => !state.isConnected || !state.isInternetReachable,
-  );
+  const offline = useOfflineStore((state) => !state.isConnected || !state.isInternetReachable);
 
   /* -------------------- Header -------------------- */
 

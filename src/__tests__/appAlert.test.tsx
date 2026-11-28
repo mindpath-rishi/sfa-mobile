@@ -72,7 +72,9 @@ describe('appAlert (replaces Alert.alert with the app modal)', () => {
   it('a single OK button with a handler (e.g. "Invoice processed") runs it', () => {
     const goBack = jest.fn();
     const screen = render(<AppAlertHost />);
-    act(() => appAlert('Success', 'Invoice processed successfully', [{ text: 'OK', onPress: goBack }]));
+    act(() =>
+      appAlert('Success', 'Invoice processed successfully', [{ text: 'OK', onPress: goBack }]),
+    );
     fireEvent.press(screen.getByText('OK'));
     expect(goBack).toHaveBeenCalledTimes(1);
   });

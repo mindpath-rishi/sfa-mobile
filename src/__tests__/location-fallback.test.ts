@@ -9,7 +9,8 @@ const mockLoc = {
 jest.mock('expo-location', () => ({
   Accuracy: { Lowest: 1, Low: 2, Balanced: 3, High: 4, Highest: 5, BestForNavigation: 6 },
   PermissionStatus: { GRANTED: 'granted', DENIED: 'denied' },
-  requestForegroundPermissionsAsync: (...a: unknown[]) => mockLoc.requestForegroundPermissionsAsync(...a),
+  requestForegroundPermissionsAsync: (...a: unknown[]) =>
+    mockLoc.requestForegroundPermissionsAsync(...a),
   getForegroundPermissionsAsync: (...a: unknown[]) => mockLoc.getForegroundPermissionsAsync(...a),
   hasServicesEnabledAsync: (...a: unknown[]) => mockLoc.hasServicesEnabledAsync(...a),
   getCurrentPositionAsync: (...a: unknown[]) => mockLoc.getCurrentPositionAsync(...a),
@@ -22,7 +23,10 @@ jest.mock('expo-task-manager', () => ({
   isTaskRegisteredAsync: jest.fn(async () => false),
 }));
 jest.mock('expo-intent-launcher', () => ({ startActivityAsync: jest.fn() }));
-jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn(), addNetworkStateListener: jest.fn() }));
+jest.mock('expo-network', () => ({
+  getNetworkStateAsync: jest.fn(),
+  addNetworkStateListener: jest.fn(),
+}));
 jest.mock('expo-application', () => ({ applicationId: 'com.salesstream.app' }));
 jest.mock('@/core/store/auth.store', () => ({
   useAuthStore: { getState: () => ({ user: null, accessToken: null }), subscribe: jest.fn() },

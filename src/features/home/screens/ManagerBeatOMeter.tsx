@@ -215,7 +215,9 @@ export default function ManagerBeatOMeterScreen() {
           accessibilityLabel="Retry loading beat-o-meter"
         >
           <Ionicons name="alert-circle-outline" size={17} color={colors.error} />
-          <AppText style={styles.errorBannerText}>Couldn't refresh data. Tap to retry.</AppText>
+          <AppText style={styles.errorBannerText}>
+            Couldn&apos;t refresh data. Tap to retry.
+          </AppText>
         </TouchableOpacity>
       )}
 

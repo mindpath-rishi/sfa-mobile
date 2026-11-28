@@ -1,29 +1,25 @@
-import { AppLanguage, i18n } from "@/shared/locales/engine/i18n";
-import { storage } from "@/shared/utils/storage";
-import { create } from "zustand";
-import { I18nManager, Platform } from "react-native";
-import * as Updates from "expo-updates";
-import Constants from "expo-constants";
+import { AppLanguage, i18n } from '@/shared/locales/engine/i18n';
+import { storage } from '@/shared/utils/storage';
+import { create } from 'zustand';
+import { I18nManager, Platform } from 'react-native';
+import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
 
-const KEY = "app_language";
+const KEY = 'app_language';
 
 // ✅ Read directly from app.config.ts -> extra
 const localization = (Constants.expoConfig?.extra as any)?.localization;
 
-const DEFAULT_LANG: AppLanguage = (localization?.defaultLanguage ||
-  "en") as AppLanguage;
+const DEFAULT_LANG: AppLanguage = (localization?.defaultLanguage || 'en') as AppLanguage;
 
 const SUPPORTED_LANGS: AppLanguage[] = (localization?.supportedLanguages || [
-  "en",
-  "hi",
-  "ur",
-  "ar",
+  'en',
+  'hi',
+  'ur',
+  'ar',
 ]) as AppLanguage[];
 
-const RTL_LANGS: AppLanguage[] = (localization?.rtlLanguages || [
-  "ur",
-  "ar",
-]) as AppLanguage[];
+const RTL_LANGS: AppLanguage[] = (localization?.rtlLanguages || ['ur', 'ar']) as AppLanguage[];
 
 const isSupportedLanguage = (lang: string): lang is AppLanguage =>
   SUPPORTED_LANGS.includes(lang as AppLanguage);
@@ -33,7 +29,7 @@ const isRTL = (lang: AppLanguage) => RTL_LANGS.includes(lang);
 // ✅ Safe reload (Expo Go safe)
 const safeReload = async (): Promise<boolean> => {
   try {
-    if (Platform.OS === "web") return false;
+    if (Platform.OS === 'web') return false;
     await Updates.reloadAsync();
     return true;
   } catch {
@@ -61,8 +57,7 @@ export const useLanguageStore = create<LanguageState>((set, get) => ({
     try {
       const saved = await storage.getItem(KEY);
 
-      const lang: AppLanguage =
-        saved && isSupportedLanguage(saved) ? saved : get().language;
+      const lang: AppLanguage = saved && isSupportedLanguage(saved) ? saved : get().language;
 
       const shouldBeRTL = isRTL(lang);
 
@@ -71,8 +66,8 @@ export const useLanguageStore = create<LanguageState>((set, get) => ({
       set({ language: lang, isRTL: shouldBeRTL });
 
       // ✅ Web direction
-      if (Platform.OS === "web") {
-        document.documentElement.dir = shouldBeRTL ? "rtl" : "ltr";
+      if (Platform.OS === 'web') {
+        document.documentElement.dir = shouldBeRTL ? 'rtl' : 'ltr';
         document.documentElement.lang = lang;
         set({ hydrated: true, needRestart: false });
         return;
@@ -116,8 +111,8 @@ export const useLanguageStore = create<LanguageState>((set, get) => ({
       set({ language: lang, isRTL: shouldBeRTL });
 
       // ✅ Web direction
-      if (Platform.OS === "web") {
-        document.documentElement.dir = shouldBeRTL ? "rtl" : "ltr";
+      if (Platform.OS === 'web') {
+        document.documentElement.dir = shouldBeRTL ? 'rtl' : 'ltr';
         document.documentElement.lang = lang;
         set({ needRestart: false });
         return;

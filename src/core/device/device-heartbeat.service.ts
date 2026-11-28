@@ -15,6 +15,7 @@ import { storage } from '@/core/storage';
 import { applyTrackingConfig, getTrackingConfig } from '@/core/location/tracking-config';
 import { useAuthStore } from '@/core/store/auth.store';
 import { useOfflineStore } from '@/core/offline/offline.store';
+import { getBackgroundTrackingStatus } from '@/shared/services/backgroundTrackingSetup';
 
 const OFFLINE_SINCE_KEY = 'device_offline_since';
 const PENDING_PERIODS_KEY = 'device_offline_periods';
@@ -48,11 +49,26 @@ const readBattery = async () => {
     ]);
     return {
       batteryLevel: level >= 0 ? Math.round(level * 100) : undefined,
-      isCharging:
-        state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL,
+      isCharging: state === Battery.BatteryState.CHARGING || state === Battery.BatteryState.FULL,
     };
   } catch {
     return {};
+  }
+};
+
+const readTrackingHealth = async () => {
+  if (Platform.OS === 'web') return undefined;
+  try {
+    const status = await getBackgroundTrackingStatus();
+    return {
+      backgroundLocation: status.backgroundLocation,
+      ...(status.batteryUnrestricted !== null
+        ? { batteryUnrestricted: status.batteryUnrestricted }
+        : {}),
+      ...(status.autostartNeeded ? { autostartConfirmed: status.autostartConfirmed } : {}),
+    };
+  } catch {
+    return undefined;
   }
 };
 
@@ -83,6 +99,8 @@ const sendHeartbeat = async (force = false) => {
         lastActiveAt,
         workSessionId: auth.workSessionId || undefined,
         offlinePeriods: periods.length ? periods : undefined,
+        // Lets the portal explain why tracking stopped (permission / battery / Autostart)
+        trackingHealth: await readTrackingHealth(),
         // Server replies with tracking settings only when this is out of date
         trackingVersion: getTrackingConfig().version,
       },

@@ -93,7 +93,9 @@ const STORAGE_KEY = 'cart-storage';
 const saveToStorage = async (state: { items: CartItemWithDetails[]; summary: CartSummary }) => {
   try {
     await storage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {}
+  } catch {
+    // Best-effort persist; in-memory cart stays valid
+  }
 };
 
 const loadFromStorage = async () => {

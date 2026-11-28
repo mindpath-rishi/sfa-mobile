@@ -178,8 +178,7 @@ export class BaseRepository<T extends Record<string, unknown>> {
    * operation (e.g. buffers that are uploaded through their own API).
    */
   async createLocal(ownerId: string, data: T) {
-    if (!ownerId?.trim())
-      throw new Error(`Cannot save local ${this.entity}: ownerId is required`);
+    if (!ownerId?.trim()) throw new Error(`Cannot save local ${this.entity}: ownerId is required`);
     const uuid = String(data.uuid ?? createUuid());
     const now = new Date().toISOString();
     const database = await getDatabase();

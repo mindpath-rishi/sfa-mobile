@@ -2,11 +2,7 @@ import { api } from '@/core/network';
 import type { ApiResponse } from '@/core/network/api.types';
 import { isSalesman } from '@/core/navigation/role.utils';
 import { isOfflineMode } from '@/core/offline/offline.store';
-import {
-  collectFreeGoods,
-  freeGoodPieces,
-  type FreeGood,
-} from '@/shared/utils/free-goods.utils';
+import { collectFreeGoods, freeGoodPieces, type FreeGood } from '@/shared/utils/free-goods.utils';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
 import { createSchemaId } from '@/utils/uuid';
@@ -348,7 +344,6 @@ export interface SaleService {
  * Thin service layer (only API calls)
  */
 export const saleService: SaleService = {
-
   createSale: async (payload: CreateSalePayload, { showLoader }: { showLoader: boolean }) => {
     const calculatedPayload = calculateSalePayload(payload);
     const user = useAuthStore.getState().user;
@@ -481,7 +476,10 @@ export const saleService: SaleService = {
      * check and deduction, priced 0.
      */
     const freeGoodQuantities = new Map<string, number>();
-    for (const good of collectFreeGoods(calculatedPayload.items as any, calculatedPayload.groupSchemes as any)) {
+    for (const good of collectFreeGoods(
+      calculatedPayload.items as any,
+      calculatedPayload.groupSchemes as any,
+    )) {
       const stockRecord = dailyStockRecords.find(
         (record: any) =>
           String(record.productId || '') === good.productId &&
@@ -490,7 +488,10 @@ export const saleService: SaleService = {
       );
       const unitQtyInCase = Math.max(toNumber(stockRecord?.unitQtyInCase, 1), 1);
       const pieces = freeGoodPieces(good, unitQtyInCase);
-      freeGoodQuantities.set(good.productId, (freeGoodQuantities.get(good.productId) ?? 0) + pieces);
+      freeGoodQuantities.set(
+        good.productId,
+        (freeGoodQuantities.get(good.productId) ?? 0) + pieces,
+      );
       const existing = productSalesMap.get(good.productId);
       if (existing) {
         existing.soldQuantity += pieces;

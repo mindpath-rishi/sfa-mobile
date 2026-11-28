@@ -7,12 +7,7 @@ export const useLoaderStyles = (props: LoaderStyleProps = {}) => {
   const { colors } = useTheme();
 
   const styleGenerator = createStyles((utils: StyleUtils) => {
-    const {
-      size = 'medium',
-      fullScreen = false,
-      overlay = false,
-      disabled = false,
-    } = props;
+    const { size = 'medium', fullScreen = false, overlay = false, disabled = false } = props;
 
     // Size mapping (for spacing consistency)
     const sizeMap = {

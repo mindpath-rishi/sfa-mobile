@@ -12,8 +12,8 @@ export const addNotificationResponseListener = (_router: Router) => () => undefi
 
 export const addFirebaseNotificationListeners = (_router: Router) => () => undefined;
 
-export const addPushTokenRefreshListener = (
-  _listener: (token: string) => void | Promise<void>,
-) => () => undefined;
+export const addPushTokenRefreshListener =
+  (_listener: (token: string) => void | Promise<void>) => () =>
+    undefined;
 
 export const setupBackgroundMessageHandler = () => {};

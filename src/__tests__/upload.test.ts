@@ -18,7 +18,10 @@ describe('uploadFormData', () => {
   });
 
   it('returns the uploaded media on success', async () => {
-    global.fetch = respond(201, { statusCode: 201, data: { mediaId: 'MID1', url: '/uploads/a.jpg' } });
+    global.fetch = respond(201, {
+      statusCode: 201,
+      data: { mediaId: 'MID1', url: '/uploads/a.jpg' },
+    });
     const res = await uploadFormData<any>('/media/upload', new FormData());
     expect(res).toMatchObject({ success: true, statusCode: 201, data: { mediaId: 'MID1' } });
   });

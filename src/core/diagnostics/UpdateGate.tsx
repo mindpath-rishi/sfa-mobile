@@ -24,8 +24,15 @@ const openStore = (storeUrl?: string | null) => {
  */
 export function UpdateGate() {
   const { colors } = useTheme();
-  const { updateRequired, updateAvailable, minAppVersion, latestAppVersion, message, storeUrl, dismissAvailable } =
-    useAppUpdateStore();
+  const {
+    updateRequired,
+    updateAvailable,
+    minAppVersion,
+    latestAppVersion,
+    message,
+    storeUrl,
+    dismissAvailable,
+  } = useAppUpdateStore();
 
   if (updateRequired) {
     return (
@@ -33,7 +40,8 @@ export function UpdateGate() {
         <View style={[styles.screen, { backgroundColor: colors.background }]}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>Update required</Text>
           <Text style={[styles.body, { color: colors.textTertiary }]}>
-            {message || 'This version of the app is no longer supported. Please update to continue.'}
+            {message ||
+              'This version of the app is no longer supported. Please update to continue.'}
           </Text>
           <Text style={[styles.version, { color: colors.textQuaternary }]}>
             Installed {APP_VERSION}
@@ -42,7 +50,10 @@ export function UpdateGate() {
           <Text style={[styles.note, { color: colors.textTertiary }]}>
             Work you saved offline is still uploaded; nothing is lost.
           </Text>
-          <Pressable style={[styles.button, { backgroundColor: colors.primary }]} onPress={() => openStore(storeUrl)}>
+          <Pressable
+            style={[styles.button, { backgroundColor: colors.primary }]}
+            onPress={() => openStore(storeUrl)}
+          >
             <Text style={[styles.buttonText, { color: colors.primaryContrast }]}>Update now</Text>
           </Pressable>
         </View>

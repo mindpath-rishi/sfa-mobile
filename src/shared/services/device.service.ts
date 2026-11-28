@@ -7,4 +7,3 @@ export const getClientDeviceIdAsync = async () => {
 
   return (await Application.getIosIdForVendorAsync()) ?? 'ios-device';
 };
-

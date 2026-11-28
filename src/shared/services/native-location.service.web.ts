@@ -2,6 +2,8 @@ type StartNativeLocationOptions = {
   workSessionId: string;
   intervalMs?: number;
   distanceMeters?: number;
+  accuracy?: 'HIGH' | 'BALANCED' | 'LOW';
+  maxAccuracyM?: number;
 };
 
 export const isNativeLocationAvailable = () => false;

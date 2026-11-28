@@ -29,7 +29,7 @@ export const DEFAULT_TRACKING_CONFIG: TrackingConfig = {
   backgroundEnabled: true,
   backgroundIntervalSec: 5,
   backgroundDistanceM: 0,
-  maxAccuracyM: 100,
+  maxAccuracyM: 50,
   heartbeatSec: 30,
   version: 'default',
 };
@@ -60,7 +60,9 @@ const sanitize = (raw: any): TrackingConfig | null => {
   const d = DEFAULT_TRACKING_CONFIG;
   return {
     trackingEnabled: raw.trackingEnabled !== false,
-    accuracyMode: ['HIGH', 'BALANCED', 'LOW'].includes(raw.accuracyMode) ? raw.accuracyMode : d.accuracyMode,
+    accuracyMode: ['HIGH', 'BALANCED', 'LOW'].includes(raw.accuracyMode)
+      ? raw.accuracyMode
+      : d.accuracyMode,
     foregroundIntervalSec: num(raw.foregroundIntervalSec, d.foregroundIntervalSec, 1, 600),
     foregroundDistanceM: num(raw.foregroundDistanceM, d.foregroundDistanceM, 0, 1000),
     backgroundEnabled: raw.backgroundEnabled !== false,

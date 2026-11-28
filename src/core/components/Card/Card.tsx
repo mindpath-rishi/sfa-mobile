@@ -157,6 +157,7 @@ const AppCardComponent = memo<CardProps>(
         setPressed(true);
 
         if (hapticFeedback && Platform.OS !== 'web') {
+          // Haptic feedback not wired up yet
         }
 
         onPressIn?.();
@@ -295,6 +296,8 @@ const AppCardComponent = memo<CardProps>(
 );
 
 // Attach subcomponents with proper typing
+AppCardComponent.displayName = 'AppCardBase';
+
 export const AppCard = AppCardComponent as CardComponentType;
 
 AppCard.Header = Header;

@@ -90,6 +90,9 @@ describe('homeService.dayComplete (van settlement / stock-count paths)', () => {
   it('uses a location the caller already captured instead of capturing again', async () => {
     await homeService.dayComplete({ carryForwardStock: true, dayEndLocation: location });
     expect(mockCapture).not.toHaveBeenCalled();
-    expect(mockApi.post.mock.calls[0][1]).toEqual({ carryForwardStock: true, dayEndLocation: location });
+    expect(mockApi.post.mock.calls[0][1]).toEqual({
+      carryForwardStock: true,
+      dayEndLocation: location,
+    });
   });
 });

@@ -11,13 +11,16 @@ export const TOPUP_STATUS = {
 
 export type TopupStatusType = (typeof TOPUP_STATUS)[keyof typeof TOPUP_STATUS];
 
-export const TOPUP_STATUS_CONFIG: Record<TopupStatusType, {
-  label: string;
-  color: string;
-  bg: string;
-  icon: string;
-  order: number;
-}> = {
+export const TOPUP_STATUS_CONFIG: Record<
+  TopupStatusType,
+  {
+    label: string;
+    color: string;
+    bg: string;
+    icon: string;
+    order: number;
+  }
+> = {
   [TOPUP_STATUS.DRAFT]: {
     label: 'Draft',
     color: '#8B5CF6',

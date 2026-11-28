@@ -7,4 +7,3 @@ export const DEFAULT_CURRENT_LOCATION = {
 };
 
 export const OSRM_ROUTE_BASE_URL = 'https://router.project-osrm.org/route/v1/driving';
-

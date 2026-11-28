@@ -61,7 +61,9 @@ const formatAgo = (iso?: string | null) => {
 };
 
 const formatMinutes = (minutes: number) =>
-  minutes >= 60 ? `${Math.floor(minutes / 60)}h ${Math.round(minutes % 60)}m` : `${Math.round(minutes)}m`;
+  minutes >= 60
+    ? `${Math.floor(minutes / 60)}h ${Math.round(minutes % 60)}m`
+    : `${Math.round(minutes)}m`;
 
 const clampPercentage = (value: number) => Math.max(0, Math.min(value, 100));
 
@@ -159,7 +161,9 @@ function TeamCoverageDetailModal({
                     </AppText>
                   )}
                   {!!item.status && (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                    <View
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}
+                    >
                       <View
                         style={{
                           width: 7,
@@ -256,9 +260,7 @@ export default function ManagerTeamCoverageScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [activeDetailType, setActiveDetailType] = useState<DetailType | null>(null);
-  const [stockUser, setStockUser] = useState<{ employeeId: string; name?: string } | null>(
-    null,
-  );
+  const [stockUser, setStockUser] = useState<{ employeeId: string; name?: string } | null>(null);
   const hasLoadedOnceRef = useRef(false);
   const isFetchingRef = useRef(false);
 
@@ -380,8 +382,7 @@ export default function ManagerTeamCoverageScreen() {
           status: user.device
             ? {
                 online: user.device.networkStatus === 'ONLINE',
-                lowBattery:
-                  user.device.batteryLevel !== null && user.device.batteryLevel <= 20,
+                lowBattery: user.device.batteryLevel !== null && user.device.batteryLevel <= 20,
                 text: [
                   user.device.batteryLevel !== null
                     ? `🔋 ${user.device.batteryLevel}%${user.device.isCharging ? ' ⚡' : ''}`
@@ -518,7 +519,7 @@ export default function ManagerTeamCoverageScreen() {
           >
             <Ionicons name="alert-circle-outline" size={16} color={colors.error ?? '#C0392B'} />
             <AppText style={styles.errorBannerText}>
-              Couldn't refresh all data. Tap to retry.
+              Couldn&apos;t refresh all data. Tap to retry.
             </AppText>
           </TouchableOpacity>
         )}

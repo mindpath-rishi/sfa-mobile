@@ -35,10 +35,7 @@ export const BackgroundLocationDisclosureModal: React.FC = () => {
       hideCloseButton
     >
       <View style={styles.container}>
-        <LinearGradient
-          colors={[colors.primary, colors.primaryDark]}
-          style={styles.headerGradient}
-        >
+        <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.headerGradient}>
           <View style={styles.headerIcon}>
             <MaterialIcons name="my-location" size={44} color={colors.primaryContrast} />
           </View>
@@ -49,24 +46,25 @@ export const BackgroundLocationDisclosureModal: React.FC = () => {
 
         <View style={styles.content}>
           <Text style={[styles.bodyText, { color: colors.textPrimary }]}>
-            Sales Stream collects your device's location{' '}
-            <Text style={styles.bold}>in the background, including while the app is closed
-            or not in use</Text>, whenever you start your work day as{' '}
-            <Text style={styles.bold}>Retailing</Text> or{' '}
+            Sales Stream collects your device&apos;s location{' '}
+            <Text style={styles.bold}>
+              in the background, including while the app is closed or not in use
+            </Text>
+            , whenever you start your work day as <Text style={styles.bold}>Retailing</Text> or{' '}
             <Text style={styles.bold}>Other Work</Text>.
           </Text>
 
           <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
-            This is used only to record your route and store visits for attendance, van
-            tracking, and delivery verification. Location is not collected on Leave days,
-            and background tracking stops automatically when you end your work day.
+            This is used only to record your route and store visits for attendance, van tracking,
+            and delivery verification. Location is not collected on Leave days, and background
+            tracking stops automatically when you end your work day.
           </Text>
 
           <View style={[styles.infoRow, { borderColor: colors.border }]}>
             <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              You will be asked to confirm this again with your device's location
-              permission prompt.
+              You will be asked to confirm this again with your device&apos;s location permission
+              prompt.
             </Text>
           </View>
         </View>

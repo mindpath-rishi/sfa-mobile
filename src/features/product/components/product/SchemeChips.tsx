@@ -9,7 +9,9 @@ const unit = (qty: number, value?: string) =>
   value === 'PIECE' ? (qty === 1 ? 'pc' : 'pcs') : 'cs';
 
 const minText = (scheme: SchemeRecord) =>
-  (scheme.minQty ?? 0) > 0 ? ` · min ${scheme.minQty} ${unit(scheme.minQty ?? 0, scheme.minQtyUnit)}` : '';
+  (scheme.minQty ?? 0) > 0
+    ? ` · min ${scheme.minQty} ${unit(scheme.minQty ?? 0, scheme.minQtyUnit)}`
+    : '';
 
 const freeText = (qty: number, freeUnit?: string, name?: string) =>
   `${qty} ${unit(qty, freeUnit)}${name ? ` ${name}` : ''} free`;
@@ -80,7 +82,9 @@ export const SchemeChips: React.FC<SchemeChipsProps> = ({ schemes, appliedScheme
             }}
           >
             <Ionicons
-              name={applied ? 'checkmark-circle' : isFreeGoods ? 'gift-outline' : 'pricetag-outline'}
+              name={
+                applied ? 'checkmark-circle' : isFreeGoods ? 'gift-outline' : 'pricetag-outline'
+              }
               size={12}
               color={colors.success}
             />

@@ -754,7 +754,11 @@ export const outletService: OutletService = {
       const blob = await fetch(document.uri).then((response) => response.blob());
       formData.append('file', blob, fileName);
     } else {
-      formData.append('file', { uri: document.uri, name: fileName, type: document.mimeType } as any);
+      formData.append('file', {
+        uri: document.uri,
+        name: fileName,
+        type: document.mimeType,
+      } as any);
     }
     formData.append('ownerType', 'CUSTOMER');
     formData.append('ownerId', customerId);

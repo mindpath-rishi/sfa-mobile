@@ -52,6 +52,7 @@ class SalesStreamLocationService : Service() {
     const val EXTRA_INTERVAL_MS = "intervalMs"
     const val EXTRA_DISTANCE_METERS = "distanceMeters"
     const val EXTRA_ACCURACY = "accuracy"
+    const val EXTRA_MAX_ACCURACY_M = "maxAccuracyM"
     const val EXTRA_NOTIFICATION_TITLE = "notificationTitle"
     const val EXTRA_NOTIFICATION_BODY = "notificationBody"
 
@@ -63,7 +64,73 @@ class SalesStreamLocationService : Service() {
     private const val KEY_WORK_SESSION_ID = "workSessionId"
     private const val KEY_BASE_URL = "baseUrl"
     private const val KEY_PENDING_LOCATIONS = "pendingLocations"
+    /** Tracking was started and not stopped (work day still running). */
+    private const val KEY_ACTIVE = "active"
+    private const val KEY_STARTED_AT = "startedAt"
+    private const val KEY_INTERVAL_MS = "intervalMs"
+    private const val KEY_DISTANCE_METERS = "distanceMeters"
+    private const val KEY_ACCURACY = "accuracy"
+    private const val KEY_MAX_ACCURACY_M = "maxAccuracyM"
+    private const val KEY_NOTIFICATION_TITLE = "notificationTitle"
+    private const val KEY_NOTIFICATION_BODY = "notificationBody"
+    /** A day that was never ended is not resumed after this long (forgotten end-day). */
+    private const val MAX_RESTORE_AGE_MS = 16 * 60 * 60 * 1000L // mobile access token lasts ~16.7 h
+
+    /** Resume tracking from the saved start options (service restart, reboot, app update). */
+    const val ACTION_RESTORE = "com.salesstream.app.location.RESTORE"
+
+    private const val DEFAULT_TITLE = "Sales Stream live location active"
+    private const val DEFAULT_BODY = "Your live location is shared while your work day is active."
+
+    /**
+     * Start intent rebuilt from the saved options, or null when there is no
+     * running work day to resume.
+     */
+    fun restoreIntent(context: Context): Intent? {
+      val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      if (!prefs.getBoolean(KEY_ACTIVE, false)) return null
+      val startedAt = prefs.getLong(KEY_STARTED_AT, 0L)
+      if (startedAt <= 0L || System.currentTimeMillis() - startedAt > MAX_RESTORE_AGE_MS) return null
+      val token = prefs.getString(KEY_TOKEN, "") ?: ""
+      val workSessionId = prefs.getString(KEY_WORK_SESSION_ID, "") ?: ""
+      val baseUrl = prefs.getString(KEY_BASE_URL, "") ?: ""
+      if (token.isBlank() || workSessionId.isBlank() || baseUrl.isBlank()) return null
+      return Intent(context, SalesStreamLocationService::class.java).apply {
+        action = ACTION_RESTORE
+        putExtra(EXTRA_TOKEN, token)
+        putExtra(EXTRA_WORK_SESSION_ID, workSessionId)
+        putExtra(EXTRA_BASE_URL, baseUrl)
+        putExtra(EXTRA_INTERVAL_MS, prefs.getLong(KEY_INTERVAL_MS, 5000L))
+        putExtra(EXTRA_DISTANCE_METERS, prefs.getFloat(KEY_DISTANCE_METERS, 5f))
+        putExtra(EXTRA_ACCURACY, prefs.getString(KEY_ACCURACY, "HIGH"))
+        putExtra(EXTRA_MAX_ACCURACY_M, prefs.getFloat(KEY_MAX_ACCURACY_M, DEFAULT_MAX_ACCURACY_M))
+        putExtra(EXTRA_NOTIFICATION_TITLE, prefs.getString(KEY_NOTIFICATION_TITLE, DEFAULT_TITLE))
+        putExtra(EXTRA_NOTIFICATION_BODY, prefs.getString(KEY_NOTIFICATION_BODY, DEFAULT_BODY))
+      }
+    }
+
+    // Same limits as the JS tracker and the server's live filter.
+    private const val DEFAULT_MAX_ACCURACY_M = 50f
+    /** Background fixes arrive batched/late on many phones; keep them for 10 min. */
+    private const val MAX_LOCATION_AGE_MS = 10 * 60_000L
+    /** Background fixes are often Wi-Fi / cell; never use a tighter limit than this. */
+    private const val MIN_ACCURACY_LIMIT_M = 150f
+    /** Largest jump that can still be written off as GPS drift. */
+    private const val MAX_DRIFT_DISTANCE_METERS = 200f
+    /** Above this reported speed (about 5 km/h) the phone is really moving. */
+    private const val MOVING_SPEED_MPS = 1.4f
+    private const val MAX_SPEED_MPS = 200f / 3.6f
+    private const val MIN_STATIONARY_DISTANCE_METERS = 5f
+    private const val MAX_STATIONARY_DISTANCE_METERS = 25f
+    private const val JUMP_MIN_METERS = 300f
+    private const val JUMP_RESET_MS = 5 * 60_000L
+    private const val JUMP_CONFIRMATIONS = 3
   }
+
+  /** Fixes worse than this (metres) are dropped; admin setting "Max accuracy". */
+  private var maxAccuracyM = DEFAULT_MAX_ACCURACY_M
+  private var lastAcceptedLocation: Location? = null
+  private var jumpRejects = 0
 
   private lateinit var fusedClient: FusedLocationProviderClient
   private val httpClient: OkHttpClient =
@@ -90,6 +157,8 @@ class SalesStreamLocationService : Service() {
 
   override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
     when (intent?.action) {
+      null, ACTION_RESTORE -> if (!started) restoreTracking()
+
       ACTION_START -> {
         persistStartOptions(intent)
         val title = intent.getStringExtra(EXTRA_NOTIFICATION_TITLE)
@@ -101,6 +170,7 @@ class SalesStreamLocationService : Service() {
       }
 
       ACTION_STOP -> {
+        markStopped()
         stopLocationUpdates()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -147,7 +217,52 @@ class SalesStreamLocationService : Service() {
       .putString(KEY_TOKEN, intent.getStringExtra(EXTRA_TOKEN) ?: "")
       .putString(KEY_WORK_SESSION_ID, intent.getStringExtra(EXTRA_WORK_SESSION_ID) ?: "")
       .putString(KEY_BASE_URL, intent.getStringExtra(EXTRA_BASE_URL) ?: "")
+      .putBoolean(KEY_ACTIVE, true)
+      .putLong(KEY_STARTED_AT, System.currentTimeMillis())
+      .putLong(KEY_INTERVAL_MS, intent.getLongExtra(EXTRA_INTERVAL_MS, 5000L))
+      .putFloat(KEY_DISTANCE_METERS, intent.getFloatExtra(EXTRA_DISTANCE_METERS, 5f))
+      .putString(KEY_ACCURACY, intent.getStringExtra(EXTRA_ACCURACY) ?: "HIGH")
+      .putFloat(KEY_MAX_ACCURACY_M, intent.getFloatExtra(EXTRA_MAX_ACCURACY_M, DEFAULT_MAX_ACCURACY_M))
+      .putString(KEY_NOTIFICATION_TITLE, intent.getStringExtra(EXTRA_NOTIFICATION_TITLE) ?: DEFAULT_TITLE)
+      .putString(KEY_NOTIFICATION_BODY, intent.getStringExtra(EXTRA_NOTIFICATION_BODY) ?: DEFAULT_BODY)
       .apply()
+  }
+
+  private fun markStopped() {
+    getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_ACTIVE, false).apply()
+  }
+
+  /**
+   * Android restarted the service by itself (null intent after it was killed),
+   * or the boot / app-update receiver asked to resume. Must reach
+   * startForeground quickly, or Android kills the service again.
+   */
+  private fun restoreTracking() {
+    val restore = restoreIntent(this)
+    try {
+      startForeground(
+        NOTIFICATION_ID,
+        buildNotification(
+          restore?.getStringExtra(EXTRA_NOTIFICATION_TITLE) ?: DEFAULT_TITLE,
+          restore?.getStringExtra(EXTRA_NOTIFICATION_BODY) ?: DEFAULT_BODY,
+        ),
+      )
+    } catch (error: Exception) {
+      // Android 12+ blocks some background starts; Android 14 needs "Allow all the time".
+      Log.e(TAG, "Restore failed: cannot start foreground service", error)
+      queueError("Tracking restore blocked: ${error.message ?: "unknown"}")
+      stopSelf()
+      return
+    }
+    if (restore == null) {
+      Log.d(TAG, "Restore skipped: no running work day")
+      stopForeground(STOP_FOREGROUND_REMOVE)
+      stopSelf()
+      return
+    }
+    Log.d(TAG, "Restoring tracking after restart")
+    startLocationUpdates(restore)
+    syncPendingLocations()
   }
 
   private fun startLocationUpdates(intent: Intent) {
@@ -166,6 +281,10 @@ class SalesStreamLocationService : Service() {
 
     val intervalMs = intent.getLongExtra(EXTRA_INTERVAL_MS, 5000L)
     val distanceMeters = intent.getFloatExtra(EXTRA_DISTANCE_METERS, 5f)
+    maxAccuracyM =
+      maxOf(intent.getFloatExtra(EXTRA_MAX_ACCURACY_M, DEFAULT_MAX_ACCURACY_M), MIN_ACCURACY_LIMIT_M)
+    lastAcceptedLocation = null
+    jumpRejects = 0
     // Admin controlled: HIGH (GPS), BALANCED (Wi-Fi / cell, ~100 m), LOW (~10 km)
     val priority =
       when (intent.getStringExtra(EXTRA_ACCURACY)) {
@@ -178,7 +297,8 @@ class SalesStreamLocationService : Service() {
       LocationRequest.Builder(priority, intervalMs)
         .setMinUpdateIntervalMillis(1000L)
         .setMinUpdateDistanceMeters(distanceMeters)
-        .setWaitForAccurateLocation(false)
+        // HIGH: wait for a real GPS fix instead of sending the first Wi-Fi / cell guess.
+        .setWaitForAccurateLocation(priority == Priority.PRIORITY_HIGH_ACCURACY)
         .build()
 
     locationCallback =
@@ -209,13 +329,100 @@ class SalesStreamLocationService : Service() {
     started = false
   }
 
+  private fun isMockLocation(location: Location): Boolean =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      location.isMock
+    } else {
+      @Suppress("DEPRECATION")
+      location.isFromMockProvider
+    }
+
+  /** Returns a stable fix, or null when the raw fix must be rejected. */
+  private fun stabilizeLocation(location: Location): Location? {
+    if (isMockLocation(location)) {
+      Log.d(TAG, "Native location rejected: mock location")
+      return null
+    }
+    if (location.hasAccuracy() && location.accuracy > maxAccuracyM) {
+      Log.d(TAG, "Native location rejected: accuracy ${location.accuracy}m exceeds ${maxAccuracyM}m")
+      return null
+    }
+    val ageMs = System.currentTimeMillis() - location.time
+    if (ageMs > MAX_LOCATION_AGE_MS) {
+      Log.d(TAG, "Native location rejected: stale (${ageMs}ms old)")
+      return null
+    }
+
+    val previous = lastAcceptedLocation
+    if (previous == null) {
+      return Location(location).apply { speed = 0f }
+    }
+    if (location.time <= previous.time) {
+      Log.d(TAG, "Native location rejected: older than the last sent fix")
+      return null
+    }
+
+    val elapsedMs = location.time - previous.time
+    val meters = previous.distanceTo(location)
+    val accuracies = listOfNotNull(
+      if (previous.hasAccuracy() && previous.accuracy > 0f) previous.accuracy else null,
+      if (location.hasAccuracy() && location.accuracy > 0f) location.accuracy else null,
+    )
+    val accuracyThreshold = accuracies.maxOrNull() ?: MIN_STATIONARY_DISTANCE_METERS
+    val stationaryThreshold = accuracyThreshold.coerceIn(
+      MIN_STATIONARY_DISTANCE_METERS,
+      MAX_STATIONARY_DISTANCE_METERS,
+    )
+
+    if (meters <= stationaryThreshold) {
+      Log.d(TAG, "Native stationary GPS jitter suppressed distance=${meters}m threshold=${stationaryThreshold}m")
+      return Location(location).apply {
+        latitude = previous.latitude
+        longitude = previous.longitude
+        speed = 0f
+      }
+    }
+
+    // GPS drift while standing still: a jump inside the fixes' own accuracy
+    // radius with no real reported speed (Wi-Fi / cell fixes indoors jump 100 m+).
+    val reportedMoving = location.hasSpeed() && location.speed > MOVING_SPEED_MPS
+    if (meters <= MAX_DRIFT_DISTANCE_METERS && !reportedMoving && meters <= accuracyThreshold) {
+      Log.d(TAG, "Native GPS drift held distance=${meters}m accuracy=${accuracyThreshold}m")
+      return Location(location).apply {
+        latitude = previous.latitude
+        longitude = previous.longitude
+        speed = 0f
+        // Keep the held position's accuracy so one bad fix does not widen later checks
+        if (previous.hasAccuracy()) accuracy = previous.accuracy
+      }
+    }
+
+    val speed = meters / (elapsedMs / 1000f)
+    if (
+      elapsedMs < JUMP_RESET_MS &&
+      meters > JUMP_MIN_METERS &&
+      speed > MAX_SPEED_MPS &&
+      jumpRejects + 1 < JUMP_CONFIRMATIONS
+    ) {
+      // A device that keeps reporting the new place was right; trust it after a few fixes.
+      jumpRejects += 1
+      Log.d(TAG, "Native location rejected: impossible jump (${speed.toInt()} m/s)")
+      return null
+    }
+    return Location(location)
+  }
+
   private fun handleLocation(location: Location) {
     Log.d(
       TAG,
       "Native location received lat=${location.latitude}, lng=${location.longitude}, accuracy=${if (location.hasAccuracy()) location.accuracy else -1f}"
     )
 
-    val payload = buildLocationPayload(location)
+    val stableLocation = stabilizeLocation(location) ?: return
+    lastAcceptedLocation = stableLocation
+    jumpRejects = 0
+
+    val payload = buildLocationPayload(stableLocation)
 
     // Save first so no location is lost if Android pauses network after sleep.
     savePendingLocation(payload)

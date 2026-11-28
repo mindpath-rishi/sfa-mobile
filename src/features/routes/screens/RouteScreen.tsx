@@ -109,10 +109,10 @@ export default function RouteScreen() {
 
   // ========== STATE ==========
   const [outlets, setOutlets] = useState<Outlet[]>([]);
-  const [currentLocation, setCurrentLocation] = useState({
-    latitude: DEFAULT_CURRENT_LOCATION.latitude,
-    longitude: DEFAULT_CURRENT_LOCATION.longitude,
-  });
+  const [currentLocation, setCurrentLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [hasCurrentLocation, setHasCurrentLocation] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(Platform.OS === 'web');
@@ -454,22 +454,27 @@ export default function RouteScreen() {
         (position) => {
           const { latitude, longitude } = position.coords;
           setCurrentLocation((previous) => {
-            if (previous.latitude === latitude && previous.longitude === longitude) return previous;
+            if (previous?.latitude === latitude && previous.longitude === longitude)
+              return previous;
             return { latitude, longitude };
           });
           setHasCurrentLocation((previous) => previous || true);
           checkAllGeofences(latitude, longitude);
         },
         (error) => console.log('Error getting location:', error),
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 5000 },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
       );
       return;
     }
 
-    const location = await captureCurrentLocation();
+    const location = await captureCurrentLocation({ preferCached: false, timeoutMs: 22000 });
     if (location) {
       setCurrentLocation((previous) => {
-        if (previous.latitude === location.latitude && previous.longitude === location.longitude) {
+        if (
+          previous &&
+          previous.latitude === location.latitude &&
+          previous.longitude === location.longitude
+        ) {
           return previous;
         }
         return {
@@ -499,22 +504,24 @@ export default function RouteScreen() {
 
         return {
           ...outlet,
-          distance: coordinate
-            ? getDistance(
-                currentLocation.latitude,
-                currentLocation.longitude,
-                coordinate.latitude,
-                coordinate.longitude,
-              )
-            : 0,
-          isInsideGeofence: coordinate
-            ? isInsideGeofence(currentLocation.latitude, currentLocation.longitude, {
-                id: outlet._id,
-                latitude: coordinate.latitude,
-                longitude: coordinate.longitude,
-                radius: 100,
-              })
-            : false,
+          distance:
+            coordinate && currentLocation
+              ? getDistance(
+                  currentLocation.latitude,
+                  currentLocation.longitude,
+                  coordinate.latitude,
+                  coordinate.longitude,
+                )
+              : 0,
+          isInsideGeofence:
+            coordinate && currentLocation
+              ? isInsideGeofence(currentLocation.latitude, currentLocation.longitude, {
+                  id: outlet._id,
+                  latitude: coordinate.latitude,
+                  longitude: coordinate.longitude,
+                  radius: 100,
+                })
+              : false,
         };
       });
   }, [filteredOutlets, currentLocation]);
@@ -534,7 +541,9 @@ export default function RouteScreen() {
       [],
     );
 
-    return hasCurrentLocation ? [currentLocation, ...outletCoordinates] : outletCoordinates;
+    return currentLocation && hasCurrentLocation
+      ? [currentLocation, ...outletCoordinates]
+      : outletCoordinates;
   }, [currentLocation, hasCurrentLocation, mapOutlets]);
 
   const fitMapToRoute = useCallback(() => {
@@ -896,7 +905,7 @@ export default function RouteScreen() {
           // Geo tag is mandatory: use the one captured (and shown on the map) in the form.
           if (!formValue.geoTag?.lat || !formValue.geoTag?.lng) {
             showLoader({ message: 'Getting customer location…' });
-            const location = await captureCurrentLocation();
+            const location = await captureCurrentLocation({ preferCached: false });
             if (location) {
               formValue.geoTag = { lat: location.latitude, lng: location.longitude };
             }
@@ -1220,7 +1229,7 @@ export default function RouteScreen() {
             <LinearGradient colors={[colors.primary, colors.primaryDark]} style={styles.header}>
               <View style={styles.progressContainer}>
                 <View style={styles.progressHeader}>
-                  <Text style={styles.progressTitle}>Today's Progress</Text>
+                  <Text style={styles.progressTitle}>Today&apos;s Progress</Text>
                   <Text style={styles.progressPercent}>
                     {Math.round(summaryStats.completionRate)}%
                   </Text>
@@ -1407,14 +1416,14 @@ export default function RouteScreen() {
               provider={PROVIDER_GOOGLE}
               style={styles.fullScreenMap}
               initialRegion={{
-                latitude: mapCoordinates[0]?.latitude ?? currentLocation.latitude,
-                longitude: mapCoordinates[0]?.longitude ?? currentLocation.longitude,
+                latitude: mapCoordinates[0]?.latitude ?? DEFAULT_CURRENT_LOCATION.latitude,
+                longitude: mapCoordinates[0]?.longitude ?? DEFAULT_CURRENT_LOCATION.longitude,
                 latitudeDelta: 0.08,
                 longitudeDelta: 0.08,
               }}
               onMapReady={() => setIsMapReady(true)}
             >
-              {hasCurrentLocation && (
+              {hasCurrentLocation && currentLocation && (
                 <Marker
                   coordinate={currentLocation}
                   title="Current Location"

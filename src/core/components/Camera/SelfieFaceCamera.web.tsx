@@ -57,13 +57,17 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
     } catch (cameraError) {
       const name = cameraError instanceof Error ? cameraError.name : '';
       if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-        setError('Camera permission was blocked. Allow camera access in your browser settings, then retry.');
+        setError(
+          'Camera permission was blocked. Allow camera access in your browser settings, then retry.',
+        );
       } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
         setError('No camera was found on this device.');
       } else if (!window.isSecureContext) {
         setError('Camera access requires a secure connection (HTTPS or localhost).');
       } else {
-        setError(cameraError instanceof Error ? cameraError.message : 'Unable to start the camera.');
+        setError(
+          cameraError instanceof Error ? cameraError.message : 'Unable to start the camera.',
+        );
       }
     }
   }, [stopCamera]);
@@ -106,7 +110,7 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
     void startCamera();
   };
 
-  const usePhoto = async () => {
+  const confirmPhoto = async () => {
     if (!photoUri || busy) return;
     setBusy(true);
     setError(null);
@@ -159,41 +163,139 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
           })
         )}
 
-        <View pointerEvents="box-none" style={{ position: 'absolute', inset: 0, justifyContent: 'space-between', alignItems: 'center', padding: 24 }}>
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: 24,
+          }}
+        >
           <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'flex-end' }}>
-            <TouchableOpacity hitSlop={9} accessibilityRole="button"
+            <TouchableOpacity
+              hitSlop={9}
+              accessibilityRole="button"
               onPress={onClose}
               accessibilityLabel="Close camera"
-              style={{ width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.55)' }}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(0,0,0,0.55)',
+              }}
             >
               <Ionicons name="close" size={26} color="white" />
             </TouchableOpacity>
           </View>
 
           {error ? (
-            <View style={{ maxWidth: 440, padding: 16, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.7)' }}>
+            <View
+              style={{
+                maxWidth: 440,
+                padding: 16,
+                borderRadius: 12,
+                backgroundColor: 'rgba(0,0,0,0.7)',
+              }}
+            >
               <AppText style={{ color: 'white', textAlign: 'center' }}>{error}</AppText>
-              <TouchableOpacity onPress={() => void startCamera()} style={{ marginTop: 14, alignSelf: 'center', padding: 10 }}>
+              <TouchableOpacity
+                onPress={() => void startCamera()}
+                style={{ marginTop: 14, alignSelf: 'center', padding: 10 }}
+              >
                 <AppText style={{ color: 'white', fontWeight: '700' }}>Retry camera</AppText>
               </TouchableOpacity>
             </View>
           ) : !photoUri ? (
-            <View pointerEvents="none" style={{ width: 260, height: 340, borderWidth: 3, borderColor: 'white', borderRadius: 140, alignItems: 'center', justifyContent: 'flex-start', paddingTop: 20 }}>
-              <AppText style={{ color: 'white', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.8)', textShadowRadius: 5 }}>{title}</AppText>
+            <View
+              pointerEvents="none"
+              style={{
+                width: 260,
+                height: 340,
+                borderWidth: 3,
+                borderColor: 'white',
+                borderRadius: 140,
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                paddingTop: 20,
+              }}
+            >
+              <AppText
+                style={{
+                  color: 'white',
+                  textAlign: 'center',
+                  textShadowColor: 'rgba(0,0,0,0.8)',
+                  textShadowRadius: 5,
+                }}
+              >
+                {title}
+              </AppText>
             </View>
           ) : (
-            <AppText style={{ color: 'white', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.55)' }}>Review your photo</AppText>
+            <AppText
+              style={{
+                color: 'white',
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                borderRadius: 20,
+                backgroundColor: 'rgba(0,0,0,0.55)',
+              }}
+            >
+              Review your photo
+            </AppText>
           )}
 
-          <View style={{ width: '100%', minHeight: 64, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24 }}>
+          <View
+            style={{
+              width: '100%',
+              minHeight: 64,
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 24,
+            }}
+          >
             {photoUri ? (
               <>
-                <TouchableOpacity onPress={retakePhoto} disabled={busy} style={{ minWidth: 120, height: 48, borderRadius: 24, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.65)' }}>
+                <TouchableOpacity
+                  onPress={retakePhoto}
+                  disabled={busy}
+                  style={{
+                    minWidth: 120,
+                    height: 48,
+                    borderRadius: 24,
+                    flexDirection: 'row',
+                    gap: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(0,0,0,0.65)',
+                  }}
+                >
                   <Ionicons name="refresh" size={20} color="white" />
                   <AppText style={{ color: 'white' }}>Retake</AppText>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => void usePhoto()} disabled={busy} style={{ minWidth: 140, height: 48, borderRadius: 24, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#16865a' }}>
-                  {busy ? <ActivityIndicator color="white" /> : <Ionicons name="checkmark" size={20} color="white" />}
+                <TouchableOpacity
+                  onPress={() => void confirmPhoto()}
+                  disabled={busy}
+                  style={{
+                    minWidth: 140,
+                    height: 48,
+                    borderRadius: 24,
+                    flexDirection: 'row',
+                    gap: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#16865a',
+                  }}
+                >
+                  {busy ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Ionicons name="checkmark" size={20} color="white" />
+                  )}
                   <AppText style={{ color: 'white' }}>Use photo</AppText>
                 </TouchableOpacity>
               </>
@@ -202,9 +304,20 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
                 onPress={capturePhoto}
                 disabled={Boolean(error)}
                 accessibilityLabel="Capture selfie"
-                style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 5, borderColor: 'white', alignItems: 'center', justifyContent: 'center', opacity: error ? 0.5 : 1 }}
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 36,
+                  borderWidth: 5,
+                  borderColor: 'white',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: error ? 0.5 : 1,
+                }}
               >
-                <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'white' }} />
+                <View
+                  style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'white' }}
+                />
               </TouchableOpacity>
             )}
           </View>

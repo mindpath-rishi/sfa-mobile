@@ -30,7 +30,7 @@ const Skeleton: React.FC<SkeletonProps> = ({
         useNativeDriver: true,
       }),
     );
-    
+
     // Optional: Pulsing opacity for more dynamic effect
     const pulseLoop = Animated.loop(
       Animated.sequence([
@@ -103,13 +103,16 @@ const Skeleton: React.FC<SkeletonProps> = ({
               },
             ]}
           />
-          
+
           {/* Secondary subtle shimmer for depth */}
           <Animated.View
             style={[
               styles.shimmerSecondary,
               {
-                transform: [{ translateX: Animated.multiply(translateX, -0.5) }, { skewX: '-15deg' }],
+                transform: [
+                  { translateX: Animated.multiply(translateX, -0.5) },
+                  { skewX: '-15deg' },
+                ],
               },
             ]}
           />

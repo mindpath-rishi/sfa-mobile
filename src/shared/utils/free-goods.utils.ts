@@ -32,9 +32,17 @@ type GroupLike = SchemeLike & {
   lines?: { productId?: string; productName?: string; freeQty?: number }[];
 };
 
-export function collectFreeGoods(items: ItemLike[] = [], groupSchemes: GroupLike[] = []): FreeGood[] {
+export function collectFreeGoods(
+  items: ItemLike[] = [],
+  groupSchemes: GroupLike[] = [],
+): FreeGood[] {
   const goods = new Map<string, FreeGood>();
-  const add = (productId: string | undefined, productName: string | undefined, qty: unknown, unit: unknown) => {
+  const add = (
+    productId: string | undefined,
+    productName: string | undefined,
+    qty: unknown,
+    unit: unknown,
+  ) => {
     const amount = Math.max(Number(qty) || 0, 0);
     if (!productId || amount <= 0) return;
     const resolvedUnit: 'CASE' | 'PIECE' = unit === 'PIECE' ? 'PIECE' : 'CASE';

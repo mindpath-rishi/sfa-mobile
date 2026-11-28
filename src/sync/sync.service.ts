@@ -660,9 +660,14 @@ const download = async (downloadOwnerId = ownerId()) => {
 export const syncService = {
   /** Queue counts, oldest unsent item and last upload, for the diagnostics heartbeat. */
   async getQueueStats() {
-    if (!enabled() || !ownerId()) return { pending: 0, failed: 0, syncing: 0, oldestPendingAt: null, lastUploadAt: null };
+    if (!enabled() || !ownerId())
+      return { pending: 0, failed: 0, syncing: 0, oldestPendingAt: null, lastUploadAt: null };
     const database = await getDatabase();
-    const rows = await database.getAllAsync<{ status: string; count: number; oldest: string | null }>(
+    const rows = await database.getAllAsync<{
+      status: string;
+      count: number;
+      oldest: string | null;
+    }>(
       `SELECT status, COUNT(*) AS count, MIN(created_at) AS oldest FROM sync_queue
        WHERE owner_id = ? AND status IN ('PENDING', 'FAILED', 'SYNCING') GROUP BY status`,
       ownerId(),
@@ -672,7 +677,11 @@ export const syncService = {
       ownerId(),
     );
     const count = (status: string) => rows.find((row) => row.status === status)?.count ?? 0;
-    const oldest = rows.map((row) => row.oldest).filter(Boolean).sort()[0] ?? null;
+    const oldest =
+      rows
+        .map((row) => row.oldest)
+        .filter(Boolean)
+        .sort()[0] ?? null;
     return {
       pending: count('PENDING'),
       failed: count('FAILED'),
@@ -702,7 +711,11 @@ export const syncService = {
   async resetDownloadWatermark() {
     if (!enabled() || !ownerId()) return;
     const database = await getDatabase();
-    await database.runAsync('DELETE FROM settings WHERE owner_id = ? AND key = ?', ownerId(), LAST_SYNC_KEY);
+    await database.runAsync(
+      'DELETE FROM settings WHERE owner_id = ? AND key = ?',
+      ownerId(),
+      LAST_SYNC_KEY,
+    );
     await this.sync();
   },
 

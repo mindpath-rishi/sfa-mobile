@@ -16,14 +16,14 @@ export type DateFormat = keyof typeof DATE_FORMATS;
 export const formatDate = (
   date: string | Date | null | undefined,
   formatStr: string = DATE_FORMATS.DISPLAY,
-  fallback: string = ''
+  fallback: string = '',
 ): string => {
   if (!date) return fallback;
-  
+
   const dateObj = typeof date === 'string' ? parseISO(date) : date;
-  
+
   if (!isValid(dateObj)) return fallback;
-  
+
   return format(dateObj, formatStr);
 };
 
@@ -80,11 +80,11 @@ export const getDaysDifference = (date1: string | Date, date2: string | Date): n
 export const isDateInRange = (
   date: string | Date,
   startDate: string | Date,
-  endDate: string | Date
+  endDate: string | Date,
 ): boolean => {
   const checkDate = typeof date === 'string' ? parseISO(date) : date;
   const start = typeof startDate === 'string' ? parseISO(startDate) : startDate;
   const end = typeof endDate === 'string' ? parseISO(endDate) : endDate;
-  
+
   return checkDate >= start && checkDate <= end;
 };

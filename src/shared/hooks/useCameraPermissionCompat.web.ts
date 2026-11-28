@@ -1,6 +1,5 @@
 const isCameraAvailable = () =>
-  typeof navigator !== 'undefined' &&
-  Boolean(navigator.mediaDevices?.getUserMedia);
+  typeof navigator !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia);
 
 export const useCameraPermissionCompat = () => ({
   // The browser asks for camera permission when SelfieFaceCamera calls

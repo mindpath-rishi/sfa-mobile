@@ -1020,7 +1020,7 @@ const EmptyState = ({ colors }: { colors: any }) => (
     <AppText
       style={{ ...T.body, color: colors.textSecondary, textAlign: 'center', marginBottom: 24 }}
     >
-      This customer doesn't exist or was removed.
+      This customer doesn&apos;t exist or was removed.
     </AppText>
     <TouchableOpacity
       onPress={() => router.back()}

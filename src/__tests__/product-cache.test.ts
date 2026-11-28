@@ -19,8 +19,22 @@ jest.mock('@/shared/services/scheme.service', () => ({
 
 const mockTables: Record<string, any[]> = {
   products: [
-    { productId: 'P1', name: 'Soap', categoryId: 'C1', casePrice: 10, piecePrice: 1, status: 'ACTIVE' },
-    { productId: 'P2', name: 'Salt', categoryId: 'C1', casePrice: 20, piecePrice: 2, status: 'ACTIVE' },
+    {
+      productId: 'P1',
+      name: 'Soap',
+      categoryId: 'C1',
+      casePrice: 10,
+      piecePrice: 1,
+      status: 'ACTIVE',
+    },
+    {
+      productId: 'P2',
+      name: 'Salt',
+      categoryId: 'C1',
+      casePrice: 20,
+      piecePrice: 2,
+      status: 'ACTIVE',
+    },
   ],
   priceLists: [],
   stock: [

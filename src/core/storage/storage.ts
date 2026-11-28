@@ -12,7 +12,7 @@ let mmkv: any = null;
  */
 try {
   // Lazy require (will fail if not installed)
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+
   const { MMKV } = require('react-native-mmkv');
   mmkv = new MMKV();
 } catch {

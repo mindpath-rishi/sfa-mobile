@@ -150,10 +150,11 @@ export function CommonListing<TItem>(props: CommonListingProps<TItem>) {
         headerRight={cardProps.headerRight?.(item)}
         subtitle={cardProps.subtitle?.(item)}
         subtitleRight={cardProps.subtitleRight?.(item)}
-        children={cardProps.children?.(item)}
         showChevron={cardProps.showChevron}
         testID={`${testID}-item-${index}`}
-      />
+      >
+        {cardProps.children?.(item)}
+      </ListingItemCard>
     );
   };
 

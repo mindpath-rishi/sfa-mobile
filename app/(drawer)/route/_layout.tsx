@@ -15,9 +15,7 @@ export default function VisitLayout() {
       }}
     >
       {/* INDEX ONLY */}
-      <Stack.Screen
-        name="index"
-      />
+      <Stack.Screen name="index" />
 
       {/* JUST REGISTER [id], NO HEADER HERE */}
       <Stack.Screen name="[id]" />

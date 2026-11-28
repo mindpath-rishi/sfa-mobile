@@ -26,11 +26,11 @@ export interface HeaderProps {
   showBorder?: boolean;
   headerBackgroundColor?: string;
   style?: any;
-  
+
   // New props for modern gradient design
   useGradient?: boolean;
   gradientColors?: string[];
-  
+
   // Deprecated/legacy
   [key: string]: any;
 }

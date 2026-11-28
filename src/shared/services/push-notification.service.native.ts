@@ -97,8 +97,7 @@ export const getPushNotificationTokenAsync = async (): Promise<string | null> =>
 
   const permission = await requestPermission(messaging());
   const enabled =
-    permission === AuthorizationStatus.AUTHORIZED ||
-    permission === AuthorizationStatus.PROVISIONAL;
+    permission === AuthorizationStatus.AUTHORIZED || permission === AuthorizationStatus.PROVISIONAL;
 
   if (!enabled) return null;
 

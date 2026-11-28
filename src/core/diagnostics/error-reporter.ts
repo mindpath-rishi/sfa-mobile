@@ -41,7 +41,8 @@ const enqueue = (entry: QueuedError) => {
 const fromLog = (level: LogLevel, message: string, meta?: LogMeta) => {
   if (level === 'debug' || (level === 'info' && !verbose)) return;
   if (SKIP.some((pattern) => pattern.test(message))) return;
-  const error = meta && Object.values(meta).find((value) => value instanceof Error) as Error | undefined;
+  const error =
+    meta && (Object.values(meta).find((value) => value instanceof Error) as Error | undefined);
   enqueue({
     level, // debug never reaches here (filtered above)
     message: message.slice(0, 2000),

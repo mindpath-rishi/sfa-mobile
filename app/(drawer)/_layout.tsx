@@ -56,6 +56,7 @@ const SALESMAN_DRAWER_ROUTES = new Set([
   'stock',
   'route',
   'my-target',
+  'expense',
   'switch-route',
   'topup',
   'checkin',
@@ -610,6 +611,13 @@ export default function DrawerLayout() {
       showBack: true,
       backgroundColor: colors.primary,
     },
+    expense: {
+      title: 'Expense',
+      showMenu: false,
+      showFilter: false,
+      showBack: true,
+      backgroundColor: colors.primary,
+    },
     'my-pocket': {
       title: 'My Pocket MIS',
       showMenu: false,
@@ -748,6 +756,11 @@ export default function DrawerLayout() {
           component: MaterialCommunityIcons,
           focusedIcon: 'target',
           unfocusedIcon: 'target',
+        },
+        expense: {
+          component: MaterialCommunityIcons,
+          focusedIcon: 'wallet',
+          unfocusedIcon: 'wallet-outline',
         },
         'switch-route': {
           component: MaterialCommunityIcons,
@@ -891,6 +904,14 @@ export default function DrawerLayout() {
         options={{
           title: 'My Target',
           drawerLabel: 'My Target',
+        }}
+      />
+
+      <Drawer.Screen
+        name="expense"
+        options={{
+          title: 'Expense',
+          drawerLabel: 'Expense',
         }}
       />
 

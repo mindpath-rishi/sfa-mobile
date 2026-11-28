@@ -139,7 +139,6 @@ export const StatsOverviewSection: React.FC<Props> = ({
 
   useEffect(() => {
     fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchStats, refreshSignal]);
 
   const handleRefresh = useCallback(async () => {
@@ -247,7 +246,7 @@ export const StatsOverviewSection: React.FC<Props> = ({
     return (
       <View style={styles.container}>
         <View style={styles.headerContainer}>
-          <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
+          <AppText style={styles.headerTitle}>TODAY&apos;S OVERVIEW</AppText>
           <Skeleton height={32} width={32} variant="circle" />
         </View>
         {renderStatsSkeleton()}
@@ -259,7 +258,7 @@ export const StatsOverviewSection: React.FC<Props> = ({
     return (
       <View style={styles.container}>
         <View style={styles.headerContainer}>
-          <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
+          <AppText style={styles.headerTitle}>TODAY&apos;S OVERVIEW</AppText>
         </View>
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle" size={48} color={colors.error} />
@@ -275,7 +274,7 @@ export const StatsOverviewSection: React.FC<Props> = ({
   return (
     <View style={styles.container}>
       <View style={styles.headerContainer}>
-        <AppText style={styles.headerTitle}>TODAY'S OVERVIEW</AppText>
+        <AppText style={styles.headerTitle}>TODAY&apos;S OVERVIEW</AppText>
         <TouchableOpacity
           hitSlop={13}
           accessibilityLabel="Refresh"

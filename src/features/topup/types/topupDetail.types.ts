@@ -1,4 +1,4 @@
-import { Topup, TopupItem } from "./topup.types";
+import { Topup, TopupItem } from './topup.types';
 
 export interface TopupDetail extends Topup {}
 

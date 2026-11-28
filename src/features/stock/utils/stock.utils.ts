@@ -31,8 +31,7 @@ export const filterStockBySearch = (items: StockItem[], query: string): StockIte
   if (!query) return items;
   const term = query.toLowerCase();
   return items.filter(
-    item => 
-      item.name?.toLowerCase().includes(term) ||
-      item.productId?.toLowerCase().includes(term)
+    (item) =>
+      item.name?.toLowerCase().includes(term) || item.productId?.toLowerCase().includes(term),
   );
 };

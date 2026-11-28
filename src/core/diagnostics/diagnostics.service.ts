@@ -33,15 +33,26 @@ const permission = async (read: () => Promise<{ status: string }>) => {
 
 /** Everything MIS → Devices & App shows about this phone. */
 export const collectDiagnostics = async () => {
-  const [deviceId, freeBytes, network, queue, location, backgroundLocation, notifications] = await Promise.all([
-    getClientDeviceIdAsync(),
-    FileSystem.getFreeDiskStorageAsync().catch(() => null),
-    Network.getNetworkStateAsync().catch(() => null),
-    syncService.getQueueStats().catch(() => null),
-    permission(() => Location.getForegroundPermissionsAsync()),
-    permission(() => Location.getBackgroundPermissionsAsync()),
-    permission(() => Notifications.getPermissionsAsync()),
-  ]);
+  const [deviceId, freeBytes, network, queue, location, backgroundLocation, notifications] =
+    await Promise.all([
+      getClientDeviceIdAsync(),
+      FileSystem.getFreeDiskStorageAsync().catch(() => null),
+      Network.getNetworkStateAsync().catch(() => null),
+      syncService.getQueueStats().catch(() => null),
+      permission(() => Location.getForegroundPermissionsAsync()),
+      permission(() => Location.getBackgroundPermissionsAsync()),
+      permission(() => Notifications.getPermissionsAsync()),
+    ]);
+  // Android 12+: "approximate" (~2 km) location makes live tracking useless.
+  const locationPrecision = await Location.getForegroundPermissionsAsync()
+    .then((result) =>
+      result.android?.accuracy === 'fine'
+        ? 'precise'
+        : result.android?.accuracy === 'coarse'
+          ? 'approximate'
+          : 'unknown',
+    )
+    .catch(() => 'unknown');
   const offline = useOfflineStore.getState();
   return {
     deviceId,
@@ -53,13 +64,22 @@ export const collectDiagnostics = async () => {
     networkType: network?.type ? String(network.type) : undefined,
     lastDownloadAt: offline.lastSyncTime ?? undefined,
     lastUploadAt: queue?.lastUploadAt ?? undefined,
-    queue: queue ? { pending: queue.pending, failed: queue.failed, syncing: queue.syncing, oldestPendingAt: queue.oldestPendingAt ?? undefined } : undefined,
-    permissions: { location, backgroundLocation, notifications },
+    queue: queue
+      ? {
+          pending: queue.pending,
+          failed: queue.failed,
+          syncing: queue.syncing,
+          oldestPendingAt: queue.oldestPendingAt ?? undefined,
+        }
+      : undefined,
+    permissions: { location, backgroundLocation, notifications, locationPrecision },
   };
 };
 
 const complete = (commandId: string, success: boolean, message?: string) =>
-  diagnosticsPost(`/diagnostics/commands/${commandId}/complete`, { success, message }).catch(() => null);
+  diagnosticsPost(`/diagnostics/commands/${commandId}/complete`, { success, message }).catch(
+    () => null,
+  );
 
 const runCommand = async (command: HeartbeatResponse['commands'][number]) => {
   try {
@@ -82,7 +102,11 @@ const runCommand = async (command: HeartbeatResponse['commands'][number]) => {
     }
   } catch (error) {
     logger.error(`Diagnostics command ${command.command} failed`, { error });
-    await complete(command.commandId, false, error instanceof Error ? error.message : String(error));
+    await complete(
+      command.commandId,
+      false,
+      error instanceof Error ? error.message : String(error),
+    );
   }
 };
 
@@ -97,7 +121,10 @@ export const sendHeartbeat = async () => {
   if (running || !useAuthStore.getState().user) return;
   running = true;
   try {
-    const response = await diagnosticsPost<HeartbeatResponse>('/diagnostics/heartbeat', await collectDiagnostics());
+    const response = await diagnosticsPost<HeartbeatResponse>(
+      '/diagnostics/heartbeat',
+      await collectDiagnostics(),
+    );
     if (!response) return;
     useAppUpdateStore.getState().setFromServer({
       updateRequired: response.updateRequired,

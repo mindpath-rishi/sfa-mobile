@@ -166,7 +166,12 @@ httpClient.interceptors.response.use(
         storeUrl: body.storeUrl,
       });
       return Promise.resolve({
-        data: { success: false, statusCode: 426, message: body.message ?? 'Please update the app', data: null },
+        data: {
+          success: false,
+          statusCode: 426,
+          message: body.message ?? 'Please update the app',
+          data: null,
+        },
       } as AxiosResponse<ApiResponse<unknown>>);
     }
 

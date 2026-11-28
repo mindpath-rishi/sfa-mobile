@@ -273,7 +273,12 @@ export const CameraModal: React.FC<CameraModalProps> = ({
               {isValidatingCapture ? (
                 <ActivityIndicator size="small" color="white" style={styles.instructionIcon} />
               ) : (
-                <Ionicons name="scan-outline" size={16} color="white" style={styles.instructionIcon} />
+                <Ionicons
+                  name="scan-outline"
+                  size={16}
+                  color="white"
+                  style={styles.instructionIcon}
+                />
               )}
               <AppText style={styles.instructionText}>
                 {isValidatingCapture ? 'Verifying face…' : title}
@@ -300,7 +305,12 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             ]}
           >
             <BlurView intensity={35} tint="dark" style={styles.errorPill}>
-              <Ionicons name="alert-circle" size={16} color="#FF6B6B" style={styles.instructionIcon} />
+              <Ionicons
+                name="alert-circle"
+                size={16}
+                color="#FF6B6B"
+                style={styles.instructionIcon}
+              />
               <AppText style={styles.errorPillText}>{captureError}</AppText>
             </BlurView>
           </Animated.View>
@@ -354,7 +364,12 @@ export const CameraModal: React.FC<CameraModalProps> = ({
             {isConfirming ? (
               <ActivityIndicator size="small" color="white" style={styles.instructionIcon} />
             ) : (
-              <Ionicons name="image-outline" size={16} color="white" style={styles.instructionIcon} />
+              <Ionicons
+                name="image-outline"
+                size={16}
+                color="white"
+                style={styles.instructionIcon}
+              />
             )}
             <AppText style={styles.instructionText}>
               {isConfirming ? 'Verifying face…' : 'Review your photo'}

@@ -215,3 +215,5 @@ export const OutletCardComponent = React.memo(
   },
   areOutletCardPropsEqual,
 );
+
+OutletCardComponent.displayName = 'OutletCard';

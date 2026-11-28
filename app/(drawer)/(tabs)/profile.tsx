@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, Linking, Platform, InteractionManager } from 'react-native';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Linking,
+  Platform,
+  InteractionManager,
+} from 'react-native';
 import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -20,7 +28,11 @@ import {
   setPushNotificationsEnabledAsync,
 } from '@/shared/services/push-notification.service';
 import { isSalesman } from '@/core/navigation/role.utils';
-import { isOfflineMode, saveOfflinePreference, useOfflineStore } from '@/core/offline/offline.store';
+import {
+  isOfflineMode,
+  saveOfflinePreference,
+  useOfflineStore,
+} from '@/core/offline/offline.store';
 import { OfflineStatusBanner } from '@/core/offline/OfflineStatusBanner';
 import { syncService } from '@/sync';
 import {

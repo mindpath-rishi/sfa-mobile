@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as Network from 'expo-network';
 import * as TaskManager from 'expo-task-manager';
 import { jwtDecode } from 'jwt-decode';
-import { AppState, Linking, Platform } from 'react-native';
+import { Alert, AppState, Linking, Platform } from 'react-native';
 import * as Application from 'expo-application';
 import * as IntentLauncher from 'expo-intent-launcher';
 import { io } from 'socket.io-client';
@@ -13,6 +13,7 @@ import { useOfflineStore } from '@/core/offline/offline.store';
 import { storage } from '@/core/storage';
 import { useAuthStore } from '@/core/store/auth.store';
 import { repositories } from '@/repositories';
+import { stabilizeStationaryFix } from '@/shared/utils/location-noise.utils';
 
 import { getAccessToken } from './tokenStorage';
 import {
@@ -22,6 +23,8 @@ import {
   syncNativePendingLocationUploads,
 } from './native-location.service';
 import { requestBackgroundLocationDisclosure } from './backgroundLocationDisclosure.bridge';
+import { requestBackgroundTrackingSetup } from './backgroundTrackingSetup.bridge';
+import { getBackgroundTrackingStatus, isBackgroundTrackingReady } from './backgroundTrackingSetup';
 import {
   getTrackingConfig,
   loadTrackingConfig,
@@ -29,12 +32,18 @@ import {
 } from '@/core/location/tracking-config';
 
 export const SALESMAN_BACKGROUND_LOCATION_TASK = 'salesman-background-location';
+/**
+ * iOS stops location updates when the user swipes the app away. A geofence
+ * around the last position (region monitoring) makes iOS relaunch the app in
+ * the background once the phone leaves it, and tracking is started again.
+ */
+export const IOS_WAKE_GEOFENCE_TASK = 'salesman-ios-wake-geofence';
+const IOS_WAKE_GEOFENCE_RADIUS_M = 150;
 
 const locationTrackingKey = (ownerId: string) => `location_tracking_enabled:${ownerId}`;
 const ACTIVE_LOCATION_SESSION_KEY = 'active_location_work_session_id';
 const LAST_BACKGROUND_LOCATION_KEY = 'last_background_location';
 const LAST_BACKGROUND_LOCATION_ERROR_KEY = 'last_background_location_error';
-const BATTERY_OPTIMIZATION_PROMPTED_KEY = 'battery_optimization_prompted';
 const BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY =
   'background_location_disclosure_acknowledged';
 
@@ -47,7 +56,6 @@ const BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY =
  */
 // Matches the native Android service cadence. 1s/1m produced a GPS callback + upload
 // every second, keeping the JS thread busy (UI jank) and draining battery.
-
 
 /**
  * Native Android service interval.
@@ -66,6 +74,12 @@ const BACKGROUND_LOCATION_DISCLOSURE_ACKNOWLEDGED_KEY =
  * Do not keep this too low, otherwise valid background points get rejected as stale.
  */
 const LOCATION_MAX_AGE_MS = 120_000;
+/**
+ * Background task limits. Android batches background points and often
+ * delivers Wi-Fi/cell fixes there, so the foreground limits drop most of them.
+ */
+const BACKGROUND_LOCATION_MAX_AGE_MS = 10 * 60_000;
+const BACKGROUND_MIN_ACCURACY_LIMIT_METERS = 150;
 // Browser geolocation often falls back to Wi-Fi/IP positioning, which can be
 // less precise than a native GPS fix. Accept those fixes for web workflows.
 const WEB_LOCATION_MAX_ACCURACY_METERS = 1_000;
@@ -101,24 +115,6 @@ const RETRY_DELAYS_MS = [5_000, 10_000, 20_000, 40_000, 60_000] as const;
 const OFFLINE_BATCH_SIZE = 50;
 const MAX_OFFLINE_LOCATIONS = 1_000;
 const OFFLINE_LOCATION_DISTANCE_METERS = 3;
-
-const requestBatteryOptimizationPermission = async () => {
-  if (Platform.OS !== 'android') return;
-
-  const alreadyPrompted = await storage.getItem(BATTERY_OPTIMIZATION_PROMPTED_KEY);
-
-  if (alreadyPrompted === 'true') return;
-
-  await storage.setItem(BATTERY_OPTIMIZATION_PROMPTED_KEY, 'true');
-
-  console.info(
-    '[Battery] Background tracking may be interrupted by Android battery optimization. Please allow unrestricted battery usage for this app.',
-  );
-};
-
-export const resetBatteryOptimizationPrompt = async () => {
-  await storage.removeItem(BATTERY_OPTIMIZATION_PROMPTED_KEY);
-};
 
 /**
  * Google Play's Prominent Disclosure & Consent requirement: before the OS
@@ -188,6 +184,8 @@ type LocationDeliveryItem = {
   location: CapturedLocation;
   workSessionId?: string;
   emittedRealtime: boolean;
+  /** Captured by the background task (sent as BACKGROUND even if the app is open). */
+  fromBackgroundTask?: boolean;
 };
 
 let webLocationWatchId: number | null = null;
@@ -286,9 +284,17 @@ const rejectLocation = (reason: string, location: CapturedLocation) => {
 
 const validateLocation = (
   location: CapturedLocation,
-  options: { compareWithPrevious?: boolean; registerAcceptance?: boolean } = {},
+  options: {
+    compareWithPrevious?: boolean;
+    registerAcceptance?: boolean;
+    background?: boolean;
+  } = {},
 ): CapturedLocation | null => {
-  const { latitude, longitude, accuracy, speed, capturedAt } = location;
+  const { latitude, longitude, accuracy, capturedAt } = location;
+  const maxAgeMs = options.background ? BACKGROUND_LOCATION_MAX_AGE_MS : LOCATION_MAX_AGE_MS;
+  const maxAccuracy = options.background
+    ? Math.max(getMaxLocationAccuracy(), BACKGROUND_MIN_ACCURACY_LIMIT_METERS)
+    : getMaxLocationAccuracy();
   const timestamp = new Date(capturedAt).getTime();
 
   if (
@@ -305,11 +311,11 @@ const validateLocation = (
 
   const age = Date.now() - timestamp;
 
-  if (age < -10_000 || age > LOCATION_MAX_AGE_MS) {
+  if (age < -10_000 || age > maxAgeMs) {
     return rejectLocation(`stale location (${age}ms old)`, location);
   }
 
-  if (accuracy != null && (!Number.isFinite(accuracy) || accuracy > getMaxLocationAccuracy())) {
+  if (accuracy != null && (!Number.isFinite(accuracy) || accuracy > maxAccuracy)) {
     return rejectLocation(`accuracy ${accuracy}m exceeds limit`, location);
   }
 
@@ -319,43 +325,58 @@ const validateLocation = (
     return rejectLocation('duplicate timestamp and coordinates', location);
   }
 
-  if (speed != null && Number.isFinite(speed) && speed > MAX_SPEED_METERS_PER_SECOND) {
-    return rejectLocation(`reported speed ${speed}m/s exceeds limit`, location);
-  }
-
+  let acceptedLocation = location;
+  let stationary = false;
   if (options.compareWithPrevious !== false && lastAcceptedLocation) {
     const previousTimestamp = new Date(lastAcceptedLocation.capturedAt).getTime();
     const elapsedSeconds = (timestamp - previousTimestamp) / 1_000;
+    const distance = distanceInMeters(lastAcceptedLocation, location);
+    const stabilized = stabilizeStationaryFix(lastAcceptedLocation, location, distance);
+    acceptedLocation = stabilized.location;
+    stationary = stabilized.stationary;
 
-    if (elapsedSeconds > 0) {
-      const calculatedSpeed = distanceInMeters(lastAcceptedLocation, location) / elapsedSeconds;
+    if (!stationary && elapsedSeconds > 0) {
+      const calculatedSpeed = distance / elapsedSeconds;
 
       if (calculatedSpeed > MAX_SPEED_METERS_PER_SECOND) {
         return rejectLocation(`impossible GPS jump (${calculatedSpeed.toFixed(1)}m/s)`, location);
       }
     }
+  } else if (options.registerAcceptance !== false) {
+    acceptedLocation = stabilizeStationaryFix(null, location, 0).location;
+  }
+
+  if (
+    acceptedLocation.speed != null &&
+    Number.isFinite(acceptedLocation.speed) &&
+    acceptedLocation.speed > MAX_SPEED_METERS_PER_SECOND
+  ) {
+    return rejectLocation(`reported speed ${acceptedLocation.speed}m/s exceeds limit`, location);
   }
 
   if (options.registerAcceptance !== false) {
     acceptedLocationKeys.add(duplicateKey);
+    acceptedLocationKeys.add(locationKey(acceptedLocation));
 
     if (acceptedLocationKeys.size > 300) {
       const oldest = acceptedLocationKeys.values().next().value;
       if (oldest) acceptedLocationKeys.delete(oldest);
     }
 
-    lastAcceptedLocation = location;
-    latestCapturedLocation = location;
+    lastAcceptedLocation = acceptedLocation;
+    latestCapturedLocation = acceptedLocation;
   }
 
   logLocation('GPS acquired', {
-    latitude,
-    longitude,
-    accuracy,
+    latitude: acceptedLocation.latitude,
+    longitude: acceptedLocation.longitude,
+    accuracy: acceptedLocation.accuracy,
+    speed: acceptedLocation.speed,
+    stationary,
     capturedAt,
   });
 
-  return location;
+  return acceptedLocation;
 };
 
 export const isValidLocation = (location: CapturedLocation) =>
@@ -383,6 +404,43 @@ const getActiveSessionId = async (workSessionId?: string) =>
   useAuthStore.getState().workSessionId ||
   (await storage.getItem(ACTIVE_LOCATION_SESSION_KEY)) ||
   undefined;
+
+/**
+ * Android 12+ lets the user grant only "approximate" location (~2 km). Those
+ * fixes are all dropped by the accuracy filter, so live tracking would look
+ * frozen or wrong; tell the user how to fix it (once per app session).
+ */
+export type LocationPrecision = 'precise' | 'approximate' | 'unknown';
+
+export const getLocationPrecision = (
+  permission: Location.LocationPermissionResponse,
+): LocationPrecision => {
+  if (Platform.OS !== 'android') return 'unknown';
+  const accuracy = permission.android?.accuracy;
+  if (accuracy === 'fine') return 'precise';
+  if (accuracy === 'coarse') return 'approximate';
+  return 'unknown';
+};
+
+let approximateLocationWarned = false;
+
+const warnIfApproximateLocation = async (permission: Location.LocationPermissionResponse) => {
+  if (getLocationPrecision(permission) !== 'approximate') return;
+  logLocation('Precise location is off', { accuracy: permission.android?.accuracy });
+  await setLastUploadError(
+    'Precise location is off. Live tracking needs precise location: Settings → Location → Precise.',
+  );
+  if (approximateLocationWarned) return;
+  approximateLocationWarned = true;
+  Alert.alert(
+    'Turn on precise location',
+    'Sales Stream only has your approximate location, so your route and live position cannot be tracked correctly.\n\nOpen settings → Permissions → Location and turn on "Use precise location".',
+    [
+      { text: 'Later', style: 'cancel' },
+      { text: 'Open settings', onPress: () => void Linking.openSettings() },
+    ],
+  );
+};
 
 const setLastUploadError = async (error: unknown) => {
   lastUploadError = errorMessage(error);
@@ -585,10 +643,15 @@ const postLocationPayload = async (payload: Record<string, unknown>) => {
   }
 };
 
-const uploadLocationRequest = async (location: CapturedLocation, workSessionId: string) => {
+const uploadLocationRequest = async (
+  location: CapturedLocation,
+  workSessionId: string,
+  fromBackgroundTask = false,
+) => {
   const payload = {
     workSessionId,
-    source: currentAppState === 'active' ? 'FOREGROUND' : 'BACKGROUND',
+    // The backend gives BACKGROUND points the looser accuracy limit.
+    source: currentAppState === 'active' && !fromBackgroundTask ? 'FOREGROUND' : 'BACKGROUND',
     location,
   };
 
@@ -628,14 +691,14 @@ const uploadLocationBatchRequest = async (locations: CapturedLocation[], workSes
 const uploadWithRetry = async (
   location: CapturedLocation,
   workSessionId: string,
-  options: { background?: boolean } = {},
+  options: { background?: boolean; fromBackgroundTask?: boolean } = {},
 ) => {
   const retryDelays = options.background ? [3_000] : RETRY_DELAYS_MS;
   let failure: unknown;
 
   for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
     try {
-      await uploadLocationRequest(location, workSessionId);
+      await uploadLocationRequest(location, workSessionId, options.fromBackgroundTask);
 
       await storage.setItem(
         LAST_BACKGROUND_LOCATION_KEY,
@@ -796,7 +859,11 @@ const hasNetworkConnection = async () => {
 const shouldStoreLocationOffline = async () =>
   useOfflineStore.getState().offlineEnabled || !(await hasNetworkConnection());
 
-const processAcceptedLocation = async (accepted: CapturedLocation, workSessionId?: string) => {
+const processAcceptedLocation = async (
+  accepted: CapturedLocation,
+  workSessionId?: string,
+  fromBackgroundTask = false,
+) => {
   const sessionId = await getActiveSessionId(workSessionId);
 
   if (!sessionId) {
@@ -824,6 +891,7 @@ const processAcceptedLocation = async (accepted: CapturedLocation, workSessionId
 
   const uploaded = await uploadWithRetry(accepted, sessionId, {
     background: isBackground,
+    fromBackgroundTask,
   });
 
   if (uploaded) {
@@ -848,7 +916,7 @@ const drainLocationDeliveryQueue = async () => {
       if (!item) continue;
 
       try {
-        await processAcceptedLocation(item.location, item.workSessionId);
+        await processAcceptedLocation(item.location, item.workSessionId, item.fromBackgroundTask);
       } catch (error) {
         await setLastUploadError(error);
       }
@@ -860,8 +928,12 @@ const drainLocationDeliveryQueue = async () => {
   return activeLocationDelivery;
 };
 
-const queueLocation = (location: CapturedLocation, workSessionId?: string) => {
-  const accepted = validateLocation(location);
+const queueLocation = (
+  location: CapturedLocation,
+  workSessionId?: string,
+  options: { background?: boolean } = {},
+) => {
+  const accepted = validateLocation(location, { background: options.background });
 
   if (!accepted) return Promise.resolve();
 
@@ -874,6 +946,7 @@ const queueLocation = (location: CapturedLocation, workSessionId?: string) => {
     location: accepted,
     workSessionId,
     emittedRealtime: false,
+    fromBackgroundTask: options.background,
   });
 
   /**
@@ -977,12 +1050,10 @@ const startWebLocationTracking = () => {
 
       const intervalReached =
         !lastWebLocation ||
-        position.timestamp - new Date(lastWebLocation.capturedAt).getTime() >=
-          fgIntervalMs();
+        position.timestamp - new Date(lastWebLocation.capturedAt).getTime() >= fgIntervalMs();
 
       const distanceReached =
-        !!lastWebLocation &&
-        distanceInMeters(lastWebLocation, location) >= fgDistanceM();
+        !!lastWebLocation && distanceInMeters(lastWebLocation, location) >= fgDistanceM();
 
       if (intervalReached || distanceReached) {
         lastWebLocation = location;
@@ -1040,10 +1111,73 @@ if (!TaskManager.isTaskDefined(SALESMAN_BACKGROUND_LOCATION_TASK)) {
        * If this function returns early, Android may suspend JS before upload/offline save finishes.
        */
       for (const nativeLocation of locations) {
-        await queueLocation(toCapturedLocation(nativeLocation), workSessionId);
+        await queueLocation(toCapturedLocation(nativeLocation), workSessionId, {
+          background: true,
+        });
       }
     },
   );
+}
+
+const placeIosWakeGeofence = async (center?: { latitude: number; longitude: number }) => {
+  if (Platform.OS !== 'ios') return;
+  const point =
+    center ??
+    latestCapturedLocation ??
+    (await Location.getLastKnownPositionAsync().catch(() => null))?.coords;
+  if (!point) return;
+  await Location.startGeofencingAsync(IOS_WAKE_GEOFENCE_TASK, [
+    {
+      identifier: 'tracking-wake',
+      latitude: point.latitude,
+      longitude: point.longitude,
+      radius: IOS_WAKE_GEOFENCE_RADIUS_M,
+      notifyOnEnter: false,
+      notifyOnExit: true,
+    },
+  ]);
+};
+
+const stopIosWakeGeofence = async () => {
+  if (Platform.OS !== 'ios') return;
+  if (await Location.hasStartedGeofencingAsync(IOS_WAKE_GEOFENCE_TASK).catch(() => false)) {
+    await Location.stopGeofencingAsync(IOS_WAKE_GEOFENCE_TASK);
+  }
+};
+
+type GeofenceTaskData = { eventType?: Location.GeofencingEventType };
+
+if (!TaskManager.isTaskDefined(IOS_WAKE_GEOFENCE_TASK)) {
+  TaskManager.defineTask<GeofenceTaskData>(IOS_WAKE_GEOFENCE_TASK, async ({ data, error }) => {
+    if (error || Platform.OS !== 'ios') return;
+    if (data?.eventType !== Location.GeofencingEventType.Exit) return;
+
+    const workSessionId = await storage.getItem(ACTIVE_LOCATION_SESSION_KEY);
+    if (!workSessionId) {
+      await stopIosWakeGeofence();
+      return;
+    }
+
+    try {
+      const running = await Location.hasStartedLocationUpdatesAsync(
+        SALESMAN_BACKGROUND_LOCATION_TASK,
+      );
+      const fix = await Location.getLastKnownPositionAsync().catch(() => null);
+
+      if (!running) {
+        // App was closed: iOS relaunched it for this geofence exit.
+        logLocation('iOS tracking resumed after leaving the wake area');
+        await startBackgroundTracking();
+        if (fix) {
+          await queueLocation(toCapturedLocation(fix), workSessionId, { background: true });
+        }
+      }
+
+      await placeIosWakeGeofence(fix?.coords);
+    } catch (wakeError) {
+      await setLastUploadError(wakeError);
+    }
+  });
 }
 
 const withLocationTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
@@ -1106,7 +1240,7 @@ const performLocationCapture = async (
           accuracy: Location.Accuracy.BestForNavigation,
           mayShowUserSettingsDialog: true,
         }),
-        10_000,
+        20_000,
       );
 
       const captured = toCapturedLocation(nativeLocation);
@@ -1138,6 +1272,10 @@ const performLocationCapture = async (
         }
       }
 
+      // Callers asking for a fresh fix (check-in, route map, geo-tag) must not
+      // silently receive an old device cache when GPS cannot get a new fix.
+      if (!preferCached) throw freshLocationError;
+
       const lastKnown = await Location.getLastKnownPositionAsync({
         maxAge: LOCATION_MAX_AGE_MS,
         requiredAccuracy: maxAccuracyM(),
@@ -1164,7 +1302,7 @@ export const captureCurrentLocation = async (
 
   activeLocationCapture = withLocationTimeout(
     performLocationCapture(options.preferCached !== false),
-    options.timeoutMs ?? 12_000,
+    options.timeoutMs ?? 22_000,
   ).catch((error) => {
     console.warn('[Location] Complete GPS capture timed out:', error);
     return undefined;
@@ -1301,10 +1439,7 @@ const restartHeartbeat = (workSessionId: string) => {
 
   heartbeatTimer = null;
 
-  const interval =
-    currentAppState === 'active'
-      ? heartbeatMs()
-      : heartbeatMs();
+  const interval = currentAppState === 'active' ? heartbeatMs() : heartbeatMs();
 
   if (interval <= 0) return;
 
@@ -1405,6 +1540,7 @@ const startNativeAndroidBackgroundTracking = async (workSessionId: string) => {
       intervalMs: bgIntervalMs(),
       distanceMeters: bgDistanceM(),
       accuracy: getTrackingConfig().accuracyMode,
+      maxAccuracyM: getTrackingConfig().maxAccuracyM,
     });
 
     nativeBackgroundTrackingStarted = started === true;
@@ -1533,12 +1669,6 @@ const performStartSalesmanBackgroundLocation = async (
 
   startConnectivitySync();
 
-  /**
-   * Android battery optimization can stop background tracking after a few minutes.
-   * Ask the user to set the app to Unrestricted when live tracking starts.
-   */
-  safeRun(requestBatteryOptimizationPermission(), 'Battery optimization prompt check failed');
-
   if (Platform.OS === 'web') {
     startWebLocationTracking();
     return;
@@ -1556,6 +1686,8 @@ const performStartSalesmanBackgroundLocation = async (
 
       return;
     }
+
+    await warnIfApproximateLocation(foreground);
 
     if (!(await Location.hasServicesEnabledAsync())) {
       logLocation('GPS disabled');
@@ -1579,6 +1711,16 @@ const performStartSalesmanBackgroundLocation = async (
       canPrompt: options?.canPromptDisclosure !== false,
     });
 
+    if (disclosureAccepted && options?.canPromptDisclosure !== false) {
+      // "Allow all the time", battery Unrestricted, Autostart: without them the
+      // phone stops tracking a few minutes after the app is left.
+      const setup = await getBackgroundTrackingStatus().catch(() => null);
+      if (setup && !isBackgroundTrackingReady(setup)) {
+        logLocation('Background tracking setup incomplete', setup);
+        await requestBackgroundTrackingSetup();
+      }
+    }
+
     if (!disclosureAccepted) {
       logLocation('Background location disclosure declined by user');
     } else if (!getTrackingConfig().backgroundEnabled) {
@@ -1587,6 +1729,7 @@ const performStartSalesmanBackgroundLocation = async (
       await startNativeAndroidBackgroundTracking(activeSessionId);
     } else if (Platform.OS === 'ios') {
       await startBackgroundTracking();
+      safeRun(placeIosWakeGeofence(), 'iOS wake geofence failed');
     }
 
     /**
@@ -1714,6 +1857,8 @@ export const stopSalesmanBackgroundLocation = async () => {
       await Location.stopLocationUpdatesAsync(SALESMAN_BACKGROUND_LOCATION_TASK);
       logLocation('Background task stopped');
     }
+
+    await stopIosWakeGeofence();
   } catch (error) {
     console.warn('[Location] Unable to stop background location:', error);
   }
@@ -1762,6 +1907,7 @@ export const getBackgroundLocationDiagnostics = async () => {
     gpsEnabled,
     foregroundPermission: foregroundPermission.status,
     backgroundPermission: backgroundPermission.status,
+    locationPrecision: getLocationPrecision(foregroundPermission),
     trackingRunning:
       foregroundTrackingRunning || backgroundTaskRunning || nativeBackgroundTrackingStarted,
     foregroundTrackingRunning,

@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
+import { View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { appAlert } from '@/core/alert/appAlert';
 import { Text } from '@/core/components/Text/ScaledText';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -40,7 +36,7 @@ export const DayEndConfirmationModal: React.FC<DayEndModalProps> = ({
     try {
       await onConfirm(carryForwardStock);
       setShowSuccessMessage(true);
-      
+
       // Auto close after 3 seconds
       setTimeout(() => {
         setShowSuccessMessage(false);
@@ -92,8 +88,8 @@ export const DayEndConfirmationModal: React.FC<DayEndModalProps> = ({
             <View style={styles.messageCard}>
               <MaterialIcons name="assignment" size={32} color={colors.primary} />
               <Text style={styles.messageText}>
-                Your ERP order has been successfully created based on the physical stock count.
-                The warehouse team will process your order shortly.
+                Your ERP order has been successfully created based on the physical stock count. The
+                warehouse team will process your order shortly.
               </Text>
             </View>
 
@@ -101,9 +97,7 @@ export const DayEndConfirmationModal: React.FC<DayEndModalProps> = ({
               <Text style={styles.nextStepsTitle}>What happens next?</Text>
               <View style={styles.nextStepItem}>
                 <View style={styles.stepDot} />
-                <Text style={styles.nextStepText}>
-                  ERP order will be processed within 24 hours
-                </Text>
+                <Text style={styles.nextStepText}>ERP order will be processed within 24 hours</Text>
               </View>
               <View style={styles.nextStepItem}>
                 <View style={styles.stepDot} />
@@ -113,9 +107,7 @@ export const DayEndConfirmationModal: React.FC<DayEndModalProps> = ({
               </View>
               <View style={styles.nextStepItem}>
                 <View style={styles.stepDot} />
-                <Text style={styles.nextStepText}>
-                  Stock adjustment report will be generated
-                </Text>
+                <Text style={styles.nextStepText}>Stock adjustment report will be generated</Text>
               </View>
             </View>
 
@@ -169,7 +161,8 @@ export const DayEndConfirmationModal: React.FC<DayEndModalProps> = ({
                 <View style={styles.checkboxContent}>
                   <Text style={styles.checkboxTitle}>Carry Forward Van Stock</Text>
                   <Text style={styles.checkboxDescription}>
-                    Keep remaining stock in van for next day. Unchecked will return all stock to warehouse.
+                    Keep remaining stock in van for next day. Unchecked will return all stock to
+                    warehouse.
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -223,9 +216,7 @@ export const DayEndConfirmationModal: React.FC<DayEndModalProps> = ({
                 ) : (
                   <>
                     <Ionicons name="checkmark-circle" size={20} color={colors.surface} />
-                    <Text style={[styles.buttonText, { color: colors.surface }]}>
-                      Submit
-                    </Text>
+                    <Text style={[styles.buttonText, { color: colors.surface }]}>Submit</Text>
                   </>
                 )}
               </TouchableOpacity>

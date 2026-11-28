@@ -90,8 +90,7 @@ export interface GroupSchemeBenefit {
 const EPSILON = 1e-9;
 
 export const isGroupSchemeType = (schemeType?: string): schemeType is GroupSchemeType =>
-  schemeType === 'GROUP_FREE_QTY' ||
-  schemeType === 'COMBO_FREE_QTY';
+  schemeType === 'GROUP_FREE_QTY' || schemeType === 'COMBO_FREE_QTY';
 
 const includes = (ids: string[] | undefined, value?: string) =>
   Boolean(ids?.length && value && ids.includes(value));

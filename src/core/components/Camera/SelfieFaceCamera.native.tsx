@@ -265,7 +265,12 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
                 {isConfirming ? (
                   <ActivityIndicator size="small" color="white" style={styles.instructionIcon} />
                 ) : (
-                  <Ionicons name="image-outline" size={16} color="white" style={styles.instructionIcon} />
+                  <Ionicons
+                    name="image-outline"
+                    size={16}
+                    color="white"
+                    style={styles.instructionIcon}
+                  />
                 )}
                 <AppText style={styles.instructionText}>
                   {isConfirming ? 'Verifying face…' : 'Review your photo'}
@@ -276,7 +281,12 @@ export const SelfieFaceCamera: React.FC<SelfieFaceCameraProps> = ({
             {captureError && (
               <View style={[styles.previewHeader, { top: undefined, marginTop: 60 }]}>
                 <BlurView intensity={35} tint="dark" style={styles.errorPill}>
-                  <Ionicons name="alert-circle" size={16} color="#FF6B6B" style={styles.instructionIcon} />
+                  <Ionicons
+                    name="alert-circle"
+                    size={16}
+                    color="#FF6B6B"
+                    style={styles.instructionIcon}
+                  />
                   <AppText style={styles.errorPillText}>{captureError}</AppText>
                 </BlurView>
               </View>

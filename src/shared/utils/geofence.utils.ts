@@ -14,12 +14,7 @@ export type GeofenceStatus = {
 /**
  * Calculate distance between two coordinates (meters)
  */
-export const getDistance = (
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number => {
+export const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Earth radius in km
 
   const dLat = (lat2 - lat1) * (Math.PI / 180);
@@ -27,9 +22,7 @@ export const getDistance = (
 
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos(lat1 * (Math.PI / 180)) *
-      Math.cos(lat2 * (Math.PI / 180)) *
-      Math.sin(dLon / 2) ** 2;
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) ** 2;
 
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
@@ -39,17 +32,8 @@ export const getDistance = (
 /**
  * Check if user is inside a geofence
  */
-export const isInsideGeofence = (
-  userLat: number,
-  userLng: number,
-  geofence: Geofence
-): boolean => {
-  const distance = getDistance(
-    userLat,
-    userLng,
-    geofence.latitude,
-    geofence.longitude
-  );
+export const isInsideGeofence = (userLat: number, userLng: number, geofence: Geofence): boolean => {
+  const distance = getDistance(userLat, userLng, geofence.latitude, geofence.longitude);
 
   return distance <= geofence.radius;
 };
@@ -60,7 +44,7 @@ export const isInsideGeofence = (
 export const checkGeofences = (
   userLat: number,
   userLng: number,
-  geofences: Geofence[]
+  geofences: Geofence[],
 ): GeofenceStatus => {
   const result: GeofenceStatus = {};
 
@@ -74,10 +58,7 @@ export const checkGeofences = (
 /**
  * Detect ENTER / EXIT events
  */
-export const detectGeofenceEvents = (
-  prevStatus: GeofenceStatus,
-  currentStatus: GeofenceStatus
-) => {
+export const detectGeofenceEvents = (prevStatus: GeofenceStatus, currentStatus: GeofenceStatus) => {
   const events: {
     id: string;
     type: 'ENTER' | 'EXIT';

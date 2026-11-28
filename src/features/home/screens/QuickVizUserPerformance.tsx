@@ -79,15 +79,45 @@ const kpiRows: TableRow[] = [
 ];
 
 const mbrRows: TableRow[] = [
-  { user: 'Kunal Nigolkar', totalOutlets: '2,730', netValue: '7 M', newOutlets: '0', orderQty: '24,342' },
-  { user: 'Mohammed\nPatel', totalOutlets: '641', netValue: '1.1 M', newOutlets: '0', orderQty: '3,054' },
+  {
+    user: 'Kunal Nigolkar',
+    totalOutlets: '2,730',
+    netValue: '7 M',
+    newOutlets: '0',
+    orderQty: '24,342',
+  },
+  {
+    user: 'Mohammed\nPatel',
+    totalOutlets: '641',
+    netValue: '1.1 M',
+    newOutlets: '0',
+    orderQty: '3,054',
+  },
   { user: 'empty', totalOutlets: '0', netValue: '1.1 M', newOutlets: '0', orderQty: '3,149' },
 ];
 
 const ttRows: TableRow[] = [
-  { user: 'Parmar\nAbusufyan', totalOutlets: '1,508', newOutlets: '0', netValue: '2.6 M', orderQty: '7,517' },
-  { user: 'Bijawar\nChhalawala', totalOutlets: '492', newOutlets: '0', netValue: '2 M', orderQty: '5,252' },
-  { user: 'Shahab Kamal', totalOutlets: '2,090', newOutlets: '1', netValue: '5.4 M', orderQty: '18,286' },
+  {
+    user: 'Parmar\nAbusufyan',
+    totalOutlets: '1,508',
+    newOutlets: '0',
+    netValue: '2.6 M',
+    orderQty: '7,517',
+  },
+  {
+    user: 'Bijawar\nChhalawala',
+    totalOutlets: '492',
+    newOutlets: '0',
+    netValue: '2 M',
+    orderQty: '5,252',
+  },
+  {
+    user: 'Shahab Kamal',
+    totalOutlets: '2,090',
+    newOutlets: '1',
+    netValue: '5.4 M',
+    orderQty: '18,286',
+  },
 ];
 
 const contribution = [
@@ -118,7 +148,10 @@ function DataTable({
       <View>
         <View style={styles.tableRow}>
           {columns.map((column) => (
-            <View key={column.key} style={[styles.tableCell, styles.tableHeadCell, { width: column.width }]}>
+            <View
+              key={column.key}
+              style={[styles.tableCell, styles.tableHeadCell, { width: column.width }]}
+            >
               <AppText style={styles.tableHeadText}>{column.label}</AppText>
             </View>
           ))}
@@ -134,7 +167,12 @@ function DataTable({
                   column.highlight && styles.highlightCell,
                 ]}
               >
-                <AppText style={[styles.tableText, index === rows.length - 1 && row.zone === 'Total' && styles.boldText]}>
+                <AppText
+                  style={[
+                    styles.tableText,
+                    index === rows.length - 1 && row.zone === 'Total' && styles.boldText,
+                  ]}
+                >
                   {row[column.key] || '-'}
                 </AppText>
               </View>
@@ -209,7 +247,7 @@ function BrandContribution({ colors }: { colors: any }) {
             <View style={[styles.legendDot, { backgroundColor: item.color }]} />
             <AppText style={styles.legendLabel}>{item.label}</AppText>
             <AppText style={styles.legendValue}>
-              {item.value}  {item.percent}
+              {item.value} {item.percent}
             </AppText>
           </View>
         ))}
@@ -271,7 +309,14 @@ export default function QuickVizUserPerformanceScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.topBar}>
-        <TouchableOpacity hitSlop={12} accessibilityLabel="Back" accessibilityRole="button" style={styles.backButton} activeOpacity={0.78} onPress={() => router.back()}>
+        <TouchableOpacity
+          hitSlop={12}
+          accessibilityLabel="Back"
+          accessibilityRole="button"
+          style={styles.backButton}
+          activeOpacity={0.78}
+          onPress={() => router.back()}
+        >
           <Ionicons name="arrow-back" size={20} color={colors.info} />
         </TouchableOpacity>
         <View style={styles.titleWrap}>
@@ -281,39 +326,85 @@ export default function QuickVizUserPerformanceScreen() {
         <View style={styles.dateChip}>
           <AppText style={styles.dateChipText}>01 Nov 2025-16 Nov 2025</AppText>
         </View>
-        <TouchableOpacity hitSlop={13} accessibilityLabel="Filter" accessibilityRole="button" style={styles.filterButton} activeOpacity={0.78}>
+        <TouchableOpacity
+          hitSlop={13}
+          accessibilityLabel="Filter"
+          accessibilityRole="button"
+          style={styles.filterButton}
+          activeOpacity={0.78}
+        >
           <Ionicons name="filter" size={18} color={colors.info} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <SectionCard title="Drop size Case" colors={colors}>
-          <DataTable columns={[COLUMNS.user, COLUMNS.orderQty, COLUMNS.productive]} rows={dropSizeRows} colors={colors} />
+          <DataTable
+            columns={[COLUMNS.user, COLUMNS.orderQty, COLUMNS.productive]}
+            rows={dropSizeRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="Coverage Per" colors={colors}>
-          <DataTable columns={[COLUMNS.user, COLUMNS.utc, COLUMNS.totalOutlets]} rows={coveragePerRows} colors={colors} />
+          <DataTable
+            columns={[COLUMNS.user, COLUMNS.utc, COLUMNS.totalOutlets]}
+            rows={coveragePerRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="Outlet Performance" colors={colors}>
-          <DataTable columns={[COLUMNS.zone, COLUMNS.utc, COLUMNS.upc, COLUMNS.orderQty, COLUMNS.drop]} rows={outletRows} colors={colors} />
+          <DataTable
+            columns={[COLUMNS.zone, COLUMNS.utc, COLUMNS.upc, COLUMNS.orderQty, COLUMNS.drop]}
+            rows={outletRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="Brand Wise Performance" colors={colors}>
-          <DataTable columns={[COLUMNS.user, COLUMNS.orderQty, COLUMNS.upc, COLUMNS.contribution]} rows={brandRows} colors={colors} />
+          <DataTable
+            columns={[COLUMNS.user, COLUMNS.orderQty, COLUMNS.upc, COLUMNS.contribution]}
+            rows={brandRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="Call Compliance and Sales KPIs" colors={colors}>
-          <DataTable columns={[COLUMNS.user, COLUMNS.sc, COLUMNS.tc, COLUMNS.pc, COLUMNS.compliance]} rows={callRows} colors={colors} />
+          <DataTable
+            columns={[COLUMNS.user, COLUMNS.sc, COLUMNS.tc, COLUMNS.pc, COLUMNS.compliance]}
+            rows={callRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="Coverage" colors={colors}>
-          <DataTable columns={[COLUMNS.user, COLUMNS.totalOutlets, COLUMNS.utc, COLUMNS.upc, COLUMNS.coverage]} rows={coverageRows} colors={colors} />
+          <DataTable
+            columns={[
+              COLUMNS.user,
+              COLUMNS.totalOutlets,
+              COLUMNS.utc,
+              COLUMNS.upc,
+              COLUMNS.coverage,
+            ]}
+            rows={coverageRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="KPI Performance" colors={colors}>
           <DataTable
-            columns={[COLUMNS.user, { ...COLUMNS.tc, highlight: true }, { ...COLUMNS.pc, highlight: true }, COLUMNS.sc, COLUMNS.orderQty]}
+            columns={[
+              COLUMNS.user,
+              { ...COLUMNS.tc, highlight: true },
+              { ...COLUMNS.pc, highlight: true },
+              COLUMNS.sc,
+              COLUMNS.orderQty,
+            ]}
             rows={kpiRows}
             colors={colors}
           />
@@ -324,11 +415,31 @@ export default function QuickVizUserPerformanceScreen() {
         </SectionCard>
 
         <SectionCard title="MBR data Test" colors={colors}>
-          <DataTable columns={[COLUMNS.user, COLUMNS.totalOutlets, COLUMNS.netValue, COLUMNS.newOutlets, COLUMNS.orderQty]} rows={mbrRows} colors={colors} />
+          <DataTable
+            columns={[
+              COLUMNS.user,
+              COLUMNS.totalOutlets,
+              COLUMNS.netValue,
+              COLUMNS.newOutlets,
+              COLUMNS.orderQty,
+            ]}
+            rows={mbrRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="TT" colors={colors}>
-          <DataTable columns={[COLUMNS.user, COLUMNS.totalOutlets, COLUMNS.newOutlets, COLUMNS.netValue, COLUMNS.orderQty]} rows={ttRows} colors={colors} />
+          <DataTable
+            columns={[
+              COLUMNS.user,
+              COLUMNS.totalOutlets,
+              COLUMNS.newOutlets,
+              COLUMNS.netValue,
+              COLUMNS.orderQty,
+            ]}
+            rows={ttRows}
+            colors={colors}
+          />
         </SectionCard>
 
         <SectionCard title="Brand wise contribution%" colors={colors}>

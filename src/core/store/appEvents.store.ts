@@ -7,7 +7,5 @@ type AppEventsState = {
 
 export const useAppEventsStore = create<AppEventsState>((set) => ({
   dashboardRefreshTick: 0,
-  bumpDashboardRefresh: () =>
-    set((s) => ({ dashboardRefreshTick: s.dashboardRefreshTick + 1 })),
+  bumpDashboardRefresh: () => set((s) => ({ dashboardRefreshTick: s.dashboardRefreshTick + 1 })),
 }));
-
